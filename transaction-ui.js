@@ -1,8 +1,7 @@
-/* BOLTIV TRANSACTION UI + API */
+/* BOLTIV API + TRANSACTION UI */
 
 const API_URL="https://boltiv-backend.onrender.com";
 
-/* API */
 const BoltivAPI={
     async request(endpoint,options={}){
         try{
@@ -19,13 +18,11 @@ const BoltivAPI={
             return{success:false,message:"Unable to connect to BOLTIV server"};
         }
     },
-
     async health(){
         return await this.request("/api/health");
     }
 };
 
-/* TRANSACTION UI */
 const BoltivTransaction={
     overlay:null,
 
@@ -38,7 +35,6 @@ const BoltivTransaction={
         const overlay=document.createElement("div");
         overlay.id="boltivTransactionOverlay";
         overlay.className="boltiv-transaction-overlay";
-
         overlay.innerHTML=`
             <div class="boltiv-transaction-card">
                 <div class="boltiv-transaction-icon" id="boltivTransactionIcon"></div>
@@ -52,7 +48,6 @@ const BoltivTransaction={
 
         document.body.appendChild(overlay);
         this.overlay=overlay;
-
         document.getElementById("boltivTransactionButton").addEventListener("click",()=>this.close());
     },
 
@@ -97,18 +92,33 @@ const BoltivTransaction={
 
     details(data){
         let html="";
+        if(data.service)html+=`<div class="transaction-detail"><span>Service</span><strong>${this.escape(data.service)}</strong></div>`;
+        if(data.amount)html+=`<div class="transaction-detail"><span>Amount</span><strong>${this.escape(data.amount)}</strong></div>`;
+        if(data.recipient)html+=`<div class="transaction-detail"><span>Recipient</span><strong>${this.escape(data.recipient)}</strong></div>`;
+        if(data.transactionId)html+=`<div class="transaction-detail"><span>Transaction ID</span><strong>${this.escape(data.transactionId)}</strong></div>`;
+        return html;
+    },
 
-        if(data.service){
-            html+=`<div class="transaction-detail"><span>Service</span><strong>${this.escape(data.service)}</strong></div>`;
-        }
+    close(){
+        if(this.overlay)this.overlay.classList.remove("show");
+    },
 
-        if(data.amount){
-            html+=`<div class="transaction-detail"><span>Amount</span><strong>${this.escape(data.amount)}</strong></div>`;
-        }
+    escape(value){
+        return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    }
+};
 
-        if(data.recipient){
-            html+=`<div class="transaction-detail"><span>Recipient</span><strong>${this.escape(data.recipient)}</strong></div>`;
-        }
+async function boltivBackendCheck(){
+    const result=await BoltivAPI.health();
+    if(result.success)console.log("BOLTIV BACKEND ONLINE",result);
+    else console.error("BOLTIV BACKEND OFFLINE",result);
+    return result;
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+    BoltivTransaction.init();
+    boltivBackendCheck();
+});        }
 
         if(data.transactionId){
             html+=`<div class="transaction-detail"><span>Transaction ID</span><strong>${this.escape(data.transactionId)}</strong></div>`;

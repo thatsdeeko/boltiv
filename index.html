@@ -47,6 +47,7 @@ button{font-family:inherit;cursor:pointer}
 </head>
 <body>
 <div class="page"><div class="container">
+
 <header class="home-header">
 <div>
 <div class="brand">BOLTIV</div>
@@ -64,48 +65,19 @@ button{font-family:inherit;cursor:pointer}
 <section class="services-section">
 <div class="section-title">PAY BILLS</div>
 <div class="services-grid">
-<button class="service-card" onclick="location.href='airtime.html'">
-<div class="service-icon">☎</div>
-<div class="service-name">Airtime</div>
-<div class="service-text">Buy airtime</div>
-</button>
-<button class="service-card" onclick="location.href='data.html'">
-<div class="service-icon">◉</div>
-<div class="service-name">Data</div>
-<div class="service-text">Buy data</div>
-</button>
-<button class="service-card" onclick="location.href='electricity.html'">
-<div class="service-icon">ϟ</div>
-<div class="service-name">Electricity</div>
-<div class="service-text">Pay electricity</div>
-</button>
-<button class="service-card" onclick="location.href='cable.html'">
-<div class="service-icon">▣</div>
-<div class="service-name">Cable TV</div>
-<div class="service-text">Pay TV subscription</div>
-</button>
+<button class="service-card" onclick="location.href='airtime.html'"><div class="service-icon">☎</div><div class="service-name">Airtime</div><div class="service-text">Buy airtime</div></button>
+<button class="service-card" onclick="location.href='data.html'"><div class="service-icon">◉</div><div class="service-name">Data</div><div class="service-text">Buy data</div></button>
+<button class="service-card" onclick="location.href='electricity.html'"><div class="service-icon">ϟ</div><div class="service-name">Electricity</div><div class="service-text">Pay electricity</div></button>
+<button class="service-card" onclick="location.href='cable.html'"><div class="service-icon">▣</div><div class="service-name">Cable TV</div><div class="service-text">Pay TV subscription</div></button>
 </div>
 </section>
 
 <section class="quick-section">
 <div class="section-title">QUICK ACCESS</div>
-<button class="quick-card" onclick="location.href='transactions.html'">
-<div class="quick-icon">↯</div>
-<div class="quick-info">
-<div class="quick-title">Transaction History</div>
-<div class="quick-text">Search and view your payments</div>
-</div>
-<div class="quick-arrow">›</div>
-</button>
-<button class="quick-card" onclick="location.href='profile.html'">
-<div class="quick-icon">◉</div>
-<div class="quick-info">
-<div class="quick-title">My Profile</div>
-<div class="quick-text">Manage your personal information</div>
-</div>
-<div class="quick-arrow">›</div>
-</button>
+<button class="quick-card" onclick="location.href='transactions.html'"><div class="quick-icon">↯</div><div class="quick-info"><div class="quick-title">Transaction History</div><div class="quick-text">Search and view your payments</div></div><div class="quick-arrow">›</div></button>
+<button class="quick-card" onclick="location.href='profile.html'"><div class="quick-icon">◉</div><div class="quick-info"><div class="quick-title">My Profile</div><div class="quick-text">Manage your personal information</div></div><div class="quick-arrow">›</div></button>
 </section>
+
 </div></div>
 
 <nav class="bottom-nav">
@@ -116,14 +88,17 @@ button{font-family:inherit;cursor:pointer}
 </nav>
 
 <script>
-function getUser(){
-try{return JSON.parse(localStorage.getItem("boltivUser")||"{}")||{}}
-catch(e){return{}}
+function getProfileName(){
+try{
+const user=JSON.parse(localStorage.getItem("boltivUser")||"{}");
+return String(user.name||user.fullName||user.firstName||"").trim();
+}catch(e){
+return"";
+}
 }
 
-function updateUserName(){
-const user=getUser();
-const name=(user.name||user.fullName||user.firstName||user.firstname||"").trim();
+function updateName(){
+const name=getProfileName();
 document.getElementById("userName").textContent=name?name.split(/\s+/)[0]:"";
 }
 
@@ -141,16 +116,17 @@ const balance=Number(localStorage.getItem("boltivWalletBalance")||0);
 document.getElementById("balance").textContent=balance.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
-function updateHome(){
+function refreshHome(){
+updateName();
 setGreeting();
-updateUserName();
 updateBalance();
 }
 
-updateHome();
-window.addEventListener("pageshow",updateHome);
-window.addEventListener("storage",updateHome);
-window.addEventListener("focus",updateHome);
+refreshHome();
+window.addEventListener("pageshow",refreshHome);
+window.addEventListener("focus",refreshHome);
+window.addEventListener("storage",refreshHome);
 </script>
+
 </body>
 </html>

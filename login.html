@@ -5,8 +5,7 @@
 <meta name="theme-color" content="#050505">
 <title>BOLTIV — Login</title>
 <link rel="stylesheet" href="style.css">
-</head>
-<body>
+</head><body>
 <div class="page">
 <div class="container"><div class="auth-page"><div class="auth-logo">BOLTIV</div>
 <div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div><div class="auth-card">
@@ -22,48 +21,59 @@ Login
 </button><div class="auth-links">
 <a href="register.html">Create Account</a>
 <a href="forgot-password.html">Forgot Password?</a>
-</div>
 </div></div>
+</div>
 </div>
 </div><script>
 const SESSION_KEY="boltivLoggedIn";
 
+function getStoredUser(){
+    try{
+        return JSON.parse(localStorage.getItem("boltivUser") || "null");
+    }catch(error){
+        return null;
+    }
+}
+
 document.getElementById("loginButton").onclick=()=>{
-const email=document.getElementById("emailInput").value.trim();
-const password=document.getElementById("passwordInput").value;
+    const email=document.getElementById("emailInput").value.trim();
+    const password=document.getElementById("passwordInput").value;
 
-if(!email){
-alert("Enter your email.");
-return;
-}
+    if(!email){
+        alert("Enter your email.");
+        return;
+    }
 
-if(!/^\S+@\S+\.\S+$/.test(email)){
-alert("Enter a valid email address.");
-return;
-}
+    if(!/^\S+@\S+\.\S+$/.test(email)){
+        alert("Enter a valid email address.");
+        return;
+    }
 
-if(!password){
-alert("Enter your password.");
-return;
-}
+    if(!password){
+        alert("Enter your password.");
+        return;
+    }
 
-const existingUser=JSON.parse(localStorage.getItem("boltivUser")||"null");
+    /*
+      Keep the existing BOLTIV user profile.
+      This prevents the login process from accidentally
+      replacing the user's saved name with an old value.
+    */
+    const existingUser=getStoredUser();
 
-const user={
-...(existingUser||{}),
-email:email
-};
+    if(existingUser){
+        existingUser.email=email;
+        localStorage.setItem("boltivUser",JSON.stringify(existingUser));
+    }else{
+        localStorage.setItem("boltivUser",JSON.stringify({
+            email:email
+        }));
+    }
 
-if(!user.firstName&&!user.firstname&&!user.name){
-user.firstName=email.split("@")[0];
-}
+    localStorage.setItem(SESSION_KEY,"true");
+    localStorage.setItem("boltivUserEmail",email);
 
-localStorage.setItem(SESSION_KEY,"true");
-localStorage.setItem("boltivUserEmail",email);
-localStorage.setItem("boltivUser",JSON.stringify(user));
-
-location.href="index.html";
+    location.href="index.html";
 };
 </script></body>
 </html>
-<!-- BOLTIV LOGIN END -->

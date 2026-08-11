@@ -19,6 +19,7 @@ const BoltivAPI={
             return{success:false,message:"Unable to connect to BOLTIV server"};
         }
     },
+
     async health(){
         return await this.request("/api/health");
     }
@@ -109,6 +110,45 @@ const BoltivTransaction={
             html+=`<div class="transaction-detail"><span>Recipient</span><strong>${this.escape(data.recipient)}</strong></div>`;
         }
 
+        if(data.transactionId){
+            html+=`<div class="transaction-detail"><span>Transaction ID</span><strong>${this.escape(data.transactionId)}</strong></div>`;
+        }
+
+        return html;
+    },
+
+    close(){
+        if(this.overlay)this.overlay.classList.remove("show");
+    },
+
+    escape(value){
+        return String(value)
+            .replace(/&/g,"&amp;")
+            .replace(/</g,"&lt;")
+            .replace(/>/g,"&gt;")
+            .replace(/"/g,"&quot;")
+            .replace(/'/g,"&#039;");
+    }
+};
+
+/* BACKEND CHECK */
+async function boltivBackendCheck(){
+    const result=await BoltivAPI.health();
+
+    if(result.success){
+        console.log("BOLTIV BACKEND ONLINE",result);
+    }else{
+        console.error("BOLTIV BACKEND OFFLINE",result);
+    }
+
+    return result;
+}
+
+/* START */
+document.addEventListener("DOMContentLoaded",()=>{
+    BoltivTransaction.init();
+    boltivBackendCheck();
+});
         if(data.transactionId){
             html+=`<div class="transaction-detail"><span>Transaction ID</span><strong>${this.escape(data.transactionId)}</strong></div>`;
         }

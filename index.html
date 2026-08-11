@@ -47,7 +47,6 @@ button{font-family:inherit;cursor:pointer}
 </head>
 <body>
 <div class="page"><div class="container">
-
 <header class="home-header">
 <div>
 <div class="brand">BOLTIV</div>
@@ -77,7 +76,6 @@ button{font-family:inherit;cursor:pointer}
 <button class="quick-card" onclick="location.href='transactions.html'"><div class="quick-icon">↯</div><div class="quick-info"><div class="quick-title">Transaction History</div><div class="quick-text">Search and view your payments</div></div><div class="quick-arrow">›</div></button>
 <button class="quick-card" onclick="location.href='profile.html'"><div class="quick-icon">◉</div><div class="quick-info"><div class="quick-title">My Profile</div><div class="quick-text">Manage your personal information</div></div><div class="quick-arrow">›</div></button>
 </section>
-
 </div></div>
 
 <nav class="bottom-nav">
@@ -91,10 +89,8 @@ button{font-family:inherit;cursor:pointer}
 function getProfileName(){
 try{
 const user=JSON.parse(localStorage.getItem("boltivUser")||"{}");
-return String(user.name||user.fullName||user.firstName||"").trim();
-}catch(e){
-return"";
-}
+return String(user.name||user.fullName||user.firstName||user.firstname||"").trim();
+}catch(e){return""}
 }
 
 function updateName(){
@@ -127,6 +123,6 @@ window.addEventListener("pageshow",refreshHome);
 window.addEventListener("focus",refreshHome);
 window.addEventListener("storage",refreshHome);
 </script>
-
 </body>
 </html>
+<!-- BOLTIV HOMEPAGE UPDATED - VERSION 2 -->

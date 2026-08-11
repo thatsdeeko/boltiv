@@ -47,7 +47,6 @@ button{font-family:inherit;cursor:pointer}
 </head>
 <body>
 <div class="page"><div class="container">
-
 <header class="home-header">
 <div>
 <div class="brand">BOLTIV</div>
@@ -65,37 +64,31 @@ button{font-family:inherit;cursor:pointer}
 <section class="services-section">
 <div class="section-title">PAY BILLS</div>
 <div class="services-grid">
-
 <button class="service-card" onclick="location.href='airtime.html'">
 <div class="service-icon">☎</div>
 <div class="service-name">Airtime</div>
 <div class="service-text">Buy airtime</div>
 </button>
-
 <button class="service-card" onclick="location.href='data.html'">
 <div class="service-icon">◉</div>
 <div class="service-name">Data</div>
 <div class="service-text">Buy data</div>
 </button>
-
 <button class="service-card" onclick="location.href='electricity.html'">
 <div class="service-icon">ϟ</div>
 <div class="service-name">Electricity</div>
 <div class="service-text">Pay electricity</div>
 </button>
-
 <button class="service-card" onclick="location.href='cable.html'">
 <div class="service-icon">▣</div>
 <div class="service-name">Cable TV</div>
 <div class="service-text">Pay TV subscription</div>
 </button>
-
 </div>
 </section>
 
 <section class="quick-section">
 <div class="section-title">QUICK ACCESS</div>
-
 <button class="quick-card" onclick="location.href='transactions.html'">
 <div class="quick-icon">↯</div>
 <div class="quick-info">
@@ -104,7 +97,6 @@ button{font-family:inherit;cursor:pointer}
 </div>
 <div class="quick-arrow">›</div>
 </button>
-
 <button class="quick-card" onclick="location.href='profile.html'">
 <div class="quick-icon">◉</div>
 <div class="quick-info">
@@ -113,7 +105,6 @@ button{font-family:inherit;cursor:pointer}
 </div>
 <div class="quick-arrow">›</div>
 </button>
-
 </section>
 </div></div>
 
@@ -125,18 +116,17 @@ button{font-family:inherit;cursor:pointer}
 </nav>
 
 <script>
-// User name
-function getUserName(){
-try{
-const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
-return(user?.firstName||user?.firstname||user?.name||"").trim();
-}catch(e){return""}
+function getUser(){
+try{return JSON.parse(localStorage.getItem("boltivUser")||"{}")||{}}
+catch(e){return{}}
 }
 
-const fullName=getUserName();
-document.getElementById("userName").textContent=fullName.split(/\s+/)[0];
+function updateUserName(){
+const user=getUser();
+const name=(user.name||user.fullName||user.firstName||user.firstname||"").trim();
+document.getElementById("userName").textContent=name?name.split(/\s+/)[0]:"";
+}
 
-// Time greeting
 function setGreeting(){
 const hour=new Date().getHours();
 let text="Good morning";
@@ -146,19 +136,21 @@ else if(hour>=21||hour<5)text="Good night";
 document.getElementById("greeting").textContent=text;
 }
 
-// Same balance key used by Wallet
 function updateBalance(){
 const balance=Number(localStorage.getItem("boltivWalletBalance")||0);
 document.getElementById("balance").textContent=balance.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
+function updateHome(){
 setGreeting();
+updateUserName();
 updateBalance();
+}
 
-// Refresh when returning from Wallet
-window.addEventListener("pageshow",updateBalance);
-window.addEventListener("storage",updateBalance);
+updateHome();
+window.addEventListener("pageshow",updateHome);
+window.addEventListener("storage",updateHome);
+window.addEventListener("focus",updateHome);
 </script>
-
 </body>
 </html>

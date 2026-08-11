@@ -1,79 +1,91 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#050505">
 <title>BOLTIV — Login</title>
 <link rel="stylesheet" href="style.css">
-</head><body>
-<div class="page">
-<div class="container"><div class="auth-page"><div class="auth-logo">BOLTIV</div>
-<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div><div class="auth-card">
+</head>
+<body>
+<div class="page"><div class="container"><div class="auth-page">
+<div class="auth-logo">BOLTIV</div>
+<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
+<div class="auth-card">
 <h1>Welcome Back</h1>
-<p class="auth-subtitle">Login to your BOLTIV account</p><div class="form-group">
+<p class="auth-subtitle">Login to your BOLTIV account</p>
+<div class="form-group">
 <label class="label">Email</label>
 <input class="input" id="emailInput" type="email" placeholder="you@example.com">
-</div><div class="form-group">
+</div>
+<div class="form-group">
 <label class="label">Password</label>
 <input class="input" id="passwordInput" type="password" placeholder="Enter password">
-</div><button class="btn btn-primary auth-btn" id="loginButton">
-Login
-</button><div class="auth-links">
+</div>
+<button class="btn btn-primary auth-btn" id="loginButton">Login</button>
+<div class="auth-links">
 <a href="register.html">Create Account</a>
 <a href="forgot-password.html">Forgot Password?</a>
-</div></div>
 </div>
 </div>
-</div><script>
+</div></div></div>
+
+<script>
+// LOGIN + USER ID
 const SESSION_KEY="boltivLoggedIn";
 
 function getStoredUser(){
-    try{
-        return JSON.parse(localStorage.getItem("boltivUser") || "null");
-    }catch(error){
-        return null;
-    }
+try{
+return JSON.parse(localStorage.getItem("boltivUser")||"null");
+}catch(error){
+return null;
+}
+}
+
+function createUserId(){
+if(window.crypto&&crypto.randomUUID)return"BOLTIV-"+crypto.randomUUID();
+return"BOLTIV-"+Date.now()+"-"+Math.random().toString(36).slice(2,10);
 }
 
 document.getElementById("loginButton").onclick=()=>{
-    const email=document.getElementById("emailInput").value.trim();
-    const password=document.getElementById("passwordInput").value;
+const email=document.getElementById("emailInput").value.trim();
+const password=document.getElementById("passwordInput").value;
 
-    if(!email){
-        alert("Enter your email.");
-        return;
-    }
+if(!email){
+alert("Enter your email.");
+return;
+}
 
-    if(!/^\S+@\S+\.\S+$/.test(email)){
-        alert("Enter a valid email address.");
-        return;
-    }
+if(!/^\S+@\S+\.\S+$/.test(email)){
+alert("Enter a valid email address.");
+return;
+}
 
-    if(!password){
-        alert("Enter your password.");
-        return;
-    }
+if(!password){
+alert("Enter your password.");
+return;
+}
 
-    /*
-      Keep the existing BOLTIV user profile.
-      This prevents the login process from accidentally
-      replacing the user's saved name with an old value.
-    */
-    const existingUser=getStoredUser();
+// Preserve the existing BOLTIV profile.
+const existingUser=getStoredUser();
+const user=existingUser||{};
 
-    if(existingUser){
-        existingUser.email=email;
-        localStorage.setItem("boltivUser",JSON.stringify(existingUser));
-    }else{
-        localStorage.setItem("boltivUser",JSON.stringify({
-            email:email
-        }));
-    }
+user.email=email;
 
-    localStorage.setItem(SESSION_KEY,"true");
-    localStorage.setItem("boltivUserEmail",email);
+// Create an ID only if this account does not already have one.
+if(!user.id&&!user.userId){
+user.id=createUserId();
+user.userId=user.id;
+}
 
-    location.href="index.html";
+localStorage.setItem("boltivUser",JSON.stringify(user));
+localStorage.setItem(SESSION_KEY,"true");
+localStorage.setItem("boltivUserEmail",email);
+
+location.href="index.html";
 };
-</script></body>
+
+// END LOGIN
+</script>
+</body>
 </html>

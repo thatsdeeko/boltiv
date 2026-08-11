@@ -8,19 +8,13 @@ const PORT=process.env.PORT||3000;
 const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
 const FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv";
 const DATABASE_URL=process.env.DATABASE_URL||"";
+const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
+const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
-const pool=new Pool({
-    connectionString:DATABASE_URL,
-    ssl:DATABASE_URL?{rejectUnauthorized:false}:false
-});
+const pool=new Pool({connectionString:DATABASE_URL,ssl:DATABASE_URL?{rejectUnauthorized:false}:false});
 
 function send(res,status,data){
-    res.writeHead(status,{
-        "Content-Type":"application/json",
-        "Access-Control-Allow-Origin":"*",
-        "Access-Control-Allow-Methods":"GET,POST,OPTIONS",
-        "Access-Control-Allow-Headers":"Content-Type,Authorization"
-    });
+    res.writeHead(status,{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization"});
     res.end(JSON.stringify(data));
 }
 
@@ -30,19 +24,16 @@ async function readBody(req){
         req.on("data",chunk=>body+=chunk);
         req.on("end",()=>{
             try{resolve(body?JSON.parse(body):{});}
-            catch(error){reject(error);}
+            catch(e){reject(e);}
         });
         req.on("error",reject);
     });
 }
 
-async function db(query,params=[]){
-    return await pool.query(query,params);
-}
+async function db(query,params=[]){return await pool.query(query,params);}
 
 function hashPassword(password,salt=crypto.randomBytes(16).toString("hex")){
-    const hash=crypto.scryptSync(password,salt,64).toString("hex");
-    return`${salt}:${hash}`;
+    return `${salt}:${crypto.scryptSync(password,salt,64).toString("hex")}`;
 }
 
 function verifyPassword(password,stored){
@@ -50,14 +41,13 @@ function verifyPassword(password,stored){
         const [salt,key]=stored.split(":");
         const hash=crypto.scryptSync(password,salt,64).toString("hex");
         return crypto.timingSafeEqual(Buffer.from(hash,"hex"),Buffer.from(key,"hex"));
-    }catch{
-        return false;
-    }
+    }catch{return false;}
 }
 
-function createToken(){
-    return crypto.randomBytes(32).toString("hex");
-}
+function createToken(){return crypto.randomBytes(32).toString("hex");}
+function createReference(){return `BOLTIV-${Date.now()}-${crypto.randomBytes(5).toString("hex")}`;}
+
+/* DATABASE */
 
 async function initializeDatabase(){
     if(!DATABASE_URL){
@@ -65,119 +55,95 @@ async function initializeDatabase(){
         return;
     }
 
-    await db(`
-        CREATE TABLE IF NOT EXISTS wallets(
-            user_id TEXT PRIMARY KEY,
-            balance NUMERIC(14,2) NOT NULL DEFAULT 0,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-    `);
+    await db(`CREATE TABLE IF NOT EXISTS wallets(
+        user_id TEXT PRIMARY KEY,
+        balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
 
-    await db(`
-        CREATE TABLE IF NOT EXISTS transactions(
-            id BIGSERIAL PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            type TEXT NOT NULL,
-            service TEXT NOT NULL,
-            amount NUMERIC(14,2) NOT NULL,
-            reference TEXT UNIQUE,
-            status TEXT NOT NULL,
-            date TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-    `);
+    await db(`CREATE TABLE IF NOT EXISTS transactions(
+        id BIGSERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        service TEXT NOT NULL,
+        amount NUMERIC(14,2) NOT NULL,
+        reference TEXT UNIQUE,
+        status TEXT NOT NULL,
+        date TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
 
-    await db(`
-        CREATE TABLE IF NOT EXISTS payments(
-            reference TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            email TEXT NOT NULL,
-            amount NUMERIC(14,2) NOT NULL,
-            amount_kobo BIGINT NOT NULL,
-            status TEXT NOT NULL,
-            credited BOOLEAN NOT NULL DEFAULT FALSE,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            credited_at TIMESTAMPTZ
-        )
-    `);
+    await db(`CREATE TABLE IF NOT EXISTS payments(
+        reference TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        amount NUMERIC(14,2) NOT NULL,
+        amount_kobo BIGINT NOT NULL,
+        status TEXT NOT NULL,
+        credited BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        credited_at TIMESTAMPTZ
+    )`);
 
-    await db(`
-        CREATE TABLE IF NOT EXISTS admins(
-            id BIGSERIAL PRIMARY KEY,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-    `);
+    await db(`CREATE TABLE IF NOT EXISTS admins(
+        id BIGSERIAL PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
 
-    await db(`
-        CREATE TABLE IF NOT EXISTS admin_sessions(
-            token TEXT PRIMARY KEY,
-            admin_id BIGINT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            expires_at TIMESTAMPTZ NOT NULL
-        )
-    `);
+    await db(`CREATE TABLE IF NOT EXISTS admin_sessions(
+        token TEXT PRIMARY KEY,
+        admin_id BIGINT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL
+    )`);
+
+    if(ADMIN_EMAIL&&ADMIN_PASSWORD){
+        const existing=await db(`SELECT id FROM admins WHERE LOWER(email)=LOWER($1)`,[ADMIN_EMAIL]);
+
+        if(!existing.rows.length){
+            await db(`INSERT INTO admins(email,password_hash) VALUES($1,$2)`,[ADMIN_EMAIL,hashPassword(ADMIN_PASSWORD)]);
+            console.log("Admin account created.");
+        }
+    }
 
     console.log("PostgreSQL database ready.");
 }
 
+/* WALLET */
+
 async function createWallet(userId){
-    await db(`
-        INSERT INTO wallets(user_id,balance)
-        VALUES($1,0)
-        ON CONFLICT(user_id) DO NOTHING
-    `,[userId]);
+    await db(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
 }
 
 async function getWallet(userId){
-    const result=await db(`
-        SELECT user_id,balance FROM wallets WHERE user_id=$1
-    `,[userId]);
-
+    const result=await db(`SELECT user_id,balance FROM wallets WHERE user_id=$1`,[userId]);
     if(!result.rows.length)return null;
-
-    return{
-        userId:result.rows[0].user_id,
-        balance:Number(result.rows[0].balance)
-    };
+    return{userId:result.rows[0].user_id,balance:Number(result.rows[0].balance)};
 }
 
 async function getTransactions(userId){
-    const result=await db(`
-        SELECT type,service,amount,reference,status,date
-        FROM transactions
-        WHERE user_id=$1
-        ORDER BY date DESC
-    `,[userId]);
-
+    const result=await db(`SELECT type,service,amount,reference,status,date FROM transactions WHERE user_id=$1 ORDER BY date DESC`,[userId]);
     return result.rows.map(x=>({...x,amount:Number(x.amount)}));
 }
 
-function createReference(){
-    return`BOLTIV-${Date.now()}-${crypto.randomBytes(5).toString("hex")}`;
-}
+/* PAYSTACK */
 
 async function paystackRequest(endpoint,options={}){
     const response=await fetch(`https://api.paystack.co${endpoint}`,{
         ...options,
         headers:{
-            "Authorization":`Bearer ${PAYSTACK_SECRET_KEY}`,
+            Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,
             "Content-Type":"application/json",
             ...(options.headers||{})
         }
     });
-
     return{httpStatus:response.status,data:await response.json()};
 }
 
-/* PAYSTACK */
-
 async function initializePayment({userId,email,amount}){
-    if(!PAYSTACK_SECRET_KEY)return{
-        success:false,
-        message:"Paystack is not configured on the server."
-    };
+    if(!PAYSTACK_SECRET_KEY)return{success:false,message:"Paystack is not configured on the server."};
 
     const reference=createReference();
 
@@ -193,15 +159,10 @@ async function initializePayment({userId,email,amount}){
         })
     });
 
-    if(!result.data.status)return{
-        success:false,
-        message:result.data.message||"Unable to initialize Paystack payment."
-    };
+    if(!result.data.status)return{success:false,message:result.data.message||"Unable to initialize Paystack payment."};
 
-    await db(`
-        INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited)
-        VALUES($1,$2,$3,$4,$5,$6,$7)
-    `,[reference,userId,email,amount,Math.round(amount*100),"initialized",false]);
+    await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+        [reference,userId,email,amount,Math.round(amount*100),"initialized",false]);
 
     return{
         success:true,
@@ -213,97 +174,50 @@ async function initializePayment({userId,email,amount}){
 }
 
 async function verifyPayment(reference){
-    if(!PAYSTACK_SECRET_KEY)return{
-        success:false,
-        message:"Paystack is not configured on the server."
-    };
+    if(!PAYSTACK_SECRET_KEY)return{success:false,message:"Paystack is not configured on the server."};
 
-    const paymentResult=await db(`
-        SELECT reference,user_id,email,amount,amount_kobo,status,credited
-        FROM payments WHERE reference=$1
-    `,[reference]);
+    const paymentResult=await db(`SELECT reference,user_id,email,amount,amount_kobo,status,credited FROM payments WHERE reference=$1`,[reference]);
 
-    if(!paymentResult.rows.length)return{
-        success:false,
-        message:"Payment reference not found."
-    };
+    if(!paymentResult.rows.length)return{success:false,message:"Payment reference not found."};
 
     const payment=paymentResult.rows[0];
 
     if(payment.credited){
         const wallet=await getWallet(payment.user_id);
-        return{
-            success:true,
-            alreadyCredited:true,
-            message:"Payment was already credited.",
-            reference,
-            balance:wallet?wallet.balance:0
-        };
+        return{success:true,alreadyCredited:true,message:"Payment was already credited.",reference,balance:wallet?wallet.balance:0};
     }
 
-    const result=await paystackRequest(
-        `/transaction/verify/${encodeURIComponent(reference)}`,
-        {method:"GET"}
-    );
+    const result=await paystackRequest(`/transaction/verify/${encodeURIComponent(reference)}`,{method:"GET"});
 
-    if(!result.data.status)return{
-        success:false,
-        message:result.data.message||"Unable to verify payment."
-    };
+    if(!result.data.status)return{success:false,message:result.data.message||"Unable to verify payment."};
 
     const transaction=result.data.data;
 
     if(transaction.status!=="success"){
-        await db(`
-            UPDATE payments SET status=$1 WHERE reference=$2
-        `,[transaction.status,reference]);
-
-        return{
-            success:false,
-            message:`Payment status: ${transaction.status}`,
-            status:transaction.status
-        };
+        await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[transaction.status,reference]);
+        return{success:false,message:`Payment status: ${transaction.status}`,status:transaction.status};
     }
 
-    if(transaction.currency!=="NGN")return{
-        success:false,
-        message:"Invalid payment currency."
-    };
+    if(transaction.currency!=="NGN")return{success:false,message:"Invalid payment currency."};
 
-    if(Number(transaction.amount)!==Number(payment.amount_kobo))return{
-        success:false,
-        message:"Payment amount does not match wallet funding amount."
-    };
+    if(Number(transaction.amount)!==Number(payment.amount_kobo)){
+        return{success:false,message:"Payment amount does not match wallet funding amount."};
+    }
 
     const client=await pool.connect();
 
     try{
         await client.query("BEGIN");
 
-        await client.query(`
-            INSERT INTO wallets(user_id,balance)
-            VALUES($1,0)
-            ON CONFLICT(user_id) DO NOTHING
-        `,[payment.user_id]);
+        await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[payment.user_id]);
 
-        const walletResult=await client.query(`
-            UPDATE wallets
-            SET balance=balance+$1,updated_at=NOW()
-            WHERE user_id=$2
-            RETURNING balance
-        `,[Number(payment.amount),payment.user_id]);
+        const walletResult=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,
+            [Number(payment.amount),payment.user_id]);
 
-        await client.query(`
-            INSERT INTO transactions(user_id,type,service,amount,reference,status)
-            VALUES($1,$2,$3,$4,$5,$6)
-            ON CONFLICT(reference) DO NOTHING
-        `,[payment.user_id,"credit","Wallet Funding",Number(payment.amount),reference,"successful"]);
+        await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(reference) DO NOTHING`,
+            [payment.user_id,"credit","Wallet Funding",Number(payment.amount),reference,"successful"]);
 
-        await client.query(`
-            UPDATE payments
-            SET status='success',credited=TRUE,credited_at=NOW()
-            WHERE reference=$1
-        `,[reference]);
+        await client.query(`UPDATE payments SET status='success',credited=TRUE,credited_at=NOW() WHERE reference=$1`,[reference]);
 
         await client.query("COMMIT");
 
@@ -317,9 +231,7 @@ async function verifyPayment(reference){
     }catch(error){
         await client.query("ROLLBACK");
         throw error;
-    }finally{
-        client.release();
-    }
+    }finally{client.release();}
 }
 
 /* ADMIN */
@@ -331,50 +243,31 @@ async function adminAuth(req){
     const token=header.slice(7).trim();
     if(!token)return null;
 
-    const result=await db(`
-        SELECT a.id,a.email
-        FROM admin_sessions s
-        JOIN admins a ON a.id=s.admin_id
-        WHERE s.token=$1 AND s.expires_at>NOW()
-    `,[token]);
+    const result=await db(`SELECT a.id,a.email FROM admin_sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=$1 AND s.expires_at>NOW()`,[token]);
 
     return result.rows[0]||null;
 }
 
 async function adminLogin(email,password){
-    const result=await db(`
-        SELECT id,email,password_hash
-        FROM admins
-        WHERE LOWER(email)=LOWER($1)
-    `,[email]);
+    const result=await db(`SELECT id,email,password_hash FROM admins WHERE LOWER(email)=LOWER($1)`,[email]);
 
-    if(!result.rows.length)return{
-        success:false,
-        message:"Invalid admin credentials."
-    };
+    if(!result.rows.length)return{success:false,message:"Invalid admin credentials."};
 
     const admin=result.rows[0];
 
-    if(!verifyPassword(password,admin.password_hash))return{
-        success:false,
-        message:"Invalid admin credentials."
-    };
+    if(!verifyPassword(password,admin.password_hash)){
+        return{success:false,message:"Invalid admin credentials."};
+    }
 
     const token=createToken();
 
-    await db(`
-        INSERT INTO admin_sessions(token,admin_id,expires_at)
-        VALUES($1,$2,NOW()+INTERVAL '24 hours')
-    `,[token,admin.id]);
+    await db(`INSERT INTO admin_sessions(token,admin_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '24 hours')`,[token,admin.id]);
 
     return{
         success:true,
         message:"Admin login successful.",
         token,
-        admin:{
-            id:admin.id,
-            email:admin.email
-        }
+        admin:{id:admin.id,email:admin.email}
     };
 }
 
@@ -394,6 +287,7 @@ const server=http.createServer(async(req,res)=>{
     const path=url.pathname;
 
     /* HEALTH */
+
     if(req.method==="GET"&&path==="/api/health"){
         return send(res,200,{
             success:true,
@@ -401,55 +295,41 @@ const server=http.createServer(async(req,res)=>{
             status:"online",
             paystack:PAYSTACK_SECRET_KEY?"configured":"not configured",
             database:DATABASE_URL?"configured":"not configured",
+            admin:ADMIN_EMAIL?"configured":"not configured",
             message:"BOLTIV backend is running"
         });
     }
 
-    /* WALLET CREATE */
+    /* CREATE WALLET */
+
     if(req.method==="POST"&&path==="/api/wallet/create"){
         try{
             const body=await readBody(req);
             const userId=String(body.userId||"").trim();
 
-            if(!userId)return send(res,400,{
-                success:false,
-                message:"User ID is required"
-            });
+            if(!userId)return send(res,400,{success:false,message:"User ID is required"});
 
             await createWallet(userId);
             const wallet=await getWallet(userId);
 
-            return send(res,200,{
-                success:true,
-                message:"Wallet ready",
-                userId,
-                balance:wallet.balance
-            });
+            return send(res,200,{success:true,message:"Wallet ready",userId,balance:wallet.balance});
         }catch(error){
             console.error("CREATE WALLET ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to create wallet."
-            });
+            return send(res,500,{success:false,message:"Unable to create wallet."});
         }
     }
 
-    /* WALLET GET */
+    /* GET WALLET */
+
     if(req.method==="GET"&&path==="/api/wallet"){
         try{
             const userId=url.searchParams.get("userId");
 
-            if(!userId)return send(res,400,{
-                success:false,
-                message:"User ID is required"
-            });
+            if(!userId)return send(res,400,{success:false,message:"User ID is required"});
 
             const wallet=await getWallet(userId);
 
-            if(!wallet)return send(res,404,{
-                success:false,
-                message:"Wallet not found"
-            });
+            if(!wallet)return send(res,404,{success:false,message:"Wallet not found"});
 
             return send(res,200,{
                 success:true,
@@ -459,14 +339,12 @@ const server=http.createServer(async(req,res)=>{
             });
         }catch(error){
             console.error("GET WALLET ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to load wallet."
-            });
+            return send(res,500,{success:false,message:"Unable to load wallet."});
         }
     }
 
-    /* WALLET FUND */
+    /* FUND WALLET */
+
     if(req.method==="POST"&&path==="/api/wallet/fund"){
         try{
             const body=await readBody(req);
@@ -474,20 +352,9 @@ const server=http.createServer(async(req,res)=>{
             const email=String(body.email||"").trim();
             const amount=Number(body.amount);
 
-            if(!userId)return send(res,400,{
-                success:false,
-                message:"User ID is required"
-            });
-
-            if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return send(res,400,{
-                success:false,
-                message:"A valid email is required"
-            });
-
-            if(!Number.isFinite(amount)||amount<100)return send(res,400,{
-                success:false,
-                message:"Minimum wallet funding amount is ₦100."
-            });
+            if(!userId)return send(res,400,{success:false,message:"User ID is required"});
+            if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return send(res,400,{success:false,message:"A valid email is required"});
+            if(!Number.isFinite(amount)||amount<100)return send(res,400,{success:false,message:"Minimum wallet funding amount is ₦100."});
 
             await createWallet(userId);
 
@@ -495,106 +362,68 @@ const server=http.createServer(async(req,res)=>{
             return send(res,result.success?200:400,result);
         }catch(error){
             console.error("PAYSTACK INITIALIZE ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to initialize payment."
-            });
+            return send(res,500,{success:false,message:"Unable to initialize payment."});
         }
     }
 
-    /* WALLET VERIFY */
+    /* VERIFY PAYMENT */
+
     if(req.method==="GET"&&path==="/api/wallet/verify"){
         try{
             const reference=url.searchParams.get("reference");
 
-            if(!reference)return send(res,400,{
-                success:false,
-                message:"Payment reference is required."
-            });
+            if(!reference)return send(res,400,{success:false,message:"Payment reference is required."});
 
             const result=await verifyPayment(reference);
             return send(res,result.success?200:400,result);
         }catch(error){
             console.error("PAYSTACK VERIFY ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to verify payment."
-            });
+            return send(res,500,{success:false,message:"Unable to verify payment."});
         }
     }
 
     /* ADMIN LOGIN */
+
     if(req.method==="POST"&&path==="/api/admin/login"){
         try{
             const body=await readBody(req);
             const email=String(body.email||"").trim();
             const password=String(body.password||"");
 
-            if(!email||!password)return send(res,400,{
-                success:false,
-                message:"Email and password are required."
-            });
+            if(!email||!password)return send(res,400,{success:false,message:"Email and password are required."});
 
             const result=await adminLogin(email,password);
             return send(res,result.success?200:401,result);
         }catch(error){
             console.error("ADMIN LOGIN ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to login."
-            });
+            return send(res,500,{success:false,message:"Unable to login."});
         }
     }
 
-    /* ADMIN ME */
+    /* ADMIN SESSION */
+
     if(req.method==="GET"&&path==="/api/admin/me"){
         try{
             const admin=await adminAuth(req);
 
-            if(!admin)return send(res,401,{
-                success:false,
-                message:"Unauthorized."
-            });
+            if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
 
-            return send(res,200,{
-                success:true,
-                admin
-            });
+            return send(res,200,{success:true,admin});
         }catch(error){
-            return send(res,500,{
-                success:false,
-                message:"Unable to verify admin session."
-            });
+            return send(res,500,{success:false,message:"Unable to verify admin session."});
         }
     }
 
     /* ADMIN STATS */
+
     if(req.method==="GET"&&path==="/api/admin/stats"){
         try{
             const admin=await adminAuth(req);
+            if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
 
-            if(!admin)return send(res,401,{
-                success:false,
-                message:"Unauthorized."
-            });
-
-            const wallets=await db(`
-                SELECT COUNT(*)::int AS count,
-                COALESCE(SUM(balance),0) AS balance
-                FROM wallets
-            `);
-
-            const transactions=await db(`
-                SELECT COUNT(*)::int AS count
-                FROM transactions
-            `);
-
-            const payments=await db(`
-                SELECT
-                    COUNT(*)::int AS count,
-                    COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) AS successful
-                FROM payments
-            `);
+            const wallets=await db(`SELECT COUNT(*)::int AS count,COALESCE(SUM(balance),0) AS balance FROM wallets`);
+            const transactions=await db(`SELECT COUNT(*)::int AS count FROM transactions`);
+            const payments=await db(`SELECT COUNT(*)::int AS count,COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) AS successful FROM payments`);
 
             return send(res,200,{
                 success:true,
@@ -608,89 +437,101 @@ const server=http.createServer(async(req,res)=>{
             });
         }catch(error){
             console.error("ADMIN STATS ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to load admin statistics."
+            return send(res,500,{success:false,message:"Unable to load admin statistics."});
+        }
+    }
+
+    /* ADMIN USERS */
+
+    if(req.method==="GET"&&path==="/api/admin/users"){
+        try{
+            const admin=await adminAuth(req);
+            if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+
+            const result=await db(`SELECT user_id,balance,created_at,updated_at FROM wallets ORDER BY created_at DESC LIMIT 100`);
+
+            return send(res,200,{
+                success:true,
+                users:result.rows.map(x=>({...x,balance:Number(x.balance)}))
             });
+        }catch(error){
+            console.error("ADMIN USERS ERROR:",error);
+            return send(res,500,{success:false,message:"Unable to load users."});
         }
     }
 
     /* ADMIN TRANSACTIONS */
+
     if(req.method==="GET"&&path==="/api/admin/transactions"){
         try{
             const admin=await adminAuth(req);
+            if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
 
-            if(!admin)return send(res,401,{
-                success:false,
-                message:"Unauthorized."
-            });
-
-            const result=await db(`
-                SELECT
-                    id,user_id,type,service,amount,reference,status,date
-                FROM transactions
-                ORDER BY date DESC
-                LIMIT 100
-            `);
+            const result=await db(`SELECT id,user_id,type,service,amount,reference,status,date FROM transactions ORDER BY date DESC LIMIT 100`);
 
             return send(res,200,{
                 success:true,
-                transactions:result.rows.map(x=>({
+                transactions:result.rows.map(x=>({...x,amount:Number(x.amount)}))
+            });
+        }catch(error){
+            console.error("ADMIN TRANSACTIONS ERROR:",error);
+            return send(res,500,{success:false,message:"Unable to load transactions."});
+        }
+    }
+
+    /* ADMIN PAYMENTS */
+
+    if(req.method==="GET"&&path==="/api/admin/payments"){
+        try{
+            const admin=await adminAuth(req);
+            if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+
+            const result=await db(`SELECT reference,user_id,email,amount,status,credited,created_at,credited_at FROM payments ORDER BY created_at DESC LIMIT 100`);
+
+            return send(res,200,{
+                success:true,
+                payments:result.rows.map(x=>({
                     ...x,
                     amount:Number(x.amount)
                 }))
             });
         }catch(error){
-            console.error("ADMIN TRANSACTIONS ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to load transactions."
-            });
+            console.error("ADMIN PAYMENTS ERROR:",error);
+            return send(res,500,{success:false,message:"Unable to load payments."});
         }
     }
 
-    /* ADMIN USERS */
-    if(req.method==="GET"&&path==="/api/admin/users"){
+    /* ADMIN LOGOUT */
+
+    if(req.method==="POST"&&path==="/api/admin/logout"){
         try{
-            const admin=await adminAuth(req);
+            const header=req.headers.authorization||"";
 
-            if(!admin)return send(res,401,{
-                success:false,
-                message:"Unauthorized."
-            });
+            if(header.startsWith("Bearer ")){
+                const token=header.slice(7).trim();
+                if(token)await db(`DELETE FROM admin_sessions WHERE token=$1`,[token]);
+            }
 
-            const result=await db(`
-                SELECT user_id,balance,created_at,updated_at
-                FROM wallets
-                ORDER BY created_at DESC
-                LIMIT 100
-            `);
-
-            return send(res,200,{
-                success:true,
-                users:result.rows.map(x=>({
-                    ...x,
-                    balance:Number(x.balance)
-                }))
-            });
+            return send(res,200,{success:true,message:"Admin logged out."});
         }catch(error){
-            console.error("ADMIN USERS ERROR:",error);
-            return send(res,500,{
-                success:false,
-                message:"Unable to load users."
-            });
+            return send(res,500,{success:false,message:"Unable to logout."});
         }
     }
 
-    /* ADMIN PAYMENTS */
-    if(req.method==="GET"&&path==="/api/admin/payments"){
-        try{
-            const admin=await adminAuth(req);
+    /* 404 */
 
-            if(!admin)return send(res,401,{
-                success:false,
-                message:"Unauthorized."
-            });
+    return send(res,404,{success:false,message:"API route not found"});
+});
 
-            const result=await db(`
-                SELECT reference,user_id,email,amount,status,credited,created_at,c
+/* START SERVER */
+
+initializeDatabase().then(()=>{
+    server.listen(PORT,"0.0.0.0",()=>{
+        console.log(`BOLTIV API running on port ${PORT}`);
+    });
+}).catch(error=>{
+    console.error("DATABASE STARTUP ERROR:",error);
+    process.exit(1);
+});
+
+/* END OF BOLTIV BACKEND */

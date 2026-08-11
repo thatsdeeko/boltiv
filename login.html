@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -9,42 +8,24 @@
 </head>
 <body>
 <div class="page">
-<div class="container">
-
-<div class="auth-page">
-
-<div class="auth-logo">BOLTIV</div>
-<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
-
-<div class="auth-card">
+<div class="container"><div class="auth-page"><div class="auth-logo">BOLTIV</div>
+<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div><div class="auth-card">
 <h1>Welcome Back</h1>
-<p class="auth-subtitle">Login to your BOLTIV account</p>
-
-<div class="form-group">
+<p class="auth-subtitle">Login to your BOLTIV account</p><div class="form-group">
 <label class="label">Email</label>
 <input class="input" id="emailInput" type="email" placeholder="you@example.com">
-</div>
-
-<div class="form-group">
+</div><div class="form-group">
 <label class="label">Password</label>
 <input class="input" id="passwordInput" type="password" placeholder="Enter password">
-</div>
-
-<button class="btn btn-primary auth-btn" id="loginButton">
+</div><button class="btn btn-primary auth-btn" id="loginButton">
 Login
-</button>
-
-<div class="auth-links">
+</button><div class="auth-links">
 <a href="register.html">Create Account</a>
 <a href="forgot-password.html">Forgot Password?</a>
 </div>
+</div></div>
 </div>
-
-</div>
-</div>
-</div>
-
-<script>
+</div><script>
 const SESSION_KEY="boltivLoggedIn";
 
 document.getElementById("loginButton").onclick=()=>{
@@ -66,12 +47,23 @@ alert("Enter your password.");
 return;
 }
 
+const existingUser=JSON.parse(localStorage.getItem("boltivUser")||"null");
+
+const user={
+...(existingUser||{}),
+email:email
+};
+
+if(!user.firstName&&!user.firstname&&!user.name){
+user.firstName=email.split("@")[0];
+}
+
 localStorage.setItem(SESSION_KEY,"true");
 localStorage.setItem("boltivUserEmail",email);
+localStorage.setItem("boltivUser",JSON.stringify(user));
 
 location.href="index.html";
 };
-</script>
-
-</body>
+</script></body>
 </html>
+<!-- BOLTIV LOGIN END -->

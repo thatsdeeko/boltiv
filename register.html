@@ -1,0 +1,149 @@
+<!DOCTYPE html><html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#050505">
+<title>BOLTIV — Create Account</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* AUTH */
+.auth-page{min-height:100vh;padding:35px 0 40px}
+.auth-logo{text-align:center;color:#d4af37;font-size:30px;font-weight:1000;letter-spacing:4px}
+.auth-tagline{text-align:center;color:#555;font-size:7px;letter-spacing:2px;margin-top:4px}
+.auth-card{margin-top:28px;padding:22px;border:1px solid #292929;border-radius:22px;background:linear-gradient(145deg,#151515,#090909);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.auth-card h1{margin:0;color:#fff;font-size:21px;font-weight:1000}
+.auth-subtitle{margin:6px 0 22px;color:#666;font-size:9px}
+.form-group{margin-bottom:15px}
+.auth-btn{width:100%;height:48px;margin-top:5px}
+.auth-links{display:flex;justify-content:center;gap:15px;margin-top:18px;font-size:8px}
+.auth-links a{color:#777}
+.auth-links a:first-child{color:#d4af37}/* SUCCESS MODAL */
+.boltiv-success-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.88);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.3s ease}
+.boltiv-success-overlay.show{opacity:1;visibility:visible}
+.boltiv-success-card{width:100%;max-width:390px;padding:30px 22px 24px;border:1px solid #d4af37;border-radius:26px;background:linear-gradient(145deg,#181818,#080808);box-shadow:0 30px 90px rgba(0,0,0,.8);text-align:center;transform:translateY(25px) scale(.94);transition:.3s ease}
+.boltiv-success-overlay.show .boltiv-success-card{transform:translateY(0) scale(1)}
+.success-ring{width:70px;height:70px;margin:0 auto 17px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid #d4af37;background:#17140b;color:#d4af37;font-size:32px;font-weight:1000;box-shadow:0 0 35px rgba(212,175,55,.15);animation:boltivSuccessPop .5s ease}
+@keyframes boltivSuccessPop{0%{transform:scale(.5);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+.success-label{color:#d4af37;font-size:7px;font-weight:1000;letter-spacing:2px;margin-bottom:7px}
+.boltiv-success-card h2{margin:0;color:#fff;font-size:22px;font-weight:1000}
+.success-message{margin:9px auto 0;max-width:290px;color:#777;font-size:9px;line-height:1.7}
+.success-user{margin-top:17px;padding:11px;border:1px solid #292929;border-radius:12px;background:#0d0d0d;color:#d4af37;font-size:9px;font-weight:900}
+.boltiv-success-btn{width:100%;margin-top:16px;padding:14px;border:0;border-radius:13px;background:linear-gradient(135deg,#d4af37,#a78320);color:#050505;font-size:9px;font-weight:1000;letter-spacing:.5px}
+.boltiv-success-btn:active{transform:scale(.98)}
+</style>
+
+</head><body>
+<div class="page">
+<div class="container">
+<div class="auth-page"><div class="auth-logo">BOLTIV</div>
+<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div><div class="auth-card">
+<h1>Create Account</h1>
+<p class="auth-subtitle">Join BOLTIV and manage your digital services</p><div class="form-group">
+<label class="label">FULL NAME</label>
+<input class="input" id="nameInput" type="text" autocomplete="name" placeholder="Enter your full name">
+</div><div class="form-group">
+<label class="label">PHONE NUMBER</label>
+<input class="input" id="phoneInput" type="tel" inputmode="tel" autocomplete="tel" placeholder="Enter phone number">
+</div><div class="form-group">
+<label class="label">EMAIL ADDRESS</label>
+<input class="input" id="emailInput" type="email" autocomplete="email" placeholder="you@example.com">
+</div><div class="form-group">
+<label class="label">PASSWORD</label>
+<input class="input" id="passwordInput" type="password" autocomplete="new-password" placeholder="Create a password">
+</div><div class="form-group">
+<label class="label">CONFIRM PASSWORD</label>
+<input class="input" id="confirmPasswordInput" type="password" autocomplete="new-password" placeholder="Confirm your password">
+</div><button class="btn btn-primary auth-btn" id="registerButton">Create Account</button>
+
+<div class="auth-links">
+<a href="login.html">Already have an account? Login</a>
+</div>
+</div></div>
+</div>
+</div><!-- SUCCESS --><div class="boltiv-success-overlay" id="successModal">
+<div class="boltiv-success-card"><div class="success-ring">✓</div><div class="success-label">ACCOUNT CREATED</div><h2>Welcome to BOLTIV</h2><p class="success-message">
+Your account has been created successfully. Your BOLTIV account is ready to use.
+</p><div class="success-user" id="successUser">
+Welcome, User
+</div><button class="boltiv-success-btn" id="successContinue">
+CONTINUE TO BOLTIV
+</button></div>
+</div><script>
+const registerButton=document.getElementById("registerButton");
+const successModal=document.getElementById("successModal");
+const successUser=document.getElementById("successUser");
+const successContinue=document.getElementById("successContinue");
+
+function getInitials(name){
+const parts=name.trim().split(/\s+/).filter(Boolean);
+if(parts.length===1)return parts[0].charAt(0).toUpperCase();
+return(parts[0].charAt(0)+parts[parts.length-1].charAt(0)).toUpperCase();
+}
+
+registerButton.onclick=()=>{
+const name=document.getElementById("nameInput").value.trim();
+const phone=document.getElementById("phoneInput").value.trim();
+const email=document.getElementById("emailInput").value.trim().toLowerCase();
+const password=document.getElementById("passwordInput").value;
+const confirm=document.getElementById("confirmPasswordInput").value;
+
+if(name.length<2){
+alert("Please enter your full name.");
+return;
+}
+
+if(phone.length<7){
+alert("Please enter a valid phone number.");
+return;
+}
+
+if(!/^\S+@\S+\.\S+$/.test(email)){
+alert("Please enter a valid email address.");
+return;
+}
+
+if(password.length<6){
+alert("Password must contain at least 6 characters.");
+return;
+}
+
+if(password!==confirm){
+alert("Passwords do not match.");
+return;
+}
+
+const user={
+name:name,
+fullName:name,
+phone:phone,
+phoneNumber:phone,
+email:email,
+password:password,
+initials:getInitials(name),
+createdAt:new Date().toISOString()
+};
+
+localStorage.setItem("boltivUser",JSON.stringify(user));
+localStorage.setItem("boltivUserEmail",email);
+localStorage.setItem("boltivLoggedIn","true");
+
+if(!localStorage.getItem("boltivBalance")){
+localStorage.setItem("boltivBalance","0.00");
+}
+
+if(!localStorage.getItem("boltivTransactions")){
+localStorage.setItem("boltivTransactions","[]");
+}
+
+successUser.textContent="Welcome, "+name;
+successModal.classList.add("show");
+};
+
+successContinue.onclick=()=>{
+successModal.classList.remove("show");
+setTimeout(()=>{
+location.href="index.html";
+},250);
+};
+</script></body>
+</html>

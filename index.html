@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#050505">
+<title>BOLTIV — Home</title>
+<script>
+if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html");
+</script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#050505;color:#fff;font-family:Arial,Helvetica,sans-serif}
+body{min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+.page{min-height:100vh;padding-bottom:100px}
+.container{width:min(100% - 30px,480px);margin:auto}
+.home-header{display:flex;align-items:center;justify-content:space-between;padding:24px 0 22px}
+.brand{color:#d4af37;font-size:23px;font-weight:1000;letter-spacing:2px}
+.greeting{margin-top:7px;color:#777;font-size:10px;font-weight:800}
+#userName{color:#d4af37;font-size:17px;font-weight:1000;margin-left:3px}
+.profile-button{width:42px;height:42px;border:1px solid #292929;border-radius:14px;background:#111;color:#d4af37;font-size:18px}
+.balance-card{position:relative;overflow:hidden;padding:25px 21px;border:1px solid #332d19;border-radius:24px;background:radial-gradient(circle at 100% 0,rgba(212,175,55,.18),transparent 38%),linear-gradient(145deg,#1a1a1a,#090909);box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.balance-label{color:#777;font-size:8px;font-weight:900;letter-spacing:1px}
+.balance-amount{margin-top:9px;color:#fff;font-size:30px;font-weight:1000}
+.fund-button{margin-top:19px;padding:11px 16px;border:1px solid #d4af37;border-radius:11px;background:#d4af37;color:#050505;font-size:8px;font-weight:1000}
+.services-section{margin-top:27px}
+.section-title{color:#777;font-size:8px;font-weight:1000;letter-spacing:1px;margin-bottom:12px}
+.services-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.service-card{min-height:130px;padding:17px;border:1px solid #242424;border-radius:19px;background:linear-gradient(145deg,#121212,#0b0b0b);text-align:left;color:#fff;transition:.2s}
+.service-card:active{transform:scale(.97);border-color:#d4af37}
+.service-icon{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:18px;font-weight:1000}
+.service-name{margin-top:17px;font-size:10px;font-weight:1000}
+.service-text{margin-top:5px;color:#666;font-size:7px}
+.quick-section{margin-top:27px}
+.quick-card{width:100%;display:flex;align-items:center;gap:13px;margin-bottom:10px;padding:15px;border:1px solid #242424;border-radius:17px;background:#101010;color:#fff;text-align:left}
+.quick-icon{width:40px;height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:17px}
+.quick-info{min-width:0;flex:1}
+.quick-title{font-size:9px;font-weight:1000}
+.quick-text{margin-top:5px;color:#666;font-size:7px}
+.quick-arrow{color:#d4af37;font-size:20px}
+.bottom-nav{position:fixed;z-index:1000;bottom:0;left:0;right:0;height:72px;display:flex;justify-content:center;gap:4px;padding:8px 12px;background:rgba(7,7,7,.96);border-top:1px solid #222;backdrop-filter:blur(15px)}
+.nav-item{width:25%;max-width:110px;border:0;background:transparent;color:#555;font-size:7px;font-weight:900}
+.nav-item.active{color:#d4af37}
+.nav-icon{display:block;margin-bottom:5px;font-size:17px}
+</style>
+</head>
+<body>
+<div class="page"><div class="container">
+
+<header class="home-header">
+<div>
+<div class="brand">BOLTIV</div>
+<div class="greeting"><span id="greeting">Good morning</span>, <span id="userName"></span> 👋</div>
+</div>
+<button class="profile-button" onclick="location.href='profile.html'">◉</button>
+</header>
+
+<section class="balance-card">
+<div class="balance-label">WALLET BALANCE</div>
+<div class="balance-amount">₦<span id="balance">0.00</span></div>
+<button class="fund-button" onclick="location.href='wallet.html'">FUND WALLET</button>
+</section>
+
+<section class="services-section">
+<div class="section-title">PAY BILLS</div>
+<div class="services-grid">
+
+<button class="service-card" onclick="location.href='airtime.html'">
+<div class="service-icon">☎</div>
+<div class="service-name">Airtime</div>
+<div class="service-text">Buy airtime</div>
+</button>
+
+<button class="service-card" onclick="location.href='data.html'">
+<div class="service-icon">◉</div>
+<div class="service-name">Data</div>
+<div class="service-text">Buy data</div>
+</button>
+
+<button class="service-card" onclick="location.href='electricity.html'">
+<div class="service-icon">ϟ</div>
+<div class="service-name">Electricity</div>
+<div class="service-text">Pay electricity</div>
+</button>
+
+<button class="service-card" onclick="location.href='cable.html'">
+<div class="service-icon">▣</div>
+<div class="service-name">Cable TV</div>
+<div class="service-text">Pay TV subscription</div>
+</button>
+
+</div>
+</section>
+
+<section class="quick-section">
+<div class="section-title">QUICK ACCESS</div>
+
+<button class="quick-card" onclick="location.href='transactions.html'">
+<div class="quick-icon">↯</div>
+<div class="quick-info">
+<div class="quick-title">Transaction History</div>
+<div class="quick-text">Search and view your payments</div>
+</div>
+<div class="quick-arrow">›</div>
+</button>
+
+<button class="quick-card" onclick="location.href='profile.html'">
+<div class="quick-icon">◉</div>
+<div class="quick-info">
+<div class="quick-title">My Profile</div>
+<div class="quick-text">Manage your personal information</div>
+</div>
+<div class="quick-arrow">›</div>
+</button>
+
+</section>
+</div></div>
+
+<nav class="bottom-nav">
+<button class="nav-item active" onclick="location.href='index.html'"><span class="nav-icon">⌂</span>Home</button>
+<button class="nav-item" onclick="location.href='wallet.html'"><span class="nav-icon">₦</span>Wallet</button>
+<button class="nav-item" onclick="location.href='transactions.html'"><span class="nav-icon">↯</span>Activity</button>
+<button class="nav-item" onclick="location.href='profile.html'"><span class="nav-icon">◉</span>Profile</button>
+</nav>
+
+<script>
+// User name
+function getUserName(){
+try{
+const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
+return(user?.firstName||user?.firstname||user?.name||"").trim();
+}catch(e){return""}
+}
+
+const fullName=getUserName();
+document.getElementById("userName").textContent=fullName.split(/\s+/)[0];
+
+// Time greeting
+function setGreeting(){
+const hour=new Date().getHours();
+let text="Good morning";
+if(hour>=12&&hour<17)text="Good afternoon";
+else if(hour>=17&&hour<21)text="Good evening";
+else if(hour>=21||hour<5)text="Good night";
+document.getElementById("greeting").textContent=text;
+}
+
+// Same balance key used by Wallet
+function updateBalance(){
+const balance=Number(localStorage.getItem("boltivWalletBalance")||0);
+document.getElementById("balance").textContent=balance.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+setGreeting();
+updateBalance();
+
+// Refresh when returning from Wallet
+window.addEventListener("pageshow",updateBalance);
+window.addEventListener("storage",updateBalance);
+</script>
+
+</body>
+</html>

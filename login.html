@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#050505">
+<title>BOLTIV — Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+<div class="container">
+
+<div class="auth-page">
+
+<div class="auth-logo">BOLTIV</div>
+<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
+
+<div class="auth-card">
+<h1>Welcome Back</h1>
+<p class="auth-subtitle">Login to your BOLTIV account</p>
+
+<div class="form-group">
+<label class="label">Email</label>
+<input class="input" id="emailInput" type="email" placeholder="you@example.com">
+</div>
+
+<div class="form-group">
+<label class="label">Password</label>
+<input class="input" id="passwordInput" type="password" placeholder="Enter password">
+</div>
+
+<button class="btn btn-primary auth-btn" id="loginButton">
+Login
+</button>
+
+<div class="auth-links">
+<a href="register.html">Create Account</a>
+<a href="forgot-password.html">Forgot Password?</a>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+const SESSION_KEY="boltivLoggedIn";
+
+document.getElementById("loginButton").onclick=()=>{
+const email=document.getElementById("emailInput").value.trim();
+const password=document.getElementById("passwordInput").value;
+
+if(!email){
+alert("Enter your email.");
+return;
+}
+
+if(!/^\S+@\S+\.\S+$/.test(email)){
+alert("Enter a valid email address.");
+return;
+}
+
+if(!password){
+alert("Enter your password.");
+return;
+}
+
+localStorage.setItem(SESSION_KEY,"true");
+localStorage.setItem("boltivUserEmail",email);
+
+location.href="index.html";
+};
+</script>
+
+</body>
+</html>

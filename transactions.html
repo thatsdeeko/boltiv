@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#050505">
+<title>BOLTIV — Transactions</title>
+<link rel="stylesheet" href="style.css">
+
+<script>
+if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html");
+</script>
+
+<style>
+.transactions-page{min-height:100vh;padding-bottom:110px}
+.transactions-header{display:flex;align-items:center;gap:13px;padding:18px 0 20px}
+.back-button{width:40px;height:40px;border-radius:12px;border:1px solid #292929;background:#111;color:#d4af37;font-size:20px;display:flex;align-items:center;justify-content:center}
+.transactions-title{color:#d4af37;font-size:19px;font-weight:1000}
+.transactions-subtitle{color:#666;font-size:8px;margin-top:4px}
+
+.search-box{position:relative;margin-bottom:17px}
+.search-icon{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:#d4af37;font-size:15px;pointer-events:none}
+.transaction-search{width:100%;height:48px;box-sizing:border-box;padding:0 42px;border-radius:15px;border:1px solid #292929;background:#101010;color:#fff;outline:none;font-family:inherit;font-size:10px;font-weight:800}
+.transaction-search::placeholder{color:#666}
+.transaction-search:focus{border-color:#d4af37;box-shadow:0 0 0 2px rgba(212,175,55,.07)}
+.clear-search{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:9px;background:#1a1a1a;color:#777;display:none;align-items:center;justify-content:center;font-size:13px}
+.clear-search.show{display:flex}
+
+.filter-box{display:flex;gap:8px;overflow-x:auto;padding-bottom:5px;margin-bottom:18px}
+.filter-box::-webkit-scrollbar{display:none}
+.filter-button{flex-shrink:0;padding:10px 15px;border-radius:12px;border:1px solid #292929;background:#0d0d0d;color:#777;font-family:inherit;font-size:8px;font-weight:900}
+.filter-button.active{color:#050505;background:#d4af37;border-color:#d4af37}
+
+.transaction-summary{padding:20px;border-radius:21px;background:radial-gradient(circle at 90% 10%,rgba(212,175,55,.14),transparent 38%),linear-gradient(145deg,#181818,#090909);border:1px solid #292929;margin-bottom:18px}
+.summary-label{color:#777;font-size:8px;font-weight:900;letter-spacing:.7px}
+.summary-row{display:flex;align-items:end;justify-content:space-between;gap:15px;margin-top:8px}
+.summary-count{color:#fff;font-size:25px;font-weight:1000}
+.summary-status{color:#70d47b;font-size:8px;font-weight:900}
+
+.transaction-list{display:flex;flex-direction:column;gap:10px}
+.transaction-item{width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:15px;border-radius:17px;border:1px solid #242424;background:#101010;text-align:left;color:#fff;transition:.2s ease}
+.transaction-item:active{transform:scale(.98)}
+.transaction-icon{width:43px;height:43px;flex-shrink:0;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:17px;font-weight:1000}
+.transaction-info{min-width:0;flex:1}
+.transaction-name{color:#fff;font-size:10px;font-weight:1000}
+.transaction-number{color:#666;font-size:8px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.transaction-right{flex-shrink:0;text-align:right}
+.transaction-amount{color:#fff;font-size:10px;font-weight:1000}
+.transaction-status{color:#70d47b;font-size:7px;font-weight:1000;margin-top:5px}
+
+.empty-state{padding:45px 20px;border-radius:21px;border:1px dashed #292929;background:#0d0d0d;text-align:center}
+.empty-icon{width:60px;height:60px;margin:0 auto 15px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:24px}
+.empty-title{color:#fff;font-size:14px;font-weight:1000}
+.empty-text{color:#666;font-size:9px;line-height:1.6;margin-top:7px}
+
+.modal{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.86);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.25s ease}
+.modal.show{opacity:1;visibility:visible}
+.modal-card{width:100%;max-width:390px;box-sizing:border-box;padding:25px 20px;border-radius:25px;background:linear-gradient(145deg,#181818,#080808);border:1px solid #292929;box-shadow:0 30px 90px rgba(0,0,0,.75)}
+.modal-top{display:flex;align-items:center;gap:13px;margin-bottom:20px}
+.modal-service-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:19px;font-weight:1000}
+.modal-service{color:#fff;font-size:14px;font-weight:1000}
+.modal-service-status{color:#70d47b;font-size:7px;font-weight:1000;margin-top:4px}
+.detail-box{padding:5px 14px;border-radius:16px;background:#0d0d0d;border:1px solid #202020}
+.detail-row{display:flex;justify-content:space-between;gap:15px;padding:13px 0;border-bottom:1px solid #1c1c1c}
+.detail-row:last-child{border-bottom:0}
+.detail-row span{color:#666;font-size:8px}
+.detail-row strong{color:#fff;font-size:9px;font-weight:900;text-align:right;word-break:break-word}
+.close-button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:linear-gradient(135deg,#f5d76e,#d4af37,#b8860b);color:#050505;font-family:inherit;font-size:9px;font-weight:1000}
+</style>
+</head>
+
+<body>
+<div class="page transactions-page">
+<div class="container">
+
+<div class="transactions-header">
+<button class="back-button" onclick="history.back()">‹</button>
+<div>
+<div class="transactions-title">Transactions</div>
+<div class="transactions-subtitle">YOUR PAYMENT ACTIVITY</div>
+</div>
+</div>
+
+<div class="search-box">
+<span class="search-icon">⌕</span>
+<input type="search" id="transactionSearch" class="transaction-search" placeholder="Search transactions..." autocomplete="off">
+<button type="button" id="clearSearch" class="clear-search">×</button>
+</div>
+
+<div class="filter-box">
+<button class="filter-button active" data-filter="all">ALL</button>
+<button class="filter-button" data-filter="airtime">AIRTIME</button>
+<button class="filter-button" data-filter="data">DATA</button>
+<button class="filter-button" data-filter="electricity">ELECTRICITY</button>
+<button class="filter-button" data-filter="cable">CABLE TV</button>
+</div>
+
+<div class="transaction-summary">
+<div class="summary-label">TRANSACTIONS FOUND</div>
+<div class="summary-row">
+<div class="summary-count" id="transactionCount">0</div>
+<div class="summary-status">● ACTIVITY</div>
+</div>
+</div>
+
+<div class="transaction-list" id="transactionList"></div>
+
+<div class="empty-state" id="emptyState">
+<div class="empty-icon">↯</div>
+<div class="empty-title" id="emptyTitle">No Transactions Yet</div>
+<div class="empty-text" id="emptyText">Your Airtime, Data, Electricity and Cable TV transactions will appear here after you make a purchase.</div>
+</div>
+
+</div>
+</div>
+
+<nav class="bottom-nav">
+<button class="nav-item" data-page="index.html">
+<span class="nav-icon">⌂</span>
+<span>Home</span>
+</button>
+<button class="nav-item" data-page="wallet.html">
+<span class="nav-icon">₦</span>
+<span>Wallet</span>
+</button>
+<button class="nav-item active" data-page="transactions.html">
+<span class="nav-icon">↯</span>
+<span>Activity</span>
+</button>
+<button class="nav-item" data-page="profile.html">
+<span class="nav-icon">◉</span>
+<span>Profile</span>
+</button>
+</nav>
+
+<div class="modal" id="transactionModal">
+<div class="modal-card">
+
+<div class="modal-top">
+<div class="modal-service-icon" id="modalIcon">₦</div>
+<div>
+<div class="modal-service" id="modalService">Transaction</div>
+<div class="modal-service-status">● SUCCESSFUL</div>
+</div>
+</div>
+
+<div class="detail-box" id="modalDetails"></div>
+<button class="close-button" id="closeModal">DONE</button>
+
+</div>
+</div>
+
+<script>
+const transactionList=document.getElementById("transactionList");
+const emptyState=document.getElementById("emptyState");
+const emptyTitle=document.getElementById("emptyTitle");
+const emptyText=document.getElementById("emptyText");
+const transactionCount=document.getElementById("transactionCount");
+const searchInput=document.getElementById("transactionSearch");
+const clearSearch=document.getElementById("clearSearch");
+const modal=document.getElementById("transactionModal");
+const modalIcon=document.getElementById("modalIcon");
+const modalService=document.getElementById("modalService");
+const modalDetails=document.getElementById("modalDetails");
+
+let currentFilter="all";
+let searchTerm="";
+
+function getTransactions(){
+const saved=localStorage.getItem("boltivTransactions");
+if(!saved)return[];
+try{
+const data=JSON.parse(saved);
+return Array.isArray(data)?data:[];
+}catch(error){
+return[];
+}
+}
+
+function getIcon(type){
+if(type==="airtime")return"☎";
+if(type==="data")return"◉";
+if(type==="electricity")return"ϟ";
+if(type==="cable")return"▣";
+return"₦";
+}
+
+function getTitle(type){
+if(type==="airtime")return"Airtime Purchase";
+if(type==="data")return"Data Purchase";
+if(type==="electricity")return"Electricity Payment";
+if(type==="cable")return"Cable TV Payment";
+return"Transaction";
+}
+
+function matchesSearch(transaction){
+if(!searchTerm)return true;
+
+const searchable=[
+transaction.type,
+getTitle(transaction.type),
+transaction.number,
+transaction.network,
+transaction.provider,
+transaction.package,
+transaction.smartcard,
+transaction.amount,
+transaction.reference,
+transaction.id,
+transaction.date
+].filter(Boolean).join(" ").toLowerCase();
+
+return searchable.includes(searchTerm.toLowerCase());
+}
+
+function formatDate(date){
+const d=new Date(date);
+if(isNaN(d.getTime()))return"Unknown date";
+return d.toLocaleDateString("en-NG",{day:"numeric",month:"short",year:"numeric"});
+}
+
+function formatTime(date){
+const d=new Date(date);
+if(isNaN(d.getTime()))return"Unknown time";
+return d.toLocaleTimeString("en-NG",{hour:"2-digit",minute:"2-digit"});
+}
+
+function renderTransactions(){
+let transactions=getTransactions();
+
+if(currentFilter!=="all"){
+transactions=transactions.filter(item=>item.type===currentFilter);
+}
+
+transactions=transactions.filter(matchesSearch);
+transactionCount.textContent=transactions.length;
+transactionList.innerHTML="";
+
+if(!transactions.length){
+emptyState.style.display="block";
+
+if(searchTerm){
+emptyTitle.textContent="No Transaction Found";
+emptyText.textContent="We couldn't find a transaction matching your search.";
+}else{
+emptyTitle.textContent="No Transactions Yet";
+emptyText.textContent="Your Airtime, Data, Electricity and Cable TV transactions will appear here after you make a purchase.";
+}
+return;
+}
+
+emptyState.style.display="none";
+
+transactions.forEach(transaction=>{
+const item=document.createElement("button");
+item.type="button";
+item.className="transaction-item";
+
+const amount=Number(transaction.amount||0).toLocaleString();
+
+item.innerHTML=`
+<div class="transaction-icon">${getIcon(transaction.type)}</div>
+<div class="transaction-info">
+<div class="transaction-name">${getTitle(transaction.type)}</div>
+<div class="transaction-number">${transaction.number||transaction.smartcard||transaction.reference||transaction.id||"BOLTIV TRANSACTION"}</div>
+</div>
+<div class="transaction-right">
+<div class="transaction-amount">₦${amount}</div>
+<div class="transaction-status">SUCCESSFUL</div>
+</div>`;
+
+item.addEventListener("click",()=>showTransaction(transaction));
+transactionList.appendChild(item);
+});
+}
+
+function showTransaction(transaction){
+modalIcon.textContent=getIcon(transaction.type);
+modalService.textContent=getTitle(transaction.type);
+
+let extra="";
+
+if(transaction.type==="cable"){
+extra=`
+<div class="detail-row">
+<span>Package</span>
+<strong>${transaction.package||"—"}</strong>
+</div>
+<div class="detail-row">
+<span>Smartcard / IUC</span>
+<strong>${transaction.smartcard||transaction.number||"—"}</strong>
+</div>`;
+}
+
+modalDetails.innerHTML=`
+<div class="detail-row">
+<span>Service</span>
+<strong>${getTitle(transaction.type)}</strong>
+</div>
+<div class="detail-row">
+<span>Amount</span>
+<strong>₦${Number(transaction.amount||0).toLocaleString()}</strong>
+</div>
+${transaction.type!=="cable"?`
+<div class="detail-row">
+<span>Number / Meter</span>
+<strong>${transaction.number||"—"}</strong>
+</div>`:""}
+${transaction.type==="cable"?"":`
+<div class="detail-row">
+<span>Network / Provider</span>
+<strong>${transaction.network||transaction.provider||"—"}</strong>
+</div>`}
+${extra}
+<div class="detail-row">
+<span>Date</span>
+<strong>${formatDate(transaction.date)}</strong>
+</div>
+<div class="detail-row">
+<span>Time</span>
+<strong>${formatTime(transaction.date)}</strong>
+</div>
+<div class="detail-row">
+<span>Transaction ID</span>
+<strong>${transaction.id||transaction.reference||"—"}</strong>
+</div>`;
+
+modal.classList.add("show");
+}
+
+document.querySelectorAll(".filter-button").forEach(button=>{
+button.addEventListener("click",()=>{
+document.querySelectorAll(".filter-button").forEach(item=>item.classList.remove("active"));
+button.classList.add("active");
+currentFilter=button.dataset.filter;
+renderTransactions();
+});
+});
+
+searchInput.addEventListener("input",()=>{
+searchTerm=searchInput.value.trim();
+clearSearch.classList.toggle("show",!!searchTerm);
+renderTransactions();
+});
+
+clearSearch.addEventListener("click",()=>{
+searchInput.value="";
+searchTerm="";
+clearSearch.classList.remove("show");
+searchInput.focus();
+renderTransactions();
+});
+
+document.getElementById("closeModal").addEventListener("click",()=>{
+modal.classList.remove("show");
+});
+
+modal.addEventListener("click",event=>{
+if(event.target===modal)modal.classList.remove("show");
+});
+
+document.querySelectorAll(".nav-item").forEach(item=>{
+item.addEventListener("click",()=>location.href=item.dataset.page);
+});
+
+renderTransactions();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,161 @@
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#050505;--card:#0d0d0d;--card2:#111;--gold:#d4af37;--gold2:#f1d77a;--text:#fff;--muted:#858585;--line:#292929;--danger:#ff5555;--success:#d4af37}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;font-size:13px;min-height:100vh}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.page{min-height:100vh;padding-bottom:82px}
+.container{width:100%;max-width:520px;margin:auto;padding:0 14px}
+
+/* HEADER */
+.header{height:68px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #151515}
+.brand-name{font-size:25px;font-weight:1000;letter-spacing:3px;color:var(--gold)}
+.brand-tagline{font-size:7px;letter-spacing:2px;color:#666;margin-top:2px}
+.profile-mini{width:38px;height:38px;border:1px solid var(--gold);border-radius:50%;background:#111;color:var(--gold);font-weight:900}
+
+/* HOME */
+.welcome{padding:25px 2px 20px}
+.welcome-title{font-size:23px;font-weight:1000;letter-spacing:.5px}
+.welcome-title span{color:var(--gold)}
+.welcome-text{color:#777;font-size:10px;margin-top:6px;line-height:1.5}
+.section{margin-top:18px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title{font-size:11px;letter-spacing:1.3px;font-weight:1000;color:#ddd}
+.card{background:linear-gradient(145deg,#111,#090909);border:1px solid #252525;border-radius:16px;padding:16px}
+
+/* WALLET */
+.balance-card{background:linear-gradient(145deg,#17140b,#090909);border:1px solid var(--gold);border-radius:18px;padding:20px;margin-top:5px;box-shadow:0 12px 30px rgba(0,0,0,.35)}
+.balance-label,.summary-label{font-size:8px;letter-spacing:1.5px;color:#777;font-weight:800}
+.balance-value{font-size:31px;font-weight:1000;color:var(--gold2);margin:8px 0 18px}
+.balance-actions{display:flex;gap:8px}
+.btn{border:0;border-radius:10px;padding:12px 14px;font-size:10px;font-weight:1000;letter-spacing:.5px}
+.btn-primary{background:var(--gold);color:#050505}
+.btn-primary:active{transform:scale(.98)}
+.btn-secondary{background:#151515;border:1px solid #333;color:#ddd}
+
+/* FORMS */
+.form-group{margin-bottom:14px}
+.label{display:block;font-size:8px;font-weight:900;letter-spacing:1px;color:#777;margin-bottom:6px}
+.input,select,textarea{width:100%;background:#090909;border:1px solid #292929;border-radius:10px;padding:12px;color:#fff;outline:none}
+.input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+textarea{resize:vertical;min-height:100px}
+.notice{padding:12px;background:#0c0c0c;border-left:2px solid var(--gold);color:#777;font-size:9px;line-height:1.6;border-radius:4px}
+.notice strong{color:var(--gold);font-size:9px}
+
+/* PROFILE */
+.profile-card{display:flex;align-items:center;gap:13px;padding:17px;background:linear-gradient(145deg,#111,#090909);border:1px solid var(--gold);border-radius:16px}
+.profile-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gold);color:#050505;font-size:21px;font-weight:1000}
+.profile-name{font-size:16px;font-weight:1000;color:#fff;width:100%;max-width:100%;white-space:normal;overflow:visible;text-overflow:unset;word-break:break-word;overflow-wrap:anywhere;text-align:center}
+.profile-email{font-size:9px;color:#777;margin-top:4px;width:100%;max-width:100%;white-space:normal;overflow:visible;text-overflow:unset;word-break:break-word;overflow-wrap:anywhere;text-align:center}
+
+/* WALLET ACTIONS */
+.wallet-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.wallet-action{background:linear-gradient(145deg,#111,#090909);border:1px solid #292929;border-radius:13px;padding:16px 10px;text-align:center;transition:.2s}
+.wallet-action:hover,.wallet-action:active{border-color:var(--gold);transform:translateY(-1px)}
+.wallet-action-icon{font-size:20px;color:var(--gold);margin-bottom:8px}
+.wallet-action-title{font-size:9px;font-weight:1000;letter-spacing:.4px;color:#ddd}
+
+/* HISTORY */
+.history-summary{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:5px}
+.summary-card{background:#0d0d0d;border:1px solid #292929;border-radius:13px;padding:14px}
+.summary-value{font-size:17px;font-weight:1000;color:var(--gold2);margin-top:7px}
+.history-filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:5px;scrollbar-width:none}
+.history-filters::-webkit-scrollbar{display:none}
+.filter-btn{white-space:nowrap;padding:8px 11px;border-radius:9px;border:1px solid #292929;background:#0d0d0d;color:#777;font-size:8px;font-weight:1000}
+.filter-btn.active{background:var(--gold);border-color:var(--gold);color:#050505}
+.transaction-list{display:flex;flex-direction:column;gap:8px}
+.transaction-item{display:flex;align-items:center;gap:10px;padding:12px;background:linear-gradient(145deg,#111,#090909);border:1px solid #252525;border-radius:13px}
+.transaction-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px;background:#17140b;border:1px solid #443814;color:var(--gold);font-weight:1000}
+.transaction-details{flex:1;min-width:0}
+.transaction-title{font-size:10px;font-weight:900;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.transaction-date{font-size:8px;color:#666;margin-top:4px}
+.transaction-right{text-align:right}
+.transaction-amount{font-size:10px;font-weight:1000}
+.transaction-amount.credit{color:#53d88a}
+.transaction-amount.debit{color:var(--danger)}
+.transaction-status{font-size:7px;color:#777;margin-top:4px}
+.empty-state{display:none;text-align:center;padding:35px 15px;border:1px dashed #292929;border-radius:14px;color:#666;font-size:9px}
+
+/* SUPPORT */
+.support-card{background:linear-gradient(145deg,#111,#090909);border:1px solid #292929;border-radius:13px;padding:14px;margin-bottom:8px}
+.support-title{font-size:11px;font-weight:1000;color:var(--gold)}
+.support-text{font-size:9px;line-height:1.6;color:#777;margin-top:5px}
+
+/* PROVIDERS */
+.provider-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.provider-card{background:#0d0d0d;border:1px solid #292929;border-radius:12px;padding:14px 8px;color:#fff}
+.provider-card.active{border-color:var(--gold);background:#17140b;box-shadow:0 0 0 1px var(--gold)}
+.provider-name{font-size:11px;font-weight:1000;color:#ddd}
+.provider-card.active .provider-name{color:var(--gold)}
+
+/* FOOTER */
+.footer{text-align:center;padding:32px 0 20px}
+.footer-logo{font-size:27px;font-weight:1000;letter-spacing:4px;color:var(--gold)}
+.footer-text{font-size:7px;letter-spacing:2px;color:#555;margin-top:4px}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:520px;height:68px;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(7,7,7,.97);border-top:1px solid #252525;z-index:1000;backdrop-filter:blur(10px)}
+.nav-item{border:0;background:transparent;color:#666;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:7px;font-weight:900}
+.nav-icon{font-size:18px;line-height:1}
+.nav-item.active{color:var(--gold)}
+
+/* TOAST */
+.boltiv-toast{position:fixed;top:18px;left:50%;transform:translate(-50%,-140%);width:calc(100% - 28px);max-width:430px;z-index:9999;display:flex;align-items:center;gap:11px;padding:13px 14px;background:linear-gradient(145deg,#17140b,#090909);border:1px solid var(--gold);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,.6);opacity:0;transition:.35s ease;pointer-events:none}
+.boltiv-toast.show{transform:translate(-50%,0);opacity:1}
+.boltiv-toast-icon{width:35px;height:35px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--gold);color:#050505;font-size:18px;font-weight:1000}
+.boltiv-toast-content{min-width:0;flex:1}
+.boltiv-toast-title{font-size:12px;font-weight:1000;color:#fff;margin-bottom:3px}
+.boltiv-toast-message{font-size:9px;line-height:1.4;color:#888}
+.boltiv-toast.error{border-color:var(--danger)}
+.boltiv-toast.error .boltiv-toast-icon{background:var(--danger);color:#fff}
+.boltiv-toast.pending{border-color:var(--gold)}
+.boltiv-toast-close{width:25px;height:25px;border:0;background:transparent;color:#666;font-size:18px}
+
+/* TRANSACTION UI */
+.boltiv-transaction-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.86);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.25s ease}
+.boltiv-transaction-overlay.show{opacity:1;visibility:visible}
+.boltiv-transaction-card{width:100%;max-width:390px;box-sizing:border-box;padding:28px 22px;border-radius:25px;text-align:center;background:linear-gradient(145deg,#181818,#080808);border:1px solid #292929;box-shadow:0 30px 90px rgba(0,0,0,.75);transform:translateY(25px) scale(.94);transition:.3s ease}
+.boltiv-transaction-overlay.show .boltiv-transaction-card{transform:translateY(0) scale(1)}
+.boltiv-transaction-icon{width:68px;height:68px;margin:0 auto 17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:1000}
+.boltiv-transaction-overlay.processing .boltiv-transaction-icon{background:#17140b;border:1px solid #d4af37;color:#d4af37}
+.boltiv-transaction-overlay.success .boltiv-transaction-icon{background:#101c12;border:1px solid #56b866;color:#70d47b}
+.boltiv-transaction-overlay.failed .boltiv-transaction-icon{background:#1d0e0e;border:1px solid #b94c4c;color:#e07878}
+.boltiv-spinner{width:25px;height:25px;border-radius:50%;border:3px solid #332b16;border-top-color:#d4af37;animation:boltivSpin .8s linear infinite}
+@keyframes boltivSpin{to{transform:rotate(360deg)}}
+.boltiv-transaction-status{font-size:8px;font-weight:1000;letter-spacing:1px;margin-bottom:8px}
+.processing .boltiv-transaction-status{color:#d4af37}
+.success .boltiv-transaction-status{color:#70d47b}
+.failed .boltiv-transaction-status{color:#e07878}
+.boltiv-transaction-title{color:#fff;font-size:19px;font-weight:1000}
+.boltiv-transaction-message{color:#777;font-size:9px;line-height:1.6;margin-top:8px}
+.boltiv-transaction-details{margin-top:20px;padding:5px 14px;border-radius:15px;background:#0d0d0d;border:1px solid #202020}
+.transaction-detail{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #1c1c1c;text-align:left}
+.transaction-detail:last-child{border-bottom:0}
+.transaction-detail span{color:#666;font-size:8px}
+.transaction-detail strong{color:#fff;font-size:9px;font-weight:900;text-align:right;word-break:break-word}
+.boltiv-transaction-button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:#d4af37;color:#050505;font-family:inherit;font-size:9px;font-weight:1000;letter-spacing:.5px}
+.boltiv-transaction-button:active{transform:scale(.98)}
+
+/* LOGIN */
+.auth-page{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:25px 0}
+.auth-logo{text-align:center;color:var(--gold);font-size:34px;font-weight:1000;letter-spacing:6px;text-shadow:0 0 25px rgba(212,175,55,.12)}
+.auth-tagline{text-align:center;color:#555;font-size:7px;letter-spacing:3px;margin-top:6px;margin-bottom:25px}
+.auth-card{width:100%;background:linear-gradient(145deg,#151515,#090909);border:1px solid #292929;border-radius:20px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.auth-card h1{color:#fff;font-size:21px;font-weight:1000;margin-bottom:6px}
+.auth-subtitle{color:#777;font-size:9px;margin-bottom:22px;line-height:1.5}
+.auth-btn{width:100%;margin-top:4px;padding:14px}
+.auth-links{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.auth-links a{color:var(--gold);font-size:8px;font-weight:900}
+.auth-links a:hover{text-decoration:underline}
+
+/* RESPONSIVE */
+@media(max-width:380px){
+.container{padding:0 11px}
+.brand-name{font-size:23px}
+.welcome-title{font-size:21px}
+.balance-value{font-size:27px}
+.wallet-action{padding:14px 8px}
+.auth-card{padding:19px}
+.auth-logo{font-size:30px}
+}

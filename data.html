@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#050505">
+<title>BOLTIV — Buy Data</title>
+<link rel="stylesheet" href="style.css">
+<script>
+if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html");
+</script>
+<style>
+.data-page{min-height:100vh;padding-bottom:110px}
+.data-header{display:flex;align-items:center;gap:13px;padding:18px 0 24px}
+.back-button{width:40px;height:40px;border-radius:12px;border:1px solid #292929;background:#111;color:#d4af37;font-size:20px;display:flex;align-items:center;justify-content:center}
+.data-title{color:#d4af37;font-size:19px;font-weight:1000}
+.data-subtitle{color:#666;font-size:8px;margin-top:4px}
+.data-hero{padding:23px;border-radius:23px;background:radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 38%),linear-gradient(145deg,#181818,#090909);border:1px solid #292929;margin-bottom:20px}
+.data-hero-label{color:#d4af37;font-size:8px;font-weight:1000;letter-spacing:1px}
+.data-hero-title{color:#fff;font-size:21px;font-weight:1000;margin-top:7px}
+.data-hero-text{color:#777;font-size:9px;line-height:1.6;margin-top:6px}
+.data-card{padding:20px;border-radius:21px;background:#101010;border:1px solid #242424}
+.data-label{display:block;color:#777;font-size:8px;font-weight:900;letter-spacing:.6px;margin-bottom:8px}
+.data-input{width:100%;box-sizing:border-box;padding:15px;border-radius:13px;border:1px solid #292929;background:#080808;color:#fff;outline:none;font-family:inherit;font-size:12px;font-weight:800;margin-bottom:18px;transition:.2s ease}
+.data-input::placeholder{color:#555}
+.data-input:focus{border-color:#d4af37;box-shadow:0 0 0 2px rgba(212,175,55,.07)}
+.network-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.network-button{padding:13px 5px;border-radius:12px;border:1px solid #292929;background:#0b0b0b;color:#777;font-size:7px;font-weight:1000;transition:.2s ease}
+.network-button:active{transform:scale(.96)}
+.network-button.active{color:#d4af37;border-color:#d4af37;background:#17140b;box-shadow:0 0 15px rgba(212,175,55,.06)}
+.plan-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
+.plan-button{text-align:left;padding:15px;border-radius:15px;border:1px solid #292929;background:#0b0b0b;color:#fff;transition:.2s ease}
+.plan-button:active{transform:scale(.97)}
+.plan-button.active{border-color:#d4af37;background:#17140b;box-shadow:0 0 18px rgba(212,175,55,.07)}
+.plan-size{color:#d4af37;font-size:13px;font-weight:1000;margin-bottom:5px}
+.plan-validity{color:#777;font-size:8px;margin-bottom:8px}
+.plan-price{color:#fff;font-size:10px;font-weight:1000}
+.purchase-button{width:100%;padding:16px;border:1px solid #292929;border-radius:14px;background:#111;color:#d4af37;font-family:inherit;font-size:10px;font-weight:1000;letter-spacing:.8px;transition:.2s ease}
+.purchase-button:hover{box-shadow:0 10px 30px rgba(212,175,55,.12)}
+.purchase-button:active{transform:scale(.97)}
+.boltiv-modal{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.86);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.25s ease}
+.boltiv-modal.show{opacity:1;visibility:visible}
+.boltiv-modal-card{width:100%;max-width:390px;box-sizing:border-box;padding:28px 22px;border-radius:25px;text-align:center;background:linear-gradient(145deg,#181818,#080808);border:1px solid #292929;box-shadow:0 30px 90px rgba(0,0,0,.75);transform:translateY(25px) scale(.94);transition:.3s ease}
+.boltiv-modal.show .boltiv-modal-card{transform:translateY(0) scale(1)}
+.modal-icon{width:66px;height:66px;margin:0 auto 17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:1000}
+.boltiv-modal.warning .modal-icon,.boltiv-modal.processing .modal-icon{background:#17140b;border:1px solid #d4af37;color:#d4af37}
+.boltiv-modal.success .modal-icon{background:#101c12;border:1px solid #56b866;color:#70d47b}
+.boltiv-modal.failed .modal-icon{background:#1d0e0e;border:1px solid #b94c4c;color:#e07878}
+.modal-spinner{width:24px;height:24px;border-radius:50%;border:3px solid #332b16;border-top-color:#d4af37;animation:boltivSpin .8s linear infinite}
+@keyframes boltivSpin{to{transform:rotate(360deg)}}
+.modal-status{color:#d4af37;font-size:8px;font-weight:1000;letter-spacing:1px;margin-bottom:8px}
+.modal-title{color:#fff;font-size:19px;font-weight:1000}
+.modal-message{color:#777;font-size:9px;line-height:1.6;margin-top:8px}
+.modal-details{margin-top:20px;padding:5px 14px;border-radius:15px;background:#0d0d0d;border:1px solid #202020}
+.modal-detail{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #1c1c1c;text-align:left}
+.modal-detail:last-child{border-bottom:0}
+.modal-detail span{color:#666;font-size:8px}
+.modal-detail strong{color:#fff;font-size:9px;font-weight:900;text-align:right;word-break:break-word}
+.modal-button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:linear-gradient(135deg,#f5d76e,#d4af37,#b8860b);color:#050505;font-family:inherit;font-size:9px;font-weight:1000}
+</style>
+</head>
+
+<body>
+
+<div class="page data-page">
+<div class="container">
+
+<div class="data-header">
+<button class="back-button" onclick="history.back()">‹</button>
+<div>
+<div class="data-title">Buy Data</div>
+<div class="data-subtitle">INSTANT DATA RECHARGE</div>
+</div>
+</div>
+
+<div class="data-hero">
+<div class="data-hero-label">BOLTIV DATA</div>
+<div class="data-hero-title">Stay Connected.</div>
+<div class="data-hero-text">Choose a data plan and recharge instantly from your BOLTIV wallet.</div>
+</div>
+
+<div class="data-card">
+
+<label class="data-label">PHONE NUMBER</label>
+<input class="data-input" id="phoneNumber" type="tel" inputmode="numeric" maxlength="11" placeholder="08012345678">
+
+<label class="data-label">SELECT NETWORK</label>
+<div class="network-grid">
+<button type="button" class="network-button" data-network="MTN">MTN</button>
+<button type="button" class="network-button" data-network="AIRTEL">AIRTEL</button>
+<button type="button" class="network-button" data-network="GLO">GLO</button>
+<button type="button" class="network-button" data-network="9MOBILE">9MOBILE</button>
+</div>
+
+<label class="data-label">SELECT DATA PLAN</label>
+<div class="plan-grid">
+<button type="button" class="plan-button" data-plan="500MB" data-price="150"><div class="plan-size">500MB</div><div class="plan-validity">30 Days</div><div class="plan-price">₦150</div></button>
+<button type="button" class="plan-button" data-plan="1GB" data-price="300"><div class="plan-size">1GB</div><div class="plan-validity">30 Days</div><div class="plan-price">₦300</div></button>
+<button type="button" class="plan-button" data-plan="2GB" data-price="600"><div class="plan-size">2GB</div><div class="plan-validity">30 Days</div><div class="plan-price">₦600</div></button>
+<button type="button" class="plan-button" data-plan="3GB" data-price="900"><div class="plan-size">3GB</div><div class="plan-validity">30 Days</div><div class="plan-price">₦900</div></button>
+<button type="button" class="plan-button" data-plan="5GB" data-price="1500"><div class="plan-size">5GB</div><div class="plan-validity">30 Days</div><div class="plan-price">₦1,500</div></button>
+<button type="button" class="plan-button" data-plan="10GB" data-price="3000"><div class="plan-size">10GB</div><div class="plan-validity">30 Days</div><div class="plan-price">₦3,000</div></button>
+</div>
+
+<button type="button" class="purchase-button" id="purchaseButton">BUY DATA</button>
+
+</div>
+</div>
+</div>
+
+<nav class="bottom-nav">
+<button class="nav-item" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
+<button class="nav-item" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
+<button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button>
+<button class="nav-item" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
+</nav>
+
+<div class="boltiv-modal" id="boltivModal">
+<div class="boltiv-modal-card">
+<div class="modal-icon" id="modalIcon">!</div>
+<div class="modal-status" id="modalStatus">NOTICE</div>
+<div class="modal-title" id="modalTitle">Complete Your Purchase</div>
+<div class="modal-message" id="modalMessage">Please complete the required information.</div>
+<div class="modal-details" id="modalDetails" style="display:none"></div>
+<button type="button" class="modal-button" id="modalButton">GOT IT</button>
+</div>
+</div>
+
+<script>
+let selectedNetwork="";
+let selectedPlan=null;
+
+const phoneInput=document.getElementById("phoneNumber");
+const modal=document.getElementById("boltivModal");
+const modalIcon=document.getElementById("modalIcon");
+const modalStatus=document.getElementById("modalStatus");
+const modalTitle=document.getElementById("modalTitle");
+const modalMessage=document.getElementById("modalMessage");
+const modalDetails=document.getElementById("modalDetails");
+const modalButton=document.getElementById("modalButton");
+
+function money(value){
+return "₦"+Number(value||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function getBalance(){
+return Number(localStorage.getItem("boltivWalletBalance")||0);
+}
+
+function setBalance(value){
+localStorage.setItem("boltivWalletBalance",String(Math.max(0,Number(value)||0)));
+}
+
+function getTransactions(){
+try{
+const data=JSON.parse(localStorage.getItem("boltivTransactions")||"[]");
+return Array.isArray(data)?data:[];
+}catch(e){
+return [];
+}
+}
+
+function saveTransaction(transaction){
+const transactions=getTransactions();
+transactions.unshift(transaction);
+localStorage.setItem("boltivTransactions",JSON.stringify(transactions));
+}
+
+function showModal(type,title,message,buttonText="GOT IT",details=""){
+modal.className="boltiv-modal show "+type;
+modalTitle.textContent=title;
+modalMessage.textContent=message;
+modalButton.textContent=buttonText;
+
+if(type==="success"){
+modalStatus.textContent="SUCCESSFUL";
+modalIcon.innerHTML="✓";
+}else if(type==="failed"){
+modalStatus.textContent="FAILED";
+modalIcon.innerHTML="×";
+}else if(type==="processing"){
+modalStatus.textContent="PROCESSING";
+modalIcon.innerHTML='<div class="modal-spinner"></div>';
+}else{
+modalStatus.textContent="NOTICE";
+modalIcon.innerHTML="!";
+}
+
+if(details){
+modalDetails.innerHTML=details;
+modalDetails.style.display="block";
+}else{
+modalDetails.innerHTML="";
+modalDetails.style.display="none";
+}
+}
+
+function closeModal(){
+modal.classList.remove("show");
+modalButton.style.display="block";
+}
+
+modalButton.addEventListener("click",closeModal);
+
+modal.addEventListener("click",event=>{
+if(event.target===modal)closeModal();
+});
+
+document.querySelectorAll(".network-button").forEach(button=>{
+button.addEventListener("click",()=>{
+document.querySelectorAll(".network-button").forEach(item=>item.classList.remove("active"));
+button.classList.add("active");
+selectedNetwork=button.dataset.network;
+});
+});
+
+document.querySelectorAll(".plan-button").forEach(button=>{
+button.addEventListener("click",()=>{
+document.querySelectorAll(".plan-button").forEach(item=>item.classList.remove("active"));
+button.classList.add("active");
+selectedPlan={
+plan:button.dataset.plan,
+price:Number(button.dataset.price)
+};
+});
+});
+
+function transactionDetails(phone,transactionId="",balance=""){
+let html=`
+<div class="modal-detail"><span>Service</span><strong>Data</strong></div>
+<div class="modal-detail"><span>Network</span><strong>${selectedNetwork}</strong></div>
+<div class="modal-detail"><span>Phone</span><strong>${phone}</strong></div>
+<div class="modal-detail"><span>Data Plan</span><strong>${selectedPlan.plan}</strong></div>
+<div class="modal-detail"><span>Amount</span><strong>${money(selectedPlan.price)}</strong></div>`;
+
+if(transactionId)html+=`<div class="modal-detail"><span>Transaction ID</span><strong>${transactionId}</strong></div>`;
+if(balance!=="")html+=`<div class="modal-detail"><span>Wallet Balance</span><strong>${money(balance)}</strong></div>`;
+
+return html;
+}
+
+document.getElementById("purchaseButton").addEventListener("click",function(){
+
+const phone=phoneInput.value.trim();
+
+if(!phone){
+showModal("warning","Phone Number Required","Enter the 11-digit phone number you want to recharge.");
+return;
+}
+
+if(phone.length!==11||!/^\d{11}$/.test(phone)){
+showModal("warning","Check Your Number","Please enter a valid 11-digit Nigerian phone number.");
+return;
+}
+
+if(!selectedNetwork){
+showModal("warning","Select Your Network","Choose the network you want to use.");
+return;
+}
+
+if(!selectedPlan){
+showModal("warning","Select a Data Plan","Choose a data plan before continuing.");
+return;
+}
+
+const balance=getBalance();
+
+if(balance<selectedPlan.price){
+showModal(
+"failed",
+"Insufficient Balance",
+`Your wallet balance is ${money(balance)}. You need ${money(selectedPlan.price)} to buy this data plan.`,
+"DONE",
+transactionDetails(phone)
+);
+return;
+}
+
+showModal(
+"processing",
+"Processing Data",
+"We're processing your data purchase. Please wait...",
+"PLEASE WAIT",
+transactionDetails(phone)
+);
+
+modalButton.style.display="none";
+
+setTimeout(()=>{
+
+const amount=selectedPlan.price;
+const newBalance=balance-amount;
+const transactionId="BTV-"+Date.now().toString().slice(-8);
+
+setBalance(newBalance);
+
+saveTransaction({
+id:transactionId,
+type:"data",
+title:"Data Purchase",
+service:"Data",
+network:selectedNetwork,
+phone:phone,
+plan:selectedPlan.plan,
+amount:amount,
+status:"Successful",
+direction:"debit",
+date:new Date().toLocaleString("en-NG",{dateStyle:"medium",timeStyle:"short"})
+});
+
+showModal(
+"success",
+"Data Purchased",
+"Your data bundle has been purchased successfully.",
+"DONE",
+transactionDetails(phone,transactionId,newBalance)
+);
+
+modalButton.style.display="block";
+
+},1800);
+
+});
+
+document.querySelectorAll(".nav-item").forEach(item=>{
+item.addEventListener("click",()=>{
+location.href=item.dataset.page;
+});
+});
+</script>
+
+</body>
+</html>

@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -25,47 +24,29 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 .wallet-modal-confirm:active,.wallet-modal-cancel:active{transform:scale(.98)}
 </style>
 </head>
-
 <body>
-<div class="page">
-<div class="container">
-
+<div class="page"><div class="container">
 <header class="header">
-<div class="brand">
-<div class="brand-name">BOLTIV</div>
-<div class="brand-tagline">DIGITAL PAYMENT HUB</div>
-</div>
+<div class="brand"><div class="brand-name">BOLTIV</div><div class="brand-tagline">DIGITAL PAYMENT HUB</div></div>
 <button class="profile-mini" id="profileButton">U</button>
-</header>
-
-<section class="welcome">
+</header><section class="welcome">
 <div class="welcome-title">MY <span>WALLET</span></div>
 <div class="welcome-text">Manage your balance and make payments securely with BOLTIV.</div>
-</section>
-
-<section class="balance-card">
+</section><section class="balance-card">
 <div class="balance-label">AVAILABLE BALANCE</div>
 <div class="balance-value" id="balance">₦0.00</div>
 <div class="balance-actions">
 <button class="btn btn-primary" onclick="document.getElementById('amount').focus()">ADD MONEY</button>
 <button class="btn btn-secondary" onclick="location.href='transactions.html'">ACTIVITY</button>
 </div>
-</section>
-
-<section class="section">
-<div class="section-head">
-<h2 class="section-title">ADD MONEY</h2>
-</div>
-
+</section><section class="section">
+<div class="section-head"><h2 class="section-title">ADD MONEY</h2></div>
 <div class="card">
 <div style="margin-bottom:16px">
 <div style="font-size:15px;font-weight:1000;color:#fff">Add money to your wallet</div>
 <div style="font-size:9px;color:#777;line-height:1.5;margin-top:5px">Choose an amount to add to your BOLTIV wallet and use it across our payment services.</div>
-</div>
-
-<div class="form-group">
+</div><div class="form-group">
 <label class="label">CHOOSE AMOUNT</label>
-
 <div class="provider-grid">
 <button class="provider-card amount-btn" data-amount="500"><div class="provider-name">₦500</div></button>
 <button class="provider-card amount-btn" data-amount="1000"><div class="provider-name">₦1,000</div></button>
@@ -74,71 +55,36 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 <button class="provider-card amount-btn" data-amount="10000"><div class="provider-name">₦10,000</div></button>
 <button class="provider-card amount-btn" data-amount="20000"><div class="provider-name">₦20,000</div></button>
 </div>
-</div>
-
-<div class="form-group">
+</div><div class="form-group">
 <label class="label">CUSTOM AMOUNT</label>
 <div style="position:relative">
 <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#d4af37;font-weight:900;font-size:12px;z-index:1">₦</span>
 <input class="input" id="amount" type="number" inputmode="numeric" min="100" placeholder="Enter amount" style="padding-left:30px">
 </div>
-</div>
-
-<div id="fundSummary" style="display:none;margin:12px 0;padding:12px;background:#17140b;border:1px solid #443814;border-radius:10px">
+</div><div id="fundSummary" style="display:none;margin:12px 0;padding:12px;background:#17140b;border:1px solid #443814;border-radius:10px">
 <div style="display:flex;justify-content:space-between;align-items:center">
 <span style="font-size:8px;color:#777">AMOUNT TO ADD</span>
 <strong id="summaryAmount" style="font-size:14px;color:#d4af37">₦0.00</strong>
 </div>
-</div>
+</div><button class="btn btn-primary" id="fundBtn" style="width:100%">CONTINUE TO FUND</button>
 
-<button class="btn btn-primary" id="fundBtn" style="width:100%">CONTINUE TO FUND</button>
 </div>
-</section>
-
-<section class="section">
-<div class="notice">
-<strong>ONE WALLET. MULTIPLE SERVICES.</strong><br>
-Use your wallet balance for airtime, data, TV subscriptions and electricity payments.
-</div>
-</section>
-
-<section class="section">
+</section><section class="section">
+<div class="notice"><strong>ONE WALLET. MULTIPLE SERVICES.</strong><br>Use your wallet balance for airtime, data, TV subscriptions and electricity payments.</div>
+</section><section class="section">
 <div class="wallet-actions">
-<div class="wallet-action" onclick="location.href='airtime.html'">
-<div class="wallet-action-icon">☎</div>
-<div class="wallet-action-title">AIRTIME</div>
+<div class="wallet-action" onclick="location.href='airtime.html'"><div class="wallet-action-icon">☎</div><div class="wallet-action-title">AIRTIME</div></div>
+<div class="wallet-action" onclick="location.href='data.html'"><div class="wallet-action-icon">⌁</div><div class="wallet-action-title">DATA</div></div>
+<div class="wallet-action" onclick="location.href='cable.html'"><div class="wallet-action-icon">▣</div><div class="wallet-action-title">TV SUBSCRIPTION</div></div>
+<div class="wallet-action" onclick="location.href='electricity.html'"><div class="wallet-action-icon">⚡</div><div class="wallet-action-title">ELECTRICITY</div></div>
 </div>
-<div class="wallet-action" onclick="location.href='data.html'">
-<div class="wallet-action-icon">⌁</div>
-<div class="wallet-action-title">DATA</div>
-</div>
-<div class="wallet-action" onclick="location.href='cable.html'">
-<div class="wallet-action-icon">▣</div>
-<div class="wallet-action-title">TV SUBSCRIPTION</div>
-</div>
-<div class="wallet-action" onclick="location.href='electricity.html'">
-<div class="wallet-action-icon">⚡</div>
-<div class="wallet-action-title">ELECTRICITY</div>
-</div>
-</div>
-</section>
-
-<footer class="footer">
-<div class="footer-logo">BOLTIV</div>
-<div class="footer-text">DIGITAL PAYMENT HUB</div>
-</footer>
-
-</div>
-</div>
-
-<nav class="bottom-nav">
+</section><footer class="footer"><div class="footer-logo">BOLTIV</div><div class="footer-text">DIGITAL PAYMENT HUB</div></footer>
+</div></div><nav class="bottom-nav">
 <button class="nav-item" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
 <button class="nav-item active" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
 <button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button>
 <button class="nav-item" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
-</nav>
-
-<div class="wallet-modal" id="walletModal">
+</nav><div class="wallet-modal" id="walletModal">
 <div class="wallet-modal-card">
 <div class="wallet-modal-icon">₦</div>
 <div class="wallet-modal-title">Confirm Wallet Funding</div>
@@ -149,175 +95,201 @@ Use your wallet balance for airtime, data, TV subscriptions and electricity paym
 <button class="wallet-modal-btn wallet-modal-confirm" id="confirmFunding">CONFIRM & CONTINUE</button>
 </div>
 </div>
-</div>
-
-<script>
+</div><script>
+// API CONFIG
 const API_URL="https://boltiv-backend.onrender.com";
 const modal=document.getElementById("walletModal");
 const modalAmount=document.getElementById("modalAmount");
 let pendingAmount=0;
 
+// API REQUEST
 const BoltivAPI={
-    async request(endpoint,options={}){
-        try{
-            const res=await fetch(`${API_URL}${endpoint}`,{
-                ...options,
-                headers:{"Content-Type":"application/json",...(options.headers||{})}
-            });
-            const data=await res.json();
-            return data;
-        }catch(error){
-            console.error("BOLTIV API ERROR:",error);
-            return{success:false,message:"Unable to connect to BOLTIV server"};
-        }
-    }
+async request(endpoint,options={}){
+try{
+const res=await fetch(`${API_URL}${endpoint}`,{
+...options,
+headers:{"Content-Type":"application/json",...(options.headers||{})}
+});
+const data=await res.json();
+return data;
+}catch(error){
+console.error("BOLTIV API ERROR:",error);
+return{success:false,message:"Unable to connect to BOLTIV server"};
+}
+}
 };
 
+// TOAST
 function showToast(type,title,message){
-    const old=document.querySelector(".boltiv-toast");
-    if(old)old.remove();
-
-    const icons={success:"✓",error:"!",pending:"⌛"};
-    const toast=document.createElement("div");
-    toast.className="boltiv-toast "+type;
-    toast.innerHTML=`<div class="boltiv-toast-icon">${icons[type]||"✓"}</div><div class="boltiv-toast-content"><div class="boltiv-toast-title">${title}</div><div class="boltiv-toast-message">${message}</div></div><button class="boltiv-toast-close">×</button>`;
-    document.body.appendChild(toast);
-
-    requestAnimationFrame(()=>toast.classList.add("show"));
-
-    const close=()=>{
-        toast.classList.remove("show");
-        setTimeout(()=>toast.remove(),350);
-    };
-
-    toast.querySelector(".boltiv-toast-close").onclick=close;
-    setTimeout(close,4000);
+const old=document.querySelector(".boltiv-toast");
+if(old)old.remove();
+const icons={success:"✓",error:"!",pending:"⌛"};
+const toast=document.createElement("div");
+toast.className="boltiv-toast "+type;
+toast.innerHTML=`<div class="boltiv-toast-icon">${icons[type]||"✓"}</div><div class="boltiv-toast-content"><div class="boltiv-toast-title">${title}</div><div class="boltiv-toast-message">${message}</div></div><button class="boltiv-toast-close">×</button>`;
+document.body.appendChild(toast);
+requestAnimationFrame(()=>toast.classList.add("show"));
+const close=()=>{toast.classList.remove("show");setTimeout(()=>toast.remove(),350)};
+toast.querySelector(".boltiv-toast-close").onclick=close;
+setTimeout(close,4000);
 }
 
+// USER ID
 function getUserId(){
-    try{
-        const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
-        return String(user?.id||user?.userId||user?.email||user?.phone||"boltiv-user");
-    }catch(error){
-        return"boltiv-user";
-    }
+try{
+const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
+return String(user?.id||user?.userId||user?.email||user?.phone||"boltiv-user");
+}catch(error){return"boltiv-user"}
 }
 
+// USER EMAIL
+function getUserEmail(){
+try{
+const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
+return String(user?.email||localStorage.getItem("boltivUserEmail")||"");
+}catch(error){return localStorage.getItem("boltivUserEmail")||""}
+}
+
+// MONEY
 function money(value){
-    return"₦"+Number(value||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+return"₦"+Number(value||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
+// CREATE WALLET
 async function createWallet(){
-    const userId=getUserId();
-
-    return await BoltivAPI.request("/api/wallet/create",{
-        method:"POST",
-        body:JSON.stringify({userId})
-    });
+return await BoltivAPI.request("/api/wallet/create",{
+method:"POST",
+body:JSON.stringify({userId:getUserId()})
+});
 }
 
+// LOAD WALLET
 async function loadWallet(){
-    const userId=getUserId();
-
-    let result=await BoltivAPI.request(`/api/wallet?userId=${encodeURIComponent(userId)}`);
-
-    if(result.success){
-        document.getElementById("balance").textContent=money(result.balance);
-        return result;
-    }
-
-    if(result.message==="Wallet not found"){
-        result=await createWallet();
-
-        if(result.success){
-            document.getElementById("balance").textContent=money(result.balance);
-            return result;
-        }
-    }
-
-    showToast("error","Wallet Error",result.message||"Unable to load wallet");
+const userId=getUserId();
+let result=await BoltivAPI.request(`/api/wallet?userId=${encodeURIComponent(userId)}`);
+if(result.success){
+document.getElementById("balance").textContent=money(result.balance);
+return result;
+}
+if(result.message==="Wallet not found"){
+result=await createWallet();
+if(result.success){
+document.getElementById("balance").textContent=money(result.balance);
+return result;
+}
+}
+showToast("error","Wallet Error",result.message||"Unable to load wallet");
 }
 
+// SUMMARY
 function updateSummary(){
-    const amount=Number(document.getElementById("amount").value);
-    const summary=document.getElementById("fundSummary");
-
-    if(amount>=100){
-        summary.style.display="block";
-        document.getElementById("summaryAmount").textContent=money(amount);
-    }else{
-        summary.style.display="none";
-    }
+const amount=Number(document.getElementById("amount").value);
+const summary=document.getElementById("fundSummary");
+if(amount>=100){
+summary.style.display="block";
+document.getElementById("summaryAmount").textContent=money(amount);
+}else summary.style.display="none";
 }
 
+// MODAL
 function openFundingModal(amount){
-    pendingAmount=amount;
-    modalAmount.textContent=money(amount);
-    modal.classList.add("show");
+pendingAmount=amount;
+modalAmount.textContent=money(amount);
+modal.classList.add("show");
 }
 
 function closeFundingModal(){
-    modal.classList.remove("show");
-    pendingAmount=0;
+modal.classList.remove("show");
+pendingAmount=0;
 }
 
+// AMOUNT BUTTONS
 document.querySelectorAll(".amount-btn").forEach(button=>{
-    button.onclick=()=>{
-        document.querySelectorAll(".amount-btn").forEach(item=>item.classList.remove("active"));
-        button.classList.add("active");
-        document.getElementById("amount").value=button.dataset.amount;
-        updateSummary();
-    };
+button.onclick=()=>{
+document.querySelectorAll(".amount-btn").forEach(item=>item.classList.remove("active"));
+button.classList.add("active");
+document.getElementById("amount").value=button.dataset.amount;
+updateSummary();
+};
 });
 
 document.getElementById("amount").addEventListener("input",()=>{
-    document.querySelectorAll(".amount-btn").forEach(item=>item.classList.remove("active"));
-    updateSummary();
+document.querySelectorAll(".amount-btn").forEach(item=>item.classList.remove("active"));
+updateSummary();
 });
 
+// OPEN FUNDING
 document.getElementById("fundBtn").onclick=()=>{
-    const amount=Number(document.getElementById("amount").value);
-
-    if(!amount||amount<100){
-        showToast("error","Invalid Amount","The minimum wallet funding amount is ₦100.");
-        return;
-    }
-
-    openFundingModal(amount);
+const amount=Number(document.getElementById("amount").value);
+if(!amount||amount<100){
+showToast("error","Invalid Amount","The minimum wallet funding amount is ₦100.");
+return;
+}
+openFundingModal(amount);
 };
 
 document.getElementById("cancelFunding").onclick=closeFundingModal;
 
-document.getElementById("confirmFunding").onclick=()=>{
-    if(!pendingAmount)return;
+// CONNECT TO BACKEND
+document.getElementById("confirmFunding").onclick=async()=>{
+if(!pendingAmount)return;
 
-    showToast("pending","Payment Gateway","Wallet funding gateway is not connected yet.");
-    closeFundingModal();
+const amount=pendingAmount;
+const userId=getUserId();
+const email=getUserEmail();
+
+if(!email){
+showToast("error","Email Required","Please add your email address to your profile first.");
+closeFundingModal();
+return;
+}
+
+showToast("pending","Connecting","Connecting to BOLTIV payment gateway...");
+
+const result=await BoltivAPI.request("/api/wallet/fund",{
+method:"POST",
+body:JSON.stringify({
+userId,
+email,
+amount
+})
+});
+
+if(result.success){
+showToast("success","Payment Ready","Payment gateway is ready.");
+if(result.authorizationUrl){
+window.location.href=result.authorizationUrl;
+}
+}else{
+showToast("error","Payment Gateway",result.message||"Unable to initialize payment.");
+}
+
+closeFundingModal();
 };
 
+// CLOSE MODAL
 modal.onclick=event=>{
-    if(event.target===modal)closeFundingModal();
+if(event.target===modal)closeFundingModal();
 };
 
 document.addEventListener("keydown",event=>{
-    if(event.key==="Escape")closeFundingModal();
+if(event.key==="Escape")closeFundingModal();
 });
 
-document.getElementById("profileButton").onclick=()=>{
-    location.href="profile.html";
-};
+// PROFILE
+document.getElementById("profileButton").onclick=()=>location.href="profile.html";
 
+// NAVIGATION
 document.querySelectorAll(".nav-item").forEach(item=>{
-    item.onclick=()=>{
-        location.href=item.dataset.page;
-    };
+item.onclick=()=>location.href=item.dataset.page;
 });
 
 document.getElementById("profileButton").textContent="U";
 
+// START
 loadWallet();
 window.addEventListener("pageshow",loadWallet);
-</script>
 
-</body>
+/* END OF BOLTIV WALLET */
+</script></body>
 </html>

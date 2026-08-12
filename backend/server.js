@@ -237,3 +237,65 @@ return send(res,200,await verifyPayment(r));
 }
 
 // END OF CHUNK 4A
+  if(req.method==="POST"&&p==="/api/vtu/debit"){
+const x=await session(req);
+if(!x)return send(res,401,{success:false,message:"Unauthorized."});
+const b=await body(req),amount=Number(b.amount);
+if(!Number.isFinite(amount)||amount<=0)return send(res,400,{success:false,message:"Valid amount is required."});
+return send(res,200,await debit(x.user_id,amount,String(b.service||"VTU Service"),String(b.reference||ref())));
+}
+
+if(req.method==="POST"&&p==="/api/admin/login"){
+const b=await body(req),r=await adminLogin(String(b.email||"").trim(),String(b.password||""));
+return send(res,r.success?200:401,r);
+}
+
+if(req.method==="GET"&&p==="/api/admin/me"){
+const x=await adminAuth(req);
+if(!x)return send(res,401,{success:false,message:"Unauthorized."});
+return send(res,200,{success:true,admin:x});
+}
+
+if(req.method==="GET"&&p==="/api/admin/stats"){
+if(!await adminAuth(req))return send(res,401,{success:false,message:"Unauthorized."});
+const w=await db(`SELECT COUNT(*)::int count,COALESCE(SUM(balance),0) balance FROM wallets`),t=await db(`SELECT COUNT(*)::int count FROM transactions`),pmt=await db(`SELECT COUNT(*)::int count,COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) successful FROM payments`);
+return send(res,200,{success:true,stats:{users:w.rows[0].count,walletBalance:Number(w.rows[0].balance),transactions:t.rows[0].count,payments:pmt.rows[0].count,successfulPayments:Number(pmt.rows[0].successful)}});
+}
+
+if(req.method==="GET"&&p==="/api/admin/users"){
+if(!await adminAuth(req))return send(res,401,{success:false,message:"Unauthorized."});
+return send(res,200,{success:true,users:await adminData("users")});
+}
+
+if(req.method==="GET"&&p==="/api/admin/transactions"){
+if(!await adminAuth(req))return send(res,401,{success:false,message:"Unauthorized."});
+return send(res,200,{success:true,transactions:await adminData("transactions")});
+}
+
+if(req.method==="GET"&&p==="/api/admin/payments"){
+if(!await adminAuth(req))return send(res,401,{success:false,message:"Unauthorized."});
+return send(res,200,{success:true,payments:await adminData("payments")});
+}
+
+if(req.method==="POST"&&p==="/api/admin/logout"){
+const h=req.headers.authorization||"";
+if(h.startsWith("Bearer "))await db(`DELETE FROM admin_sessions WHERE token=$1`,[h.slice(7).trim()]);
+return send(res,200,{success:true,message:"Admin logged out."});
+}
+
+return send(res,404,{success:false,message:"API route not found"});
+
+}catch(e){
+console.error("BOLTIV ERROR:",e);
+return send(res,500,{success:false,message:"Server error."});
+}
+});
+
+init().then(()=>{
+server.listen(PORT,"0.0.0.0",()=>console.log(`BOLTIV API running on port ${PORT}`));
+}).catch(e=>{
+console.error("STARTUP ERROR:",e);
+process.exit(1);
+});
+
+// END OF BOLTIV BACKEND

@@ -38,6 +38,7 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 .save-btn.show{display:block}
 .actions{display:grid;gap:9px}
 .action{width:100%;padding:15px;display:flex;align-items:center;gap:12px;border-radius:15px;background:#101010;border:1px solid #242424;color:#fff;text-align:left}
+.action:active{transform:scale(.98);border-color:#d4af37}
 .action-icon{width:38px;height:38px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#17140b;border:1px solid #403513;color:#d4af37;font-size:13px}
 .action-text{flex:1}
 .action-title{font-size:9px;font-weight:900}
@@ -78,14 +79,15 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 <button class="action" id="securityBtn"><div class="action-icon">⌾</div><div class="action-text"><div class="action-title">Security Settings</div><div class="action-sub">Manage your Transaction PIN and account security</div></div><div class="action-arrow">›</div></button>
 </div></div>
 
-<!-- SUPPORT -->
-<div class="section"><div class="section-head"><h3>Support</h3></div><div class="actions">
-<button class="action" id="supportBtn"><div class="action-icon">?</div><div class="action-text"><div class="action-title">BOLTIV Support</div><div class="action-sub">Get help with your account and transactions</div></div><div class="action-arrow">›</div></button>
-</div></div>
-
-<!-- ACCOUNT ACTIONS -->
+<!-- ACCOUNT -->
 <div class="section"><div class="section-head"><h3>Account</h3></div><div class="actions">
+
+<!-- SUPPORT -->
+<button class="action" id="supportBtn"><div class="action-icon">?</div><div class="action-text"><div class="action-title">Support</div><div class="action-sub">Get help with your account and transactions</div></div><div class="action-arrow">›</div></button>
+
+<!-- LOGOUT -->
 <button class="action logout" id="logoutBtn"><div class="action-icon">↪</div><div class="action-text"><div class="action-title">Log Out</div><div class="action-sub">Sign out of your BOLTIV account</div></div><div class="action-arrow">›</div></button>
+
 </div></div>
 
 </div></div>
@@ -107,7 +109,12 @@ function getUser(){try{return JSON.parse(localStorage.getItem("boltivUser")||"{}
 function saveUser(user){localStorage.setItem("boltivUser",JSON.stringify(user))}
 
 // ELEMENTS
-const nameInput=document.getElementById("nameInput"),phoneInput=document.getElementById("phoneInput"),emailInput=document.getElementById("emailInput"),editBtn=document.getElementById("editBtn"),saveBtn=document.getElementById("saveBtn"),modal=document.getElementById("modal");
+const nameInput=document.getElementById("nameInput");
+const phoneInput=document.getElementById("phoneInput");
+const emailInput=document.getElementById("emailInput");
+const editBtn=document.getElementById("editBtn");
+const saveBtn=document.getElementById("saveBtn");
+const modal=document.getElementById("modal");
 
 // LOAD PROFILE
 function loadProfile(){
@@ -142,7 +149,9 @@ editBtn.onclick=()=>nameInput.disabled?enableEdit():disableEdit();
 
 // SAVE PROFILE
 saveBtn.onclick=()=>{
-const name=nameInput.value.trim(),phone=phoneInput.value.trim(),email=emailInput.value.trim();
+const name=nameInput.value.trim();
+const phone=phoneInput.value.trim();
+const email=emailInput.value.trim();
 if(name.length<2){alert("Please enter your full name.");return}
 if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return}
 const oldUser=getUser();
@@ -176,4 +185,4 @@ loadProfile();
 </script>
 </body>
 </html>
-<!-- BOLTIV PROFILE UPDATED WITH SUPPORT -->
+<!-- BOLTIV PROFILE WITH SUPPORT -->

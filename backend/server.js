@@ -303,6 +303,14 @@ return send(res,200,{success:true,message:"Admin logged out."});
 }
 
 return send(res,404,{success:false,message:"API route not found"});
+  if(req.method==="GET"&&path==="/api/admin/reset-password"){
+if(!ADMIN_EMAIL||!ADMIN_PASSWORD)return send(res,500,{success:false,message:"ADMIN_EMAIL or ADMIN_PASSWORD is missing."});
+const r=await db(`SELECT id FROM admins WHERE LOWER(email)=LOWER($1)`,[ADMIN_EMAIL]);
+if(!r.rows.length)return send(res,404,{success:false,message:"Admin account not found."});
+await db(`UPDATE admins SET password_hash=$1 WHERE id=$2`,[hash(ADMIN_PASSWORD),r.rows[0].id]);
+await db(`DELETE FROM admin_sessions WHERE admin_id=$1`,[r.rows[0].id]);
+return send(res,200,{success:true,message:"Admin password reset successfully."});
+  }
 }catch(e){
 console.error("BOLTIV ERROR:",e);
 return send(res,500,{success:false,message:"Server error."});

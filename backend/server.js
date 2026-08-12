@@ -684,3 +684,47 @@ payments:result.rows.map(x=>({...x,amount:Number(x.amount)}))
 }
 
 // CONTINUE TO CHUNK 4B
+  // ADMIN LOGOUT
+if(req.method==="POST"&&path==="/api/admin/logout"){
+const header=req.headers.authorization||"";
+
+if(header.startsWith("Bearer ")){
+const token=header.slice(7).trim();
+if(token){
+await db(`DELETE FROM admin_sessions WHERE token=$1`,[token]);
+}
+}
+
+return send(res,200,{
+success:true,
+message:"Admin logged out."
+});
+}
+
+// 404
+return send(res,404,{
+success:false,
+message:"API route not found"
+});
+
+}catch(error){
+console.error("BOLTIV ERROR:",error);
+
+return send(res,500,{
+success:false,
+message:"Internal server error."
+});
+}
+});
+
+// START SERVER
+initializeDatabase().then(()=>{
+server.listen(PORT,"0.0.0.0",()=>{
+console.log(`BOLTIV API running on port ${PORT}`);
+});
+}).catch(error=>{
+console.error("DATABASE STARTUP ERROR:",error);
+process.exit(1);
+});
+
+// END OF BOLTIV BACKEND

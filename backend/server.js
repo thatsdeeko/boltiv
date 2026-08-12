@@ -367,3 +367,259 @@ client.release();
 }
 
 // END OF CHUNK 2
+// ADMIN
+async function adminAuth(req){
+const header=req.headers.authorization||"";
+if(!header.startsWith("Bearer "))return null;
+
+const token=header.slice(7).trim();
+if(!token)return null;
+
+const result=await db(
+`SELECT a.id,a.email
+FROM admin_sessions s
+JOIN admins a ON a.id=s.admin_id
+WHERE s.token=$1 AND s.expires_at>NOW()`,
+[token]
+);
+
+return result.rows[0]||null;
+}
+
+async function adminLogin(email,password){
+const result=await db(
+`SELECT id,email,password_hash
+FROM admins
+WHERE LOWER(email)=LOWER($1)`,
+[email]
+);
+
+if(!result.rows.length){
+return{
+success:false,
+message:"Invalid admin credentials."
+};
+}
+
+const admin=result.rows[0];
+
+if(!verifyPassword(password,admin.password_hash)){
+return{
+success:false,
+message:"Invalid admin credentials."
+};
+}
+
+const token=createToken();
+
+await db(
+`INSERT INTO admin_sessions(
+token,admin_id,expires_at
+) VALUES($1,$2,NOW()+INTERVAL '24 hours')`,
+[token,admin.id]
+);
+
+return{
+success:true,
+message:"Admin login successful.",
+token,
+admin:{
+id:admin.id,
+email:admin.email
+}
+};
+}
+
+// SERVER
+const server=http.createServer(async(req,res)=>{
+res.setHeader("Access-Control-Allow-Origin","*");
+res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
+res.setHeader(
+"Access-Control-Allow-Headers",
+"Content-Type,Authorization"
+);
+
+if(req.method==="OPTIONS"){
+res.writeHead(204);
+return res.end();
+}
+
+const url=new URL(req.url,"http://localhost");
+const path=url.pathname;
+
+try{
+
+// HEALTH
+if(req.method==="GET"&&path==="/api/health"){
+return send(res,200,{
+success:true,
+app:"BOLTIV",
+status:"online",
+paystack:PAYSTACK_SECRET_KEY?"configured":"not configured",
+database:DATABASE_URL?"configured":"not configured",
+admin:ADMIN_EMAIL?"configured":"not configured",
+message:"BOLTIV backend is running"
+});
+}
+
+// CREATE WALLET
+if(req.method==="POST"&&path==="/api/wallet/create"){
+const body=await readBody(req);
+const userId=String(body.userId||"").trim();
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required"
+});
+}
+
+await createWallet(userId);
+
+const wallet=await getWallet(userId);
+
+return send(res,200,{
+success:true,
+message:"Wallet ready",
+userId,
+balance:wallet.balance
+});
+}
+
+// GET WALLET
+if(req.method==="GET"&&path==="/api/wallet"){
+const userId=url.searchParams.get("userId");
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required"
+});
+}
+
+let wallet=await getWallet(userId);
+
+if(!wallet){
+await createWallet(userId);
+wallet=await getWallet(userId);
+}
+
+return send(res,200,{
+success:true,
+userId,
+balance:wallet.balance,
+transactions:await getTransactions(userId)
+});
+}
+
+// FUND WALLET
+if(req.method==="POST"&&path==="/api/wallet/fund"){
+const body=await readBody(req);
+
+const userId=String(body.userId||"").trim();
+const email=String(body.email||"").trim();
+const amount=Number(body.amount);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required"
+});
+}
+
+if(
+!email||
+!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+){
+return send(res,400,{
+success:false,
+message:"A valid email is required"
+});
+}
+
+if(!Number.isFinite(amount)||amount<100){
+return send(res,400,{
+success:false,
+message:"Minimum wallet funding amount is ₦100."
+});
+}
+
+await createWallet(userId);
+
+const result=await initializePayment({
+userId,
+email,
+amount
+});
+
+return send(
+res,
+result.success?200:400,
+result
+);
+}
+
+// VERIFY PAYMENT
+if(req.method==="GET"&&path==="/api/wallet/verify"){
+const reference=url.searchParams.get("reference");
+
+if(!reference){
+return send(res,400,{
+success:false,
+message:"Payment reference is required."
+});
+}
+
+const result=await verifyPayment(reference);
+
+return send(
+res,
+result.success?200:400,
+result
+);
+}
+
+// ADMIN LOGIN
+if(req.method==="POST"&&path==="/api/admin/login"){
+const body=await readBody(req);
+
+const email=String(body.email||"").trim();
+const password=String(body.password||"");
+
+if(!email||!password){
+return send(res,400,{
+success:false,
+message:"Email and password are required."
+});
+}
+
+const result=await adminLogin(
+email,
+password
+);
+
+return send(
+res,
+result.success?200:401,
+result
+);
+}
+
+// ADMIN SESSION
+if(req.method==="GET"&&path==="/api/admin/me"){
+const admin=await adminAuth(req);
+
+if(!admin){
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+return send(res,200,{
+success:true,
+admin
+});
+}
+
+// END OF CHUNK 3

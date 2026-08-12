@@ -5,128 +5,525 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#050505">
 <title>BOLTIV — Admin</title>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#050505;color:#fff;font-family:Arial,sans-serif}
-.hidden{display:none!important}
-.wrap{width:min(1100px,92%);margin:auto}
-.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.card{width:100%;max-width:390px;background:#101010;border:1px solid #292929;border-radius:22px;padding:28px;box-shadow:0 20px 70px #000}
-.logo{text-align:center;color:#d4af37;font-size:30px;font-weight:900}
-.title{text-align:center;font-size:15px;font-weight:900;margin-top:10px}
-.sub{text-align:center;color:#666;font-size:9px;margin:7px 0 25px;letter-spacing:1px}
-.label{display:block;color:#888;font-size:8px;font-weight:700;margin:0 0 7px}
-.input{width:100%;padding:14px;border:1px solid #292929;border-radius:10px;background:#080808;color:#fff;outline:0;margin-bottom:15px}
-.input:focus{border-color:#d4af37}
-.btn{width:100%;border:0;border-radius:10px;padding:14px;font-weight:900;cursor:pointer}
-.gold{background:#d4af37;color:#050505}
-.error{text-align:center;color:#ff7777;font-size:9px;margin-top:12px}
-.dashboard{min-height:100vh;padding-bottom:70px}
-.header{border-bottom:1px solid #222;padding:20px 0;display:flex;align-items:center;justify-content:space-between}
-.brand{color:#d4af37;font-size:23px;font-weight:900}
-.tag{color:#666;font-size:8px;letter-spacing:1.5px;margin-top:3px}
-.user{display:flex;align-items:center;gap:10px}
-.email{color:#888;font-size:9px}
-.avatar{width:38px;height:38px;border:1px solid #d4af37;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#d4af37;font-weight:900}
-.logout{background:#160c0c;border:1px solid #3a2929;color:#e77;border-radius:8px;padding:9px 12px;font-size:8px;font-weight:900;cursor:pointer}
-.main{padding-top:25px}
-.heading{font-size:22px;font-weight:900}
-.heading span{color:#d4af37}
-.desc{color:#666;font-size:9px;margin-top:5px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}
-.stat{background:#101010;border:1px solid #242424;border-radius:16px;padding:18px}
-.stat small{display:block;color:#777;font-size:8px;letter-spacing:.7px}
-.value{color:#d4af37;font-size:21px;font-weight:900;margin-top:9px}
-.section{margin-top:28px}
-.sectionhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.sectiontitle{font-size:14px;font-weight:900}
-.refresh{background:#111;color:#d4af37;border:1px solid #333;border-radius:8px;padding:8px 11px;font-size:8px;font-weight:900;cursor:pointer}
-.tablebox{overflow:auto;background:#0d0d0d;border:1px solid #222;border-radius:15px}
-.table{width:100%;border-collapse:collapse;min-width:650px}
-.table th{color:#777;font-size:8px;text-align:left;padding:13px;border-bottom:1px solid #222}
-.table td{color:#bbb;font-size:9px;padding:13px;border-bottom:1px solid #181818}
-.status{display:inline-block;background:#17140b;color:#d4af37;border-radius:20px;padding:5px 8px;font-size:7px;font-weight:900}
-.empty{text-align:center!important;color:#666!important;padding:25px!important}
-@media(max-width:700px){
-.stats{grid-template-columns:repeat(2,1fr)}
-.email{display:none}
+
+body{
+margin:0;
+background:#050505;
+color:#fff;
+font-family:Arial,sans-serif
 }
+
+.hidden{display:none!important}
+
+.wrap{
+width:min(1100px,92%);
+margin:auto
+}
+
+/* LOGIN */
+
+.login{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px
+}
+
+.card{
+width:100%;
+max-width:390px;
+background:#101010;
+border:1px solid #292929;
+border-radius:22px;
+padding:28px;
+box-shadow:0 20px 70px #000
+}
+
+.logo{
+text-align:center;
+color:#d4af37;
+font-size:30px;
+font-weight:900
+}
+
+.title{
+text-align:center;
+font-size:15px;
+font-weight:900;
+margin-top:10px
+}
+
+.sub{
+text-align:center;
+color:#666;
+font-size:9px;
+margin:7px 0 25px;
+letter-spacing:1px
+}
+
+.label{
+display:block;
+color:#888;
+font-size:8px;
+font-weight:700;
+margin:0 0 7px
+}
+
+.input{
+width:100%;
+padding:14px;
+border:1px solid #292929;
+border-radius:10px;
+background:#080808;
+color:#fff;
+outline:0;
+margin-bottom:15px
+}
+
+.input:focus{
+border-color:#d4af37
+}
+
+.btn{
+width:100%;
+border:0;
+border-radius:10px;
+padding:14px;
+font-weight:900;
+cursor:pointer
+}
+
+.gold{
+background:#d4af37;
+color:#050505
+}
+
+.gold:disabled{
+opacity:.6;
+cursor:not-allowed
+}
+
+.error{
+text-align:center;
+color:#ff7777;
+font-size:9px;
+margin-top:12px;
+line-height:1.5
+}
+
+.success{
+text-align:center;
+color:#d4af37;
+font-size:9px;
+margin-top:12px
+}
+
+/* DASHBOARD */
+
+.dashboard{
+min-height:100vh;
+padding-bottom:70px
+}
+
+.header{
+border-bottom:1px solid #222;
+padding:20px 0;
+display:flex;
+align-items:center;
+justify-content:space-between
+}
+
+.brand{
+color:#d4af37;
+font-size:23px;
+font-weight:900
+}
+
+.tag{
+color:#666;
+font-size:8px;
+letter-spacing:1.5px;
+margin-top:3px
+}
+
+.user{
+display:flex;
+align-items:center;
+gap:10px
+}
+
+.email{
+color:#888;
+font-size:9px
+}
+
+.avatar{
+width:38px;
+height:38px;
+border:1px solid #d4af37;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+color:#d4af37;
+font-weight:900
+}
+
+.logout{
+background:#160c0c;
+border:1px solid #3a2929;
+color:#e77;
+border-radius:8px;
+padding:9px 12px;
+font-size:8px;
+font-weight:900;
+cursor:pointer
+}
+
+.main{
+padding-top:25px
+}
+
+.heading{
+font-size:22px;
+font-weight:900
+}
+
+.heading span{
+color:#d4af37
+}
+
+.desc{
+color:#666;
+font-size:9px;
+margin-top:5px
+}
+
+.stats{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:12px;
+margin-top:22px
+}
+
+.stat{
+background:#101010;
+border:1px solid #242424;
+border-radius:16px;
+padding:18px
+}
+
+.stat small{
+display:block;
+color:#777;
+font-size:8px;
+letter-spacing:.7px
+}
+
+.value{
+color:#d4af37;
+font-size:21px;
+font-weight:900;
+margin-top:9px
+}
+
+.section{
+margin-top:28px
+}
+
+.sectionhead{
+display:flex;
+align-items:center;
+justify-content:space-between;
+margin-bottom:12px
+}
+
+.sectiontitle{
+font-size:14px;
+font-weight:900
+}
+
+.refresh{
+background:#111;
+color:#d4af37;
+border:1px solid #333;
+border-radius:8px;
+padding:8px 11px;
+font-size:8px;
+font-weight:900;
+cursor:pointer
+}
+
+.tablebox{
+overflow:auto;
+background:#0d0d0d;
+border:1px solid #222;
+border-radius:15px
+}
+
+.table{
+width:100%;
+border-collapse:collapse;
+min-width:650px
+}
+
+.table th{
+color:#777;
+font-size:8px;
+text-align:left;
+padding:13px;
+border-bottom:1px solid #222
+}
+
+.table td{
+color:#bbb;
+font-size:9px;
+padding:13px;
+border-bottom:1px solid #181818
+}
+
+.status{
+display:inline-block;
+background:#17140b;
+color:#d4af37;
+border-radius:20px;
+padding:5px 8px;
+font-size:7px;
+font-weight:900
+}
+
+.empty{
+text-align:center!important;
+color:#666!important;
+padding:25px!important
+}
+
+@media(max-width:700px){
+
+.stats{
+grid-template-columns:repeat(2,1fr)
+}
+
+.email{
+display:none
+}
+
+}
+
 @media(max-width:420px){
-.stats{gap:8px}
-.stat{padding:13px}
-.value{font-size:17px}
+
+.stats{
+gap:8px
+}
+
+.stat{
+padding:13px
+}
+
+.value{
+font-size:17px
+}
+
 }
 </style>
 </head>
+
 <body>
 
+<!-- ================= LOGIN ================= -->
+
 <div id="login" class="login">
+
 <div class="card">
+
 <div class="logo">BOLTIV</div>
-<div class="title">ADMIN CONTROL CENTER</div>
-<div class="sub">SECURE ADMINISTRATOR ACCESS</div>
 
-<label class="label">ADMIN EMAIL</label>
-<input id="email" class="input" type="email" placeholder="Admin email" autocomplete="username">
+<div class="title">
+ADMIN CONTROL CENTER
+</div>
 
-<label class="label">ADMIN PASSWORD</label>
-<input id="password" class="input" type="password" placeholder="Admin password" autocomplete="current-password">
+<div class="sub">
+SECURE ADMINISTRATOR ACCESS
+</div>
 
-<button id="loginBtn" class="btn gold">LOGIN TO ADMIN</button>
+<label class="label">
+ADMIN EMAIL
+</label>
+
+<input
+id="email"
+class="input"
+type="email"
+placeholder="Admin email"
+autocomplete="username"
+>
+
+<label class="label">
+ADMIN PASSWORD
+</label>
+
+<input
+id="password"
+class="input"
+type="password"
+placeholder="Admin password"
+autocomplete="current-password"
+>
+
+<button
+id="loginBtn"
+class="btn gold"
+type="button"
+>
+LOGIN TO ADMIN
+</button>
+
 <div id="error" class="error"></div>
+
 </div>
 </div>
+
+
+<!-- ================= DASHBOARD ================= -->
 
 <div id="dashboard" class="dashboard hidden">
+
 <div class="wrap">
 
 <header class="header">
+
 <div>
-<div class="brand">BOLTIV</div>
-<div class="tag">ADMIN CONTROL CENTER</div>
+
+<div class="brand">
+BOLTIV
 </div>
+
+<div class="tag">
+ADMIN CONTROL CENTER
+</div>
+
+</div>
+
 <div class="user">
+
 <div id="adminEmail" class="email"></div>
-<div class="avatar">A</div>
-<button id="logoutBtn" class="logout">LOGOUT</button>
+
+<div class="avatar">
+A
 </div>
+
+<button
+id="logoutBtn"
+class="logout"
+type="button"
+>
+LOGOUT
+</button>
+
+</div>
+
 </header>
 
+
 <main class="main">
-<div class="heading">SYSTEM <span>OVERVIEW</span></div>
-<div class="desc">Monitor BOLTIV wallet activity and platform statistics.</div>
+
+<div class="heading">
+SYSTEM <span>OVERVIEW</span>
+</div>
+
+<div class="desc">
+Monitor BOLTIV wallet activity and platform statistics.
+</div>
+
+
+<!-- ================= STATS ================= -->
 
 <div class="stats">
-<div class="stat">
-<small>TOTAL USERS</small>
-<div id="users" class="value">0</div>
-</div>
 
 <div class="stat">
-<small>WALLET BALANCE</small>
-<div id="wallet" class="value">₦0.00</div>
+
+<small>
+TOTAL USERS
+</small>
+
+<div id="users" class="value">
+0
 </div>
 
-<div class="stat">
-<small>TRANSACTIONS</small>
-<div id="transactions" class="value">0</div>
 </div>
 
+
 <div class="stat">
-<small>SUCCESSFUL PAYMENTS</small>
-<div id="payments" class="value">₦0.00</div>
+
+<small>
+WALLET BALANCE
+</small>
+
+<div id="wallet" class="value">
+₦0.00
 </div>
+
 </div>
+
+
+<div class="stat">
+
+<small>
+TRANSACTIONS
+</small>
+
+<div id="transactions" class="value">
+0
+</div>
+
+</div>
+
+
+<div class="stat">
+
+<small>
+SUCCESSFUL PAYMENTS
+</small>
+
+<div id="payments" class="value">
+₦0.00
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ================= TRANSACTIONS ================= -->
 
 <section class="section">
+
 <div class="sectionhead">
-<div class="sectiontitle">RECENT TRANSACTIONS</div>
-<button class="refresh" onclick="loadTransactions()">REFRESH</button>
+
+<div class="sectiontitle">
+RECENT TRANSACTIONS
+</div>
+
+<button
+class="refresh"
+id="refreshTransactions"
+type="button"
+>
+REFRESH
+</button>
+
 </div>
 
 <div class="tablebox">
+
 <table class="table">
+
 <thead>
+
 <tr>
 <th>USER</th>
 <th>TYPE</th>
@@ -135,260 +532,686 @@ body{margin:0;background:#050505;color:#fff;font-family:Arial,sans-serif}
 <th>STATUS</th>
 <th>DATE</th>
 </tr>
+
 </thead>
-<tbody id="transactionBody"></tbody>
+
+<tbody id="transactionBody">
+
+<tr>
+<td colspan="6" class="empty">
+Loading...
+</td>
+</tr>
+
+</tbody>
+
 </table>
+
 </div>
+
 </section>
 
+
+<!-- ================= USERS ================= -->
+
 <section class="section">
+
 <div class="sectionhead">
-<div class="sectiontitle">USERS</div>
-<button class="refresh" onclick="loadUsers()">REFRESH</button>
+
+<div class="sectiontitle">
+USERS
+</div>
+
+<button
+class="refresh"
+id="refreshUsers"
+type="button"
+>
+REFRESH
+</button>
+
 </div>
 
 <div class="tablebox">
+
 <table class="table">
+
 <thead>
+
 <tr>
 <th>USER ID</th>
 <th>BALANCE</th>
 <th>CREATED</th>
 <th>UPDATED</th>
 </tr>
+
 </thead>
-<tbody id="userBody"></tbody>
+
+<tbody id="userBody">
+
+<tr>
+<td colspan="4" class="empty">
+Loading...
+</td>
+</tr>
+
+</tbody>
+
 </table>
+
 </div>
+
 </section>
 
 </main>
-</div>
+
 </div>
 
+</div>
+
+
+<!-- ================= JAVASCRIPT ================= -->
+
 <script>
+
 const API="https://boltiv-backend.onrender.com";
+
 const KEY="boltivAdminToken";
+
 
 const $=id=>document.getElementById(id);
 
-const money=x=>"₦"+Number(x||0).toLocaleString("en-NG",{
+
+function money(value){
+
+return "₦"+Number(value||0).toLocaleString("en-NG",{
 minimumFractionDigits:2,
 maximumFractionDigits:2
 });
 
-const date=x=>x?new Date(x).toLocaleString("en-NG"):"—";
+}
 
-function escapeHTML(x){
-return String(x??"").replace(/[&<>"']/g,c=>({
+
+function formatDate(value){
+
+if(!value)return "—";
+
+const d=new Date(value);
+
+if(Number.isNaN(d.getTime()))return "—";
+
+return d.toLocaleString("en-NG");
+
+}
+
+
+function escapeHTML(value){
+
+return String(value??"").replace(/[&<>"']/g,function(char){
+
+return {
 "&":"&amp;",
 "<":"&lt;",
 ">":"&gt;",
 '"':"&quot;",
 "'":"&#039;"
-}[c]));
-}
+}[char];
 
-async function api(path,options={}){
-try{
-const token=localStorage.getItem(KEY);
-
-const res=await fetch(API+path,{
-...options,
-headers:{
-"Content-Type":"application/json",
-...(token?{"Authorization":"Bearer "+token}:{}),
-...(options.headers||{})
-}
 });
 
-return await res.json();
+}
 
-}catch(e){
+
+/* ================= API ================= */
+
+async function api(path,options={}){
+
+const token=localStorage.getItem(KEY);
+
+const headers={
+"Content-Type":"application/json",
+...(token
+?{"Authorization":"Bearer "+token}
+:{})
+};
+
+if(options.headers){
+
+Object.assign(headers,options.headers);
+
+}
+
+try{
+
+console.log("BOLTIV API REQUEST:",API+path);
+
+const response=await fetch(API+path,{
+...options,
+headers
+});
+
+const text=await response.text();
+
+let data;
+
+try{
+
+data=text?JSON.parse(text):{};
+
+}catch{
+
+data={
+success:false,
+message:text||"Invalid server response."
+};
+
+}
+
+console.log("BOLTIV API RESPONSE:",path,data);
+
+return data;
+
+}catch(error){
+
+console.error("BOLTIV API ERROR:",error);
+
 return{
 success:false,
 message:"Unable to connect to BOLTIV server."
 };
+
 }
+
 }
+
+
+/* ================= SCREEN ================= */
 
 function showLogin(){
+
 $("login").classList.remove("hidden");
+
 $("dashboard").classList.add("hidden");
+
 }
+
 
 function showDashboard(email){
+
 $("login").classList.add("hidden");
+
 $("dashboard").classList.remove("hidden");
+
 $("adminEmail").textContent=email||"";
+
 }
 
+
+/* ================= LOGIN ================= */
+
 async function login(){
+
 const email=$("email").value.trim().toLowerCase();
+
 const password=$("password").value;
 
 $("error").textContent="";
 
-if(!email||!password){
-$("error").textContent="Enter your admin email and password.";
+if(!email){
+
+$("error").textContent="Enter your admin email.";
+
 return;
+
 }
+
+if(!password){
+
+$("error").textContent="Enter your admin password.";
+
+return;
+
+}
+
+
+$("loginBtn").disabled=true;
 
 $("loginBtn").textContent="LOGGING IN...";
 
-const r=await api("/api/admin/login",{
+
+console.log("ADMIN LOGIN START");
+
+console.log("Email:",email);
+
+
+const result=await api("/api/admin/login",{
+
 method:"POST",
+
 body:JSON.stringify({
-email,
-password
+
+email:email,
+
+password:password
+
 })
+
 });
 
-if(!r.success){
+
+console.log("ADMIN LOGIN RESULT:",result);
+
+
+if(!result.success){
+
+$("loginBtn").disabled=false;
+
 $("loginBtn").textContent="LOGIN TO ADMIN";
-$("error").textContent=r.message||"Admin login failed.";
+
+$("error").textContent=
+result.message||"Admin login failed.";
+
 return;
+
 }
 
-localStorage.setItem(KEY,r.token);
-localStorage.setItem("boltivAdminEmail",r.admin.email);
+
+if(!result.token){
+
+$("loginBtn").disabled=false;
 
 $("loginBtn").textContent="LOGIN TO ADMIN";
 
-showDashboard(r.admin.email);
+$("error").textContent=
+"Login succeeded but no admin session token was returned.";
 
-loadDashboard();
+return;
+
 }
 
-async function check(){
+
+localStorage.setItem(KEY,result.token);
+
+localStorage.setItem(
+"boltivAdminEmail",
+result.admin?.email||email
+);
+
+
+$("loginBtn").disabled=false;
+
+$("loginBtn").textContent="LOGIN TO ADMIN";
+
+
+showDashboard(
+result.admin?.email||email
+);
+
+
+await loadDashboard();
+
+}
+
+
+/* ================= SESSION CHECK ================= */
+
+async function checkSession(){
+
 const token=localStorage.getItem(KEY);
 
 if(!token){
+
 showLogin();
+
 return;
+
 }
 
-const r=await api("/api/admin/me");
 
-if(!r.success){
+const result=await api("/api/admin/me");
+
+
+if(!result.success){
+
 localStorage.removeItem(KEY);
+
 localStorage.removeItem("boltivAdminEmail");
+
 showLogin();
+
 return;
+
 }
 
-showDashboard(r.admin.email);
 
-loadDashboard();
+showDashboard(
+result.admin?.email||
+localStorage.getItem("boltivAdminEmail")||
+""
+);
+
+
+await loadDashboard();
+
 }
+
+
+/* ================= STATS ================= */
 
 async function loadStats(){
-const r=await api("/api/admin/stats");
 
-if(!r.success){
-if(r.message==="Unauthorized.")await logout();
+const result=await api("/api/admin/stats");
+
+
+if(!result.success){
+
+if(result.message==="Unauthorized."){
+
+await logout();
+
 return;
+
 }
 
-const s=r.stats||{};
+$("users").textContent="—";
 
-$("users").textContent=s.users||0;
-$("wallet").textContent=money(s.walletBalance);
-$("transactions").textContent=s.transactions||0;
-$("payments").textContent=money(s.successfulPayments);
+$("wallet").textContent="—";
+
+$("transactions").textContent="—";
+
+$("payments").textContent="—";
+
+return;
+
 }
+
+
+const stats=result.stats||{};
+
+
+$("users").textContent=
+stats.users??0;
+
+
+$("wallet").textContent=
+money(stats.walletBalance);
+
+
+$("transactions").textContent=
+stats.transactions??0;
+
+
+$("payments").textContent=
+money(stats.successfulPayments);
+
+}
+
+
+/* ================= TRANSACTIONS ================= */
 
 async function loadTransactions(){
-const b=$("transactionBody");
 
-b.innerHTML='<tr><td colspan="6" class="empty">Loading...</td></tr>';
+const body=$("transactionBody");
 
-const r=await api("/api/admin/transactions");
 
-if(!r.success){
-b.innerHTML='<tr><td colspan="6" class="empty">Unable to load transactions.</td></tr>';
+body.innerHTML=
+'<tr><td colspan="6" class="empty">Loading...</td></tr>';
+
+
+const result=
+await api("/api/admin/transactions");
+
+
+if(!result.success){
+
+body.innerHTML=
+'<tr><td colspan="6" class="empty">'+
+escapeHTML(
+result.message||
+"Unable to load transactions."
+)+
+'</td></tr>';
+
 return;
+
 }
 
-if(!r.transactions||!r.transactions.length){
-b.innerHTML='<tr><td colspan="6" class="empty">No transactions yet.</td></tr>';
+
+if(
+!Array.isArray(result.transactions)||
+!result.transactions.length
+){
+
+body.innerHTML=
+'<tr><td colspan="6" class="empty">'+
+"No transactions yet."+
+'</td></tr>';
+
 return;
+
 }
 
-b.innerHTML=r.transactions.map(x=>`
+
+body.innerHTML=
+result.transactions.map(function(item){
+
+return `
 <tr>
-<td>${escapeHTML(x.user_id)}</td>
-<td>${escapeHTML(x.type)}</td>
-<td>${escapeHTML(x.service)}</td>
-<td>${money(x.amount)}</td>
-<td><span class="status">${escapeHTML(x.status)}</span></td>
-<td>${date(x.date||x.created_at)}</td>
+
+<td>
+${escapeHTML(item.user_id)}
+</td>
+
+<td>
+${escapeHTML(item.type)}
+</td>
+
+<td>
+${escapeHTML(item.service)}
+</td>
+
+<td>
+${money(item.amount)}
+</td>
+
+<td>
+<span class="status">
+${escapeHTML(item.status)}
+</span>
+</td>
+
+<td>
+${formatDate(item.date||item.created_at)}
+</td>
+
 </tr>
-`).join("");
+`;
+
+}).join("");
+
 }
-  <script>
+
+
+/* ================= USERS ================= */
+
 async function loadUsers(){
-const b=$("userBody");
 
-b.innerHTML='<tr><td colspan="4" class="empty">Loading...</td></tr>';
+const body=$("userBody");
 
-const r=await api("/api/admin/users");
 
-if(!r.success){
-b.innerHTML='<tr><td colspan="4" class="empty">Unable to load users.</td></tr>';
+body.innerHTML=
+'<tr><td colspan="4" class="empty">Loading...</td></tr>';
+
+
+const result=
+await api("/api/admin/users");
+
+
+if(!result.success){
+
+body.innerHTML=
+'<tr><td colspan="4" class="empty">'+
+escapeHTML(
+result.message||
+"Unable to load users."
+)+
+'</td></tr>';
+
 return;
+
 }
 
-if(!r.users||!r.users.length){
-b.innerHTML='<tr><td colspan="4" class="empty">No users yet.</td></tr>';
+
+if(
+!Array.isArray(result.users)||
+!result.users.length
+){
+
+body.innerHTML=
+'<tr><td colspan="4" class="empty">'+
+"No users yet."+
+'</td></tr>';
+
 return;
+
 }
 
-b.innerHTML=r.users.map(x=>`
+
+body.innerHTML=
+result.users.map(function(item){
+
+return `
 <tr>
-<td>${escapeHTML(x.user_id)}</td>
-<td>${money(x.balance)}</td>
-<td>${date(x.created_at)}</td>
-<td>${date(x.updated_at)}</td>
+
+<td>
+${escapeHTML(item.user_id)}
+</td>
+
+<td>
+${money(item.balance)}
+</td>
+
+<td>
+${formatDate(item.created_at)}
+</td>
+
+<td>
+${formatDate(item.updated_at)}
+</td>
+
 </tr>
-`).join("");
+`;
+
+}).join("");
+
 }
+
+
+/* ================= DASHBOARD ================= */
 
 async function loadDashboard(){
+
 await Promise.all([
+
 loadStats(),
+
 loadTransactions(),
+
 loadUsers()
+
 ]);
+
 }
+
+
+/* ================= LOGOUT ================= */
 
 async function logout(){
+
 const token=localStorage.getItem(KEY);
 
+
 if(token){
+
 await api("/api/admin/logout",{
+
 method:"POST"
+
 });
+
 }
+
 
 localStorage.removeItem(KEY);
+
 localStorage.removeItem("boltivAdminEmail");
 
+
 showLogin();
+
+$("email").value="";
+
+$("password").value="";
+
+$("error").textContent="";
+
 }
 
-$("loginBtn").onclick=login;
-$("logoutBtn").onclick=logout;
 
-$("password").addEventListener("keydown",e=>{
-if(e.key==="Enter")login();
-});
+/* ================= EVENTS ================= */
 
-check();
+$("loginBtn").addEventListener(
+"click",
+login
+);
 
-/* BOLTIV ADMIN — CONNECTED TO POSTGRESQL BACKEND */
+
+$("logoutBtn").addEventListener(
+"click",
+logout
+);
+
+
+$("refreshTransactions").addEventListener(
+"click",
+loadTransactions
+);
+
+
+$("refreshUsers").addEventListener(
+"click",
+loadUsers
+);
+
+
+$("password").addEventListener(
+"keydown",
+function(event){
+
+if(event.key==="Enter"){
+
+login();
+
+}
+
+}
+);
+
+
+/* ================= START ================= */
+
+console.log(
+"BOLTIV ADMIN PANEL INITIALIZED"
+);
+
+console.log(
+"Backend:",
+API
+);
+
+checkSession();
+
 </script>
-</body>
-</html>
 
-<!-- BOLTIV ADMIN PANEL — BACKEND CONNECTED VERSION -->
+</body>
+  </html>

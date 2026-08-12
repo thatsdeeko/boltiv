@@ -623,3 +623,64 @@ admin
 }
 
 // END OF CHUNK 3
+  // ADMIN STATS
+if(req.method==="GET"&&path==="/api/admin/stats"){
+const admin=await adminAuth(req);
+if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+
+const wallets=await db(`SELECT COUNT(*)::int AS count,COALESCE(SUM(balance),0) AS balance FROM wallets`);
+const transactions=await db(`SELECT COUNT(*)::int AS count FROM transactions`);
+const payments=await db(`SELECT COUNT(*)::int AS count,COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) AS successful FROM payments`);
+
+return send(res,200,{
+success:true,
+stats:{
+users:wallets.rows[0].count,
+walletBalance:Number(wallets.rows[0].balance),
+transactions:transactions.rows[0].count,
+payments:payments.rows[0].count,
+successfulPayments:Number(payments.rows[0].successful)
+}
+});
+}
+
+// ADMIN USERS
+if(req.method==="GET"&&path==="/api/admin/users"){
+const admin=await adminAuth(req);
+if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+
+const result=await db(`SELECT user_id,balance,created_at,updated_at FROM wallets ORDER BY created_at DESC LIMIT 100`);
+
+return send(res,200,{
+success:true,
+users:result.rows.map(x=>({...x,balance:Number(x.balance)}))
+});
+}
+
+// ADMIN TRANSACTIONS
+if(req.method==="GET"&&path==="/api/admin/transactions"){
+const admin=await adminAuth(req);
+if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+
+const result=await db(`SELECT id,user_id,type,service,amount,reference,status,date FROM transactions ORDER BY date DESC LIMIT 100`);
+
+return send(res,200,{
+success:true,
+transactions:result.rows.map(x=>({...x,amount:Number(x.amount)}))
+});
+}
+
+// ADMIN PAYMENTS
+if(req.method==="GET"&&path==="/api/admin/payments"){
+const admin=await adminAuth(req);
+if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+
+const result=await db(`SELECT reference,user_id,email,amount,status,credited,created_at,credited_at FROM payments ORDER BY created_at DESC LIMIT 100`);
+
+return send(res,200,{
+success:true,
+payments:result.rows.map(x=>({...x,amount:Number(x.amount)}))
+});
+}
+
+// CONTINUE TO CHUNK 4B

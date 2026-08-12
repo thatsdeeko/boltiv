@@ -21,4 +21,32 @@ document.querySelectorAll(".amount-button").forEach(b=>b.onclick=()=>{document.q
 custom.oninput=()=>{amount=Number(custom.value);document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"))};
 
 // CHUNK 1 END
-  
+  function uid(){try{let u=JSON.parse(localStorage.getItem("boltivUser")||"{}");return String(u.id||u.userId||u.email||"")}catch(e){return""}}
+function details(){return`<div class="modal-detail"><span>Service</span><strong>Airtime</strong></div><div class="modal-detail"><span>Network</span><strong>${network}</strong></div><div class="modal-detail"><span>Phone</span><strong>${phone.value}</strong></div><div class="modal-detail"><span>Amount</span><strong>${money(amount)}</strong></div>`}
+async function buy(){
+const p=phone.value.trim();
+if(!/^\d{11}$/.test(p))return show("warning","Check Your Number","Enter a valid 11-digit Nigerian phone number.");
+if(!network)return show("warning","Select Network","Choose MTN, Airtel, Glo or 9mobile.");
+if(!amount||amount<50)return show("warning","Invalid Amount","The minimum airtime purchase is ₦50.");
+const id=uid();
+if(!id)return show("failed","Session Error","Please log in again and try again.");
+show("processing","Checking Service","Connecting to BOLTIV...");
+mb.style.display="none";
+try{
+const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:id,phone:p,network,amount})});
+let d={};
+try{d=await r.json()}catch(e){}
+if(d.success){
+show("success","Airtime Purchased",d.message||"Your airtime purchase was successful.",details()+(d.reference?`<div class="modal-detail"><span>Reference</span><strong>${d.reference}</strong></div>`:""));
+mb.style.display="block";
+}else{
+show("failed","Airtime Unavailable",d.message||"The airtime provider is not available yet.",details());
+mb.style.display="block";
+}
+}catch(e){
+show("failed","Service Unavailable","The BOLTIV airtime service is currently unavailable. Please try again later.",details());
+mb.style.display="block";
+}}
+document.getElementById("purchaseButton").onclick=buy;
+</script></body></html>
+<!-- BOLTIV AIRTIME PROVIDER READY -->

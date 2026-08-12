@@ -1,13 +1,4 @@
-const http=require("node:http"),crypto=require("node:crypto"),{Pool}=require("pg");
-const PORT=process.env.PORT||3000,DATABASE_URL=process.env.DATABASE_URL||"",PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"",FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv",ADMIN_EMAIL=process.env.ADMIN_EMAIL||"",ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
-const pool=new Pool({connectionString:DATABASE_URL,ssl:DATABASE_URL?{rejectUnauthorized:false}:false});
-const db=(q,p=[])=>pool.query(q,p);
-const send=(r,s,d)=>{r.writeHead(s,{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization"});r.end(JSON.stringify(d))};
-const body=req=>new Promise((ok,no)=>{let b="";req.on("data",x=>b+=x);req.on("end",()=>{try{ok(b?JSON.parse(b):{})}catch(e){no(e)}});req.on("error",no)});
-const token=()=>crypto.randomBytes(32).toString("hex"),ref=()=>`BOLTIV-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,uid=()=>`BOLTIV-${crypto.randomBytes(10).toString("hex")}`;
-const hash=(p,s=crypto.randomBytes(16).toString("hex"))=>`${s}:${crypto.scryptSync(p,s,64).toString("hex")}`;
-const verify=(p,x)=>{try{let[s,k]=x.split(":"),h=crypto.scryptSync(p,s,64).toString("hex");return crypto.timingSafeEqual(Buffer.from(h,"hex"),Buffer.from(k,"hex"))}catch{return false}};
-const initials=n=>{let x=String(n||"").trim().split(/\s+/).filter(Boolean);return x.length>1?(x[0][0]+x.at(-1)[0]).toUpperCase():(x[0]?.[0]||"U").toUpperCase()};
+const http=require("node:http"),crypto=require("node:crypto"),{Pool}=require("pg"),PORT=process.env.PORT||3000,DATABASE_URL=process.env.DATABASE_URL||"",PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"",FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv",ADMIN_EMAIL=process.env.ADMIN_EMAIL||"",ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"",pool=new Pool({connectionString:DATABASE_URL,ssl:DATABASE_URL?{rejectUnauthorized:false}:false}),db=(q,p=[])=>pool.query(q,p),send=(r,s,d)=>(r.writeHead(s,{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization"}),r.end(JSON.stringify(d))),body=req=>new Promise((ok,no)=>{let b="";req.on("data",x=>b+=x);req.on("end",()=>{try{ok(b?JSON.parse(b):{})}catch(e){no(e)}});req.on("error",no)}),token=()=>crypto.randomBytes(32).toString("hex"),ref=()=>`BOLTIV-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,uid=()=>`BOLTIV-${crypto.randomBytes(10).toString("hex")}`,hash=(p,s=crypto.randomBytes(16).toString("hex"))=>`${s}:${crypto.scryptSync(p,s,64).toString("hex")}`,verify=(p,x)=>{try{let[s,k]=x.split(":"),h=crypto.scryptSync(p,s,64).toString("hex");return crypto.timingSafeEqual(Buffer.from(h,"hex"),Buffer.from(k,"hex"))}catch{return false}},initials=n=>{let x=String(n||"").trim().split(/\s+/).filter(Boolean);return x.length>1?(x[0][0]+x.at(-1)[0]).toUpperCase():(x[0]?.[0]||"U").toUpperCase()};
 
 async function init(){
 if(!DATABASE_URL)return console.log("DATABASE_URL is not configured.");
@@ -37,7 +28,6 @@ await makeWallet(r.rows[0].user_id);
 return{success:true,user:r.rows[0]};
 }
 
-// CHUNK 1 END
 async function loginUser(email,password){
 const u=await userEmail(email);
 if(!u||!verify(password,u.password_hash))return{success:false,message:"Invalid email or password."};
@@ -112,7 +102,6 @@ return{success:true,message:"Wallet funded successfully.",reference,amount:Numbe
 }catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}
 }
 
-// CHUNK 2 END
 async function debit(id,amount,service,reference=ref()){
 const c=await pool.connect();
 try{
@@ -143,24 +132,21 @@ return{success:true,message:"Admin login successful.",token:t,admin:{id:r.rows[0
 }
 
 async function adminData(type){
-if(type==="users")return(await db(`SELECT user_id,name,phone,email,created_at FROM users ORDER BY created_at DESC LIMIT 100`)).rows;
+if(type==="users")return(await db(`SELECT u.user_id,u.name,u.phone,u.email,COALESCE(w.balance,0) balance,u.created_at,u.updated_at FROM users u LEFT JOIN wallets w ON w.user_id=u.user_id ORDER BY u.created_at DESC LIMIT 100`)).rows.map(x=>({...x,balance:Number(x.balance)}));
 if(type==="transactions")return(await db(`SELECT id,user_id,type,service,amount,reference,status,date FROM transactions ORDER BY date DESC LIMIT 100`)).rows.map(x=>({...x,amount:Number(x.amount)}));
 if(type==="payments")return(await db(`SELECT reference,user_id,email,amount,status,credited,created_at,credited_at FROM payments ORDER BY created_at DESC LIMIT 100`)).rows.map(x=>({...x,amount:Number(x.amount)}));
 return[];
 }
 
-// CHUNK 3 END
 const server=http.createServer(async(req,res)=>{
 res.setHeader("Access-Control-Allow-Origin","*");
 res.setHeader("Access-Control-Allow-Methods","GET,POST,PUT,OPTIONS");
 res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");
 if(req.method==="OPTIONS"){res.writeHead(204);return res.end()}
 const u=new URL(req.url,"http://localhost"),p=u.pathname;
-
 try{
 
-if(req.method==="GET"&&p==="/api/health")
-return send(res,200,{success:true,app:"BOLTIV",status:"online",paystack:PAYSTACK_SECRET_KEY?"configured":"not configured",database:DATABASE_URL?"configured":"not configured",admin:ADMIN_EMAIL?"configured":"not configured",message:"BOLTIV backend is running"});
+if(req.method==="GET"&&p==="/api/health")return send(res,200,{success:true,app:"BOLTIV",status:"online",paystack:PAYSTACK_SECRET_KEY?"configured":"not configured",database:DATABASE_URL?"configured":"not configured",admin:ADMIN_EMAIL?"configured":"not configured",message:"BOLTIV backend is running"});
 
 if(req.method==="POST"&&p==="/api/auth/register"){
 const b=await body(req),r=await createUser(String(b.name||"").trim(),String(b.phone||"").trim(),String(b.email||"").trim().toLowerCase(),String(b.password||""));
@@ -236,8 +222,7 @@ if(!r)return send(res,400,{success:false,message:"Payment reference is required.
 return send(res,200,await verifyPayment(r));
 }
 
-// END OF CHUNK 4A
-  if(req.method==="POST"&&p==="/api/vtu/debit"){
+if(req.method==="POST"&&p==="/api/vtu/debit"){
 const x=await session(req);
 if(!x)return send(res,401,{success:false,message:"Unauthorized."});
 const b=await body(req),amount=Number(b.amount);
@@ -258,8 +243,8 @@ return send(res,200,{success:true,admin:x});
 
 if(req.method==="GET"&&p==="/api/admin/stats"){
 if(!await adminAuth(req))return send(res,401,{success:false,message:"Unauthorized."});
-const w=await db(`SELECT COUNT(*)::int count,COALESCE(SUM(balance),0) balance FROM wallets`),t=await db(`SELECT COUNT(*)::int count FROM transactions`),pmt=await db(`SELECT COUNT(*)::int count,COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) successful FROM payments`);
-return send(res,200,{success:true,stats:{users:w.rows[0].count,walletBalance:Number(w.rows[0].balance),transactions:t.rows[0].count,payments:pmt.rows[0].count,successfulPayments:Number(pmt.rows[0].successful)}});
+const users=await db(`SELECT COUNT(*)::int count FROM users`),w=await db(`SELECT COALESCE(SUM(balance),0) balance FROM wallets`),t=await db(`SELECT COUNT(*)::int count FROM transactions`),pmt=await db(`SELECT COUNT(*)::int count,COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) successful FROM payments`);
+return send(res,200,{success:true,stats:{users:users.rows[0].count,walletBalance:Number(w.rows[0].balance),transactions:t.rows[0].count,payments:pmt.rows[0].count,successfulPayments:Number(pmt.rows[0].successful)}});
 }
 
 if(req.method==="GET"&&p==="/api/admin/users"){
@@ -284,18 +269,9 @@ return send(res,200,{success:true,message:"Admin logged out."});
 }
 
 return send(res,404,{success:false,message:"API route not found"});
-
-}catch(e){
-console.error("BOLTIV ERROR:",e);
-return send(res,500,{success:false,message:"Server error."});
-}
+}catch(e){console.error("BOLTIV ERROR:",e);return send(res,500,{success:false,message:"Server error."})}
 });
 
-init().then(()=>{
-server.listen(PORT,"0.0.0.0",()=>console.log(`BOLTIV API running on port ${PORT}`));
-}).catch(e=>{
-console.error("STARTUP ERROR:",e);
-process.exit(1);
-});
+init().then(()=>server.listen(PORT,"0.0.0.0",()=>console.log(`BOLTIV API running on port ${PORT}`))).catch(e=>{console.error("STARTUP ERROR:",e);process.exit(1)});
 
-// END OF BOLTIV BACKEND
+/* END OF BOLTIV SERVER */

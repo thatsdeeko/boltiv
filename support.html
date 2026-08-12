@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -11,49 +10,31 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 </script>
 </head>
 <body>
-<div class="page"><div class="container">
-
-<header class="header">
+<div class="page"><div class="container"><header class="header">
 <div class="brand">
 <div class="brand-name">BOLTIV</div>
 <div class="brand-tagline">DIGITAL PAYMENT HUB</div>
 </div>
 <button class="profile-mini" id="profileButton">U</button>
-</header>
-
-<section class="welcome">
+</header><section class="welcome">
 <div class="welcome-title">BOLTIV <span>SUPPORT</span></div>
 <div class="welcome-text">We're here to help you with your account and transactions.</div>
-</section>
-
-<section class="section">
-<div class="section-head"><h2 class="section-title">HOW CAN WE HELP?</h2></div>
-
-<div class="support-card">
+</section><section class="section">
+<div class="section-head"><h2 class="section-title">HOW CAN WE HELP?</h2></div><div class="support-card">
 <div class="support-title">Wallet & Funding</div>
 <div class="support-text">Having trouble funding your wallet or seeing your balance? Contact support and we'll help you resolve it.</div>
-</div>
-
-<div class="support-card">
+</div><div class="support-card">
 <div class="support-title">Airtime & Data</div>
 <div class="support-text">Report failed, pending or incorrect airtime and data transactions.</div>
-</div>
-
-<div class="support-card">
+</div><div class="support-card">
 <div class="support-title">Cable TV</div>
 <div class="support-text">Need help with a cable subscription or payment issue? We're available to assist.</div>
-</div>
-
-<div class="support-card">
+</div><div class="support-card">
 <div class="support-title">Electricity</div>
 <div class="support-text">Contact us if your electricity payment is pending, failed or not reflected.</div>
 </div>
-</section>
-
-<section class="section">
-<div class="section-head"><h2 class="section-title">CONTACT SUPPORT</h2></div>
-
-<div class="card">
+</section><section class="section">
+<div class="section-head"><h2 class="section-title">CONTACT SUPPORT</h2></div><div class="card">
 <div class="form-group">
 <label class="label">SUBJECT</label>
 <select id="subject">
@@ -66,51 +47,36 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 <option>Account</option>
 <option>Other</option>
 </select>
-</div>
-
-<div class="form-group">
+</div><div class="form-group">
 <label class="label">MESSAGE</label>
 <textarea id="message" rows="5" placeholder="Describe your issue..."></textarea>
-</div>
+</div><button class="btn btn-primary" id="sendBtn" style="width:100%">SEND REQUEST</button>
 
-<button class="btn btn-primary" id="sendBtn" style="width:100%">SEND REQUEST</button>
 </div>
-</section>
-
-<section class="section">
+</section><section class="section">
 <div class="card text-center">
 <div class="wallet-action-icon">◉</div>
 <div style="font-size:13px;font-weight:900;margin-bottom:5px">BOLTIV SUPPORT</div>
 <div style="font-size:10px;color:#666;line-height:1.6">
 For urgent transaction issues, keep your transaction ID available when contacting support.
-</div>
-
-<div style="margin-top:18px">
-<a href="mailto:boltivsupport@gmail.com" style="display:block;color:#d4af37;text-decoration:none;font-size:11px;font-weight:900;margin-bottom:10px">
+</div><div style="margin-top:18px">
+<a href="https://wa.me/2347086836820" style="display:block;color:#d4af37;text-decoration:none;font-size:11px;font-weight:900;margin-bottom:10px">
+◉ WhatsApp Support
+</a>
+<a href="mailto:boltivsupport@gmail.com" style="display:block;color:#d4af37;text-decoration:none;font-size:11px;font-weight:900">
 ✉ boltivsupport@gmail.com
 </a>
-<a href="tel:07086836820" style="display:block;color:#d4af37;text-decoration:none;font-size:11px;font-weight:900">
-☎ 07086836820
-</a>
 </div>
 </div>
-</section>
-
-<footer class="footer">
+</section><footer class="footer">
 <div class="footer-logo">BOLTIV</div>
 <div class="footer-text">DIGITAL PAYMENT HUB</div>
-</footer>
-
-</div></div>
-
-<nav class="bottom-nav">
+</footer></div></div><nav class="bottom-nav">
 <button class="nav-item" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
 <button class="nav-item" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
 <button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Transactions</span></button>
 <button class="nav-item active" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
-</nav>
-
-<script>
+</nav><script>
 function loadUser(){
 try{
 const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
@@ -124,13 +90,41 @@ document.getElementById("sendBtn").onclick=()=>{
 const subject=document.getElementById("subject").value;
 const message=document.getElementById("message").value.trim();
 
-if(!subject){alert("Please select an issue.");return}
-if(!message){alert("Please enter your message.");return}
+if(!subject){
+alert("Please select an issue.");
+return;
+}
 
-const email="boltivsupport@gmail.com";
-const body=`BOLTIV Support Request\n\nIssue: ${subject}\n\nMessage:\n${message}`;
-location.href=`mailto:${email}?subject=${encodeURIComponent("BOLTIV Support - "+subject)}&body=${encodeURIComponent(body)}`;
+if(!message){
+alert("Please enter your message.");
+return;
+}
+
+const phone="2347086836820";
+const user=getUser();
+const name=String(user.name||user.fullName||"BOLTIV User").trim();
+const email=String(user.email||"").trim();
+
+const text=
+`BOLTIV SUPPORT REQUEST
+
+Name: ${name}
+Email: ${email||"Not provided"}
+Issue: ${subject}
+
+Message:
+${message}`;
+
+location.href=`https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 };
+
+function getUser(){
+try{
+return JSON.parse(localStorage.getItem("boltivUser")||"{}")||{};
+}catch(e){
+return{};
+}
+}
 
 document.getElementById("profileButton").onclick=()=>location.href="profile.html";
 
@@ -139,7 +133,6 @@ item.onclick=()=>location.href=item.dataset.page;
 });
 
 loadUser();
-</script>
-</body>
+</script></body>
 </html>
-<!-- BOLTIV SUPPORT UPDATED -->
+<!-- BOLTIV SUPPORT — WHATSAPP REQUEST SYSTEM UPDATED -->

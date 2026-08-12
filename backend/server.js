@@ -113,3 +113,127 @@ return{success:true,message:"Wallet funded successfully.",reference,amount:Numbe
 }
 
 // CHUNK 2 END
+async function debit(id,amount,service,reference=ref()){
+const c=await pool.connect();
+try{
+await c.query("BEGIN");
+const w=await c.query(`SELECT balance FROM wallets WHERE user_id=$1 FOR UPDATE`,[id]);
+if(!w.rows.length){await c.query("ROLLBACK");return{success:false,message:"Wallet not found."}}
+if(Number(w.rows[0].balance)<amount){await c.query("ROLLBACK");return{success:false,message:"Insufficient wallet balance.",balance:Number(w.rows[0].balance)}}
+const r=await c.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,id]);
+await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status) VALUES($1,'debit',$2,$3,$4,'successful')`,[id,service,amount,reference]);
+await c.query("COMMIT");
+return{success:true,reference,balance:Number(r.rows[0].balance)};
+}catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}
+}
+
+async function adminAuth(req){
+const h=req.headers.authorization||"";
+if(!h.startsWith("Bearer "))return null;
+const r=await db(`SELECT a.id,a.email FROM admin_sessions s JOIN admins a ON a.id=s.admin_id WHERE s.token=$1 AND s.expires_at>NOW()`,[h.slice(7).trim()]);
+return r.rows[0]||null;
+}
+
+async function adminLogin(email,password){
+const r=await db(`SELECT * FROM admins WHERE LOWER(email)=LOWER($1)`,[email]);
+if(!r.rows.length||!verify(password,r.rows[0].password_hash))return{success:false,message:"Invalid admin credentials."};
+const t=token();
+await db(`INSERT INTO admin_sessions(token,admin_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '24 hours')`,[t,r.rows[0].id]);
+return{success:true,message:"Admin login successful.",token:t,admin:{id:r.rows[0].id,email:r.rows[0].email}};
+}
+
+async function adminData(type){
+if(type==="users")return(await db(`SELECT user_id,name,phone,email,created_at FROM users ORDER BY created_at DESC LIMIT 100`)).rows;
+if(type==="transactions")return(await db(`SELECT id,user_id,type,service,amount,reference,status,date FROM transactions ORDER BY date DESC LIMIT 100`)).rows.map(x=>({...x,amount:Number(x.amount)}));
+if(type==="payments")return(await db(`SELECT reference,user_id,email,amount,status,credited,created_at,credited_at FROM payments ORDER BY created_at DESC LIMIT 100`)).rows.map(x=>({...x,amount:Number(x.amount)}));
+return[];
+}
+
+// CHUNK 3 END
+const server=http.createServer(async(req,res)=>{
+res.setHeader("Access-Control-Allow-Origin","*");
+res.setHeader("Access-Control-Allow-Methods","GET,POST,PUT,OPTIONS");
+res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");
+if(req.method==="OPTIONS"){res.writeHead(204);return res.end()}
+const u=new URL(req.url,"http://localhost"),p=u.pathname;
+
+try{
+
+if(req.method==="GET"&&p==="/api/health")
+return send(res,200,{success:true,app:"BOLTIV",status:"online",paystack:PAYSTACK_SECRET_KEY?"configured":"not configured",database:DATABASE_URL?"configured":"not configured",admin:ADMIN_EMAIL?"configured":"not configured",message:"BOLTIV backend is running"});
+
+if(req.method==="POST"&&p==="/api/auth/register"){
+const b=await body(req),r=await createUser(String(b.name||"").trim(),String(b.phone||"").trim(),String(b.email||"").trim().toLowerCase(),String(b.password||""));
+return send(res,r.success?201:400,r);
+}
+
+if(req.method==="POST"&&p==="/api/auth/login"){
+const b=await body(req),r=await loginUser(String(b.email||"").trim(),String(b.password||""));
+return send(res,r.success?200:401,r);
+}
+
+if(req.method==="POST"&&p==="/api/auth/forgot-password"){
+const b=await body(req);
+return send(res,200,await forgotPassword(String(b.email||"").trim().toLowerCase()));
+}
+
+if(req.method==="POST"&&p==="/api/auth/reset-password"){
+const b=await body(req);
+return send(res,200,await resetPassword(String(b.token||""),String(b.password||"")));
+}
+
+if(req.method==="GET"&&p==="/api/auth/me"){
+const x=await session(req);
+if(!x)return send(res,401,{success:false,message:"Unauthorized."});
+return send(res,200,{success:true,user:{id:x.user_id,name:x.name,phone:x.phone,email:x.email,initials:x.initials}});
+}
+
+if(req.method==="POST"&&p==="/api/auth/logout"){
+const h=req.headers.authorization||"";
+if(h.startsWith("Bearer "))await db(`DELETE FROM user_sessions WHERE token=$1`,[h.slice(7).trim()]);
+return send(res,200,{success:true,message:"Logged out successfully."});
+}
+
+if(req.method==="PUT"&&p==="/api/profile"){
+const x=await session(req);
+if(!x)return send(res,401,{success:false,message:"Unauthorized."});
+const b=await body(req);
+return send(res,200,await updateProfile(x.user_id,String(b.name||"").trim(),String(b.phone||"").trim(),String(b.email||"").trim().toLowerCase()));
+}
+
+if(req.method==="POST"&&p==="/api/profile/password"){
+const x=await session(req);
+if(!x)return send(res,401,{success:false,message:"Unauthorized."});
+const b=await body(req);
+return send(res,200,await changePassword(x.user_id,String(b.currentPassword||""),String(b.newPassword||"")));
+}
+
+if(req.method==="POST"&&p==="/api/wallet/create"){
+const b=await body(req),id=String(b.userId||"").trim();
+if(!id)return send(res,400,{success:false,message:"User ID is required."});
+await makeWallet(id);
+return send(res,200,{success:true,userId:id,balance:(await wallet(id)).balance});
+}
+
+if(req.method==="GET"&&p==="/api/wallet"){
+const id=u.searchParams.get("userId");
+if(!id)return send(res,400,{success:false,message:"User ID is required."});
+let w=await wallet(id);
+if(!w){await makeWallet(id);w=await wallet(id)}
+return send(res,200,{success:true,userId:id,balance:w.balance,transactions:await transactions(id)});
+}
+
+if(req.method==="POST"&&p==="/api/wallet/fund"){
+const b=await body(req),id=String(b.userId||"").trim(),email=String(b.email||"").trim(),amount=Number(b.amount);
+if(!id||!/^\S+@\S+\.\S+$/.test(email)||!Number.isFinite(amount)||amount<100)return send(res,400,{success:false,message:"Valid user, email and amount of at least ₦100 are required."});
+await makeWallet(id);
+return send(res,200,await fund(id,email,amount));
+}
+
+if(req.method==="GET"&&p==="/api/wallet/verify"){
+const r=u.searchParams.get("reference");
+if(!r)return send(res,400,{success:false,message:"Payment reference is required."});
+return send(res,200,await verifyPayment(r));
+}
+
+// END OF CHUNK 4A

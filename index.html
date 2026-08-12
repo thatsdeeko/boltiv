@@ -4,119 +4,99 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#050505">
-<title>BOLTIV — Home</title>
-<script>
-if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html");
-</script>
+<title>BOLTIV — Fast & Reliable Digital Services</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#050505;color:#fff;font-family:Arial,Helvetica,sans-serif}
 body{min-height:100vh}
 button{font-family:inherit;cursor:pointer}
-.page{min-height:100vh;padding-bottom:100px}
+.page{min-height:100vh;padding-bottom:40px}
 .container{width:min(100% - 30px,480px);margin:auto}
-.home-header{display:flex;align-items:center;justify-content:space-between;padding:24px 0 22px}
-.brand{color:#d4af37;font-size:23px;font-weight:1000;letter-spacing:2px}
-.greeting{margin-top:7px;color:#777;font-size:10px;font-weight:800}
-#userName{color:#d4af37;font-size:17px;font-weight:1000;margin-left:3px}
-.profile-button{width:42px;height:42px;border:1px solid #292929;border-radius:14px;background:#111;color:#d4af37;font-size:18px}
-.balance-card{position:relative;overflow:hidden;padding:25px 21px;border:1px solid #332d19;border-radius:24px;background:radial-gradient(circle at 100% 0,rgba(212,175,55,.18),transparent 38%),linear-gradient(145deg,#1a1a1a,#090909);box-shadow:0 18px 50px rgba(0,0,0,.35)}
-.balance-label{color:#777;font-size:8px;font-weight:900;letter-spacing:1px}
-.balance-amount{margin-top:9px;color:#fff;font-size:30px;font-weight:1000}
-.fund-button{margin-top:19px;padding:11px 16px;border:1px solid #d4af37;border-radius:11px;background:#d4af37;color:#050505;font-size:8px;font-weight:1000}
-.services-section{margin-top:27px}
-.section-title{color:#777;font-size:8px;font-weight:1000;letter-spacing:1px;margin-bottom:12px}
-.services-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-.service-card{min-height:130px;padding:17px;border:1px solid #242424;border-radius:19px;background:linear-gradient(145deg,#121212,#0b0b0b);text-align:left;color:#fff;transition:.2s}
-.service-card:active{transform:scale(.97);border-color:#d4af37}
-.service-icon{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:18px;font-weight:1000}
-.service-name{margin-top:17px;font-size:10px;font-weight:1000}
-.service-text{margin-top:5px;color:#666;font-size:7px}
-.quick-section{margin-top:27px}
-.quick-card{width:100%;display:flex;align-items:center;gap:13px;margin-bottom:10px;padding:15px;border:1px solid #242424;border-radius:17px;background:#101010;color:#fff;text-align:left}
-.quick-icon{width:40px;height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:17px}
-.quick-info{min-width:0;flex:1}
-.quick-title{font-size:9px;font-weight:1000}
-.quick-text{margin-top:5px;color:#666;font-size:7px}
-.quick-arrow{color:#d4af37;font-size:20px}
-.bottom-nav{position:fixed;z-index:1000;bottom:0;left:0;right:0;height:72px;display:flex;justify-content:center;gap:4px;padding:8px 12px;background:rgba(7,7,7,.96);border-top:1px solid #222;backdrop-filter:blur(15px)}
-.nav-item{width:25%;max-width:110px;border:0;background:transparent;color:#555;font-size:7px;font-weight:900}
-.nav-item.active{color:#d4af37}
-.nav-icon{display:block;margin-bottom:5px;font-size:17px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:24px 0}
+.brand{color:#d4af37;font-size:25px;font-weight:1000;letter-spacing:3px}
+.login{padding:10px 15px;border:1px solid #d4af37;border-radius:10px;background:transparent;color:#d4af37;font-size:9px;font-weight:1000}
+.hero{padding:35px 0 25px}
+.hero-label{color:#d4af37;font-size:9px;font-weight:1000;letter-spacing:2px}
+.hero h1{margin:12px 0 0;font-size:38px;line-height:1.05;font-weight:1000;letter-spacing:-1px}
+.hero h1 span{color:#d4af37}
+.hero p{margin:16px 0 0;color:#777;font-size:12px;line-height:1.7}
+.hero-button{margin-top:22px;padding:14px 20px;border:0;border-radius:12px;background:#d4af37;color:#050505;font-size:9px;font-weight:1000}
+.services{margin-top:35px}
+.title{color:#777;font-size:8px;font-weight:1000;letter-spacing:1.5px;margin-bottom:13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.card{min-height:125px;padding:17px;border:1px solid #242424;border-radius:19px;background:linear-gradient(145deg,#121212,#0b0b0b)}
+.icon{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#17140b;border:1px solid #3a3016;color:#d4af37;font-size:18px;font-weight:1000}
+.name{margin-top:16px;font-size:10px;font-weight:1000}
+.text{margin-top:5px;color:#666;font-size:7px}
+.info{margin-top:35px;padding:20px;border:1px solid #242424;border-radius:20px;background:#101010}
+.info h2{margin:0;color:#fff;font-size:15px}
+.info p{margin:10px 0 0;color:#777;font-size:9px;line-height:1.7}
+.footer{margin-top:40px;padding:20px 0;border-top:1px solid #202020;text-align:center;color:#555;font-size:8px}
+.footer strong{color:#d4af37}
 </style>
 </head>
 <body>
-<div class="page"><div class="container">
-<header class="home-header">
-<div>
+<div class="page">
+<div class="container">
+
+<header class="header">
 <div class="brand">BOLTIV</div>
-<div class="greeting"><span id="greeting">Good morning</span>, <span id="userName"></span> 👋</div>
-</div>
-<button class="profile-button" onclick="location.href='profile.html'">◉</button>
+<button class="login" onclick="location.href='login.html'">LOGIN</button>
 </header>
 
-<section class="balance-card">
-<div class="balance-label">WALLET BALANCE</div>
-<div class="balance-amount">₦<span id="balance">0.00</span></div>
-<button class="fund-button" onclick="location.href='wallet.html'">FUND WALLET</button>
+<section class="hero">
+<div class="hero-label">DIGITAL SERVICES MADE SIMPLE</div>
+<h1>Power your day with <span>BOLTIV.</span></h1>
+<p>Buy airtime and data, pay electricity bills, renew your cable subscription and manage your digital payments from one convenient platform.</p>
+<button class="hero-button" onclick="location.href='register.html'">GET STARTED</button>
 </section>
 
-<section class="services-section">
-<div class="section-title">PAY BILLS</div>
-<div class="services-grid">
-<button class="service-card" onclick="location.href='airtime.html'"><div class="service-icon">☎</div><div class="service-name">Airtime</div><div class="service-text">Buy airtime</div></button>
-<button class="service-card" onclick="location.href='data.html'"><div class="service-icon">◉</div><div class="service-name">Data</div><div class="service-text">Buy data</div></button>
-<button class="service-card" onclick="location.href='electricity.html'"><div class="service-icon">ϟ</div><div class="service-name">Electricity</div><div class="service-text">Pay electricity</div></button>
-<button class="service-card" onclick="location.href='cable.html'"><div class="service-icon">▣</div><div class="service-name">Cable TV</div><div class="service-text">Pay TV subscription</div></button>
+<section class="services">
+<div class="title">OUR SERVICES</div>
+
+<div class="grid">
+
+<div class="card">
+<div class="icon">☎</div>
+<div class="name">Airtime</div>
+<div class="text">Recharge your phone instantly.</div>
+</div>
+
+<div class="card">
+<div class="icon">◉</div>
+<div class="name">Data</div>
+<div class="text">Get affordable data bundles.</div>
+</div>
+
+<div class="card">
+<div class="icon">ϟ</div>
+<div class="name">Electricity</div>
+<div class="text">Pay your electricity bills easily.</div>
+</div>
+
+<div class="card">
+<div class="icon">▣</div>
+<div class="name">Cable TV</div>
+<div class="text">Renew your TV subscription.</div>
+</div>
+
 </div>
 </section>
 
-<section class="quick-section">
-<div class="section-title">QUICK ACCESS</div>
-<button class="quick-card" onclick="location.href='transactions.html'"><div class="quick-icon">↯</div><div class="quick-info"><div class="quick-title">Transaction History</div><div class="quick-text">Search and view your payments</div></div><div class="quick-arrow">›</div></button>
-<button class="quick-card" onclick="location.href='profile.html'"><div class="quick-icon">◉</div><div class="quick-info"><div class="quick-title">My Profile</div><div class="quick-text">Manage your personal information</div></div><div class="quick-arrow">›</div></button>
+<section class="info">
+<h2>Fast. Simple. Reliable.</h2>
+<p>BOLTIV provides convenient digital payment and bill payment services designed to make everyday transactions easier.</p>
 </section>
-</div></div>
 
-<nav class="bottom-nav">
-<button class="nav-item active" onclick="location.href='index.html'"><span class="nav-icon">⌂</span>Home</button>
-<button class="nav-item" onclick="location.href='wallet.html'"><span class="nav-icon">₦</span>Wallet</button>
-<button class="nav-item" onclick="location.href='transactions.html'"><span class="nav-icon">↯</span>Activity</button>
-<button class="nav-item" onclick="location.href='profile.html'"><span class="nav-icon">◉</span>Profile</button>
-</nav>
+<footer class="footer">
+<strong>BOLTIV</strong><br><br>
+Digital services made simple.
+</footer>
 
-<script>
-function getUser(){
-try{return JSON.parse(localStorage.getItem("boltivUser")||"{}")}catch(e){return{}}
-}
-function updateName(){
-const user=getUser();
-const name=String(user.name||user.fullName||user.firstName||user.firstname||"").trim();
-document.getElementById("userName").textContent=name?name.split(/\s+/)[0]:"";
-}
-function setGreeting(){
-const hour=new Date().getHours();
-let text="Good morning";
-if(hour>=12&&hour<17)text="Good afternoon";
-else if(hour>=17&&hour<21)text="Good evening";
-else if(hour>=21||hour<5)text="Good night";
-document.getElementById("greeting").textContent=text;
-}
-function updateBalance(){
-const balance=Number(localStorage.getItem("boltivWalletBalance")||0);
-document.getElementById("balance").textContent=balance.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-function refreshHome(){
-updateName();
-setGreeting();
-updateBalance();
-}
-refreshHome();
-window.addEventListener("pageshow",refreshHome);
-window.addEventListener("focus",refreshHome);
-window.addEventListener("storage",refreshHome);
-setInterval(refreshHome,1000);
-</script>
+</div>
+</div>
+
 </body>
 </html>
-<!-- BOLTIV HOMEPAGE UPDATED -->
+
+<!-- BOLTIV PUBLIC LANDING PAGE — PAYSTACK REVIEW READY -->

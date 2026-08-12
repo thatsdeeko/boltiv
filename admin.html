@@ -5,303 +5,151 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#050505">
 <title>BOLTIV — Admin</title>
-<link rel="stylesheet" href="style.css">
 <style>
-body{background:#050505;color:#fff}.admin-page{min-height:100vh;padding-bottom:90px}.admin-container{width:min(1100px,92%);margin:auto}.admin-header{display:flex;align-items:center;justify-content:space-between;padding:22px 0;border-bottom:1px solid #222}.admin-brand{font-size:24px;font-weight:1000;color:#d4af37}.admin-tag{font-size:8px;color:#666;letter-spacing:1.5px;margin-top:3px}.admin-user{display:flex;align-items:center;gap:8px}.admin-email{font-size:9px;color:#888}.admin-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#17140b;border:1px solid #d4af37;color:#d4af37;font-weight:1000}.admin-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.admin-login-card{width:100%;max-width:390px;background:linear-gradient(145deg,#151515,#080808);border:1px solid #292929;border-radius:22px;padding:28px;box-shadow:0 25px 70px #000}.admin-login-logo{text-align:center;font-size:30px;font-weight:1000;color:#d4af37}.admin-login-title{text-align:center;font-size:16px;font-weight:1000;margin-top:10px}.admin-login-sub{text-align:center;font-size:9px;color:#666;margin:7px 0 24px}.admin-main{padding-top:24px}.admin-title{font-size:22px;font-weight:1000}.admin-title span{color:#d4af37}.admin-subtitle{font-size:9px;color:#666;margin-top:5px}.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}.stat-card{background:#101010;border:1px solid #242424;border-radius:16px;padding:18px}.stat-label{font-size:8px;color:#777;letter-spacing:.8px}.stat-value{font-size:22px;font-weight:1000;color:#d4af37;margin-top:9px}.admin-section{margin-top:28px}.admin-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.admin-section-title{font-size:14px;font-weight:1000}.admin-refresh{border:1px solid #333;background:#111;color:#d4af37;border-radius:9px;padding:8px 12px;font-size:8px;font-weight:1000}.admin-table-wrap{overflow-x:auto;background:#0d0d0d;border:1px solid #222;border-radius:15px}.admin-table{width:100%;border-collapse:collapse;min-width:650px}.admin-table th{font-size:8px;color:#777;text-align:left;padding:13px;border-bottom:1px solid #222}.admin-table td{font-size:9px;color:#bbb;padding:13px;border-bottom:1px solid #181818}.status{font-size:7px;font-weight:1000;padding:5px 8px;border-radius:20px;background:#17140b;color:#d4af37}.logout{border:1px solid #3a2929;background:#160c0c;color:#d77;padding:9px 12px;border-radius:9px;font-size:8px;font-weight:1000}.hidden{display:none!important}.error{color:#e77;font-size:9px;margin-top:10px;text-align:center}.empty{padding:25px;text-align:center;color:#666;font-size:9px}@media(max-width:700px){.stats-grid{grid-template-columns:repeat(2,1fr)}.admin-email{display:none}}@media(max-width:420px){.stats-grid{gap:8px}.stat-card{padding:13px}.stat-value{font-size:17px}}
+:root{--bg:#050505;--bg-elevated:#0c0c0c;--bg-card:#101010;--bg-card-hover:#141414;--border:#1f1f1f;--border-soft:#2a2a2a;--text:#f2f2f2;--text-muted:#8a8a8a;--text-dim:#5c5c5c;--gold:#d4af37;--gold-soft:rgba(212,175,55,.12);--gold-border:rgba(212,175,55,.35);--danger:#e07070;--danger-bg:rgba(224,112,112,.08);--radius:16px;--radius-sm:10px;--shadow:0 20px 50px rgba(0,0,0,.45)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input{font:inherit}
+.hidden{display:none!important}
+.admin-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(212,175,55,.08),transparent),var(--bg)}
+.admin-login-card{width:100%;max-width:400px;background:linear-gradient(160deg,#141414 0%,#0a0a0a 100%);border:1px solid var(--border-soft);border-radius:22px;padding:36px 32px;box-shadow:var(--shadow)}
+.admin-login-logo{text-align:center;font-size:32px;font-weight:800;letter-spacing:-.5px;color:var(--gold)}
+.admin-login-title{text-align:center;font-size:15px;font-weight:700;margin-top:10px;letter-spacing:.4px}
+.admin-login-sub{text-align:center;font-size:11px;color:var(--text-dim);margin:6px 0 28px;letter-spacing:1.2px;text-transform:uppercase}
+.form-group{margin-bottom:16px}
+.label{display:block;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.8px;margin-bottom:8px;text-transform:uppercase}
+.input{width:100%;background:#0a0a0a;border:1px solid var(--border-soft);border-radius:var(--radius-sm);padding:13px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+.input::placeholder{color:#555}
+.input:focus{border-color:var(--gold-border);box-shadow:0 0 0 3px var(--gold-soft)}
+.btn{border:none;border-radius:var(--radius-sm);padding:13px 16px;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;transition:transform .15s,opacity .15s,background .15s}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(135deg,#e0c060,#d4af37);color:#111;width:100%;margin-top:8px}
+.btn-primary:hover{opacity:.92}
+.error{color:var(--danger);font-size:12px;margin-top:14px;text-align:center;min-height:18px}
+.admin-page{min-height:100vh;padding-bottom:60px;background:radial-gradient(ellipse 70% 40% at 50% -10%,rgba(212,175,55,.06),transparent),var(--bg)}
+.admin-container{width:min(1120px,94%);margin:0 auto}
+.admin-header{display:flex;align-items:center;justify-content:space-between;padding:22px 0;border-bottom:1px solid var(--border);gap:16px}
+.admin-brand{font-size:22px;font-weight:800;color:var(--gold);letter-spacing:-.3px}
+.admin-tag{font-size:10px;color:var(--text-dim);letter-spacing:1.4px;margin-top:3px;text-transform:uppercase}
+.admin-user{display:flex;align-items:center;gap:12px}
+.admin-email{font-size:12px;color:var(--text-muted)}
+.admin-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gold-soft);border:1px solid var(--gold-border);color:var(--gold);font-weight:800;font-size:13px}
+.logout{border:1px solid #3a2929;background:var(--danger-bg);color:var(--danger);padding:9px 14px;border-radius:9px;font-size:11px;font-weight:700;letter-spacing:.4px;cursor:pointer;transition:background .15s}
+.logout:hover{background:rgba(224,112,112,.14)}
+.admin-main{padding-top:28px}
+.admin-title{font-size:24px;font-weight:800;letter-spacing:-.4px}
+.admin-title span{color:var(--gold)}
+.admin-subtitle{font-size:13px;color:var(--text-muted);margin-top:6px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:26px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 18px;position:relative;overflow:hidden;transition:border-color .2s,background .2s}
+.stat-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.5}
+.stat-card:hover{background:var(--bg-card-hover);border-color:var(--border-soft)}
+.stat-label{font-size:11px;color:var(--text-muted);letter-spacing:.9px;font-weight:600;text-transform:uppercase}
+.stat-value{font-size:24px;font-weight:800;color:var(--gold);margin-top:10px;letter-spacing:-.5px}
+.admin-section{margin-top:32px}
+.admin-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px}
+.admin-section-title{font-size:15px;font-weight:700}
+.admin-refresh{border:1px solid var(--border-soft);background:#111;color:var(--gold);border-radius:9px;padding:9px 14px;font-size:11px;font-weight:700;letter-spacing:.4px;cursor:pointer;transition:background .15s,border-color .15s}
+.admin-refresh:hover{background:#161616;border-color:var(--gold-border)}
+.admin-table-wrap{overflow-x:auto;background:var(--bg-elevated);border:1px solid var(--border);border-radius:14px}
+.admin-table{width:100%;border-collapse:collapse;min-width:680px}
+.admin-table th{font-size:11px;color:var(--text-muted);text-align:left;padding:14px 16px;border-bottom:1px solid var(--border);font-weight:600;letter-spacing:.6px;text-transform:uppercase;background:rgba(255,255,255,.015)}
+.admin-table td{font-size:13px;color:#c8c8c8;padding:14px 16px;border-bottom:1px solid #161616}
+.admin-table tbody tr:last-child td{border-bottom:none}
+.admin-table tbody tr:hover td{background:rgba(255,255,255,.02)}
+.status{display:inline-block;font-size:10px;font-weight:700;padding:5px 10px;border-radius:20px;background:var(--gold-soft);color:var(--gold);letter-spacing:.3px;text-transform:uppercase}
+.empty{padding:36px 20px;text-align:center;color:var(--text-dim);font-size:13px}
+@media(max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.admin-email{display:none}.admin-login-card{padding:28px 22px}.admin-title{font-size:20px}.stat-value{font-size:20px}}
+@media(max-width:420px){.stats-grid{gap:10px}.stat-card{padding:16px 14px}.stat-value{font-size:18px}.admin-header{padding:18px 0}}
 </style>
 </head>
 <body>
-
 <div id="loginView" class="admin-login">
 <div class="admin-login-card">
 <div class="admin-login-logo">BOLTIV</div>
-<div class="admin-login-title">ADMIN CONTROL CENTER</div>
-<div class="admin-login-sub">SECURE ADMINISTRATOR ACCESS</div>
+<div class="admin-login-title">Admin Control Center</div>
+<div class="admin-login-sub">Secure administrator access</div>
 <div class="form-group">
-<label class="label">ADMIN EMAIL</label>
-<input class="input" id="adminEmail" type="email" placeholder="Admin email">
+<label class="label" for="adminEmail">Admin Email</label>
+<input class="input" id="adminEmail" type="email" placeholder="admin@boltiv.com" autocomplete="username">
 </div>
 <div class="form-group">
-<label class="label">ADMIN PASSWORD</label>
-<input class="input" id="adminPassword" type="password" placeholder="Admin password">
+<label class="label" for="adminPassword">Admin Password</label>
+<input class="input" id="adminPassword" type="password" placeholder="Enter password" autocomplete="current-password">
 </div>
-<button class="btn btn-primary" id="loginBtn" style="width:100%">LOGIN TO ADMIN</button>
+<button class="btn btn-primary" id="loginBtn">Login to Admin</button>
 <div id="loginError" class="error"></div>
 </div>
 </div>
-
 <div id="dashboardView" class="admin-page hidden">
 <div class="admin-container">
-
 <header class="admin-header">
 <div>
 <div class="admin-brand">BOLTIV</div>
-<div class="admin-tag">ADMIN CONTROL CENTER</div>
+<div class="admin-tag">Admin Control Center</div>
 </div>
 <div class="admin-user">
 <div class="admin-email" id="adminEmailDisplay"></div>
 <div class="admin-avatar">A</div>
-<button class="logout" id="logoutBtn">LOGOUT</button>
+<button class="logout" id="logoutBtn" type="button">Logout</button>
 </div>
 </header>
-
 <main class="admin-main">
-<div class="admin-title">SYSTEM <span>OVERVIEW</span></div>
+<div class="admin-title">System <span>Overview</span></div>
 <div class="admin-subtitle">Monitor BOLTIV wallet activity and platform statistics.</div>
-
 <div class="stats-grid">
-<div class="stat-card">
-<div class="stat-label">TOTAL USERS</div>
-<div class="stat-value" id="users">0</div>
+<div class="stat-card"><div class="stat-label">Total Users</div><div class="stat-value" id="users">0</div></div>
+<div class="stat-card"><div class="stat-label">Wallet Balance</div><div class="stat-value" id="walletBalance">₦0.00</div></div>
+<div class="stat-card"><div class="stat-label">Transactions</div><div class="stat-value" id="transactions">0</div></div>
+<div class="stat-card"><div class="stat-label">Successful Payments</div><div class="stat-value" id="successfulPayments">₦0.00</div></div>
 </div>
-<div class="stat-card">
-<div class="stat-label">WALLET BALANCE</div>
-<div class="stat-value" id="walletBalance">₦0</div>
-</div>
-<div class="stat-card">
-<div class="stat-label">TRANSACTIONS</div>
-<div class="stat-value" id="transactions">0</div>
-</div>
-<div class="stat-card">
-<div class="stat-label">SUCCESSFUL PAYMENTS</div>
-<div class="stat-value" id="successfulPayments">₦0</div>
-</div>
-</div>
-
 <section class="admin-section">
 <div class="admin-section-head">
-<div class="admin-section-title">RECENT TRANSACTIONS</div>
-<button class="admin-refresh" onclick="loadTransactions()">REFRESH</button>
+<div class="admin-section-title">Recent Transactions</div>
+<button class="admin-refresh" type="button" onclick="loadTransactions()">Refresh</button>
 </div>
 <div class="admin-table-wrap">
 <table class="admin-table">
-<thead>
-<tr>
-<th>USER</th>
-<th>TYPE</th>
-<th>SERVICE</th>
-<th>AMOUNT</th>
-<th>STATUS</th>
-<th>DATE</th>
-</tr>
-</thead>
+<thead><tr><th>User</th><th>Type</th><th>Service</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
 <tbody id="transactionBody"></tbody>
 </table>
 </div>
 </section>
-
 <section class="admin-section">
 <div class="admin-section-head">
-<div class="admin-section-title">USERS</div>
-<button class="admin-refresh" onclick="loadUsers()">REFRESH</button>
+<div class="admin-section-title">Users</div>
+<button class="admin-refresh" type="button" onclick="loadUsers()">Refresh</button>
 </div>
 <div class="admin-table-wrap">
 <table class="admin-table">
-<thead>
-<tr>
-<th>USER ID</th>
-<th>BALANCE</th>
-<th>CREATED</th>
-<th>UPDATED</th>
-</tr>
-</thead>
+<thead><tr><th>User ID</th><th>Balance</th><th>Created</th><th>Updated</th></tr></thead>
 <tbody id="userBody"></tbody>
 </table>
 </div>
 </section>
-
 </main>
 </div>
 </div>
-
 <script>
-const API_URL="https://boltiv-backend.onrender.com";
-const TOKEN_KEY="boltivAdminToken";
-
-function money(value){
-return"₦"+Number(value||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-
-async function api(endpoint,options={}){
-try{
-const res=await fetch(API_URL+endpoint,{
-...options,
-headers:{
-"Content-Type":"application/json",
-...(options.headers||{}),
-...(localStorage.getItem(TOKEN_KEY)?{"Authorization":"Bearer "+localStorage.getItem(TOKEN_KEY)}:{})
-}
-});
-return await res.json();
-}catch(error){
-return{success:false,message:"Unable to connect to BOLTIV server."};
-}
-}
-
-function showLogin(){
-document.getElementById("loginView").classList.remove("hidden");
-document.getElementById("dashboardView").classList.add("hidden");
-}
-
-function showDashboard(){
-document.getElementById("loginView").classList.add("hidden");
-document.getElementById("dashboardView").classList.remove("hidden");
-}
-
-async function login(){
-const email=document.getElementById("adminEmail").value.trim();
-const password=document.getElementById("adminPassword").value;
-const error=document.getElementById("loginError");
-
-error.textContent="";
-
-if(!email||!password){
-error.textContent="Enter your admin email and password.";
-return;
-}
-
-const result=await api("/api/admin/login",{
-method:"POST",
-body:JSON.stringify({email,password})
-});
-
-if(!result.success){
-error.textContent=result.message||"Admin login failed.";
-return;
-}
-
-localStorage.setItem(TOKEN_KEY,result.token);
-localStorage.setItem("boltivAdminEmail",result.admin.email);
-showDashboard();
-document.getElementById("adminEmailDisplay").textContent=result.admin.email;
-loadDashboard();
-}
-
-async function checkSession(){
-const token=localStorage.getItem(TOKEN_KEY);
-
-if(!token){
-showLogin();
-return;
-}
-
-const result=await api("/api/admin/me");
-
-if(!result.success){
-localStorage.removeItem(TOKEN_KEY);
-showLogin();
-return;
-}
-
-showDashboard();
-document.getElementById("adminEmailDisplay").textContent=result.admin.email;
-loadDashboard();
-}
-
-async function loadStats(){
-const result=await api("/api/admin/stats");
-
-if(!result.success){
-if(result.message==="Unauthorized.")logout();
-return;
-}
-
-const stats=result.stats;
-
-document.getElementById("users").textContent=stats.users;
-document.getElementById("walletBalance").textContent=money(stats.walletBalance);
-document.getElementById("transactions").textContent=stats.transactions;
-document.getElementById("successfulPayments").textContent=money(stats.successfulPayments);
-}
-
-async function loadTransactions(){
-const body=document.getElementById("transactionBody");
-body.innerHTML='<tr><td colspan="6" class="empty">Loading...</td></tr>';
-
-const result=await api("/api/admin/transactions");
-
-if(!result.success){
-body.innerHTML='<tr><td colspan="6" class="empty">Unable to load transactions.</td></tr>';
-return;
-}
-
-if(!result.transactions.length){
-body.innerHTML='<tr><td colspan="6" class="empty">No transactions yet.</td></tr>';
-return;
-}
-
-body.innerHTML=result.transactions.map(x=>`
-<tr>
-<td>${escapeHTML(x.user_id)}</td>
-<td>${escapeHTML(x.type)}</td>
-<td>${escapeHTML(x.service)}</td>
-<td>${money(x.amount)}</td>
-<td><span class="status">${escapeHTML(x.status)}</span></td>
-<td>${formatDate(x.date)}</td>
-</tr>
-`).join("");
-}
-
-async function loadUsers(){
-const body=document.getElementById("userBody");
-body.innerHTML='<tr><td colspan="4" class="empty">Loading...</td></tr>';
-
-const result=await api("/api/admin/users");
-
-if(!result.success){
-body.innerHTML='<tr><td colspan="4" class="empty">Unable to load users.</td></tr>';
-return;
-}
-
-if(!result.users.length){
-body.innerHTML='<tr><td colspan="4" class="empty">No users yet.</td></tr>';
-return;
-}
-
-body.innerHTML=result.users.map(x=>`
-<tr>
-<td>${escapeHTML(x.user_id)}</td>
-<td>${money(x.balance)}</td>
-<td>${formatDate(x.created_at)}</td>
-<td>${formatDate(x.updated_at)}</td>
-</tr>
-`).join("");
-}
-
-function formatDate(value){
-return value?new Date(value).toLocaleString("en-NG"):"—";
-}
-
-function escapeHTML(value){
-return String(value??"").replace(/[&<>"']/g,x=>({
-"&":"&amp;",
-"<":"&lt;",
-">":"&gt;",
-'"':"&quot;",
-"'":"&#039;"
-}[x]));
-}
-
-async function loadDashboard(){
-await Promise.all([loadStats(),loadTransactions(),loadUsers()]);
-}
-
-function logout(){
-localStorage.removeItem(TOKEN_KEY);
-localStorage.removeItem("boltivAdminEmail");
-showLogin();
-}
-
+const API_URL="https://boltiv-backend.onrender.com",TOKEN_KEY="boltivAdminToken";
+function money(v){return"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})}
+async function api(e,o={}){try{const r=await fetch(API_URL+e,{...o,headers:{"Content-Type":"application/json",...(o.headers||{}),...(localStorage.getItem(TOKEN_KEY)?{Authorization:"Bearer "+localStorage.getItem(TOKEN_KEY)}:{})}});return await r.json()}catch{return{success:!1,message:"Unable to connect to BOLTIV server."}}}
+function showLogin(){document.getElementById("loginView").classList.remove("hidden");document.getElementById("dashboardView").classList.add("hidden")}
+function showDashboard(){document.getElementById("loginView").classList.add("hidden");document.getElementById("dashboardView").classList.remove("hidden")}
+async function login(){const e=document.getElementById("adminEmail").value.trim(),p=document.getElementById("adminPassword").value,err=document.getElementById("loginError");err.textContent="";if(!e||!p){err.textContent="Enter your admin email and password.";return}const r=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:e,password:p})});if(!r.success){err.textContent=r.message||"Admin login failed.";return}localStorage.setItem(TOKEN_KEY,r.token);localStorage.setItem("boltivAdminEmail",r.admin.email);showDashboard();document.getElementById("adminEmailDisplay").textContent=r.admin.email;loadDashboard()}
+async function checkSession(){const t=localStorage.getItem(TOKEN_KEY);if(!t){showLogin();return}const r=await api("/api/admin/me");if(!r.success){localStorage.removeItem(TOKEN_KEY);showLogin();return}showDashboard();document.getElementById("adminEmailDisplay").textContent=r.admin.email;loadDashboard()}
+async function loadStats(){const r=await api("/api/admin/stats");if(!r.success){if(r.message==="Unauthorized.")logout();return}const s=r.stats;document.getElementById("users").textContent=s.users;document.getElementById("walletBalance").textContent=money(s.walletBalance);document.getElementById("transactions").textContent=s.transactions;document.getElementById("successfulPayments").textContent=money(s.successfulPayments)}
+async function loadTransactions(){const b=document.getElementById("transactionBody");b.innerHTML='<tr><td colspan="6" class="empty">Loading...</td></tr>';const r=await api("/api/admin/transactions");if(!r.success){b.innerHTML='<tr><td colspan="6" class="empty">Unable to load transactions.</td></tr>';return}if(!r.transactions.length){b.innerHTML='<tr><td colspan="6" class="empty">No transactions yet.</td></tr>';return}b.innerHTML=r.transactions.map(x=>`<tr><td>\( {escapeHTML(x.user_id)}</td><td> \){escapeHTML(x.type)}</td><td>\( {escapeHTML(x.service)}</td><td> \){money(x.amount)}</td><td><span class="status">\( {escapeHTML(x.status)}</span></td><td> \){formatDate(x.date)}</td></tr>`).join("")}
+async function loadUsers(){const b=document.getElementById("userBody");b.innerHTML='<tr><td colspan="4" class="empty">Loading...</td></tr>';const r=await api("/api/admin/users");if(!r.success){b.innerHTML='<tr><td colspan="4" class="empty">Unable to load users.</td></tr>';return}if(!r.users.length){b.innerHTML='<tr><td colspan="4" class="empty">No users yet.</td></tr>';return}b.innerHTML=r.users.map(x=>`<tr><td>\( {escapeHTML(x.user_id)}</td><td> \){money(x.balance)}</td><td>\( {formatDate(x.created_at)}</td><td> \){formatDate(x.updated_at)}</td></tr>`).join("")}
+function formatDate(v){return v?new Date(v).toLocaleString("en-NG"):"—"}
+function escapeHTML(v){return String(v??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[x]))}
+async function loadDashboard(){await Promise.all([loadStats(),loadTransactions(),loadUsers()])}
+function logout(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem("boltivAdminEmail");showLogin()}
 document.getElementById("loginBtn").onclick=login;
 document.getElementById("logoutBtn").onclick=logout;
-
-document.addEventListener("keydown",e=>{
-if(e.key==="Enter"&&!document.getElementById("loginView").classList.contains("hidden"))login();
-});
-
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&!document.getElementById("loginView").classList.contains("hidden"))login()});
 checkSession();
-
-/* END OF BOLTIV ADMIN DASHBOARD */
 </script>
 </body>
-  </html>
+</html>

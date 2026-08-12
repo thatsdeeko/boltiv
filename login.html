@@ -29,63 +29,40 @@
 </div>
 </div>
 </div></div></div>
-
 <script>
-// LOGIN + USER ID
+// LOGIN + USER SESSION
 const SESSION_KEY="boltivLoggedIn";
-
 function getStoredUser(){
-try{
-return JSON.parse(localStorage.getItem("boltivUser")||"null");
-}catch(error){
-return null;
+try{return JSON.parse(localStorage.getItem("boltivUser")||"null")}catch(error){return null}
 }
-}
-
 function createUserId(){
 if(window.crypto&&crypto.randomUUID)return"BOLTIV-"+crypto.randomUUID();
 return"BOLTIV-"+Date.now()+"-"+Math.random().toString(36).slice(2,10);
 }
-
 document.getElementById("loginButton").onclick=()=>{
 const email=document.getElementById("emailInput").value.trim();
 const password=document.getElementById("passwordInput").value;
-
-if(!email){
-alert("Enter your email.");
-return;
-}
-
-if(!/^\S+@\S+\.\S+$/.test(email)){
-alert("Enter a valid email address.");
-return;
-}
-
-if(!password){
-alert("Enter your password.");
-return;
-}
-
-// Preserve the existing BOLTIV profile.
+if(!email){alert("Enter your email.");return}
+if(!/^\S+@\S+\.\S+$/.test(email)){alert("Enter a valid email address.");return}
+if(!password){alert("Enter your password.");return}
 const existingUser=getStoredUser();
-const user=existingUser||{};
-
+let user=existingUser;
+if(!user||String(user.email||"").toLowerCase()!==email.toLowerCase()){
+user={email};
+}else{
 user.email=email;
-
-// Create an ID only if this account does not already have one.
+}
 if(!user.id&&!user.userId){
 user.id=createUserId();
 user.userId=user.id;
 }
-
 localStorage.setItem("boltivUser",JSON.stringify(user));
 localStorage.setItem(SESSION_KEY,"true");
 localStorage.setItem("boltivUserEmail",email);
-
 location.href="index.html";
 };
-
 // END LOGIN
 </script>
 </body>
 </html>
+<!-- BOLTIV LOGIN UPDATED -->

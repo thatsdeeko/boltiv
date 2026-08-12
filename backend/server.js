@@ -1,730 +1,115 @@
-const http=require("node:http");
-const crypto=require("node:crypto");
-const{Pool}=require("pg");
+const http=require("node:http"),crypto=require("node:crypto"),{Pool}=require("pg");
+const PORT=process.env.PORT||3000,DATABASE_URL=process.env.DATABASE_URL||"",PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"",FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv",ADMIN_EMAIL=process.env.ADMIN_EMAIL||"",ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
+const pool=new Pool({connectionString:DATABASE_URL,ssl:DATABASE_URL?{rejectUnauthorized:false}:false});
+const db=(q,p=[])=>pool.query(q,p);
+const send=(r,s,d)=>{r.writeHead(s,{"Content-Type":"application/json","Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Access-Control-Allow-Headers":"Content-Type,Authorization"});r.end(JSON.stringify(d))};
+const body=req=>new Promise((ok,no)=>{let b="";req.on("data",x=>b+=x);req.on("end",()=>{try{ok(b?JSON.parse(b):{})}catch(e){no(e)}});req.on("error",no)});
+const token=()=>crypto.randomBytes(32).toString("hex"),ref=()=>`BOLTIV-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`,uid=()=>`BOLTIV-${crypto.randomBytes(10).toString("hex")}`;
+const hash=(p,s=crypto.randomBytes(16).toString("hex"))=>`${s}:${crypto.scryptSync(p,s,64).toString("hex")}`;
+const verify=(p,x)=>{try{let[s,k]=x.split(":"),h=crypto.scryptSync(p,s,64).toString("hex");return crypto.timingSafeEqual(Buffer.from(h,"hex"),Buffer.from(k,"hex"))}catch{return false}};
+const initials=n=>{let x=String(n||"").trim().split(/\s+/).filter(Boolean);return x.length>1?(x[0][0]+x.at(-1)[0]).toUpperCase():(x[0]?.[0]||"U").toUpperCase()};
 
-const PORT=process.env.PORT||3000;
-const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
-const FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv";
-const DATABASE_URL=process.env.DATABASE_URL||"";
-const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
-const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
-
-const pool=new Pool({
-connectionString:DATABASE_URL,
-ssl:DATABASE_URL?{rejectUnauthorized:false}:false
-});
-
-function send(res,status,data){
-res.writeHead(status,{
-"Content-Type":"application/json",
-"Access-Control-Allow-Origin":"*",
-"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
-"Access-Control-Allow-Headers":"Content-Type,Authorization"
-});
-res.end(JSON.stringify(data));
-}
-
-async function readBody(req){
-return new Promise((resolve,reject)=>{
-let body="";
-req.on("data",chunk=>body+=chunk);
-req.on("end",()=>{
-try{resolve(body?JSON.parse(body):{})}
-catch(e){reject(e)}
-});
-req.on("error",reject);
-});
-}
-
-async function db(query,params=[]){
-return await pool.query(query,params);
-}
-
-function hashPassword(password,salt=crypto.randomBytes(16).toString("hex")){
-return`${salt}:${crypto.scryptSync(password,salt,64).toString("hex")}`;
-}
-
-function verifyPassword(password,stored){
-try{
-const[salt,key]=stored.split(":");
-const hash=crypto.scryptSync(password,salt,64).toString("hex");
-return crypto.timingSafeEqual(
-Buffer.from(hash,"hex"),
-Buffer.from(key,"hex")
-);
-}catch{
-return false;
-}
-}
-
-function createToken(){
-return crypto.randomBytes(32).toString("hex");
-}
-
-function createReference(){
-return`BOLTIV-${Date.now()}-${crypto.randomBytes(5).toString("hex")}`;
-}
-
-// DATABASE
-async function initializeDatabase(){
-if(!DATABASE_URL){
-console.log("DATABASE_URL is not configured.");
-return;
-}
-
-await db(`CREATE TABLE IF NOT EXISTS wallets(
-user_id TEXT PRIMARY KEY,
-balance NUMERIC(14,2) NOT NULL DEFAULT 0,
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-
-await db(`CREATE TABLE IF NOT EXISTS transactions(
-id BIGSERIAL PRIMARY KEY,
-user_id TEXT NOT NULL,
-type TEXT NOT NULL,
-service TEXT NOT NULL,
-amount NUMERIC(14,2) NOT NULL,
-reference TEXT UNIQUE,
-status TEXT NOT NULL,
-date TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-
-await db(`CREATE TABLE IF NOT EXISTS payments(
-reference TEXT PRIMARY KEY,
-user_id TEXT NOT NULL,
-email TEXT NOT NULL,
-amount NUMERIC(14,2) NOT NULL,
-amount_kobo BIGINT NOT NULL,
-status TEXT NOT NULL,
-credited BOOLEAN NOT NULL DEFAULT FALSE,
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-credited_at TIMESTAMPTZ
-)`);
-
-await db(`CREATE TABLE IF NOT EXISTS admins(
-id BIGSERIAL PRIMARY KEY,
-email TEXT UNIQUE NOT NULL,
-password_hash TEXT NOT NULL,
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-
-await db(`CREATE TABLE IF NOT EXISTS admin_sessions(
-token TEXT PRIMARY KEY,
-admin_id BIGINT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-expires_at TIMESTAMPTZ NOT NULL
-)`);
-
-if(ADMIN_EMAIL&&ADMIN_PASSWORD){
-const existing=await db(
-`SELECT id FROM admins WHERE LOWER(email)=LOWER($1)`,
-[ADMIN_EMAIL]
-);
-
-if(!existing.rows.length){
-await db(
-`INSERT INTO admins(email,password_hash) VALUES($1,$2)`,
-[ADMIN_EMAIL,hashPassword(ADMIN_PASSWORD)]
-);
-console.log("Admin account created.");
-}
-}
-
+async function init(){
+if(!DATABASE_URL)return console.log("DATABASE_URL is not configured.");
+await db(`CREATE TABLE IF NOT EXISTS users(id BIGSERIAL PRIMARY KEY,user_id TEXT UNIQUE NOT NULL,name TEXT NOT NULL,phone TEXT NOT NULL,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,initials TEXT,created_at TIMESTAMPTZ DEFAULT NOW(),updated_at TIMESTAMPTZ DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS password_resets(id BIGSERIAL PRIMARY KEY,user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,token TEXT UNIQUE NOT NULL,expires_at TIMESTAMPTZ NOT NULL,used BOOLEAN DEFAULT FALSE,created_at TIMESTAMPTZ DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS user_sessions(token TEXT PRIMARY KEY,user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,created_at TIMESTAMPTZ DEFAULT NOW(),expires_at TIMESTAMPTZ NOT NULL)`);
+await db(`CREATE TABLE IF NOT EXISTS wallets(user_id TEXT PRIMARY KEY,balance NUMERIC(14,2) DEFAULT 0,created_at TIMESTAMPTZ DEFAULT NOW(),updated_at TIMESTAMPTZ DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS transactions(id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL,type TEXT NOT NULL,service TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,reference TEXT UNIQUE,status TEXT NOT NULL,date TIMESTAMPTZ DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS payments(reference TEXT PRIMARY KEY,user_id TEXT NOT NULL,email TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,amount_kobo BIGINT NOT NULL,status TEXT NOT NULL,credited BOOLEAN DEFAULT FALSE,created_at TIMESTAMPTZ DEFAULT NOW(),credited_at TIMESTAMPTZ)`);
+await db(`CREATE TABLE IF NOT EXISTS admins(id BIGSERIAL PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,created_at TIMESTAMPTZ DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS admin_sessions(token TEXT PRIMARY KEY,admin_id BIGINT REFERENCES admins(id) ON DELETE CASCADE,created_at TIMESTAMPTZ DEFAULT NOW(),expires_at TIMESTAMPTZ NOT NULL)`);
+if(ADMIN_EMAIL&&ADMIN_PASSWORD&&!((await db(`SELECT id FROM admins WHERE LOWER(email)=LOWER($1)`,[ADMIN_EMAIL])).rows.length))await db(`INSERT INTO admins(email,password_hash) VALUES($1,$2)`,[ADMIN_EMAIL,hash(ADMIN_PASSWORD)]);
 console.log("PostgreSQL database ready.");
 }
 
-// END OF CHUNK 1
-async function createWallet(userId){
-await db(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
+const wallet=async id=>{let r=await db(`SELECT user_id,balance FROM wallets WHERE user_id=$1`,[id]);return r.rows[0]?{userId:r.rows[0].user_id,balance:Number(r.rows[0].balance)}:null};
+const makeWallet=id=>db(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[id]);
+const transactions=async id=>(await db(`SELECT type,service,amount,reference,status,date FROM transactions WHERE user_id=$1 ORDER BY date DESC`,[id])).rows.map(x=>({...x,amount:Number(x.amount)}));
+const userEmail=async e=>(await db(`SELECT * FROM users WHERE LOWER(email)=LOWER($1)`,[e])).rows[0]||null;
+const session=async req=>{let h=req.headers.authorization||"";if(!h.startsWith("Bearer "))return null;let r=await db(`SELECT u.* FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token=$1 AND s.expires_at>NOW()`,[h.slice(7).trim()]);return r.rows[0]||null};
+const userSession=async id=>{let t=token();await db(`INSERT INTO user_sessions(token,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '7 days')`,[t,id]);return t};
+
+async function createUser(name,phone,email,password){
+if(await userEmail(email))return{success:false,message:"An account with this email already exists."};
+let r=await db(`INSERT INTO users(user_id,name,phone,email,password_hash,initials) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,user_id,name,phone,email,initials,created_at`,[uid(),name,phone,email,hash(password),initials(name)]);
+await makeWallet(r.rows[0].user_id);
+return{success:true,user:r.rows[0]};
 }
 
-async function getWallet(userId){
-const result=await db(`SELECT user_id,balance FROM wallets WHERE user_id=$1`,[userId]);
-if(!result.rows.length)return null;
-return{
-userId:result.rows[0].user_id,
-balance:Number(result.rows[0].balance)
-};
+// CHUNK 1 END
+async function loginUser(email,password){
+const u=await userEmail(email);
+if(!u||!verify(password,u.password_hash))return{success:false,message:"Invalid email or password."};
+return{success:true,message:"Login successful.",token:await userSession(u.id),user:{id:u.user_id,name:u.name,phone:u.phone,email:u.email,initials:u.initials}};
 }
 
-async function getTransactions(userId){
-const result=await db(`SELECT type,service,amount,reference,status,date FROM transactions WHERE user_id=$1 ORDER BY date DESC`,[userId]);
-return result.rows.map(x=>({...x,amount:Number(x.amount)}));
+async function forgotPassword(email){
+const u=await userEmail(email);
+if(!u)return{success:true,message:"If the email exists, a reset request has been created."};
+const t=token();
+await db(`UPDATE password_resets SET used=TRUE WHERE user_id=$1 AND used=FALSE`,[u.id]);
+await db(`INSERT INTO password_resets(user_id,token,expires_at) VALUES($1,$2,NOW()+INTERVAL '30 minutes')`,[u.id,t]);
+console.log("PASSWORD RESET TOKEN:",t);
+return{success:true,message:"Password reset request created.",token:t};
 }
 
-// PAYSTACK
-async function paystackRequest(endpoint,options={}){
-const response=await fetch(`https://api.paystack.co${endpoint}`,{
-...options,
-headers:{
-Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,
-"Content-Type":"application/json",
-...(options.headers||{})
-}
-});
-return{
-httpStatus:response.status,
-data:await response.json()
-};
+async function resetPassword(t,password){
+const r=await db(`SELECT u.id,u.user_id FROM password_resets p JOIN users u ON u.id=p.user_id WHERE p.token=$1 AND p.used=FALSE AND p.expires_at>NOW()`,[t]);
+if(!r.rows.length)return{success:false,message:"Invalid or expired reset token."};
+await db(`UPDATE users SET password_hash=$1,updated_at=NOW() WHERE id=$2`,[hash(password),r.rows[0].id]);
+await db(`UPDATE password_resets SET used=TRUE WHERE token=$1`,[t]);
+await db(`DELETE FROM user_sessions WHERE user_id=$1`,[r.rows[0].id]);
+return{success:true,message:"Password reset successfully."};
 }
 
-async function initializePayment({userId,email,amount}){
-if(!PAYSTACK_SECRET_KEY){
-return{
-success:false,
-message:"Paystack is not configured on the server."
-};
+async function updateProfile(id,name,phone,email){
+const e=await db(`SELECT id FROM users WHERE LOWER(email)=LOWER($1) AND user_id<>$2`,[email,id]);
+if(e.rows.length)return{success:false,message:"Email is already in use."};
+const r=await db(`UPDATE users SET name=$1,phone=$2,email=$3,initials=$4,updated_at=NOW() WHERE user_id=$5 RETURNING user_id,name,phone,email,initials`,[name,phone,email,initials(name),id]);
+return r.rows.length?{success:true,user:r.rows[0]}:{success:false,message:"User not found."};
 }
 
-const reference=createReference();
-
-const result=await paystackRequest("/transaction/initialize",{
-method:"POST",
-body:JSON.stringify({
-email,
-amount:String(Math.round(amount*100)),
-currency:"NGN",
-reference,
-callback_url:`${FRONTEND_URL}/payment-success.html`,
-metadata:{
-userId,
-service:"BOLTIV Wallet Funding"
-}
-})
-});
-
-if(!result.data.status){
-return{
-success:false,
-message:result.data.message||"Unable to initialize Paystack payment."
-};
+async function changePassword(id,current,next){
+const r=await db(`SELECT password_hash FROM users WHERE user_id=$1`,[id]);
+if(!r.rows.length||!verify(current,r.rows[0].password_hash))return{success:false,message:"Current password is incorrect."};
+await db(`UPDATE users SET password_hash=$1,updated_at=NOW() WHERE user_id=$2`,[hash(next),id]);
+return{success:true,message:"Password changed successfully."};
 }
 
-await db(
-`INSERT INTO payments(
-reference,user_id,email,amount,amount_kobo,status,credited
-) VALUES($1,$2,$3,$4,$5,$6,$7)`,
-[
-reference,
-userId,
-email,
-amount,
-Math.round(amount*100),
-"initialized",
-false
-]
-);
+async function paystack(path,opt={}){
+const r=await fetch(`https://api.paystack.co${path}`,{...opt,headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,"Content-Type":"application/json",...(opt.headers||{})}});
+return{status:r.status,data:await r.json()};
+}
 
-return{
-success:true,
-message:"Payment initialized",
-reference,
-authorizationUrl:result.data.data.authorization_url,
-accessCode:result.data.data.access_code
-};
+async function fund(userId,email,amount){
+if(!PAYSTACK_SECRET_KEY)return{success:false,message:"Paystack is not configured on the server."};
+const reference=ref(),r=await paystack("/transaction/initialize",{method:"POST",body:JSON.stringify({email,amount:String(Math.round(amount*100)),currency:"NGN",reference,callback_url:`${FRONTEND_URL}/payment-success.html`,metadata:{userId,service:"BOLTIV Wallet Funding"}})});
+if(!r.data.status)return{success:false,message:r.data.message||"Unable to initialize payment."};
+await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status) VALUES($1,$2,$3,$4,$5,'initialized')`,[reference,userId,email,amount,Math.round(amount*100)]);
+return{success:true,message:"Payment initialized",reference,authorizationUrl:r.data.data.authorization_url,accessCode:r.data.data.access_code};
 }
 
 async function verifyPayment(reference){
-if(!PAYSTACK_SECRET_KEY){
-return{
-success:false,
-message:"Paystack is not configured on the server."
-};
-}
-
-const paymentResult=await db(
-`SELECT reference,user_id,email,amount,amount_kobo,status,credited
-FROM payments WHERE reference=$1`,
-[reference]
-);
-
-if(!paymentResult.rows.length){
-return{
-success:false,
-message:"Payment reference not found."
-};
-}
-
-const payment=paymentResult.rows[0];
-
-if(payment.credited){
-const wallet=await getWallet(payment.user_id);
-return{
-success:true,
-alreadyCredited:true,
-message:"Payment was already credited.",
-reference,
-balance:wallet?wallet.balance:0
-};
-}
-
-const result=await paystackRequest(
-`/transaction/verify/${encodeURIComponent(reference)}`,
-{method:"GET"}
-);
-
-if(!result.data.status){
-return{
-success:false,
-message:result.data.message||"Unable to verify payment."
-};
-}
-
-const transaction=result.data.data;
-
-if(transaction.status!=="success"){
-await db(
-`UPDATE payments SET status=$1 WHERE reference=$2`,
-[transaction.status,reference]
-);
-
-return{
-success:false,
-message:`Payment status: ${transaction.status}`,
-status:transaction.status
-};
-}
-
-if(transaction.currency!=="NGN"){
-return{
-success:false,
-message:"Invalid payment currency."
-};
-}
-
-if(Number(transaction.amount)!==Number(payment.amount_kobo)){
-return{
-success:false,
-message:"Payment amount does not match wallet funding amount."
-};
-}
-
-const client=await pool.connect();
-
+if(!PAYSTACK_SECRET_KEY)return{success:false,message:"Paystack is not configured on the server."};
+const p=(await db(`SELECT * FROM payments WHERE reference=$1`,[reference])).rows[0];
+if(!p)return{success:false,message:"Payment reference not found."};
+if(p.credited)return{success:true,alreadyCredited:true,reference,balance:(await wallet(p.user_id))?.balance||0};
+const r=await paystack(`/transaction/verify/${encodeURIComponent(reference)}`,{method:"GET"});
+if(!r.data.status)return{success:false,message:r.data.message||"Unable to verify payment."};
+const x=r.data.data;
+if(x.status!=="success"){await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[x.status,reference]);return{success:false,message:`Payment status: ${x.status}`,status:x.status}};
+if(x.currency!=="NGN"||Number(x.amount)!==Number(p.amount_kobo))return{success:false,message:"Payment details do not match."};
+const c=await pool.connect();
 try{
-await client.query("BEGIN");
-
-await client.query(
-`INSERT INTO wallets(user_id,balance)
-VALUES($1,0)
-ON CONFLICT(user_id) DO NOTHING`,
-[payment.user_id]
-);
-
-const walletResult=await client.query(
-`UPDATE wallets
-SET balance=balance+$1,updated_at=NOW()
-WHERE user_id=$2
-RETURNING balance`,
-[
-Number(payment.amount),
-payment.user_id
-]
-);
-
-await client.query(
-`INSERT INTO transactions(
-user_id,type,service,amount,reference,status
-)
-VALUES($1,$2,$3,$4,$5,$6)
-ON CONFLICT(reference) DO NOTHING`,
-[
-payment.user_id,
-"credit",
-"Wallet Funding",
-Number(payment.amount),
-reference,
-"successful"
-]
-);
-
-await client.query(
-`UPDATE payments
-SET status='success',
-credited=TRUE,
-credited_at=NOW()
-WHERE reference=$1`,
-[reference]
-);
-
-await client.query("COMMIT");
-
-return{
-success:true,
-message:"Wallet funded successfully.",
-reference,
-amount:Number(payment.amount),
-balance:Number(walletResult.rows[0].balance)
-};
-
-}catch(error){
-await client.query("ROLLBACK");
-throw error;
-}finally{
-client.release();
-}
+await c.query("BEGIN");
+await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[p.user_id]);
+const w=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(p.amount),p.user_id]);
+await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status) VALUES($1,'credit','Wallet Funding',$2,$3,'successful') ON CONFLICT(reference) DO NOTHING`,[p.user_id,Number(p.amount),reference]);
+await c.query(`UPDATE payments SET status='success',credited=TRUE,credited_at=NOW() WHERE reference=$1`,[reference]);
+await c.query("COMMIT");
+return{success:true,message:"Wallet funded successfully.",reference,amount:Number(p.amount),balance:Number(w.rows[0].balance)};
+}catch(e){await c.query("ROLLBACK");throw e}finally{c.release()}
 }
 
-// END OF CHUNK 2
-// ADMIN
-async function adminAuth(req){
-const header=req.headers.authorization||"";
-if(!header.startsWith("Bearer "))return null;
-
-const token=header.slice(7).trim();
-if(!token)return null;
-
-const result=await db(
-`SELECT a.id,a.email
-FROM admin_sessions s
-JOIN admins a ON a.id=s.admin_id
-WHERE s.token=$1 AND s.expires_at>NOW()`,
-[token]
-);
-
-return result.rows[0]||null;
-}
-
-async function adminLogin(email,password){
-const result=await db(
-`SELECT id,email,password_hash
-FROM admins
-WHERE LOWER(email)=LOWER($1)`,
-[email]
-);
-
-if(!result.rows.length){
-return{
-success:false,
-message:"Invalid admin credentials."
-};
-}
-
-const admin=result.rows[0];
-
-if(!verifyPassword(password,admin.password_hash)){
-return{
-success:false,
-message:"Invalid admin credentials."
-};
-}
-
-const token=createToken();
-
-await db(
-`INSERT INTO admin_sessions(
-token,admin_id,expires_at
-) VALUES($1,$2,NOW()+INTERVAL '24 hours')`,
-[token,admin.id]
-);
-
-return{
-success:true,
-message:"Admin login successful.",
-token,
-admin:{
-id:admin.id,
-email:admin.email
-}
-};
-}
-
-// SERVER
-const server=http.createServer(async(req,res)=>{
-res.setHeader("Access-Control-Allow-Origin","*");
-res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
-res.setHeader(
-"Access-Control-Allow-Headers",
-"Content-Type,Authorization"
-);
-
-if(req.method==="OPTIONS"){
-res.writeHead(204);
-return res.end();
-}
-
-const url=new URL(req.url,"http://localhost");
-const path=url.pathname;
-
-try{
-
-// HEALTH
-if(req.method==="GET"&&path==="/api/health"){
-return send(res,200,{
-success:true,
-app:"BOLTIV",
-status:"online",
-paystack:PAYSTACK_SECRET_KEY?"configured":"not configured",
-database:DATABASE_URL?"configured":"not configured",
-admin:ADMIN_EMAIL?"configured":"not configured",
-message:"BOLTIV backend is running"
-});
-}
-
-// CREATE WALLET
-if(req.method==="POST"&&path==="/api/wallet/create"){
-const body=await readBody(req);
-const userId=String(body.userId||"").trim();
-
-if(!userId){
-return send(res,400,{
-success:false,
-message:"User ID is required"
-});
-}
-
-await createWallet(userId);
-
-const wallet=await getWallet(userId);
-
-return send(res,200,{
-success:true,
-message:"Wallet ready",
-userId,
-balance:wallet.balance
-});
-}
-
-// GET WALLET
-if(req.method==="GET"&&path==="/api/wallet"){
-const userId=url.searchParams.get("userId");
-
-if(!userId){
-return send(res,400,{
-success:false,
-message:"User ID is required"
-});
-}
-
-let wallet=await getWallet(userId);
-
-if(!wallet){
-await createWallet(userId);
-wallet=await getWallet(userId);
-}
-
-return send(res,200,{
-success:true,
-userId,
-balance:wallet.balance,
-transactions:await getTransactions(userId)
-});
-}
-
-// FUND WALLET
-if(req.method==="POST"&&path==="/api/wallet/fund"){
-const body=await readBody(req);
-
-const userId=String(body.userId||"").trim();
-const email=String(body.email||"").trim();
-const amount=Number(body.amount);
-
-if(!userId){
-return send(res,400,{
-success:false,
-message:"User ID is required"
-});
-}
-
-if(
-!email||
-!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-){
-return send(res,400,{
-success:false,
-message:"A valid email is required"
-});
-}
-
-if(!Number.isFinite(amount)||amount<100){
-return send(res,400,{
-success:false,
-message:"Minimum wallet funding amount is ₦100."
-});
-}
-
-await createWallet(userId);
-
-const result=await initializePayment({
-userId,
-email,
-amount
-});
-
-return send(
-res,
-result.success?200:400,
-result
-);
-}
-
-// VERIFY PAYMENT
-if(req.method==="GET"&&path==="/api/wallet/verify"){
-const reference=url.searchParams.get("reference");
-
-if(!reference){
-return send(res,400,{
-success:false,
-message:"Payment reference is required."
-});
-}
-
-const result=await verifyPayment(reference);
-
-return send(
-res,
-result.success?200:400,
-result
-);
-}
-
-// ADMIN LOGIN
-if(req.method==="POST"&&path==="/api/admin/login"){
-const body=await readBody(req);
-
-const email=String(body.email||"").trim();
-const password=String(body.password||"");
-
-if(!email||!password){
-return send(res,400,{
-success:false,
-message:"Email and password are required."
-});
-}
-
-const result=await adminLogin(
-email,
-password
-);
-
-return send(
-res,
-result.success?200:401,
-result
-);
-}
-
-// ADMIN SESSION
-if(req.method==="GET"&&path==="/api/admin/me"){
-const admin=await adminAuth(req);
-
-if(!admin){
-return send(res,401,{
-success:false,
-message:"Unauthorized."
-});
-}
-
-return send(res,200,{
-success:true,
-admin
-});
-}
-
-// END OF CHUNK 3
-  // ADMIN STATS
-if(req.method==="GET"&&path==="/api/admin/stats"){
-const admin=await adminAuth(req);
-if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
-
-const wallets=await db(`SELECT COUNT(*)::int AS count,COALESCE(SUM(balance),0) AS balance FROM wallets`);
-const transactions=await db(`SELECT COUNT(*)::int AS count FROM transactions`);
-const payments=await db(`SELECT COUNT(*)::int AS count,COALESCE(SUM(CASE WHEN status='success' THEN amount ELSE 0 END),0) AS successful FROM payments`);
-
-return send(res,200,{
-success:true,
-stats:{
-users:wallets.rows[0].count,
-walletBalance:Number(wallets.rows[0].balance),
-transactions:transactions.rows[0].count,
-payments:payments.rows[0].count,
-successfulPayments:Number(payments.rows[0].successful)
-}
-});
-}
-
-// ADMIN USERS
-if(req.method==="GET"&&path==="/api/admin/users"){
-const admin=await adminAuth(req);
-if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
-
-const result=await db(`SELECT user_id,balance,created_at,updated_at FROM wallets ORDER BY created_at DESC LIMIT 100`);
-
-return send(res,200,{
-success:true,
-users:result.rows.map(x=>({...x,balance:Number(x.balance)}))
-});
-}
-
-// ADMIN TRANSACTIONS
-if(req.method==="GET"&&path==="/api/admin/transactions"){
-const admin=await adminAuth(req);
-if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
-
-const result=await db(`SELECT id,user_id,type,service,amount,reference,status,date FROM transactions ORDER BY date DESC LIMIT 100`);
-
-return send(res,200,{
-success:true,
-transactions:result.rows.map(x=>({...x,amount:Number(x.amount)}))
-});
-}
-
-// ADMIN PAYMENTS
-if(req.method==="GET"&&path==="/api/admin/payments"){
-const admin=await adminAuth(req);
-if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
-
-const result=await db(`SELECT reference,user_id,email,amount,status,credited,created_at,credited_at FROM payments ORDER BY created_at DESC LIMIT 100`);
-
-return send(res,200,{
-success:true,
-payments:result.rows.map(x=>({...x,amount:Number(x.amount)}))
-});
-}
-
-// CONTINUE TO CHUNK 4B
-  // ADMIN LOGOUT
-if(req.method==="POST"&&path==="/api/admin/logout"){
-const header=req.headers.authorization||"";
-
-if(header.startsWith("Bearer ")){
-const token=header.slice(7).trim();
-if(token){
-await db(`DELETE FROM admin_sessions WHERE token=$1`,[token]);
-}
-}
-
-return send(res,200,{
-success:true,
-message:"Admin logged out."
-});
-}
-
-// 404
-return send(res,404,{
-success:false,
-message:"API route not found"
-});
-
-}catch(error){
-console.error("BOLTIV ERROR:",error);
-
-return send(res,500,{
-success:false,
-message:"Internal server error."
-});
-}
-});
-
-// START SERVER
-initializeDatabase().then(()=>{
-server.listen(PORT,"0.0.0.0",()=>{
-console.log(`BOLTIV API running on port ${PORT}`);
-});
-}).catch(error=>{
-console.error("DATABASE STARTUP ERROR:",error);
-process.exit(1);
-});
-
-// END OF BOLTIV BACKEND
+// CHUNK 2 END

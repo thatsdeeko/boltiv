@@ -1,138 +1,635 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#050505">
 <title>BOLTIV — Support</title>
 <link rel="stylesheet" href="style.css">
+
 <script>
-if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html");
+if(localStorage.getItem("boltivLoggedIn")!=="true"){
+location.replace("login.html");
+}
 </script>
+
+<style>
+*{box-sizing:border-box}
+
+.support-page{
+min-height:100vh;
+padding-bottom:110px;
+}
+
+.support-header{
+display:flex;
+align-items:center;
+gap:13px;
+padding:18px 0 24px;
+}
+
+.support-back{
+width:40px;
+height:40px;
+border:1px solid #292929;
+border-radius:12px;
+background:#111;
+color:#d4af37;
+font-size:20px;
+}
+
+.support-title{
+font-size:19px;
+font-weight:1000;
+color:#fff;
+}
+
+.support-subtitle{
+margin-top:4px;
+color:#666;
+font-size:8px;
+letter-spacing:.5px;
+}
+
+.support-hero{
+padding:22px;
+border-radius:22px;
+background:
+radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 38%),
+linear-gradient(145deg,#181818,#090909);
+border:1px solid #292929;
+margin-bottom:20px;
+}
+
+.hero-icon{
+width:52px;
+height:52px;
+border-radius:16px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#17140b;
+border:1px solid #403513;
+color:#d4af37;
+font-size:21px;
+margin-bottom:14px;
+}
+
+.hero-title{
+font-size:17px;
+font-weight:1000;
+}
+
+.hero-text{
+margin-top:6px;
+color:#777;
+font-size:8px;
+line-height:1.7;
+}
+
+.issue-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:9px;
+}
+
+.issue-card{
+padding:16px 13px;
+border-radius:16px;
+background:#101010;
+border:1px solid #242424;
+text-align:left;
+color:#fff;
+transition:.2s ease;
+}
+
+.issue-card:active{
+transform:scale(.98);
+border-color:#d4af37;
+}
+
+.issue-icon{
+width:36px;
+height:36px;
+border-radius:11px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#17140b;
+border:1px solid #403513;
+color:#d4af37;
+font-size:14px;
+margin-bottom:10px;
+}
+
+.issue-title{
+font-size:9px;
+font-weight:1000;
+}
+
+.issue-text{
+margin-top:4px;
+color:#666;
+font-size:7px;
+line-height:1.5;
+}
+
+.form-card{
+padding:20px;
+border-radius:20px;
+background:#101010;
+border:1px solid #242424;
+}
+
+.form-group{
+margin-bottom:16px;
+}
+
+.form-label{
+display:block;
+margin-bottom:8px;
+color:#777;
+font-size:8px;
+font-weight:900;
+letter-spacing:.6px;
+}
+
+.form-select,
+.form-textarea{
+width:100%;
+border:1px solid #292929;
+border-radius:12px;
+background:#080808;
+color:#fff;
+outline:none;
+font-family:inherit;
+font-size:10px;
+font-weight:700;
+}
+
+.form-select{
+height:48px;
+padding:0 13px;
+}
+
+.form-textarea{
+padding:13px;
+resize:none;
+line-height:1.6;
+}
+
+.form-select:focus,
+.form-textarea:focus{
+border-color:#d4af37;
+box-shadow:0 0 0 2px rgba(212,175,55,.06);
+}
+
+.send-button{
+width:100%;
+height:48px;
+border:0;
+border-radius:13px;
+background:linear-gradient(135deg,#f5d76e,#d4af37,#b8860b);
+color:#050505;
+font-size:9px;
+font-weight:1000;
+letter-spacing:.5px;
+}
+
+.send-button:active{
+transform:scale(.98);
+}
+
+.contact-card{
+margin-top:20px;
+padding:22px;
+border-radius:20px;
+background:#101010;
+border:1px solid #242424;
+text-align:center;
+}
+
+.contact-icon{
+width:50px;
+height:50px;
+margin:0 auto 12px;
+border-radius:15px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#17140b;
+border:1px solid #403513;
+color:#d4af37;
+font-size:20px;
+}
+
+.contact-title{
+font-size:13px;
+font-weight:1000;
+}
+
+.contact-text{
+margin-top:6px;
+color:#666;
+font-size:8px;
+line-height:1.6;
+}
+
+.contact-buttons{
+display:grid;
+gap:9px;
+margin-top:18px;
+}
+
+.contact-button{
+display:flex;
+align-items:center;
+justify-content:center;
+gap:8px;
+width:100%;
+padding:13px;
+border-radius:12px;
+text-decoration:none;
+font-size:9px;
+font-weight:1000;
+}
+
+.whatsapp-button{
+background:#151b16;
+border:1px solid #28452d;
+color:#70d47b;
+}
+
+.email-button{
+background:#17140b;
+border:1px solid #403513;
+color:#d4af37;
+}
+
+.boltiv-message{
+display:none;
+margin-top:12px;
+padding:12px;
+border-radius:11px;
+font-size:8px;
+line-height:1.5;
+text-align:center;
+}
+
+.boltiv-message.show{
+display:block;
+}
+
+.message-error{
+background:#2a1111;
+border:1px solid #4a2020;
+color:#ff8d8d;
+}
+
+.bottom-nav{
+position:fixed;
+z-index:10;
+bottom:0;
+left:0;
+right:0;
+height:68px;
+display:flex;
+justify-content:center;
+padding:8px 12px;
+background:rgba(7,7,7,.97);
+border-top:1px solid #222;
+}
+
+.nav-item{
+width:25%;
+max-width:110px;
+border:0;
+background:transparent;
+color:#555;
+font-size:7px;
+font-weight:900;
+}
+
+.nav-item.active{
+color:#d4af37;
+}
+
+.nav-icon{
+display:block;
+margin-bottom:4px;
+font-size:17px;
+}
+</style>
 </head>
+
 <body>
-<div class="page"><div class="container"><header class="header">
-<div class="brand">
-<div class="brand-name">BOLTIV</div>
-<div class="brand-tagline">DIGITAL PAYMENT HUB</div>
+
+<div class="page support-page">
+<div class="container">
+
+<!-- HEADER -->
+<header class="support-header">
+<button class="support-back" onclick="history.back()">‹</button>
+
+<div>
+<div class="support-title">Support</div>
+<div class="support-subtitle">BOLTIV CUSTOMER SUPPORT</div>
 </div>
-<button class="profile-mini" id="profileButton">U</button>
-</header><section class="welcome">
-<div class="welcome-title">BOLTIV <span>SUPPORT</span></div>
-<div class="welcome-text">We're here to help you with your account and transactions.</div>
-</section><section class="section">
-<div class="section-head"><h2 class="section-title">HOW CAN WE HELP?</h2></div><div class="support-card">
-<div class="support-title">Wallet & Funding</div>
-<div class="support-text">Having trouble funding your wallet or seeing your balance? Contact support and we'll help you resolve it.</div>
-</div><div class="support-card">
-<div class="support-title">Airtime & Data</div>
-<div class="support-text">Report failed, pending or incorrect airtime and data transactions.</div>
-</div><div class="support-card">
-<div class="support-title">Cable TV</div>
-<div class="support-text">Need help with a cable subscription or payment issue? We're available to assist.</div>
-</div><div class="support-card">
-<div class="support-title">Electricity</div>
-<div class="support-text">Contact us if your electricity payment is pending, failed or not reflected.</div>
+</header>
+
+<!-- HERO -->
+<div class="support-hero">
+<div class="hero-icon">?</div>
+<div class="hero-title">How can we help?</div>
+<div class="hero-text">
+Choose an issue below or send us a support request. For transaction problems, keep your transaction ID available.
 </div>
-</section><section class="section">
-<div class="section-head"><h2 class="section-title">CONTACT SUPPORT</h2></div><div class="card">
-<div class="form-group">
-<label class="label">SUBJECT</label>
-<select id="subject">
-<option value="">SELECT ISSUE</option>
-<option>Wallet Funding</option>
-<option>Airtime</option>
-<option>Data</option>
-<option>Cable TV</option>
-<option>Electricity</option>
-<option>Account</option>
-<option>Other</option>
-</select>
-</div><div class="form-group">
-<label class="label">MESSAGE</label>
-<textarea id="message" rows="5" placeholder="Describe your issue..."></textarea>
-</div><button class="btn btn-primary" id="sendBtn" style="width:100%">SEND REQUEST</button>
+</div>
+
+<!-- ISSUE TYPES -->
+<div class="section">
+
+<div class="section-head">
+<h2 class="section-title">SELECT AN ISSUE</h2>
+</div>
+
+<div class="issue-grid">
+
+<button class="issue-card" data-issue="Wallet Funding">
+<div class="issue-icon">₦</div>
+<div class="issue-title">Wallet Funding</div>
+<div class="issue-text">Funding, balance or payment gateway issues.</div>
+</button>
+
+<button class="issue-card" data-issue="Airtime">
+<div class="issue-icon">☎</div>
+<div class="issue-title">Airtime</div>
+<div class="issue-text">Failed, pending or incorrect airtime.</div>
+</button>
+
+<button class="issue-card" data-issue="Data">
+<div class="issue-icon">◉</div>
+<div class="issue-title">Data</div>
+<div class="issue-text">Data purchase or activation problems.</div>
+</button>
+
+<button class="issue-card" data-issue="Cable TV">
+<div class="issue-icon">▣</div>
+<div class="issue-title">Cable TV</div>
+<div class="issue-text">Subscription and payment issues.</div>
+</button>
+
+<button class="issue-card" data-issue="Electricity">
+<div class="issue-icon">ϟ</div>
+<div class="issue-title">Electricity</div>
+<div class="issue-text">Meter, payment or token problems.</div>
+</button>
+
+<button class="issue-card" data-issue="Account">
+<div class="issue-icon">◉</div>
+<div class="issue-title">Account</div>
+<div class="issue-text">Profile, login or account problems.</div>
+</button>
 
 </div>
-</section><section class="section">
-<div class="card text-center">
-<div class="wallet-action-icon">◉</div>
-<div style="font-size:13px;font-weight:900;margin-bottom:5px">BOLTIV SUPPORT</div>
-<div style="font-size:10px;color:#666;line-height:1.6">
-For urgent transaction issues, keep your transaction ID available when contacting support.
-</div><div style="margin-top:18px">
-<a href="https://wa.me/2347086836820" style="display:block;color:#d4af37;text-decoration:none;font-size:11px;font-weight:900;margin-bottom:10px">
+</div>
+
+<!-- CONTACT FORM -->
+<div class="section">
+
+<div class="section-head">
+<h2 class="section-title">CONTACT SUPPORT</h2>
+</div>
+
+<div class="form-card">
+
+<div class="form-group">
+<label class="form-label">ISSUE</label>
+
+<select id="subject" class="form-select">
+<option value="">SELECT ISSUE</option>
+<option value="Wallet Funding">Wallet Funding</option>
+<option value="Airtime">Airtime</option>
+<option value="Data">Data</option>
+<option value="Cable TV">Cable TV</option>
+<option value="Electricity">Electricity</option>
+<option value="Account">Account</option>
+<option value="Other">Other</option>
+</select>
+</div>
+
+<div class="form-group">
+<label class="form-label">MESSAGE</label>
+
+<textarea
+id="message"
+class="form-textarea"
+rows="6"
+placeholder="Describe your issue..."
+></textarea>
+</div>
+
+<button id="sendBtn" class="send-button">
+SEND SUPPORT REQUEST
+</button>
+
+<div id="formMessage" class="boltiv-message"></div>
+
+</div>
+</div>
+
+<!-- DIRECT CONTACT -->
+<div class="contact-card">
+
+<div class="contact-icon">◉</div>
+
+<div class="contact-title">
+BOLTIV SUPPORT
+</div>
+
+<div class="contact-text">
+You can also contact us directly through WhatsApp or email.
+</div>
+
+<div class="contact-buttons">
+
+<a
+class="contact-button whatsapp-button"
+href="https://wa.me/2347086836820"
+>
 ◉ WhatsApp Support
 </a>
-<a href="mailto:boltivsupport@gmail.com" style="display:block;color:#d4af37;text-decoration:none;font-size:11px;font-weight:900">
-✉ boltivsupport@gmail.com
+
+<a
+class="contact-button email-button"
+href="mailto:boltivsupport@gmail.com"
+>
+✉ Email Support
 </a>
+
 </div>
+
 </div>
-</section><footer class="footer">
+
+<footer class="footer">
 <div class="footer-logo">BOLTIV</div>
 <div class="footer-text">DIGITAL PAYMENT HUB</div>
-</footer></div></div><nav class="bottom-nav">
-<button class="nav-item" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
-<button class="nav-item" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
-<button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Transactions</span></button>
-<button class="nav-item active" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
-</nav><script>
-function loadUser(){
+</footer>
+
+</div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+
+<button class="nav-item" data-page="index.html">
+<span class="nav-icon">⌂</span>
+<span>Home</span>
+</button>
+
+<button class="nav-item" data-page="wallet.html">
+<span class="nav-icon">₦</span>
+<span>Wallet</span>
+</button>
+
+<button class="nav-item" data-page="transactions.html">
+<span class="nav-icon">↯</span>
+<span>Activity</span>
+</button>
+
+<button class="nav-item active" data-page="profile.html">
+<span class="nav-icon">◉</span>
+<span>Profile</span>
+</button>
+
+</nav>
+
+<script>
+
+const subject=document.getElementById("subject");
+const message=document.getElementById("message");
+const sendBtn=document.getElementById("sendBtn");
+const formMessage=document.getElementById("formMessage");
+
+/* USER */
+function getUser(){
+
 try{
-const user=JSON.parse(localStorage.getItem("boltivUser")||"null");
-if(!user)return;
-const name=String(user.name||user.fullName||user.firstName||"U").trim().split(/\s+/)[0];
-document.getElementById("profileButton").textContent=name.charAt(0).toUpperCase()||"U";
-}catch(e){}
+return JSON.parse(
+localStorage.getItem("boltivUser")||"{}"
+)||{};
+
+}catch(error){
+
+return{};
+
 }
 
-document.getElementById("sendBtn").onclick=()=>{
-const subject=document.getElementById("subject").value;
-const message=document.getElementById("message").value.trim();
+}
 
-if(!subject){
-alert("Please select an issue.");
+/* SHOW MESSAGE */
+function showMessage(text){
+
+formMessage.textContent=text;
+formMessage.className="boltiv-message message-error boltiv-message show";
+
+}
+
+/* ISSUE CARDS */
+document.querySelectorAll(".issue-card").forEach(card=>{
+
+card.onclick=()=>{
+
+subject.value=card.dataset.issue;
+
+document.querySelectorAll(".issue-card").forEach(item=>{
+item.style.borderColor="#242424";
+});
+
+card.style.borderColor="#d4af37";
+
+document
+.querySelector(".form-card")
+.scrollIntoView({
+behavior:"smooth",
+block:"center"
+});
+
+};
+
+});
+
+/* SEND SUPPORT REQUEST */
+sendBtn.onclick=()=>{
+
+const selectedIssue=subject.value;
+const text=message.value.trim();
+
+if(!selectedIssue){
+
+showMessage("Please select the type of issue you need help with.");
 return;
+
 }
 
-if(!message){
-alert("Please enter your message.");
+if(!text){
+
+showMessage("Please describe your issue before sending the request.");
 return;
+
 }
+
+if(text.length<5){
+
+showMessage("Please provide a little more detail about your issue.");
+return;
+
+}
+
+const user=getUser();
+
+const name=String(
+user.name||
+user.fullName||
+user.firstName||
+"BOLTIV User"
+).trim();
+
+const email=String(
+user.email||
+""
+).trim();
 
 const phone="2347086836820";
-const user=getUser();
-const name=String(user.name||user.fullName||"BOLTIV User").trim();
-const email=String(user.email||"").trim();
 
-const text=
+const supportMessage=
 `BOLTIV SUPPORT REQUEST
 
 Name: ${name}
 Email: ${email||"Not provided"}
-Issue: ${subject}
+Issue: ${selectedIssue}
 
 Message:
-${message}`;
+${text}`;
 
-location.href=`https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+location.href=
+`https://wa.me/${phone}?text=${encodeURIComponent(supportMessage)}`;
+
 };
 
-function getUser(){
-try{
-return JSON.parse(localStorage.getItem("boltivUser")||"{}")||{};
-}catch(e){
-return{};
-}
-}
+/* NAVIGATION */
+document
+.querySelectorAll(".nav-item")
+.forEach(item=>{
 
-document.getElementById("profileButton").onclick=()=>location.href="profile.html";
+item.onclick=()=>{
+location.href=item.dataset.page;
+};
 
-document.querySelectorAll(".nav-item").forEach(item=>{
-item.onclick=()=>location.href=item.dataset.page;
 });
 
-loadUser();
-</script></body>
+</script>
+
+</body>
 </html>
-<!-- BOLTIV SUPPORT — WHATSAPP REQUEST SYSTEM UPDATED -->
+<!-- END OF BOLTIV SUPPORT -->

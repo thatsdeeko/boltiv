@@ -9,7 +9,6 @@
 <script>
 if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html");
 </script>
-
 <style>
 *{box-sizing:border-box}
 .profile-page{min-height:100vh;padding-bottom:110px}
@@ -56,103 +55,40 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 .modal-btn{width:100%;margin-top:18px;padding:13px;border:0;border-radius:12px;background:#d4af37;color:#050505;font-size:9px;font-weight:1000}
 </style>
 </head>
-
 <body>
-
-<div class="page profile-page">
-<div class="container">
+<div class="page profile-page"><div class="container">
 
 <!-- HEADER -->
-<div class="profile-top">
-<div>
-<div class="profile-title">My <span>Profile</span></div>
-<div class="profile-sub">MANAGE YOUR BOLTIV ACCOUNT</div>
-</div>
-</div>
+<div class="profile-top"><div><div class="profile-title">My <span>Profile</span></div><div class="profile-sub">MANAGE YOUR BOLTIV ACCOUNT</div></div></div>
 
 <!-- IDENTITY -->
-<div class="identity-card">
-<div class="identity">
-<div class="avatar" id="avatar">U</div>
-<div>
-<div class="identity-name" id="identityName">User</div>
-<div class="identity-email" id="identityEmail">No email added</div>
-<div class="status"><span class="status-dot"></span>ACCOUNT ACTIVE</div>
-</div>
-</div>
-</div>
+<div class="identity-card"><div class="identity"><div class="avatar" id="avatar">U</div><div><div class="identity-name" id="identityName">User</div><div class="identity-email" id="identityEmail">No email added</div><div class="status"><span class="status-dot"></span>ACCOUNT ACTIVE</div></div></div></div>
 
 <!-- PERSONAL INFORMATION -->
-<div class="section">
-<div class="section-head">
-<h3>Personal Information</h3>
-<button class="edit-btn" id="editBtn">EDIT DETAILS</button>
-</div>
-
+<div class="section"><div class="section-head"><h3>Personal Information</h3><button class="edit-btn" id="editBtn">EDIT DETAILS</button></div>
 <div class="details-card">
-
-<div class="detail">
-<div class="detail-label">FULL NAME</div>
-<input id="nameInput" class="detail-input" type="text" disabled placeholder="Enter your full name">
-</div>
-
-<div class="detail">
-<div class="detail-label">PHONE NUMBER</div>
-<input id="phoneInput" class="detail-input" type="tel" disabled placeholder="Enter phone number">
-</div>
-
-<div class="detail">
-<div class="detail-label">EMAIL ADDRESS</div>
-<input id="emailInput" class="detail-input" type="email" disabled placeholder="Enter email address">
-</div>
-
+<div class="detail"><div class="detail-label">FULL NAME</div><input id="nameInput" class="detail-input" type="text" disabled placeholder="Enter your full name"></div>
+<div class="detail"><div class="detail-label">PHONE NUMBER</div><input id="phoneInput" class="detail-input" type="tel" disabled placeholder="Enter phone number"></div>
+<div class="detail"><div class="detail-label">EMAIL ADDRESS</div><input id="emailInput" class="detail-input" type="email" disabled placeholder="Enter email address"></div>
 <button id="saveBtn" class="save-btn">SAVE CHANGES</button>
-
-</div>
-</div>
+</div></div>
 
 <!-- SECURITY -->
-<div class="section">
-<div class="section-head">
-<h3>Security</h3>
-</div>
+<div class="section"><div class="section-head"><h3>Security</h3></div><div class="actions">
+<button class="action" id="securityBtn"><div class="action-icon">⌾</div><div class="action-text"><div class="action-title">Security Settings</div><div class="action-sub">Manage your Transaction PIN and account security</div></div><div class="action-arrow">›</div></button>
+</div></div>
 
-<div class="actions">
-
-<button class="action" id="securityBtn">
-<div class="action-icon">⌾</div>
-<div class="action-text">
-<div class="action-title">Security Settings</div>
-<div class="action-sub">Manage your Transaction PIN and account security</div>
-</div>
-<div class="action-arrow">›</div>
-</button>
-
-</div>
-</div>
+<!-- SUPPORT -->
+<div class="section"><div class="section-head"><h3>Support</h3></div><div class="actions">
+<button class="action" id="supportBtn"><div class="action-icon">?</div><div class="action-text"><div class="action-title">BOLTIV Support</div><div class="action-sub">Get help with your account and transactions</div></div><div class="action-arrow">›</div></button>
+</div></div>
 
 <!-- ACCOUNT ACTIONS -->
-<div class="section">
-<div class="section-head">
-<h3>Account</h3>
-</div>
+<div class="section"><div class="section-head"><h3>Account</h3></div><div class="actions">
+<button class="action logout" id="logoutBtn"><div class="action-icon">↪</div><div class="action-text"><div class="action-title">Log Out</div><div class="action-sub">Sign out of your BOLTIV account</div></div><div class="action-arrow">›</div></button>
+</div></div>
 
-<div class="actions">
-
-<button class="action logout" id="logoutBtn">
-<div class="action-icon">↪</div>
-<div class="action-text">
-<div class="action-title">Log Out</div>
-<div class="action-sub">Sign out of your BOLTIV account</div>
-</div>
-<div class="action-arrow">›</div>
-</button>
-
-</div>
-</div>
-
-</div>
-</div>
+</div></div>
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
@@ -163,94 +99,52 @@ if(localStorage.getItem("boltivLoggedIn")!=="true")location.replace("login.html"
 </nav>
 
 <!-- SUCCESS MODAL -->
-<div class="modal" id="modal">
-<div class="modal-box">
-<div class="modal-icon">✓</div>
-<div class="modal-title">Profile Updated</div>
-<div class="modal-text">Your personal information has been successfully updated.</div>
-<button class="modal-btn" id="modalDone">DONE</button>
-</div>
-</div>
+<div class="modal" id="modal"><div class="modal-box"><div class="modal-icon">✓</div><div class="modal-title">Profile Updated</div><div class="modal-text">Your personal information has been successfully updated.</div><button class="modal-btn" id="modalDone">DONE</button></div></div>
 
 <script>
 // USER STORAGE
-function getUser(){
-try{
-return JSON.parse(localStorage.getItem("boltivUser")||"{}")||{};
-}catch(e){return{}}
-}
-
-function saveUser(user){
-localStorage.setItem("boltivUser",JSON.stringify(user));
-}
+function getUser(){try{return JSON.parse(localStorage.getItem("boltivUser")||"{}")||{}}catch(e){return{}}}
+function saveUser(user){localStorage.setItem("boltivUser",JSON.stringify(user))}
 
 // ELEMENTS
-const nameInput=document.getElementById("nameInput");
-const phoneInput=document.getElementById("phoneInput");
-const emailInput=document.getElementById("emailInput");
-const editBtn=document.getElementById("editBtn");
-const saveBtn=document.getElementById("saveBtn");
-const modal=document.getElementById("modal");
+const nameInput=document.getElementById("nameInput"),phoneInput=document.getElementById("phoneInput"),emailInput=document.getElementById("emailInput"),editBtn=document.getElementById("editBtn"),saveBtn=document.getElementById("saveBtn"),modal=document.getElementById("modal");
 
 // LOAD PROFILE
 function loadProfile(){
 const user=getUser();
-const name=(user.name||user.fullName||user.firstName||"User").trim();
+const name=String(user.name||user.fullName||user.firstName||"User").trim()||"User";
 const phone=user.phone||user.phoneNumber||"";
 const email=user.email||"";
-
 nameInput.value=name;
 phoneInput.value=phone;
 emailInput.value=email;
 document.getElementById("identityName").textContent=name;
 document.getElementById("identityEmail").textContent=email||"No email added";
-
 const parts=name.split(/\s+/).filter(Boolean);
 document.getElementById("avatar").textContent=parts.length>1?(parts[0][0]+parts[parts.length-1][0]).toUpperCase():name[0].toUpperCase();
 }
 
 // EDIT MODE
 function enableEdit(){
-[nameInput,phoneInput,emailInput].forEach(input=>{
-input.disabled=false;
-input.classList.add("editing");
-});
+[nameInput,phoneInput,emailInput].forEach(input=>{input.disabled=false;input.classList.add("editing")});
 editBtn.textContent="DONE EDITING";
 saveBtn.classList.add("show");
 nameInput.focus();
 }
-
 function disableEdit(){
-[nameInput,phoneInput,emailInput].forEach(input=>{
-input.disabled=true;
-input.classList.remove("editing");
-});
+[nameInput,phoneInput,emailInput].forEach(input=>{input.disabled=true;input.classList.remove("editing")});
 editBtn.textContent="EDIT DETAILS";
 saveBtn.classList.remove("show");
 }
 
 // EDIT BUTTON
-editBtn.onclick=()=>{
-if(nameInput.disabled)enableEdit();
-else disableEdit();
-};
+editBtn.onclick=()=>nameInput.disabled?enableEdit():disableEdit();
 
 // SAVE PROFILE
 saveBtn.onclick=()=>{
-const name=nameInput.value.trim();
-const phone=phoneInput.value.trim();
-const email=emailInput.value.trim();
-
-if(name.length<2){
-alert("Please enter your full name.");
-return;
-}
-
-if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-alert("Please enter a valid email address.");
-return;
-}
-
+const name=nameInput.value.trim(),phone=phoneInput.value.trim(),email=emailInput.value.trim();
+if(name.length<2){alert("Please enter your full name.");return}
+if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert("Please enter a valid email address.");return}
 const oldUser=getUser();
 saveUser({...oldUser,name,fullName:name,phone,phoneNumber:phone,email});
 loadProfile();
@@ -259,18 +153,14 @@ modal.classList.add("show");
 };
 
 // CLOSE MODAL
-document.getElementById("modalDone").onclick=()=>{
-modal.classList.remove("show");
-};
-
-modal.onclick=e=>{
-if(e.target===modal)modal.classList.remove("show");
-};
+document.getElementById("modalDone").onclick=()=>modal.classList.remove("show");
+modal.onclick=e=>{if(e.target===modal)modal.classList.remove("show")};
 
 // SECURITY
-document.getElementById("securityBtn").onclick=()=>{
-location.href="security.html";
-};
+document.getElementById("securityBtn").onclick=()=>location.href="security.html";
+
+// SUPPORT
+document.getElementById("supportBtn").onclick=()=>location.href="support.html";
 
 // LOGOUT
 document.getElementById("logoutBtn").onclick=()=>{
@@ -279,13 +169,11 @@ location.replace("login.html");
 };
 
 // NAVIGATION
-document.querySelectorAll(".nav-item").forEach(item=>{
-item.onclick=()=>location.href=item.dataset.page;
-});
+document.querySelectorAll(".nav-item").forEach(item=>{item.onclick=()=>location.href=item.dataset.page});
 
 // START
 loadProfile();
 </script>
-
 </body>
 </html>
+<!-- BOLTIV PROFILE UPDATED WITH SUPPORT -->

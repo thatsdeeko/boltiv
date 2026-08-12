@@ -25,4 +25,4 @@ function updateSummary(){let v=plans[plan.value]||0;document.getElementById("sum
 function checkPayment(){pay.disabled=!(verified&&plans[plan.value])}
 pay.onclick=()=>{let value=plans[plan.value],number=smartcard.value.trim(),balance=getBalance();if(!verified)return showMessage("Please verify your smartcard or IUC number first.","error");if(!value)return showMessage("Select a subscription plan.","error");if(balance<value)return showMessage(`Insufficient wallet balance. Available: ${money(balance)}.`,"error");setBalance(balance-value);let now=new Date(),id="BTV-"+Date.now().toString().slice(-8);saveTransaction({id,type:"cable",service:"Cable TV",title:"Cable TV Subscription",provider:selectedProvider,smartcard:number,plan:plan.value,amount:value,status:"Successful",direction:"debit",date:now.toLocaleString("en-NG",{dateStyle:"medium",timeStyle:"short"}),createdAt:now.toISOString()});showMessage(`Cable TV payment successful. ${money(value)} deducted from your wallet.`,"success");pay.disabled=true};
 </script></body></html>
-<!-- BOLTIV CABLE TV PAGE COMPRESSED -->
+<!-- BOLTIV CABLE TV -->

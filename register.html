@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7f7f5">
+<title>BOLTIV — Create Account</title>
+<link rel="stylesheet" href="style.css">
+
+<style>
+.auth-page{
+    min-height:100vh;
+    padding:35px 0 40px;
+}
+
+.auth-logo{
+    text-align:center;
+    color:#d4af37;
+    font-size:30px;
+    font-weight:1000;
+    letter-spacing:4px;
+}
+
+.auth-tagline{
+    text-align:center;
+    color:#555;
+    font-size:7px;
+    letter-spacing:2px;
+    margin-top:4px;
+}
+
+.auth-card{
+    margin-top:28px;
+    padding:22px;
+    border:1px solid #e5e5e1;
+    border-radius:22px;
+    background:linear-gradient(145deg,#151515,#ffffff);
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+
+.auth-card h1{
+    margin:0;
+    color:#171717;
+    font-size:21px;
+    font-weight:1000;
+}
+
+.auth-subtitle{
+    margin:6px 0 22px;
+    color:#666;
+    font-size:9px;
+}
+
+.form-group{
+    margin-bottom:15px;
+}
+
+.auth-btn{
+    width:100%;
+    height:48px;
+    margin-top:5px;
+}
+
+.auth-links{
+    display:flex;
+    justify-content:center;
+    gap:15px;
+    margin-top:18px;
+    font-size:8px;
+}
+
+.auth-links a{
+    color:#777;
+}
+
+.auth-links a:first-child{
+    color:#d4af37;
+}
+
+/* STATUS */
+.status-message{
+    display:none;
+    margin-bottom:15px;
+    padding:11px;
+    border-radius:10px;
+    font-size:8px;
+    line-height:1.5;
+}
+
+.status-message.show{
+    display:block;
+}
+
+.status-message.error{
+    color:#ff8b8b;
+    background:#211010;
+    border:1px solid #542323;
+}
+
+.status-message.success{
+    color:#d4af37;
+    background:#fffdf4;
+    border:1px solid #ead99b;
+}
+
+/* SUCCESS MODAL */
+.boltiv-success-overlay{
+    position:fixed;
+    inset:0;
+    z-index:99999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(0,0,0,.88);
+    backdrop-filter:blur(12px);
+    opacity:0;
+    visibility:hidden;
+    transition:.3s ease;
+}
+
+.boltiv-success-overlay.show{
+    opacity:1;
+    visibility:visible;
+}
+
+.boltiv-success-card{
+    width:100%;
+    max-width:390px;
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    background:#ffffff;
+    color:#171717;
+}
+
+.auth-page{
+    min-height:100vh;
+    padding:40px 0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+}
+
+.auth-logo{
+    text-align:center;
+    color:#c49a25;
+    font-size:36px;
+    font-weight:1000;
+    letter-spacing:5px;
+}
+
+.auth-tagline{
+    text-align:center;
+    color:#777;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:2px;
+    margin-top:7px;
+}
+
+.auth-card{
+    margin-top:30px;
+    padding:28px;
+    border:1px solid #e4e4e4;
+    border-radius:20px;
+    background:#ffffff;
+    box-shadow:0 12px 35px rgba(0,0,0,.07);
+}
+
+.auth-card h1{
+    margin:0;
+    color:#171717;
+    font-size:27px;
+    font-weight:900;
+}
+
+.auth-subtitle{
+    margin:8px 0 26px;
+    color:#707070;
+    font-size:14px;
+    line-height:1.5;
+}
+
+.form-group{
+    margin-bottom:18px;
+}
+
+.label{
+    display:block;
+    margin-bottom:8px;
+    color:#333333;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.8px;
+}
+
+.input{
+    width:100%;
+    height:52px;
+    padding:0 15px;
+
+    border:1px solid #dcdcdc;
+    border-radius:11px;
+
+    background:#ffffff;
+    color:#171717;
+
+    font-size:15px;
+
+    outline:none;
+
+    transition:
+        border-color .2s,
+        box-shadow .2s;
+}
+
+.input::placeholder{
+    color:#777;
+}
+
+.input:focus{
+    border-color:#c49a25;
+    box-shadow:
+        0 0 0 3px
+        rgba(196,154,37,.12);
+}
+
+.auth-btn{
+    width:100%;
+    height:52px;
+    margin-top:4px;
+
+    border:none;
+    border-radius:11px;
+
+    background:#d4af37;
+    color:#171717;
+
+    font-size:15px;
+    font-weight:900;
+
+    cursor:pointer;
+
+    transition:
+        transform .15s,
+        background .2s,
+        box-shadow .2s;
+}
+
+.auth-btn:hover{
+    background:#c9a12f;
+    box-shadow:
+        0 8px 20px
+        rgba(196,154,37,.22);
+}
+
+.auth-btn:active{
+    transform:scale(.98);
+}
+
+.auth-btn:disabled{
+    opacity:.65;
+    cursor:not-allowed;
+}
+
+.auth-links{
+    display:flex;
+    justify-content:center;
+    margin-top:22px;
+    font-size:13px;
+}
+
+.auth-links a{
+    color:#b58a17;
+    text-decoration:none;
+    font-weight:700;
+}
+
+.auth-links a:hover{
+    text-decoration:underline;
+}
+
+
+/* =========================
+   STATUS MESSAGE
+========================= */
+
+.status-message{
+    display:none;
+
+    margin-bottom:17px;
+    padding:13px 14px;
+
+    border-radius:10px;
+
+    font-size:13px;
+    line-height:1.5;
+}
+
+.status-message.show{
+    display:block;
+}
+
+.status-message.error{
+    color:#a32929;
+    background:#fff4f4;
+    border:1px solid #f0caca;
+}
+
+.status-message.success{
+    color:#80620c;
+    background:#fffaf0;
+    border:1px solid #ead9a5;
+}
+
+
+/* =========================
+   SUCCESS MODAL
+========================= */
+
+.boltiv-success-overlay{
+    position:fixed;
+    inset:0;
+    z-index:99999;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    padding:20px;
+
+    background:rgba(255,255,255,.88);
+
+    backdrop-filter:blur(12px);
+
+    opacity:0;
+    visibility:hidden;
+
+    transition:.3s ease;
+}
+
+.boltiv-success-overlay.show{
+    opacity:1;
+    visibility:visible;
+}
+
+.boltiv-success-card{
+    width:100%;
+    max-width:390px;
+
+    padding:32px 24px 25px;
+
+    border:1px solid #d4af37;
+    border-radius:24px;
+
+    background:#ffffff;
+
+    box-shadow:
+        0 25px 70px
+        rgba(0,0,0,.16);
+
+    text-align:center;
+
+    transform:
+        translateY(25px)
+        scale(.94);
+
+    transition:.3s ease;
+}
+
+.boltiv-success-overlay.show
+.boltiv-success-card{
+
+    transform:
+        translateY(0)
+        scale(1);
+}
+
+.success-ring{
+
+    width:70px;
+    height:70px;
+
+    margin:0 auto 18px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:50%;
+
+    border:2px solid #d4af37;
+
+    background:#fffaf0;
+
+    color:#b58a17;
+
+    font-size:32px;
+    font-weight:1000;
+}
+
+.success-label{
+
+    color:#b58a17;
+
+    font-size:10px;
+    font-weight:1000;
+
+    letter-spacing:2px;
+
+    margin-bottom:8px;
+}
+
+.boltiv-success-card h2{
+
+    margin:0;
+
+    color:#171717;
+
+    font-size:24px;
+
+    font-weight:900;
+}
+
+.success-message{
+
+    margin:10px auto 0;
+
+    max-width:300px;
+
+    color:#707070;
+
+    font-size:13px;
+
+    line-height:1.7;
+}
+
+.success-user{
+
+    margin-top:18px;
+
+    padding:13px;
+
+    border:1px solid #e5e5e5;
+
+    border-radius:12px;
+
+    background:#fafafa;
+
+    color:#b58a17;
+
+    font-size:13px;
+
+    font-weight:800;
+}
+
+.boltiv-success-btn{
+
+    width:100%;
+
+    margin-top:17px;
+
+    padding:14px;
+
+    border:0;
+
+    border-radius:11px;
+
+    background:#d4af37;
+
+    color:#171717;
+
+    font-size:13px;
+
+    font-weight:1000;
+
+    cursor:pointer;
+
+    transition:.2s;
+}
+
+.boltiv-success-btn:hover{
+
+    background:#c9a12f;
+
+    box-shadow:
+        0 8px 20px
+        rgba(196,154,37,.20);
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media(max-width:480px){
+
+    .container{
+        padding:0 16px;
+    }
+
+    .auth-page{
+        justify-content:flex-start;
+        padding-top:55px;
+    }
+
+    .auth-logo{
+        font-size:32px;
+    }
+
+    .auth-card{
+        margin-top:28px;
+        padding:23px 20px;
+        border-radius:18px;
+    }
+
+    .auth-card h1{
+        font-size:24px;
+    }
+
+    .auth-subtitle{
+        font-size:13px;
+    }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="page">
+<div class="container">
+
+<div class="auth-page">
+
+<div class="auth-logo">BOLTIV</div>
+<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
+
+<div class="auth-card">
+
+<h1>Create Account</h1>
+
+<p class="auth-subtitle">
+Join BOLTIV and manage your digital services
+</p>
+
+<div class="status-message" id="statusMessage"></div>
+
+<div class="form-group">
+<label class="label">FULL NAME</label>
+<input
+class="input"
+id="nameInput"
+type="text"
+autocomplete="name"
+placeholder="Enter your full name">
+</div>
+
+<div class="form-group">
+<label class="label">PHONE NUMBER</label>
+<input
+class="input"
+id="phoneInput"
+type="tel"
+inputmode="tel"
+autocomplete="tel"
+placeholder="Enter phone number">
+</div>
+
+<div class="form-group">
+<label class="label">EMAIL ADDRESS</label>
+<input
+class="input"
+id="emailInput"
+type="email"
+autocomplete="email"
+placeholder="you@example.com">
+</div>
+
+<div class="form-group">
+<label class="label">PASSWORD</label>
+<input
+class="input"
+id="passwordInput"
+type="password"
+autocomplete="new-password"
+placeholder="Create a password">
+</div>
+
+<div class="form-group">
+<label class="label">CONFIRM PASSWORD</label>
+<input
+class="input"
+id="confirmPasswordInput"
+type="password"
+autocomplete="new-password"
+placeholder="Confirm your password">
+</div>
+
+<button
+class="btn btn-primary auth-btn"
+id="registerButton">
+Create Account
+</button>
+
+<div class="auth-links">
+<a href="login.html">
+Already have an account? Login
+</a>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+
+<!-- SUCCESS MODAL -->
+
+<div class="boltiv-success-overlay" id="successModal">
+
+<div class="boltiv-success-card">
+
+<div class="success-ring">✓</div>
+
+<div class="success-label">
+ACCOUNT CREATED
+</div>
+
+<h2>Welcome to BOLTIV</h2>
+
+<p class="success-message">
+Your account has been created successfully.
+Your BOLTIV account is ready to use.
+</p>
+
+<div class="success-user" id="successUser">
+Welcome, User
+</div>
+
+<button
+class="boltiv-success-btn"
+id="successContinue">
+CONTINUE TO LOGIN
+</button>
+
+</div>
+</div>
+
+
+<script>
+
+const API_BASE="https://boltiv-backend.onrender.com";
+
+const registerButton=
+document.getElementById("registerButton");
+
+const statusMessage=
+document.getElementById("statusMessage");
+
+const successModal=
+document.getElementById("successModal");
+
+const successUser=
+document.getElementById("successUser");
+
+const successContinue=
+document.getElementById("successContinue");
+
+
+function showStatus(message,type="error"){
+
+    statusMessage.textContent=message;
+
+    statusMessage.className=
+        "status-message show "+type;
+
+}
+
+
+function clearStatus(){
+
+    statusMessage.textContent="";
+
+    statusMessage.className=
+        "status-message";
+
+}
+
+
+function getInitials(name){
+
+    const parts=
+        name.trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+    if(parts.length===1){
+        return parts[0]
+            .charAt(0)
+            .toUpperCase();
+    }
+
+    return (
+        parts[0].charAt(0)+
+        parts[parts.length-1].charAt(0)
+    ).toUpperCase();
+
+}
+
+
+registerButton.onclick=async()=>{
+
+    clearStatus();
+
+    const name=
+        document.getElementById("nameInput")
+        .value.trim();
+
+    const phone=
+        document.getElementById("phoneInput")
+        .value.trim();
+
+    const email=
+        document.getElementById("emailInput")
+        .value.trim()
+        .toLowerCase();
+
+    const password=
+        document.getElementById("passwordInput")
+        .value;
+
+    const confirm=
+        document.getElementById("confirmPasswordInput")
+        .value;
+
+
+    if(name.length<2){
+
+        showStatus(
+            "Please enter your full name."
+        );
+
+        return;
+    }
+
+
+    if(phone.length<7){
+
+        showStatus(
+            "Please enter a valid phone number."
+        );
+
+        return;
+    }
+
+
+    if(!/^\S+@\S+\.\S+$/.test(email)){
+
+        showStatus(
+            "Please enter a valid email address."
+        );
+
+        return;
+    }
+
+
+    if(password.length<6){
+
+        showStatus(
+            "Password must contain at least 6 characters."
+        );
+
+        return;
+    }
+
+
+    if(password!==confirm){
+
+        showStatus(
+            "Passwords do not match."
+        );
+
+        return;
+    }
+
+
+    registerButton.disabled=true;
+
+    registerButton.textContent=
+        "CREATING ACCOUNT...";
+
+
+    try{
+
+        const response=await fetch(
+            API_BASE+"/api/auth/register",
+            {
+                method:"POST",
+
+                headers:{
+                    "Content-Type":
+                    "application/json"
+                },
+
+                body:JSON.stringify({
+
+                    name:name,
+
+                    fullName:name,
+
+                    phone:phone,
+
+                    phoneNumber:phone,
+
+                    email:email,
+
+                    password:password
+
+                })
+            }
+        );
+
+
+        let data;
+
+        try{
+
+            data=await response.json();
+
+        }catch{
+
+            data={
+                success:false,
+                message:
+                "The server returned an invalid response."
+            };
+
+        }
+
+
+        if(!response.ok||!data.success){
+
+            throw new Error(
+                data.message||
+                "Unable to create account."
+            );
+
+        }
+
+
+        /*
+         IMPORTANT:
+         We do NOT store the password.
+         */
+
+        localStorage.removeItem(
+            "boltivLoggedIn"
+        );
+
+        localStorage.removeItem(
+            "boltivUser"
+        );
+
+        localStorage.removeItem(
+            "boltivUserEmail"
+        );
+
+        localStorage.removeItem(
+            "boltivBalance"
+        );
+
+        localStorage.removeItem(
+            "boltivTransactions"
+        );
+
+
+        successUser.textContent=
+            "Welcome, "+name;
+
+        successModal.classList.add("show");
+
+
+    }catch(error){
+
+        console.error(
+            "BOLTIV REGISTRATION ERROR:",
+            error
+        );
+
+        showStatus(
+            error.message||
+            "Unable to connect to BOLTIV."
+        );
+
+    }finally{
+
+        registerButton.disabled=false;
+
+        registerButton.textContent=
+            "Create Account";
+
+    }
+
+};
+
+
+successContinue.onclick=()=>{
+
+    successModal.classList.remove("show");
+
+    setTimeout(()=>{
+
+        location.href="login.html";
+
+    },250);
+
+};
+
+</script>
+
+</body>
+</html>

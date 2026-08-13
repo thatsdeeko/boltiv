@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#f7f7f5">
+<title>BOLTIV — History</title>
+<link rel="stylesheet" href="style.css">
+
+<script>
+if(localStorage.getItem("boltivLoggedIn")!=="true"){
+location.replace("login.html");
+}
+</script>
+
+<style>
+.history-page{
+padding-bottom:100px
+}
+
+.history-head{
+padding:8px 0 20px
+}
+
+.history-title{
+font-size:25px;
+font-weight:1000;
+color:#fff
+}
+
+.history-title span{
+color:#d4af37
+}
+
+.history-subtitle{
+font-size:9px;
+color:#777;
+line-height:1.6;
+margin-top:6px
+}
+
+.history-tools{
+display:flex;
+gap:8px;
+margin-bottom:14px
+}
+
+.history-search{
+flex:1;
+min-width:0;
+position:relative
+}
+
+.history-search input{
+width:100%;
+box-sizing:border-box;
+padding-left:38px
+}
+
+.history-search-icon{
+position:absolute;
+left:14px;
+top:50%;
+transform:translateY(-50%);
+color:#d4af37;
+font-size:13px;
+z-index:2
+}
+
+.history-filter{
+width:44px;
+height:44px;
+border:1px solid #e5e5e1;
+border-radius:11px;
+background:#ffffff;
+color:#d4af37;
+font-size:16px
+}
+
+.history-summary{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:8px;
+margin-bottom:17px
+}
+
+.history-stat{
+background:linear-gradient(145deg,#151515,#0a0a0a);
+border:1px solid #252525;
+border-radius:14px;
+padding:14px
+}
+
+.history-stat-label{
+font-size:7px;
+color:#666;
+font-weight:900
+}
+
+.history-stat-value{
+font-size:15px;
+color:#d4af37;
+font-weight:1000;
+margin-top:6px
+}
+
+.history-group{
+margin-bottom:18px
+}
+
+.history-date{
+display:flex;
+align-items:center;
+gap:8px;
+font-size:8px;
+font-weight:1000;
+color:#777;
+margin-bottom:8px
+}
+
+.history-date:after{
+content:"";
+height:1px;
+background:#1f1f1f;
+flex:1
+}
+
+.history-item{
+width:100%;
+box-sizing:border-box;
+display:flex;
+align-items:center;
+gap:11px;
+padding:13px;
+margin-bottom:7px;
+border-radius:14px;
+border:1px solid #e5e5e1;
+background:linear-gradient(145deg,#151515,#0a0a0a);
+text-align:left
+}
+
+.history-icon{
+width:40px;
+height:40px;
+flex-shrink:0;
+border-radius:12px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#fffdf4;
+border:1px solid #4b3d16;
+color:#d4af37;
+font-size:16px
+}
+
+.history-main{
+flex:1;
+min-width:0
+}
+
+.history-item-title{
+font-size:9px;
+font-weight:1000;
+color:#171717;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis
+}
+
+.history-item-meta{
+font-size:7px;
+color:#666;
+margin-top:5px;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis
+}
+
+.history-right{
+text-align:right;
+flex-shrink:0
+}
+
+.history-amount{
+font-size:10px;
+font-weight:1000
+}
+
+.history-amount.credit{
+color:#d4af37
+}
+
+.history-amount.debit{
+color:#fff
+}
+
+.history-status{
+font-size:6px;
+color:#d4af37;
+font-weight:900;
+margin-top:4px
+}
+
+.history-empty{
+padding:50px 20px;
+text-align:center;
+border:1px solid #e5e5e1;
+border-radius:18px;
+background:linear-gradient(145deg,#ffffff,#ffffff)
+}
+
+.history-empty-icon{
+width:58px;
+height:58px;
+margin:0 auto 14px;
+display:flex;
+align-items:center;
+justify-content:center;
+border-radius:50%;
+background:#fffdf4;
+border:1px solid #4b3d16;
+color:#d4af37;
+font-size:22px
+}
+
+.history-empty-title{
+font-size:13px;
+font-weight:1000;
+color:#fff
+}
+
+.history-empty-text{
+font-size:8px;
+line-height:1.6;
+color:#666;
+margin-top:6px
+}
+
+.history-modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.82);
+display:flex;
+align-items:flex-end;
+justify-content:center;
+z-index:9999;
+opacity:0;
+visibility:hidden;
+transition:.25s ease;
+backdrop-filter:blur(7px)
+}
+
+.history-modal.show{
+opacity:1;
+visibility:visible
+}
+
+.history-modal-card{
+width:100%;
+max-width:520px;
+background:linear-gradient(145deg,#151515,#ffffff);
+border:1px solid #d4af37;
+border-bottom:0;
+border-radius:23px 23px 0 0;
+padding:23px;
+transform:translateY(30px);
+transition:.25s ease
+}
+
+.history-modal.show .history-modal-card{
+transform:translateY(0)
+}
+
+.history-handle{
+width:38px;
+height:4px;
+border-radius:10px;
+background:#333;
+margin:0 auto 20px
+}
+
+.history-modal-top{
+display:flex;
+align-items:center;
+gap:12px
+}
+
+.history-modal-icon{
+width:48px;
+height:48px;
+border-radius:14px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#fffdf4;
+border:1px solid #4b3d16;
+color:#d4af37;
+font-size:19px
+}
+
+.history-modal-title{
+font-size:16px;
+font-weight:1000;
+color:#fff
+}
+
+.history-modal-status{
+font-size:8px;
+color:#d4af37;
+margin-top:4px
+}
+
+.history-modal-amount{
+font-size:29px;
+font-weight:1000;
+color:#f1d77a;
+margin:22px 0
+}
+
+.history-detail{
+display:flex;
+justify-content:space-between;
+gap:15px;
+padding:12px 0;
+border-bottom:1px solid #1e1e1e;
+font-size:8px
+}
+
+.history-detail span:first-child{
+color:#666
+}
+
+.history-detail span:last-child{
+color:#eee;
+font-weight:900;
+text-align:right
+}
+
+.history-close{
+width:100%;
+margin-top:18px;
+padding:13px;
+border:1px solid #e5e5e1;
+border-radius:11px;
+background:#ffffff;
+color:#777;
+font-size:9px;
+font-weight:1000
+}
+
+.clear-history{
+width:100%;
+margin-top:10px;
+padding:12px;
+border:1px solid #3b1b1b;
+border-radius:11px;
+background:#150c0c;
+color:#c77;
+font-size:8px;
+font-weight:1000
+}
+
+@media(max-width:360px){
+.history-summary{
+grid-template-columns:1fr
+}
+}
+</style>
+</head>
+
+<body>
+
+<div class="page history-page">
+
+<div class="container">
+
+<header class="header">
+
+<div class="brand">
+<div class="brand-name">BOLTIV</div>
+<div class="brand-tagline">DIGITAL PAYMENT HUB</div>
+</div>
+
+<button class="profile-mini" id="profileButton">U</button>
+
+</header>
+
+<section class="history-head">
+
+<div class="history-title">
+FULL <span>HISTORY</span>
+</div>
+
+<div class="history-subtitle">
+A complete record of your BOLTIV wallet and service activity.
+</div>
+
+</section>
+
+<section class="balance-card">
+
+<div class="balance-label">
+AVAILABLE BALANCE
+</div>
+
+<div class="balance-value" id="balance">
+₦0.00
+</div>
+
+<div class="balance-actions">
+
+<button class="btn btn-primary" onclick="location.href='wallet.html'">
+ADD MONEY
+</button>
+
+<button class="btn btn-secondary" onclick="location.href='transactions.html'">
+ACTIVITY
+</button>
+
+</div>
+
+</section>
+
+<section class="section">
+
+<div class="history-tools">
+
+<div class="history-search">
+
+<span class="history-search-icon">⌕</span>
+
+<input
+class="input"
+id="search"
+type="search"
+placeholder="Search transactions...">
+
+</div>
+
+<button class="history-filter" id="filterButton">
+≡
+</button>
+
+</div>
+
+<div class="history-summary">
+
+<div class="history-stat">
+
+<div class="history-stat-label">
+TOTAL TRANSACTIONS
+</div>
+
+<div class="history-stat-value" id="totalCount">
+0
+</div>
+
+</div>
+
+<div class="history-stat">
+
+<div class="history-stat-label">
+TOTAL SPENT
+</div>
+
+<div class="history-stat-value" id="totalSpent">
+₦0.00
+</div>
+
+</div>
+
+</div>
+
+<div id="historyList"></div>
+
+</section>
+
+<footer class="footer">
+
+<div class="footer-logo">BOLTIV</div>
+
+<div class="footer-text">
+DIGITAL PAYMENT HUB
+</div>
+
+</footer>
+
+</div>
+
+</div>
+
+<nav class="bottom-nav">
+
+<button class="nav-item" data-page="index.html">
+<span class="nav-icon">⌂</span>
+<span>Home</span>
+</button>
+
+<button class="nav-item" data-page="wallet.html">
+<span class="nav-icon">₦</span>
+<span>Wallet</span>
+</button>
+
+<button class="nav-item active" data-page="history.html">
+<span class="nav-icon">↯</span>
+<span>History</span>
+</button>
+
+<button class="nav-item" data-page="profile.html">
+<span class="nav-icon">◉</span>
+<span>Profile</span>
+</button>
+
+</nav>
+
+<div class="history-modal" id="historyModal">
+
+<div class="history-modal-card">
+
+<div class="history-handle"></div>
+
+<div class="history-modal-top">
+
+<div class="history-modal-icon" id="modalIcon">
+↯
+</div>
+
+<div>
+
+<div class="history-modal-title" id="modalTitle">
+Transaction
+</div>
+
+<div class="history-modal-status" id="modalStatus">
+Successful
+</div>
+
+</div>
+
+</div>
+
+<div class="history-modal-amount" id="modalAmount">
+₦0.00
+</div>
+
+<div id="modalDetails"></div>
+
+<button class="history-close" id="closeModal">
+CLOSE
+</button>
+
+</div>
+
+</div>
+
+<script>
+
+const icons={
+wallet:"₦",
+airtime:"☎",
+data:"⌁",
+cable:"▣",
+electricity:"⚡"
+};
+
+function money(value){
+
+return "₦"+Math.abs(Number(value||0))
+.toLocaleString("en-NG",{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+});
+
+}
+
+function getBalance(){
+
+return Number(
+localStorage.getItem("boltivWalletBalance")||0
+);
+
+}
+
+function updateBalance(){
+
+document.getElementById("balance")
+.textContent=money(getBalance());
+
+}
+
+function getTransactions(){
+
+try{
+
+const data=JSON.parse(
+localStorage.getItem("boltivTransactions")||"[]"
+);
+
+return Array.isArray(data)?data:[];
+
+}catch(e){
+
+return [];
+
+}
+
+}
+
+function getFirstName(){
+
+try{
+
+const user=JSON.parse(
+localStorage.getItem("boltivUser")||"null"
+);
+
+return(
+user?.firstName||
+user?.firstname||
+user?.name||
+"User"
+).trim().split(/\s+/)[0];
+
+}catch(e){
+
+return "User";
+
+}
+
+}
+
+function escapeHTML(value){
+
+return String(value??"")
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#039;");
+
+}
+
+let currentFilter="all";
+let searchText="";
+
+function getFiltered(){
+
+return getTransactions().filter(tx=>{
+
+const matchesFilter=
+currentFilter==="all"||
+tx.type===currentFilter;
+
+const searchable=[
+tx.title,
+tx.type,
+tx.network,
+tx.phone,
+tx.bundle,
+tx.provider,
+tx.package,
+tx.smartcard,
+tx.meter,
+tx.meterType,
+tx.id,
+tx.status,
+tx.date
+]
+.join(" ")
+.toLowerCase();
+
+const matchesSearch=
+!searchText||
+searchable.includes(searchText);
+
+return matchesFilter&&matchesSearch;
+
+});
+
+}
+
+function formatDate(date){
+
+if(!date)return "Recent";
+
+const parsed=new Date(date);
+
+if(Number.isNaN(parsed.getTime())){
+return date;
+}
+
+return parsed.toLocaleDateString(
+"en-NG",
+{
+day:"numeric",
+month:"long",
+year:"numeric"
+}
+);
+
+}
+
+function renderHistory(){
+
+const list=
+document.getElementById("historyList");
+
+const transactions=getFiltered();
+
+document.getElementById("totalCount")
+.textContent=transactions.length;
+
+const spent=
+transactions.reduce((total,tx)=>{
+
+if(
+tx.direction==="debit"||
+(tx.type!=="wallet"&&tx.direction!=="credit")
+){
+
+return total+Number(tx.amount||0);
+
+}
+
+return total;
+
+},0);
+
+document.getElementById("totalSpent")
+.textContent=money(spent);
+
+if(!transactions.length){
+
+list.innerHTML=`
+<div class="history-empty">
+
+<div class="history-empty-icon">
+↯
+</div>
+
+<div class="history-empty-title">
+No History Found
+</div>
+
+<div class="history-empty-text">
+There are no transactions matching your current search or filter.
+</div>
+
+</div>
+`;
+
+return;
+
+}
+
+const groups={};
+
+transactions.forEach(tx=>{
+
+const date=formatDate(tx.date);
+
+if(!groups[date]){
+groups[date]=[];
+}
+
+groups[date].push(tx);
+
+});
+
+list.innerHTML=
+Object.entries(groups)
+.map(([date,items])=>{
+
+return`
+<div class="history-group">
+
+<div class="history-date">
+${escapeHTML(date)}
+</div>
+
+${items.map(tx=>{
+
+const originalIndex=
+getTransactions().indexOf(tx);
+
+const direction=
+tx.direction==="credit"||
+tx.type==="wallet"
+?"credit":"debit";
+
+const sign=
+direction==="credit"?"+":"−";
+
+const title=
+tx.title||"Transaction";
+
+let meta=
+tx.date||"";
+
+if(tx.phone){
+meta+=" • "+tx.phone;
+}
+
+if(tx.smartcard){
+meta+=" • "+tx.smartcard;
+}
+
+if(tx.meter){
+meta+=" • "+tx.meter;
+}
+
+return`
+<button class="history-item"
+data-index="${originalIndex}">
+
+<div class="history-icon">
+${icons[tx.type]||"↯"}
+</div>
+
+<div class="history-main">
+
+<div class="history-item-title">
+${escapeHTML(title)}
+</div>
+
+<div class="history-item-meta">
+${escapeHTML(meta)}
+</div>
+
+</div>
+
+<div class="history-right">
+
+<div class="history-amount ${direction}">
+${sign}${money(tx.amount)}
+</div>
+
+<div class="history-status">
+${escapeHTML(tx.status||"Successful")}
+</div>
+
+</div>
+
+</button>
+`;
+
+}).join("")}
+
+</div>
+`;
+
+}).join("");
+
+document.querySelectorAll(".history-item")
+.forEach(item=>{
+
+item.onclick=()=>{
+
+const tx=
+getTransactions()[
+Number(item.dataset.index)
+];
+
+openDetails(tx);
+
+};
+
+});
+
+}
+
+function openDetails(tx){
+
+if(!tx)return;
+
+const direction=
+tx.direction==="credit"||
+tx.type==="wallet"
+?"credit":"debit";
+
+const sign=
+direction==="credit"?"+":"−";
+
+document.getElementById("modalIcon")
+.textContent=icons[tx.type]||"↯";
+
+document.getElementById("modalTitle")
+.textContent=tx.title||"Transaction";
+
+document.getElementById("modalStatus")
+.textContent=tx.status||"Successful";
+
+document.getElementById("modalAmount")
+.textContent=
+sign+money(tx.amount);
+
+const rows=[];
+
+if(tx.network)
+rows.push(["Network",tx.network]);
+
+if(tx.phone)
+rows.push(["Phone Number",tx.phone]);
+
+if(tx.bundle)
+rows.push(["Bundle",tx.bundle]);
+
+if(tx.provider)
+rows.push(["Provider",tx.provider]);
+
+if(tx.package)
+rows.push(["Package",tx.package]);
+
+if(tx.smartcard)
+rows.push(["Smartcard / IUC",tx.smartcard]);
+
+if(tx.meter)
+rows.push(["Meter Number",tx.meter]);
+
+if(tx.meterType)
+rows.push(["Meter Type",tx.meterType]);
+
+if(tx.date)
+rows.push(["Date",tx.date]);
+
+if(tx.id)
+rows.push(["Transaction ID",tx.id]);
+
+document.getElementById("modalDetails")
+.innerHTML=rows.map(row=>`
+<div class="history-detail">
+<span>${escapeHTML(row[0])}</span>
+<span>${escapeHTML(row[1])}</span>
+</div>
+`).join("");
+
+document.getElementById("historyModal")
+.classList.add("show");
+
+}
+
+document.getElementById("search")
+.addEventListener("input",event=>{
+
+searchText=
+event.target.value
+.trim()
+.toLowerCase();
+
+renderHistory();
+
+});
+
+document.getElementById("filterButton")
+.onclick=()=>{
+
+const filters=[
+"all",
+"wallet",
+"airtime",
+"data",
+"cable",
+"electricity"
+];
+
+const current=
+filters.indexOf(currentFilter);
+
+currentFilter=
+filters[(current+1)%filters.length];
+
+const names={
+all:"ALL",
+wallet:"WALLET",
+airtime:"AIRTIME",
+data:"DATA",
+cable:"CABLE",
+electricity:"ELECTRICITY"
+};
+
+document.getElementById("filterButton")
+.title=
+"Filter: "+names[currentFilter];
+
+renderHistory();
+
+};
+
+document.getElementById("closeModal")
+.onclick=()=>{
+
+document.getElementById("historyModal")
+.classList.remove("show");
+
+};
+
+document.getElementById("historyModal")
+.onclick=event=>{
+
+if(
+event.target===
+document.getElementById("historyModal")
+){
+
+document.getElementById("historyModal")
+.classList.remove("show");
+
+}
+
+};
+
+document.addEventListener("keydown",event=>{
+
+if(event.key==="Escape"){
+
+document.getElementById("historyModal")
+.classList.remove("show");
+
+}
+
+});
+
+document.getElementById("profileButton")
+.onclick=()=>{
+location.href="profile.html";
+};
+
+document.querySelectorAll(".nav-item")
+.forEach(item=>{
+
+item.onclick=()=>{
+location.href=item.dataset.page;
+};
+
+});
+
+document.getElementById("profileButton")
+.textContent=
+getFirstName()
+.charAt(0)
+.toUpperCase();
+
+updateBalance();
+renderHistory();
+
+window.addEventListener(
+"pageshow",
+()=>{
+updateBalance();
+renderHistory();
+}
+);
+
+window.addEventListener(
+"storage",
+()=>{
+updateBalance();
+renderHistory();
+}
+);
+
+</script>
+
+</body>
+</html>

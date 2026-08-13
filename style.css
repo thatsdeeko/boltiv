@@ -1,0 +1,210 @@
+/* BOLTIV — LIGHT WHITE + GOLD THEME (matches login.html) */
+
+:root{
+--bg:#ffffff;
+--card:#fff;
+--card2:#fafaf8;
+--gold:#d4af37;
+--gold2:#b89220;
+--text:#171717;
+--muted:#707070;
+--line:#e5e5e1;
+--soft:#f1f1ed;
+--danger:#d64545;
+--success:#218c52;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;font-size:13px;min-height:100vh}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+a{color:inherit;text-decoration:none}
+.page{min-height:100vh;padding-bottom:82px}
+.container{width:100%;max-width:520px;margin:auto;padding:0 14px}
+
+/* HEADER */
+.header{height:68px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#fff}
+.brand-name{font-size:25px;font-weight:1000;letter-spacing:3px;color:var(--gold2)}
+.brand-tagline{font-size:7px;letter-spacing:2px;color:#888;margin-top:2px}
+.profile-mini{width:38px;height:38px;border:1px solid var(--gold);border-radius:50%;background:#fff;color:var(--gold2);font-weight:900}
+
+/* HOME */
+.welcome{padding:25px 2px 20px}
+.welcome-title{font-size:23px;font-weight:1000;letter-spacing:.5px;color:var(--text)}
+.welcome-title span{color:var(--gold2)}
+.welcome-text{color:var(--muted);font-size:10px;margin-top:6px;line-height:1.5}
+.section{margin-top:18px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.section-title{font-size:11px;letter-spacing:1.3px;font-weight:1000;color:#333}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 5px 20px rgba(0,0,0,.04)}
+
+/* WALLET */
+.balance-card{background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid var(--gold);border-radius:18px;padding:20px;margin-top:5px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
+.balance-label,.summary-label{font-size:8px;letter-spacing:1.5px;color:#777;font-weight:800}
+.balance-value{font-size:31px;font-weight:1000;color:var(--gold2);margin:8px 0 18px}
+.balance-actions{display:flex;gap:8px}
+.btn{border:0;border-radius:10px;padding:12px 14px;font-size:10px;font-weight:1000;letter-spacing:.5px}
+.btn-primary{background:var(--gold);color:#171717}
+.btn-primary:hover{background:#c9a32e}
+.btn-primary:active{transform:scale(.98)}
+.btn-secondary{background:#fff;border:1px solid var(--line);color:#333}
+.btn-secondary:hover{border-color:var(--gold);color:var(--gold2)}
+
+/* FORMS */
+.form-group{margin-bottom:14px}
+.label{display:block;font-size:8px;font-weight:900;letter-spacing:1px;color:#666;margin-bottom:6px}
+.input,select,textarea{width:100%;background:#fff;border:1px solid #dcdcd8;border-radius:10px;padding:12px;color:var(--text);outline:none}
+.input::placeholder,textarea::placeholder{color:#aaa}
+.input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,.1)}
+textarea{resize:vertical;min-height:100px}
+.notice{padding:12px;background:#fffdf4;border-left:2px solid var(--gold);color:#777;font-size:9px;line-height:1.6;border-radius:4px}
+.notice strong{color:var(--gold2);font-size:9px}
+
+/* PROFILE */
+.profile-card{display:flex;align-items:center;gap:13px;padding:17px;background:#fff;border:1px solid var(--gold);border-radius:16px;box-shadow:0 5px 18px rgba(0,0,0,.04)}
+.profile-avatar{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gold);color:#171717;font-size:21px;font-weight:1000}
+.profile-name{font-size:16px;font-weight:1000;color:var(--text);width:100%;max-width:100%;white-space:normal;overflow:visible;text-overflow:unset;word-break:break-word;overflow-wrap:anywhere;text-align:center}
+.profile-email{font-size:9px;color:#777;margin-top:4px;width:100%;max-width:100%;white-space:normal;overflow:visible;text-overflow:unset;word-break:break-word;overflow-wrap:anywhere;text-align:center}
+
+/* WALLET ACTIONS */
+.wallet-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.wallet-action{background:#fff;border:1px solid var(--line);border-radius:13px;padding:16px 10px;text-align:center;transition:.2s;box-shadow:0 4px 15px rgba(0,0,0,.03)}
+.wallet-action:hover,.wallet-action:active{border-color:var(--gold);transform:translateY(-1px);box-shadow:0 7px 20px rgba(0,0,0,.06)}
+.wallet-action-icon{font-size:20px;color:var(--gold2);margin-bottom:8px}
+.wallet-action-title{font-size:9px;font-weight:1000;letter-spacing:.4px;color:#333}
+
+/* HISTORY */
+.history-summary{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:5px}
+.summary-card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px}
+.summary-value{font-size:17px;font-weight:1000;color:var(--gold2);margin-top:7px}
+.history-filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:5px;scrollbar-width:none}
+.history-filters::-webkit-scrollbar{display:none}
+.filter-btn{white-space:nowrap;padding:8px 11px;border-radius:9px;border:1px solid var(--line);background:#fff;color:#777;font-size:8px;font-weight:1000}
+.filter-btn.active{background:var(--gold);border-color:var(--gold);color:#171717}
+.transaction-list{display:flex;flex-direction:column;gap:8px}
+.transaction-item{display:flex;align-items:center;gap:10px;padding:12px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:0 3px 12px rgba(0,0,0,.03)}
+.transaction-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px;background:#fffdf4;border:1px solid #ead99b;color:var(--gold2);font-weight:1000}
+.transaction-details{flex:1;min-width:0}
+.transaction-title{font-size:10px;font-weight:900;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.transaction-date{font-size:8px;color:#888;margin-top:4px}
+.transaction-right{text-align:right}
+.transaction-amount{font-size:10px;font-weight:1000}
+.transaction-amount.credit{color:var(--success)}
+.transaction-amount.debit{color:var(--danger)}
+.transaction-status{font-size:7px;color:#888;margin-top:4px}
+.empty-state{display:none;text-align:center;padding:35px 15px;border:1px dashed #ccc;border-radius:14px;color:#888;font-size:9px;background:#fff}
+
+/* SUPPORT */
+.support-card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:8px;box-shadow:0 3px 12px rgba(0,0,0,.03)}
+.support-title{font-size:11px;font-weight:1000;color:var(--gold2)}
+.support-text{font-size:9px;line-height:1.6;color:#777;margin-top:5px}
+
+/* PROVIDERS */
+.provider-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.provider-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 8px;color:var(--text)}
+.provider-card.active{border-color:var(--gold);background:#fffdf4;box-shadow:0 0 0 1px var(--gold)}
+.provider-name{font-size:11px;font-weight:1000;color:#333}
+.provider-card.active .provider-name{color:var(--gold2)}
+
+/* FOOTER */
+.footer{text-align:center;padding:32px 0 20px}
+.footer-logo{font-size:27px;font-weight:1000;letter-spacing:4px;color:var(--gold2)}
+.footer-text{font-size:7px;letter-spacing:2px;color:#888;margin-top:4px}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:520px;height:68px;display:grid;grid-template-columns:repeat(4,1fr);background:rgba(255,255,255,.97);border-top:1px solid var(--line);z-index:1000;backdrop-filter:blur(10px)}
+.nav-item{border:0;background:transparent;color:#888;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:7px;font-weight:900}
+.nav-icon{font-size:18px;line-height:1}
+.nav-item.active{color:var(--gold2)}
+
+/* TOAST */
+.boltiv-toast{position:fixed;top:18px;left:50%;transform:translate(-50%,-140%);width:calc(100% - 28px);max-width:430px;z-index:9999;display:flex;align-items:center;gap:11px;padding:13px 14px;background:#fff;border:1px solid var(--gold);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,.15);opacity:0;transition:.35s ease;pointer-events:none}
+.boltiv-toast.show{transform:translate(-50%,0);opacity:1}
+.boltiv-toast-icon{width:35px;height:35px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--gold);color:#171717;font-size:18px;font-weight:1000}
+.boltiv-toast-content{min-width:0;flex:1}
+.boltiv-toast-title{font-size:12px;font-weight:1000;color:#222;margin-bottom:3px}
+.boltiv-toast-message{font-size:9px;line-height:1.4;color:#777}
+.boltiv-toast.error{border-color:var(--danger)}
+.boltiv-toast.error .boltiv-toast-icon{background:var(--danger);color:#fff}
+.boltiv-toast.pending{border-color:var(--gold)}
+.boltiv-toast-close{width:25px;height:25px;border:0;background:transparent;color:#888;font-size:18px}
+
+/* TRANSACTION MODAL */
+.boltiv-transaction-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,20,20,.45);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.25s ease}
+.boltiv-transaction-overlay.show{opacity:1;visibility:visible}
+.boltiv-transaction-card{width:100%;max-width:390px;box-sizing:border-box;padding:28px 22px;border-radius:25px;text-align:center;background:#fff;border:1px solid var(--line);box-shadow:0 30px 90px rgba(0,0,0,.2);transform:translateY(25px) scale(.94);transition:.3s ease}
+.boltiv-transaction-overlay.show .boltiv-transaction-card{transform:translateY(0) scale(1)}
+.boltiv-transaction-icon{width:68px;height:68px;margin:0 auto 17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:1000}
+.boltiv-transaction-overlay.processing .boltiv-transaction-icon{background:#fffdf4;border:1px solid var(--gold);color:var(--gold2)}
+.boltiv-transaction-overlay.success .boltiv-transaction-icon{background:#eefaf2;border:1px solid #56b866;color:#218c52}
+.boltiv-transaction-overlay.failed .boltiv-transaction-icon{background:#fff0f0;border:1px solid #d87878;color:#c74444}
+.boltiv-spinner{width:25px;height:25px;border-radius:50%;border:3px solid #eee5c7;border-top-color:var(--gold);animation:boltivSpin .8s linear infinite}
+@keyframes boltivSpin{to{transform:rotate(360deg)}}
+.boltiv-transaction-status{font-size:8px;font-weight:1000;letter-spacing:1px;margin-bottom:8px}
+.processing .boltiv-transaction-status{color:var(--gold2)}
+.success .boltiv-transaction-status{color:var(--success)}
+.failed .boltiv-transaction-status{color:var(--danger)}
+.boltiv-transaction-title{color:#222;font-size:19px;font-weight:1000}
+.boltiv-transaction-message{color:#777;font-size:9px;line-height:1.6;margin-top:8px}
+.boltiv-transaction-details{margin-top:20px;padding:5px 14px;border-radius:15px;background:#fafaf8;border:1px solid var(--line)}
+.transaction-detail{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid var(--line);text-align:left}
+.transaction-detail:last-child{border-bottom:0}
+.transaction-detail span{color:#777;font-size:8px}
+.transaction-detail strong{color:#222;font-size:9px;font-weight:900;text-align:right;word-break:break-word}
+.boltiv-transaction-button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:var(--gold);color:#171717;font-family:inherit;font-size:9px;font-weight:1000;letter-spacing:.5px}
+.boltiv-transaction-button:active{transform:scale(.98)}
+
+/* AUTH */
+.auth-page{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:25px 0}
+.auth-logo{text-align:center;color:var(--gold2);font-size:34px;font-weight:1000;letter-spacing:6px}
+.auth-tagline{text-align:center;color:#888;font-size:7px;letter-spacing:3px;margin-top:6px;margin-bottom:25px}
+.auth-card{width:100%;background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 15px 45px rgba(0,0,0,.07)}
+.auth-card h1{color:#171717;font-size:21px;font-weight:1000;margin-bottom:6px}
+.auth-subtitle{color:#777;font-size:9px;margin-bottom:22px;line-height:1.5}
+.auth-btn{width:100%;margin-top:4px;padding:14px}
+.auth-links{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.auth-links a{color:var(--gold2);font-size:8px;font-weight:900}
+.auth-links a:hover{text-decoration:underline}
+
+/* STATUS */
+.status-message{display:none;margin-bottom:15px;padding:11px;border-radius:10px;font-size:8px;line-height:1.5}
+.status-message.show{display:block}
+.status-message.error{color:#b52f2f;background:#fff1f1;border:1px solid #efcaca}
+.status-message.success{color:#8b6b14;background:#fffdf2;border:1px solid #ead99b}
+
+/* REGISTER SUCCESS */
+.boltiv-success-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,20,20,.45);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.3s ease}
+.boltiv-success-overlay.show{opacity:1;visibility:visible}
+.boltiv-success-card{width:100%;max-width:390px;padding:30px 22px 24px;border:1px solid var(--gold);border-radius:26px;background:#fff;box-shadow:0 30px 90px rgba(0,0,0,.2);text-align:center;transform:translateY(25px) scale(.94);transition:.3s ease}
+.boltiv-success-overlay.show .boltiv-success-card{transform:translateY(0) scale(1)}
+.success-ring{width:70px;height:70px;margin:0 auto 17px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--gold);background:#fffdf4;color:var(--gold2);font-size:32px;font-weight:1000}
+.success-label{color:var(--gold2);font-size:7px;font-weight:1000;letter-spacing:2px;margin-bottom:7px}
+.boltiv-success-card h2{margin:0;color:#171717;font-size:22px;font-weight:1000}
+.success-message{margin:9px auto 0;max-width:290px;color:#777;font-size:9px;line-height:1.7}
+.success-user{margin-top:17px;padding:11px;border:1px solid var(--line);border-radius:12px;background:#fafaf8;color:var(--gold2);font-size:9px;font-weight:900}
+.boltiv-success-btn{width:100%;margin-top:16px;padding:14px;border:0;border-radius:13px;background:var(--gold);color:#171717;font-size:9px;font-weight:1000}
+
+/* ADMIN */
+.admin-card,.admin-panel,.admin-table,.admin-stat{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.04)}
+.admin-card{padding:16px}
+.admin-panel{padding:18px}
+.admin-stat{padding:15px}
+.admin-title,.admin-heading{color:#171717;font-weight:1000}
+.admin-muted{color:#777}
+.admin-gold{color:var(--gold2)}
+.admin-table{overflow:auto}
+.admin-table th{background:#fafaf8;color:#555;font-weight:1000}
+.admin-table td,.admin-table th{padding:11px;border-bottom:1px solid var(--line);font-size:9px;text-align:left}
+.admin-table tr:last-child td{border-bottom:0}
+
+/* RESPONSIVE */
+@media(max-width:380px){
+.container{padding:0 11px}
+.brand-name{font-size:23px}
+.welcome-title{font-size:21px}
+.balance-value{font-size:27px}
+.wallet-action{padding:14px 8px}
+.auth-card{padding:19px}
+.auth-logo{font-size:30px}
+             }

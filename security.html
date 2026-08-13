@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#f7f7f5">
+<title>BOLTIV — Security</title>
+
+<link rel="stylesheet" href="style.css">
+
+<script>
+if(localStorage.getItem("boltivLoggedIn")!=="true"){
+location.replace("login.html");
+}
+</script>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+background:#ffffff;
+color:#171717;
+}
+
+.security-page{
+min-height:100vh;
+padding-bottom:110px;
+}
+
+.security-header{
+display:flex;
+align-items:center;
+gap:13px;
+padding:18px 0 24px;
+}
+
+.security-back{
+width:40px;
+height:40px;
+border:1px solid #e5e5e1;
+border-radius:12px;
+background:#ffffff;
+color:#d4af37;
+font-size:20px;
+}
+
+.security-title{
+font-size:19px;
+font-weight:1000;
+}
+
+.security-subtitle{
+margin-top:4px;
+color:#666;
+font-size:8px;
+}
+
+.security-hero{
+padding:22px;
+border-radius:22px;
+background:
+radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 38%),
+linear-gradient(145deg,#fffdf4,#ffffff);
+border:1px solid #e5e5e1;
+margin-bottom:20px;
+}
+
+.hero-icon{
+width:50px;
+height:50px;
+border-radius:15px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#fffdf4;
+border:1px solid #403513;
+color:#d4af37;
+font-size:20px;
+margin-bottom:14px;
+}
+
+.hero-title{
+font-size:17px;
+font-weight:1000;
+}
+
+.hero-text{
+margin-top:6px;
+color:#777;
+font-size:8px;
+line-height:1.6;
+}
+
+.security-card{
+padding:20px;
+border-radius:20px;
+background:#ffffff;
+border:1px solid #e5e5e1;
+}
+
+.security-status{
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:15px;
+border-radius:15px;
+background:#fafaf8;
+border:1px solid #e5e5e1;
+margin-bottom:20px;
+}
+
+.status-left{
+display:flex;
+align-items:center;
+gap:11px;
+}
+
+.status-icon{
+width:36px;
+height:36px;
+border-radius:11px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#ffffffc12;
+border:1px solid #254d29;
+color:#70d47b;
+font-size:14px;
+}
+
+.status-title{
+font-size:9px;
+font-weight:1000;
+}
+
+.status-text{
+margin-top:3px;
+color:#666;
+font-size:7px;
+}
+
+.status-badge{
+font-size:7px;
+font-weight:1000;
+}
+
+.status-on{
+color:#70d47b;
+}
+
+.status-off{
+color:#777;
+}
+
+.security-label{
+display:block;
+color:#777;
+font-size:8px;
+font-weight:900;
+letter-spacing:.6px;
+margin-bottom:8px;
+}
+
+.security-input{
+width:100%;
+height:48px;
+padding:0 50px 0 14px;
+border:1px solid #e5e5e1;
+border-radius:12px;
+background:#ffffff;
+color:#171717;
+outline:0;
+font-size:13px;
+font-weight:800;
+letter-spacing:3px;
+margin-bottom:15px;
+}
+
+.security-input:focus{
+border-color:#d4af37;
+box-shadow:0 0 0 2px rgba(212,175,55,.06);
+}
+
+.pin-wrap{
+position:relative;
+}
+
+.show-pin{
+position:absolute;
+right:12px;
+top:14px;
+border:0;
+background:transparent;
+color:#777;
+font-size:8px;
+font-weight:900;
+}
+
+.show-pin:active{
+color:#d4af37;
+}
+
+.security-button{
+width:100%;
+height:48px;
+border:0;
+border-radius:13px;
+background:linear-gradient(135deg,#f5d76e,#d4af37,#b8860b);
+color:#f7f7f5;
+font-size:9px;
+font-weight:1000;
+letter-spacing:.5px;
+}
+
+.security-button:active{
+transform:scale(.98);
+}
+
+.security-button:disabled{
+background:#333;
+color:#777;
+}
+
+.message{
+display:none;
+margin-top:12px;
+padding:12px;
+border-radius:11px;
+text-align:center;
+font-size:8px;
+line-height:1.5;
+}
+
+.message.show{
+display:block;
+}
+
+.message.error{
+background:#fff1f1;
+color:#ff8d8d;
+border:1px solid #4a2020;
+}
+
+.message.success{
+background:#122313;
+color:#8cff9a;
+border:1px solid #254d29;
+}
+
+.security-note{
+margin-top:15px;
+padding:12px;
+border-radius:12px;
+background:#fffdf4;
+border:1px solid #332b16;
+color:#a88b39;
+font-size:7px;
+line-height:1.6;
+}
+
+.hidden{
+display:none!important;
+}
+
+/* BOTTOM NAV */
+
+.bottom-nav{
+position:fixed;
+z-index:10;
+bottom:0;
+left:0;
+right:0;
+height:68px;
+display:flex;
+justify-content:center;
+padding:8px 12px;
+background:rgba(255,255,255,.97);
+border-top:1px solid #222;
+}
+
+.nav-item{
+width:25%;
+max-width:110px;
+border:0;
+background:transparent;
+color:#555;
+font-size:7px;
+font-weight:900;
+}
+
+.nav-item.active{
+color:#d4af37;
+}
+
+.nav-icon{
+display:block;
+margin-bottom:4px;
+font-size:17px;
+}
+
+/* CONFIRM MODAL */
+
+.pin-modal{
+position:fixed;
+inset:0;
+z-index:9999;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+background:rgba(0,0,0,.85);
+backdrop-filter:blur(10px);
+opacity:0;
+visibility:hidden;
+transition:.25s;
+}
+
+.pin-modal.show{
+opacity:1;
+visibility:visible;
+}
+
+.pin-modal-box{
+width:100%;
+max-width:370px;
+padding:25px 20px;
+border-radius:24px;
+background:linear-gradient(145deg,#fffdf4,#ffffff);
+border:1px solid #d4af37;
+text-align:center;
+transform:translateY(20px) scale(.96);
+transition:.25s;
+}
+
+.pin-modal.show .pin-modal-box{
+transform:translateY(0) scale(1);
+}
+
+.pin-modal-icon{
+width:56px;
+height:56px;
+margin:0 auto 14px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#fffdf4;
+border:1px solid #d4af37;
+color:#d4af37;
+font-size:21px;
+}
+
+.pin-modal-title{
+font-size:16px;
+font-weight:1000;
+}
+
+.pin-modal-text{
+margin-top:7px;
+color:#777;
+font-size:8px;
+line-height:1.6;
+}
+
+.pin-modal-actions{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:8px;
+margin-top:18px;
+}
+
+.modal-btn{
+height:43px;
+border-radius:11px;
+font-size:8px;
+font-weight:1000;
+}
+
+.modal-cancel{
+border:1px solid #e5e5e1;
+background:#ffffff;
+color:#777;
+}
+
+.modal-confirm{
+border:0;
+background:#d4af37;
+color:#f7f7f5;
+}
+</style>
+</head>
+
+<body>
+
+<div class="page security-page">
+
+<div class="container">
+
+<!-- HEADER -->
+
+<header class="security-header">
+
+<button
+class="security-back"
+type="button"
+onclick="history.back()">
+‹
+</button>
+
+<div>
+
+<div class="security-title">
+Security
+</div>
+
+<div class="security-subtitle">
+PROTECT YOUR BOLTIV ACCOUNT
+</div>
+
+</div>
+
+</header>
+
+
+<!-- HERO -->
+
+<div class="security-hero">
+
+<div class="hero-icon">
+⌾
+</div>
+
+<div class="hero-title">
+Account Security
+</div>
+
+<div class="hero-text">
+Protect your wallet and transactions with a secure Transaction PIN.
+</div>
+
+</div>
+
+
+<!-- SECURITY CARD -->
+
+<div class="security-card">
+
+
+<!-- STATUS -->
+
+<div class="security-status">
+
+<div class="status-left">
+
+<div class="status-icon" id="statusIcon">
+✓
+</div>
+
+<div>
+
+<div class="status-title">
+Transaction PIN
+</div>
+
+<div
+class="status-text"
+id="pinStatusText">
+No PIN configured
+</div>
+
+</div>
+
+</div>
+
+<div
+class="status-badge status-off"
+id="pinStatus">
+OFF
+</div>
+
+</div>
+
+
+<!-- CREATE PIN -->
+
+<div id="createSection">
+
+<label class="security-label">
+CREATE TRANSACTION PIN
+</label>
+
+<div class="pin-wrap">
+
+<input
+id="createPin"
+class="security-input"
+type="password"
+inputmode="numeric"
+maxlength="4"
+autocomplete="new-password"
+placeholder="4-digit PIN">
+
+<button
+class="show-pin"
+data-target="createPin"
+type="button">
+SHOW
+</button>
+
+</div>
+
+
+<label class="security-label">
+CONFIRM TRANSACTION PIN
+</label>
+
+<div class="pin-wrap">
+
+<input
+id="createConfirmPin"
+class="security-input"
+type="password"
+inputmode="numeric"
+maxlength="4"
+autocomplete="new-password"
+placeholder="Repeat new PIN">
+
+<button
+class="show-pin"
+data-target="createConfirmPin"
+type="button">
+SHOW
+</button>
+
+</div>
+
+<button
+id="createPinBtn"
+class="security-button"
+type="button">
+CREATE TRANSACTION PIN
+</button>
+
+</div>
+
+
+<!-- CHANGE PIN -->
+
+<div
+id="changeSection"
+class="hidden">
+
+<label class="security-label">
+CURRENT PIN
+</label>
+
+<div class="pin-wrap">
+
+<input
+id="currentPin"
+class="security-input"
+type="password"
+inputmode="numeric"
+maxlength="4"
+autocomplete="current-password"
+placeholder="Enter current PIN">
+
+<button
+class="show-pin"
+data-target="currentPin"
+type="button">
+SHOW
+</button>
+
+</div>
+
+
+<label class="security-label">
+NEW PIN
+</label>
+
+<div class="pin-wrap">
+
+<input
+id="newPin"
+class="security-input"
+type="password"
+inputmode="numeric"
+maxlength="4"
+autocomplete="new-password"
+placeholder="4-digit PIN">
+
+<button
+class="show-pin"
+data-target="newPin"
+type="button">
+SHOW
+</button>
+
+</div>
+
+
+<label class="security-label">
+CONFIRM NEW PIN
+</label>
+
+<div class="pin-wrap">
+
+<input
+id="confirmPin"
+class="security-input"
+type="password"
+inputmode="numeric"
+maxlength="4"
+autocomplete="new-password"
+placeholder="Repeat new PIN">
+
+<button
+class="show-pin"
+data-target="confirmPin"
+type="button">
+SHOW
+</button>
+
+</div>
+
+
+<button
+id="changePinBtn"
+class="security-button"
+type="button">
+CHANGE TRANSACTION PIN
+</button>
+
+</div>
+
+
+<!-- MESSAGE -->
+
+<div
+id="message"
+class="message">
+</div>
+
+
+<!-- NOTE -->
+
+<div class="security-note">
+
+Your Transaction PIN should be kept private.
+Never share it with anyone.
+
+<br><br>
+
+For this frontend-only version of BOLTIV,
+the PIN is stored locally on this device.
+
+</div>
+
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- BOTTOM NAV -->
+
+<nav class="bottom-nav">
+
+<button
+class="nav-item"
+data-page="index.html"
+type="button">
+
+<span class="nav-icon">⌂</span>
+Home
+
+</button>
+
+
+<button
+class="nav-item"
+data-page="wallet.html"
+type="button">
+
+<span class="nav-icon">₦</span>
+Wallet
+
+</button>
+
+
+<button
+class="nav-item"
+data-page="transactions.html"
+type="button">
+
+<span class="nav-icon">↯</span>
+Activity
+
+</button>
+
+
+<button
+class="nav-item active"
+data-page="profile.html"
+type="button">
+
+<span class="nav-icon">◉</span>
+Profile
+
+</button>
+
+</nav>
+
+
+<!-- SUCCESS MODAL -->
+
+<div
+class="pin-modal"
+id="successModal">
+
+<div class="pin-modal-box">
+
+<div class="pin-modal-icon">
+✓
+</div>
+
+<div class="pin-modal-title">
+Transaction PIN Updated
+</div>
+
+<div class="pin-modal-text">
+Your Transaction PIN has been saved successfully.
+You can now use it to protect your BOLTIV payments.
+</div>
+
+<button
+class="modal-btn modal-confirm"
+id="successDone"
+type="button"
+style="width:100%;margin-top:18px;">
+DONE
+</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+/* =========================
+   ELEMENTS
+========================= */
+
+const createSection=
+document.getElementById("createSection");
+
+const changeSection=
+document.getElementById("changeSection");
+
+const createPin=
+document.getElementById("createPin");
+
+const createConfirmPin=
+document.getElementById("createConfirmPin");
+
+const currentPin=
+document.getElementById("currentPin");
+
+const newPin=
+document.getElementById("newPin");
+
+const confirmPin=
+document.getElementById("confirmPin");
+
+const message=
+document.getElementById("message");
+
+const successModal=
+document.getElementById("successModal");
+
+
+/* =========================
+   MESSAGE
+========================= */
+
+function showMessage(text,type){
+
+message.textContent=text;
+
+message.className=
+"message show "+type;
+
+}
+
+
+/* =========================
+   GET PIN
+========================= */
+
+function getPin(){
+
+return localStorage.getItem(
+"boltivTransactionPin"
+);
+
+}
+
+
+/* =========================
+   STATUS
+========================= */
+
+function updateStatus(){
+
+const pin=getPin();
+
+const status=
+document.getElementById("pinStatus");
+
+const statusText=
+document.getElementById("pinStatusText");
+
+const statusIcon=
+document.getElementById("statusIcon");
+
+
+if(pin){
+
+status.textContent="ON";
+
+status.className=
+"status-badge status-on";
+
+statusText.textContent=
+"Transaction PIN is active";
+
+statusIcon.textContent="✓";
+
+createSection.classList.add("hidden");
+
+changeSection.classList.remove("hidden");
+
+}else{
+
+status.textContent="OFF";
+
+status.className=
+"status-badge status-off";
+
+statusText.textContent=
+"No PIN configured";
+
+statusIcon.textContent="+";
+
+createSection.classList.remove("hidden");
+
+changeSection.classList.add("hidden");
+
+}
+
+}
+
+
+/* =========================
+   DIGIT ONLY INPUT
+========================= */
+
+[
+createPin,
+createConfirmPin,
+currentPin,
+newPin,
+confirmPin
+].forEach(input=>{
+
+input.addEventListener("input",()=>{
+
+input.value=
+input.value
+.replace(/\D/g,"")
+.slice(0,4);
+
+});
+
+});
+
+
+/* =========================
+   SHOW / HIDE PIN
+========================= */
+
+document
+.querySelectorAll(".show-pin")
+.forEach(button=>{
+
+button.onclick=()=>{
+
+const input=
+document.getElementById(
+button.dataset.target
+);
+
+if(input.type==="password"){
+
+input.type="text";
+button.textContent="HIDE";
+
+}else{
+
+input.type="password";
+button.textContent="SHOW";
+
+}
+
+};
+
+});
+
+
+/* =========================
+   CREATE PIN
+========================= */
+
+document
+.getElementById("createPinBtn")
+.onclick=()=>{
+
+const pin=
+createPin.value.trim();
+
+const confirm=
+createConfirmPin.value.trim();
+
+
+if(!/^\d{4}$/.test(pin)){
+
+showMessage(
+"Your Transaction PIN must contain exactly 4 digits.",
+"error"
+);
+
+createPin.focus();
+
+return;
+
+}
+
+
+if(pin!==confirm){
+
+showMessage(
+"Your PINs do not match.",
+"error"
+);
+
+createConfirmPin.focus();
+
+return;
+
+}
+
+
+localStorage.setItem(
+"boltivTransactionPin",
+pin
+);
+
+createPin.value="";
+createConfirmPin.value="";
+
+updateStatus();
+
+showMessage(
+"Transaction PIN created successfully.",
+"success"
+);
+
+successModal.classList.add("show");
+
+};
+
+
+/* =========================
+   CHANGE PIN
+========================= */
+
+document
+.getElementById("changePinBtn")
+.onclick=()=>{
+
+const oldPin=getPin();
+
+const current=
+currentPin.value.trim();
+
+const newValue=
+newPin.value.trim();
+
+const confirm=
+confirmPin.value.trim();
+
+
+if(!oldPin){
+
+updateStatus();
+
+return;
+
+}
+
+
+if(current!==oldPin){
+
+showMessage(
+"Current PIN is incorrect.",
+"error"
+);
+
+currentPin.focus();
+
+return;
+
+}
+
+
+if(!/^\d{4}$/.test(newValue)){
+
+showMessage(
+"New PIN must contain exactly 4 digits.",
+"error"
+);
+
+newPin.focus();
+
+return;
+
+}
+
+
+if(newValue===oldPin){
+
+showMessage(
+"Your new PIN must be different from your current PIN.",
+"error"
+);
+
+newPin.focus();
+
+return;
+
+}
+
+
+if(newValue!==confirm){
+
+showMessage(
+"Your new PINs do not match.",
+"error"
+);
+
+confirmPin.focus();
+
+return;
+
+}
+
+
+localStorage.setItem(
+"boltivTransactionPin",
+newValue
+);
+
+
+currentPin.value="";
+newPin.value="";
+confirmPin.value="";
+
+
+updateStatus();
+
+showMessage(
+"Transaction PIN changed successfully.",
+"success"
+);
+
+successModal.classList.add("show");
+
+};
+
+
+/* =========================
+   SUCCESS MODAL
+========================= */
+
+document
+.getElementById("successDone")
+.onclick=()=>{
+
+successModal.classList.remove("show");
+
+};
+
+
+/* =========================
+   CLOSE MODAL
+========================= */
+
+successModal.onclick=(event)=>{
+
+if(event.target===successModal){
+
+successModal.classList.remove("show");
+
+}
+
+};
+
+
+/* =========================
+   ESCAPE
+========================= */
+
+document.addEventListener(
+"keydown",
+event=>{
+
+if(event.key==="Escape"){
+
+successModal.classList.remove("show");
+
+}
+
+});
+
+
+/* =========================
+   NAVIGATION
+========================= */
+
+document
+.querySelectorAll(".nav-item")
+.forEach(item=>{
+
+item.onclick=()=>{
+
+location.href=
+item.dataset.page;
+
+};
+
+});
+
+
+/* =========================
+   START
+========================= */
+
+updateStatus();
+
+
+/* REFRESH WHEN RETURNING */
+
+window.addEventListener(
+"pageshow",
+updateStatus
+);
+
+</script>
+
+</body>
+</html>
+
+<!-- BOLTIV SECURITY -->

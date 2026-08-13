@@ -941,5 +941,332 @@ success:false,
 statusCode:502,
 message:"VTU provider connection failed."
 };
+}
+if(!result.configured){
+await refundWallet(userId,amount);
+
+return{
+success:false,
+statusCode:503,
+message:result.message
+};
+}
+
+const providerData=result.data;
+
+const providerReference=
+providerData?.reference||
+providerData?.transaction_id||
+providerData?.transactionId||
+null;
+
+if(!result.success){
+await refundWallet(userId,amount);
+
+const client=await pool.connect();
+
+try{
+await insertTransaction(client,{
+userId,
+service,
+amount,
+reference:ref,
+status:"failed",
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage,
+provider,
+responseData:providerData
+});
+}finally{
+client.release();
+}
+
+const current=await wallet(userId);
+
+return{
+success:false,
+statusCode:400,
+message:"VTU transaction failed.",
+reference:ref,
+balance:current?current.balance:0
+};
+}
+
+const client=await pool.connect();
+
+try{
+await insertTransaction(client,{
+userId,
+service,
+amount,
+reference:ref,
+providerReference,
+status:"successful",
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage,
+provider,
+responseData:providerData
+});
+}finally{
+client.release();
+}
+
+const finalWallet=await wallet(userId);
+
+return{
+success:true,
+message:`${service} purchase successful.`,
+reference:ref,
+providerReference,
+service,
+amount,
+status:"successful",
+balance:finalWallet?finalWallet.balance:0,
+data:providerData
+};
+}
+
+const server=http.createServer(
+async(req,res)=>{
+res.setHeader(
+"Access-Control-Allow-Origin",
+"*"
+);
+res.setHeader(
+"Access-Control-Allow-Methods",
+"GET,POST,OPTIONS"
+);
+res.setHeader(
+"Access-Control-Allow-Headers",
+"Content-Type,Authorization"
+);
+
+if(req.method==="OPTIONS"){
+res.writeHead(204);
+return res.end();
+}
+
+const url=new URL(
+req.url,
+"http://localhost"
+);
+
+const path=url.pathname;
+
+try{
+
+if(req.method==="GET"&&path==="/api/health"){
+return send(res,200,{
+success:true,
+app:"BOLTIV",
+status:"online",
+paystack:
+PAYSTACK_SECRET_KEY?
+"configured":
+"not configured",
+database:
+DATABASE_URL?
+"configured":
+"not configured",
+vtu:
+VTU_API_URL&&VTU_API_KEY?
+"configured":
+"not configured",
+admin:
+ADMIN_EMAIL&&ADMIN_PASSWORD?
+"configured":
+"not configured",
+message:"BOLTIV backend is running"
+});
+}
+
+if(req.method==="POST"&&path==="/api/auth/register"){
+const b=await body(req);
+const r=await registerCustomer(b);
+return send(
+res,
+r.statusCode||200,
+r
+);
+}
+
+if(req.method==="POST"&&path==="/api/auth/login"){
+const b=await body(req);
+const r=await loginCustomer(
+b.email,
+b.password
+);
+return send(
+res,
+r.statusCode||200,
+r
+);
+}
+
+if(req.method==="GET"&&path==="/api/auth/me"){
+const u=await customer(req);
+
+if(!u){
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+const w=await wallet(String(u.id));
+
+return send(res,200,{
+success:true,
+user:{
+id:u.id,
+name:u.full_name,
+fullName:u.full_name,
+phone:u.phone,
+email:u.email,
+createdAt:u.created_at
+},
+balance:w?w.balance:0
+});
+}
+
+if(req.method==="POST"&&path==="/api/auth/logout"){
+const t=authToken(req);
+
+if(t){
+await db(
+`DELETE FROM user_sessions
+WHERE token=$1`,
+[t]
+);
+}
+
+return send(res,200,{
+success:true,
+message:"Logged out successfully."
+});
+}
+
+if(req.method==="POST"&&path==="/api/wallet/create"){
+const b=await body(req);
+const userId=clean(b.userId);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+await createWallet(userId);
+const w=await wallet(userId);
+
+return send(res,200,{
+success:true,
+message:"Wallet ready.",
+userId,
+balance:w?w.balance:0
+});
+}
+
+if(req.method==="GET"&&path==="/api/wallet"){
+const userId=clean(
+url.searchParams.get("userId")
+);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+const w=await wallet(userId);
+
+if(!w){
+return send(res,404,{
+success:false,
+message:"Wallet not found."
+});
+}
+
+return send(res,200,{
+success:true,
+userId,
+balance:w.balance,
+transactions:await transactions(userId)
+});
+}
+
+if(req.method==="POST"&&path==="/api/wallet/fund"){
+const b=await body(req);
+const userId=clean(b.userId);
+const email=clean(b.email).toLowerCase();
+const amount=Number(b.amount);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+if(!validEmail(email)){
+return send(res,400,{
+success:false,
+message:"A valid email is required."
+});
+}
+
+if(!Number.isFinite(amount)||amount<100){
+return send(res,400,{
+success:false,
+message:"Minimum wallet funding amount is ₦100."
+});
+}
+
+await createWallet(userId);
+
+const r=await initializePayment(
+userId,
+email,
+amount
+);
+
+return send(
+res,
+r.success?200:400,
+r
+);
+}
+
+if(req.method==="GET"&&path==="/api/wallet/verify"){
+const ref=clean(
+url.searchParams.get("reference")
+);
+
+if(!ref){
+return send(res,400,{
+success:false,
+message:"Payment reference is required."
+});
+}
+
+const r=await verifyPayment(ref);
+
+return send(
+res,
+r.success?200:400,
+r
+);
   }
-  
+

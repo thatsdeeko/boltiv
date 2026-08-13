@@ -3327,3 +3327,715 @@ result
 return null;
 
   }
+const server=http.createServer(
+async(req,res)=>{
+
+if(req.method==="OPTIONS"){
+
+res.writeHead(204,{
+"Access-Control-Allow-Origin":"*",
+"Access-Control-Allow-Methods":
+"GET,POST,OPTIONS",
+"Access-Control-Allow-Headers":
+"Content-Type,Authorization"
+});
+
+return res.end();
+
+}
+
+try{
+
+const url=
+new URL(
+req.url,
+`http://${req.headers.host||"localhost"}`
+);
+
+const path=
+url.pathname;
+
+
+/*
+HEALTH CHECK
+*/
+
+if(
+req.method==="GET"&&
+path==="/"
+){
+
+return send(res,200,{
+success:true,
+message:
+"BOLTIV API is running.",
+status:
+"online"
+});
+
+}
+
+
+/*
+API HEALTH CHECK
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/health"
+){
+
+return send(res,200,{
+success:true,
+message:
+"BOLTIV API is healthy.",
+status:
+"online",
+timestamp:
+new Date().toISOString()
+});
+
+}
+
+
+/*
+ADMIN ROUTES
+*/
+
+const adminHandled=
+await handleAdminRoutes(
+req,
+res,
+path
+);
+
+if(adminHandled){
+
+return;
+}
+
+
+/*
+PASSWORD RESET ROUTES
+*/
+
+const passwordHandled=
+await handlePasswordRoutes(
+req,
+res,
+path
+);
+
+if(passwordHandled){
+
+return;
+}
+
+
+/*
+AUTH ROUTES
+*/
+
+const authHandled=
+await handleAuthRoutes(
+req,
+res,
+path
+);
+
+if(authHandled){
+
+return;
+}
+
+
+/*
+USER ROUTES
+*/
+
+const userHandled=
+await handleUserRoutes(
+req,
+res,
+path,
+url
+);
+
+if(userHandled){
+
+return;
+}
+
+
+/*
+PAYSTACK WEBHOOK
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/paystack/webhook"
+){
+
+if(!PAYSTACK_SECRET_KEY){
+
+return send(res,503,{
+success:false,
+message:
+"Paystack is not configured."
+});
+
+}
+
+/*
+Read the raw body because Paystack
+signatures must be calculated from
+the exact request body.
+*/
+
+let rawBody="";
+
+req.on(
+"data",
+chunk=>{
+rawBody+=chunk;
+}
+);
+
+req.on(
+"end",
+async()=>{
+
+try{
+
+const signature=
+req.headers["x-paystack-signature"];
+
+if(!signature){
+
+return send(res,401,{
+success:false,
+message:
+"Missing Paystack signature."
+});
+
+}
+
+const expectedSignature=
+crypto
+.createHmac(
+"sha512",
+PAYSTACK_SECRET_KEY
+)
+.update(rawBody)
+.digest("hex");
+
+const received=
+String(signature);
+
+if(
+received.length!==
+expectedSignature.length
+){
+
+return send(res,401,{
+success:false,
+message:
+"Invalid Paystack signature."
+});
+
+}
+
+const validSignature=
+crypto.timingSafeEqual(
+Buffer.from(received),
+Buffer.from(expectedSignature)
+);
+
+if(!validSignature){
+
+return send(res,401,{
+success:false,
+message:
+"Invalid Paystack signature."
+});
+
+}
+
+let event;
+
+try{
+
+event=
+JSON.parse(rawBody);
+
+}catch(error){
+
+return send(res,400,{
+success:false,
+message:
+"Invalid webhook payload."
+});
+
+}
+
+if(
+event.event!==
+"charge.success"
+){
+
+return send(res,200,{
+success:true,
+message:
+"Webhook received."
+});
+
+}
+
+const transaction=
+event.data||{};
+
+const referenceValue=
+clean(
+transaction.reference
+);
+
+if(!referenceValue){
+
+return send(res,400,{
+success:false,
+message:
+"Payment reference is missing."
+});
+
+}
+
+const paymentResult=
+await db(
+`SELECT *
+FROM payments
+WHERE reference=$1
+LIMIT 1`,
+[
+referenceValue
+]
+);
+
+if(!paymentResult.rows.length){
+
+return send(res,404,{
+success:false,
+message:
+"Payment record not found."
+});
+
+}
+
+const payment=
+paymentResult.rows[0];
+
+if(payment.credited){
+
+return send(res,200,{
+success:true,
+message:
+"Payment already credited."
+});
+
+}
+
+if(
+Number(transaction.amount)!==
+Number(payment.amount_kobo)
+){
+
+await db(
+`UPDATE payments
+SET status='failed'
+WHERE reference=$1`,
+[
+referenceValue
+]
+);
+
+return send(res,400,{
+success:false,
+message:
+"Payment amount does not match."
+});
+
+}
+
+const client=
+await pool.connect();
+
+try{
+
+await client.query(
+"BEGIN"
+);
+
+const lockedResult=
+await client.query(
+`SELECT *
+FROM payments
+WHERE reference=$1
+FOR UPDATE`,
+[
+referenceValue
+]
+);
+
+if(!lockedResult.rows.length){
+
+await client.query(
+"ROLLBACK"
+);
+
+return send(res,404,{
+success:false,
+message:
+"Payment record not found."
+});
+
+}
+
+const lockedPayment=
+lockedResult.rows[0];
+
+if(lockedPayment.credited){
+
+await client.query(
+"COMMIT"
+);
+
+return send(res,200,{
+success:true,
+message:
+"Payment already credited."
+});
+
+}
+
+await client.query(
+`INSERT INTO wallets(
+user_id,
+balance
+)
+VALUES($1,0)
+ON CONFLICT(user_id)
+DO NOTHING`,
+[
+lockedPayment.user_id
+]
+);
+
+const walletResult=
+await client.query(
+`UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance`,
+[
+Number(lockedPayment.amount),
+lockedPayment.user_id
+]
+);
+
+if(!walletResult.rows.length){
+
+throw new Error(
+"Wallet update failed."
+);
+
+}
+
+await client.query(
+`UPDATE payments
+SET
+status='success',
+credited=TRUE,
+credited_at=NOW()
+WHERE reference=$1`,
+[
+referenceValue
+]
+);
+
+await client.query(
+`INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+status,
+date
+)
+VALUES(
+$1,
+'credit',
+'Wallet Funding',
+$2,
+$3,
+'successful',
+NOW()
+)
+ON CONFLICT(reference)
+DO NOTHING`,
+[
+lockedPayment.user_id,
+Number(lockedPayment.amount),
+referenceValue
+]
+);
+
+await client.query(
+"COMMIT"
+);
+
+return send(res,200,{
+success:true,
+message:
+"Payment received and wallet credited.",
+reference:
+referenceValue,
+amount:
+Number(lockedPayment.amount),
+balance:
+Number(
+walletResult.rows[0].balance
+)
+});
+
+}catch(error){
+
+await client.query(
+"ROLLBACK"
+);
+
+console.error(
+"PAYSTACK WEBHOOK CREDIT ERROR:",
+error
+);
+
+return send(res,500,{
+success:false,
+message:
+"Unable to credit payment."
+});
+
+}finally{
+
+client.release();
+
+}
+
+}catch(error){
+
+console.error(
+"PAYSTACK WEBHOOK ERROR:",
+error
+);
+
+return send(res,500,{
+success:false,
+message:
+"Webhook processing failed."
+});
+
+}
+
+});
+
+return;
+
+}
+
+
+/*
+UNKNOWN ROUTE
+*/
+
+return send(res,404,{
+success:false,
+message:
+"Route not found."
+});
+
+}catch(error){
+
+console.error(
+"SERVER ERROR:",
+error
+);
+
+return send(res,500,{
+success:false,
+message:
+"Internal server error"
+});
+
+}
+
+});
+async function startServer(){
+
+try{
+
+await setup();
+
+await cleanupPasswordResetTokens();
+
+/*
+Clean expired reset tokens every hour.
+*/
+
+setInterval(
+()=>{
+cleanupPasswordResetTokens();
+},
+60*60*1000
+);
+
+server.listen(
+PORT,
+"0.0.0.0",
+()=>{
+
+console.log(
+`BOLTIV API running on port ${PORT}`
+);
+
+console.log(
+`Frontend: ${FRONTEND_URL}`
+);
+
+console.log(
+`Admin configured: ${
+ADMIN_EMAIL?
+"YES":
+"NO"
+}`
+);
+
+console.log(
+`Paystack configured: ${
+PAYSTACK_SECRET_KEY?
+"YES":
+"NO"
+}`
+);
+
+console.log(
+`VTU configured: ${
+VTU_API_URL&&VTU_API_KEY?
+"YES":
+"NO"
+}`
+);
+
+console.log(
+`Password reset email configured: ${
+RESEND_API_KEY?
+"YES":
+"NO"
+}`
+);
+
+}
+);
+
+}catch(error){
+
+console.error(
+"STARTUP ERROR:",
+error
+);
+
+process.exit(1);
+
+}
+
+}
+
+
+process.on(
+"SIGTERM",
+async()=>{
+
+console.log(
+"SIGTERM received. Shutting down..."
+);
+
+server.close(
+async()=>{
+
+try{
+
+await pool.end();
+
+console.log(
+"BOLTIV server stopped."
+);
+
+process.exit(0);
+
+}catch(error){
+
+console.error(
+"SHUTDOWN ERROR:",
+error
+);
+
+process.exit(1);
+
+}
+
+}
+);
+
+});
+
+
+process.on(
+"SIGINT",
+async()=>{
+
+console.log(
+"SIGINT received. Shutting down..."
+);
+
+server.close(
+async()=>{
+
+try{
+
+await pool.end();
+
+console.log(
+"BOLTIV server stopped."
+);
+
+process.exit(0);
+
+}catch(error){
+
+console.error(
+"SHUTDOWN ERROR:",
+error
+);
+
+process.exit(1);
+
+}
+
+}
+);
+
+});
+
+
+startServer();
+

@@ -617,3 +617,765 @@ message:
 };
 
 }
+async function adminLogin(
+email,
+password
+){
+
+email=clean(email).toLowerCase();
+password=String(password||"");
+
+if(!ADMIN_EMAIL||
+!ADMIN_PASSWORD){
+
+return{
+success:false,
+message:
+"Admin environment variables are not configured."
+};
+
+}
+
+let result=await db(
+`SELECT
+id,
+email,
+password_hash
+FROM admins
+WHERE LOWER(email)=LOWER($1)`,
+[ADMIN_EMAIL]
+);
+
+if(!result.rows.length){
+
+const passwordHash=
+hashPassword(ADMIN_PASSWORD);
+
+result=await db(
+`INSERT INTO admins(
+email,
+password_hash
+)
+VALUES($1,$2)
+RETURNING id,email,password_hash`,
+[
+ADMIN_EMAIL,
+passwordHash
+]
+);
+
+}
+
+const admin=result.rows[0];
+
+if(!verifyPassword(
+password,
+admin.password_hash
+)){
+
+return{
+success:false,
+message:
+"Invalid admin credentials."
+};
+
+}
+
+await db(
+`DELETE FROM admin_sessions
+WHERE expires_at<NOW()`
+);
+
+const sessionToken=token();
+
+await db(
+`INSERT INTO admin_sessions(
+token,
+admin_id,
+expires_at
+)
+VALUES(
+$1,
+$2,
+NOW()+INTERVAL '24 hours'
+)`,
+[
+sessionToken,
+admin.id
+]
+);
+
+return{
+success:true,
+message:
+"Admin login successful.",
+token:sessionToken,
+admin:{
+id:admin.id,
+email:admin.email
+}
+};
+
+}
+
+async function adminFromToken(req){
+
+const authorization=
+req.headers.authorization||"";
+
+if(!authorization.startsWith(
+"Bearer "
+)){
+return null;
+}
+
+const sessionToken=
+authorization.slice(7).trim();
+
+const result=await db(
+`SELECT
+a.id,
+a.email
+FROM admin_sessions s
+JOIN admins a
+ON a.id=s.admin_id
+WHERE s.token=$1
+AND s.expires_at>NOW()`,
+[sessionToken]
+);
+
+return result.rows[0]||null;
+
+}
+
+async function initializePayment(
+userId,
+email,
+amount
+){
+
+if(!PAYSTACK_SECRET_KEY){
+
+return{
+success:false,
+message:
+"Paystack is not configured on the server."
+};
+
+}
+
+const referenceValue=
+reference("BOLTIV-PAY");
+
+const response=await fetch(
+"https://api.paystack.co/transaction/initialize",
+{
+method:"POST",
+headers:{
+Authorization:
+`Bearer ${PAYSTACK_SECRET_KEY}`,
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+email,
+amount:Math.round(
+amount*100
+),
+currency:"NGN",
+reference:referenceValue,
+callback_url:
+`${FRONTEND_URL}/payment-success.html`,
+metadata:{
+userId
+}
+})
+}
+);
+
+const data=await response.json();
+
+if(!response.ok||
+!data.status){
+
+return{
+success:false,
+message:
+data.message||
+"Unable to initialize payment."
+};
+
+}
+
+await db(
+`INSERT INTO payments(
+reference,
+user_id,
+email,
+amount,
+amount_kobo,
+status,
+credited
+)
+VALUES(
+$1,$2,$3,$4,$5,
+'initialized',
+FALSE
+)`,
+[
+referenceValue,
+userId,
+email,
+amount,
+Math.round(amount*100)
+]
+);
+
+return{
+success:true,
+message:
+"Payment initialized.",
+reference:
+referenceValue,
+authorizationUrl:
+data.data.authorization_url,
+accessCode:
+data.data.access_code
+};
+
+}
+
+async function verifyPayment(
+referenceValue
+){
+
+if(!PAYSTACK_SECRET_KEY){
+
+return{
+success:false,
+message:
+"Paystack is not configured on the server."
+};
+
+}
+
+const paymentResult=await db(
+`SELECT *
+FROM payments
+WHERE reference=$1`,
+[referenceValue]
+);
+
+if(!paymentResult.rows.length){
+
+return{
+success:false,
+message:
+"Payment reference not found."
+};
+
+}
+
+const payment=
+paymentResult.rows[0];
+
+if(payment.credited){
+
+const currentWallet=
+await getWallet(
+payment.user_id
+);
+
+return{
+success:true,
+alreadyCredited:true,
+reference:
+referenceValue,
+balance:
+currentWallet?
+currentWallet.balance:0
+};
+
+}
+
+const response=await fetch(
+`https://api.paystack.co/transaction/verify/${encodeURIComponent(referenceValue)}`,
+{
+method:"GET",
+headers:{
+Authorization:
+`Bearer ${PAYSTACK_SECRET_KEY}`
+}
+}
+);
+
+const data=await response.json();
+
+if(!response.ok||
+!data.status){
+
+return{
+success:false,
+message:
+data.message||
+"Unable to verify payment."
+};
+
+}
+
+const transaction=data.data;
+
+if(transaction.status!=="success"){
+
+await db(
+`UPDATE payments
+SET status=$1
+WHERE reference=$2`,
+[
+transaction.status,
+referenceValue
+]
+);
+
+return{
+success:false,
+message:
+`Payment status: ${transaction.status}`,
+status:
+transaction.status
+};
+
+}
+
+if(
+Number(transaction.amount)!==
+Number(payment.amount_kobo)
+){
+
+return{
+success:false,
+message:
+"Payment amount does not match."
+};
+
+}
+
+const client=
+await pool.connect();
+
+try{
+
+await client.query("BEGIN");
+
+await client.query(
+`INSERT INTO wallets(
+user_id,
+balance
+)
+VALUES($1,0)
+ON CONFLICT(user_id)
+DO NOTHING`,
+[payment.user_id]
+);
+
+const walletResult=
+await client.query(
+`UPDATE wallets
+SET balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance`,
+[
+Number(payment.amount),
+payment.user_id
+]
+);
+
+await client.query(
+`INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+status,
+date
+)
+VALUES(
+$1,
+'credit',
+'Wallet Funding',
+$2,
+$3,
+'successful',
+NOW()
+)
+ON CONFLICT(reference)
+DO NOTHING`,
+[
+payment.user_id,
+Number(payment.amount),
+referenceValue
+]
+);
+
+await client.query(
+`UPDATE payments
+SET
+status='success',
+credited=TRUE,
+credited_at=NOW()
+WHERE reference=$1`,
+[referenceValue]
+);
+
+await client.query("COMMIT");
+
+return{
+success:true,
+message:
+"Wallet funded successfully.",
+reference:
+referenceValue,
+amount:
+Number(payment.amount),
+balance:
+Number(walletResult.rows[0].balance)
+};
+
+}catch(error){
+
+await client.query("ROLLBACK");
+throw error;
+
+}finally{
+
+client.release();
+
+}
+
+}
+async function debitWallet(
+userId,
+amount
+){
+
+const client=await pool.connect();
+
+try{
+
+await client.query("BEGIN");
+
+const result=await client.query(
+`UPDATE wallets
+SET
+balance=balance-$1,
+updated_at=NOW()
+WHERE user_id=$2
+AND balance>=$1
+RETURNING balance`,
+[
+amount,
+userId
+]
+);
+
+if(!result.rows.length){
+
+await client.query("ROLLBACK");
+
+return{
+success:false,
+message:
+"Insufficient wallet balance."
+};
+
+}
+
+await client.query("COMMIT");
+
+return{
+success:true,
+balance:
+Number(result.rows[0].balance)
+};
+
+}catch(error){
+
+await client.query("ROLLBACK");
+throw error;
+
+}finally{
+
+client.release();
+
+}
+
+}
+
+async function refundWallet(
+userId,
+amount
+){
+
+await db(
+`UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2`,
+[
+amount,
+userId
+]
+);
+
+}
+
+async function insertTransaction(data){
+
+await db(
+`INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+status,
+date
+)
+VALUES(
+$1,$2,$3,$4,$5,$6,NOW()
+)
+ON CONFLICT(reference)
+DO NOTHING`,
+[
+data.userId,
+data.type||"debit",
+data.service,
+data.amount,
+data.reference,
+data.status
+]
+);
+
+}
+
+async function callVTUProvider(
+payload
+){
+
+if(!VTU_API_URL||
+!VTU_API_KEY){
+
+return{
+success:false,
+configured:false,
+message:
+"VTU provider is not configured."
+};
+
+}
+
+const response=await fetch(
+VTU_API_URL,
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json",
+Authorization:
+`Bearer ${VTU_API_KEY}`
+},
+body:JSON.stringify(payload)
+}
+);
+
+let data={};
+
+try{
+data=await response.json();
+}catch(error){
+data={};
+}
+
+return{
+success:response.ok,
+configured:true,
+status:response.status,
+data
+};
+
+}
+
+async function processVTUService(
+data
+){
+
+const userId=clean(data.userId);
+const amount=Number(data.amount);
+
+if(!userId){
+
+return{
+success:false,
+statusCode:400,
+message:
+"User ID is required."
+};
+
+}
+
+if(!validAmount(amount)){
+
+return{
+success:false,
+statusCode:400,
+message:
+"Invalid amount."
+};
+
+}
+
+await createWallet(userId);
+
+const current=
+await getWallet(userId);
+
+if(!current||
+current.balance<amount){
+
+return{
+success:false,
+statusCode:400,
+message:
+"Insufficient wallet balance.",
+balance:
+current?current.balance:0
+};
+
+}
+
+const referenceValue=
+reference("BOLTIV-TX");
+
+const debit=
+await debitWallet(
+userId,
+amount
+);
+
+if(!debit.success){
+
+return{
+success:false,
+statusCode:400,
+message:
+debit.message
+};
+
+}
+
+let providerResult;
+
+try{
+
+providerResult=
+await callVTUProvider(
+data.providerPayload
+);
+
+}catch(error){
+
+console.error(
+"VTU PROVIDER ERROR:",
+error
+);
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:502,
+message:
+"VTU provider connection failed."
+};
+
+}
+
+if(!providerResult.configured){
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:503,
+message:
+providerResult.message
+};
+
+}
+
+const providerData=
+providerResult.data||{};
+
+if(!providerResult.success){
+
+await refundWallet(
+userId,
+amount
+);
+
+await insertTransaction({
+userId,
+service:data.service,
+amount,
+reference:referenceValue,
+status:"failed"
+});
+
+return{
+success:false,
+statusCode:400,
+message:
+"VTU transaction failed.",
+reference:
+referenceValue,
+balance:
+(await getWallet(userId)).balance
+};
+
+}
+
+await insertTransaction({
+userId,
+service:data.service,
+amount,
+reference:referenceValue,
+status:"successful"
+});
+
+const finalWallet=
+await getWallet(userId);
+
+return{
+success:true,
+message:
+`${data.service} purchase successful.`,
+reference:
+referenceValue,
+amount,
+status:"successful",
+balance:
+finalWallet?
+finalWallet.balance:0,
+data:providerData
+};
+
+}

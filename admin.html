@@ -2,131 +2,126 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#050505">
-
 <title>BOLTIV — Admin Login</title>
 
 <style>
-*{
-    box-sizing:border-box;
-}
+*{box-sizing:border-box}
 
 body{
-    margin:0;
-    min-height:100vh;
-    background:#050505;
-    color:#fff;
-    font-family:Arial,sans-serif;
+margin:0;
+min-height:100vh;
+background:#050505;
+color:#fff;
+font-family:Arial,sans-serif;
 }
 
 .login{
-    min-height:100vh;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:20px;
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
 }
 
 .card{
-    width:100%;
-    max-width:390px;
-    padding:28px;
-    background:#101010;
-    border:1px solid #292929;
-    border-radius:22px;
-    box-shadow:0 20px 70px rgba(0,0,0,.7);
+width:100%;
+max-width:390px;
+padding:28px;
+background:#101010;
+border:1px solid #292929;
+border-radius:22px;
+box-shadow:0 20px 70px rgba(0,0,0,.7);
 }
 
 .logo{
-    text-align:center;
-    color:#d4af37;
-    font-size:30px;
-    font-weight:900;
-    letter-spacing:4px;
+text-align:center;
+color:#d4af37;
+font-size:30px;
+font-weight:900;
+letter-spacing:4px;
 }
 
 .title{
-    text-align:center;
-    margin-top:10px;
-    color:#fff;
-    font-size:15px;
-    font-weight:900;
+text-align:center;
+margin-top:10px;
+font-size:15px;
+font-weight:900;
 }
 
 .sub{
-    text-align:center;
-    margin:7px 0 25px;
-    color:#666;
-    font-size:9px;
-    letter-spacing:1px;
+text-align:center;
+margin:7px 0 25px;
+color:#666;
+font-size:9px;
+letter-spacing:1px;
 }
 
 label{
-    display:block;
-    margin-bottom:7px;
-    color:#888;
-    font-size:8px;
-    font-weight:700;
+display:block;
+margin-bottom:7px;
+color:#888;
+font-size:8px;
+font-weight:700;
 }
 
 input{
-    width:100%;
-    height:48px;
-    margin-bottom:15px;
-    padding:0 14px;
-    border:1px solid #292929;
-    border-radius:10px;
-    outline:none;
-    background:#080808;
-    color:#fff;
-    font-size:14px;
+width:100%;
+height:48px;
+margin-bottom:15px;
+padding:0 14px;
+border:1px solid #292929;
+border-radius:10px;
+outline:none;
+background:#080808;
+color:#fff;
+font-size:14px;
 }
 
 input:focus{
-    border-color:#d4af37;
+border-color:#d4af37;
 }
 
 button{
-    width:100%;
-    height:48px;
-    border:0;
-    border-radius:10px;
-    background:#d4af37;
-    color:#050505;
-    font-weight:900;
-    cursor:pointer;
+width:100%;
+height:48px;
+border:0;
+border-radius:10px;
+background:#d4af37;
+color:#050505;
+font-weight:900;
+cursor:pointer;
 }
 
 button:disabled{
-    opacity:.55;
-    cursor:not-allowed;
+opacity:.55;
 }
 
 .message{
-    display:none;
-    margin-top:14px;
-    padding:11px;
-    border-radius:10px;
-    text-align:center;
-    font-size:9px;
-    line-height:1.5;
+display:none;
+margin-top:14px;
+padding:11px;
+border-radius:10px;
+text-align:center;
+font-size:9px;
+line-height:1.5;
 }
 
 .message.show{
-    display:block;
+display:block;
 }
 
 .message.error{
-    color:#ff8585;
-    background:#211010;
-    border:1px solid #542323;
+color:#ff8585;
+background:#211010;
+border:1px solid #542323;
 }
 
 .message.success{
-    color:#d4af37;
-    background:#17140b;
-    border:1px solid #3a3016;
+color:#d4af37;
+background:#17140b;
+border:1px solid #3a3016;
 }
 </style>
 </head>
@@ -134,406 +129,217 @@ button:disabled{
 <body>
 
 <div class="login">
+<div class="card">
 
-    <div class="card">
+<div class="logo">BOLTIV</div>
 
-        <div class="logo">BOLTIV</div>
+<div class="title">
+ADMIN CONTROL CENTER
+</div>
 
-        <div class="title">
-            ADMIN CONTROL CENTER
-        </div>
+<div class="sub">
+SECURE ADMINISTRATOR ACCESS
+</div>
 
-        <div class="sub">
-            SECURE ADMINISTRATOR ACCESS
-        </div>
+<label for="email">
+ADMIN EMAIL
+</label>
 
-        <label for="adminEmail">
-            ADMIN EMAIL
-        </label>
+<input
+id="email"
+type="email"
+autocomplete="username"
+placeholder="Admin email">
 
-        <input
-            id="adminEmail"
-            type="email"
-            inputmode="email"
-            autocomplete="username"
-            placeholder="Admin email"
-        >
+<label for="password">
+ADMIN PASSWORD
+</label>
 
-        <label for="adminPassword">
-            ADMIN PASSWORD
-        </label>
+<input
+id="password"
+type="password"
+autocomplete="current-password"
+placeholder="Admin password">
 
-        <input
-            id="adminPassword"
-            type="password"
-            autocomplete="current-password"
-            placeholder="Admin password"
-        >
+<button
+id="loginButton"
+type="button">
+LOGIN TO ADMIN
+</button>
 
-        <button
-            id="adminLoginButton"
-            type="button"
-        >
-            LOGIN TO ADMIN
-        </button>
+<div
+id="message"
+class="message">
+</div>
 
-        <div
-            id="message"
-            class="message"
-        ></div>
-
-    </div>
-
+</div>
 </div>
 
 <script>
+const API=
+"https://boltiv-backend.onrender.com";
 
-"use strict";
+const email=
+document.getElementById("email");
 
+const password=
+document.getElementById("password");
 
-/* =========================================
-   BOLTIV ADMIN CONFIGURATION
-========================================= */
+const button=
+document.getElementById("loginButton");
 
-const API_BASE =
-    "https://boltiv-backend.onrender.com";
-
-const ADMIN_TOKEN_KEY =
-    "boltivAdminToken";
-
-
-/* =========================================
-   ELEMENTS
-========================================= */
-
-const emailInput =
-    document.getElementById("adminEmail");
-
-const passwordInput =
-    document.getElementById("adminPassword");
-
-const loginButton =
-    document.getElementById("adminLoginButton");
-
-const messageBox =
-    document.getElementById("message");
-
-
-/* =========================================
-   MESSAGE
-========================================= */
+const message=
+document.getElementById("message");
 
 function showMessage(text,type="error"){
 
-    messageBox.textContent =
-        text;
+message.textContent=text;
 
-    messageBox.className =
-        "message show " + type;
+message.className=
+"message show "+type;
 
 }
 
+async function login(){
 
-/* =========================================
-   LOGIN
-========================================= */
+const adminEmail=
+email.value.trim().toLowerCase();
 
-async function adminLogin(){
+const adminPassword=
+password.value;
 
-    messageBox.className =
-        "message";
+message.className="message";
+message.textContent="";
 
-    messageBox.textContent =
-        "";
+if(!adminEmail){
 
+showMessage(
+"Enter your admin email."
+);
 
-    const email =
-        emailInput.value
-        .trim()
-        .toLowerCase();
+email.focus();
+return;
+}
 
-    const password =
-        passwordInput.value;
+if(!adminPassword){
 
+showMessage(
+"Enter your admin password."
+);
 
-    if(!email){
+password.focus();
+return;
+}
 
-        showMessage(
-            "Enter your admin email."
-        );
+button.disabled=true;
+button.textContent="LOGGING IN...";
 
-        emailInput.focus();
+try{
 
-        return;
-    }
+const response=
+await fetch(
+API+"/api/admin/login",
+{
+method:"POST",
 
+headers:{
+"Content-Type":
+"application/json",
+"Accept":
+"application/json"
+},
 
-    if(!/^\S+@\S+\.\S+$/.test(email)){
+body:JSON.stringify({
+email:adminEmail,
+password:adminPassword
+})
+}
+);
 
-        showMessage(
-            "Enter a valid email address."
-        );
+const data=
+await response.json();
 
-        emailInput.focus();
+if(!response.ok||!data.success){
 
-        return;
-    }
-
-
-    if(!password){
-
-        showMessage(
-            "Enter your admin password."
-        );
-
-        passwordInput.focus();
-
-        return;
-    }
-
-
-    loginButton.disabled =
-        true;
-
-    loginButton.textContent =
-        "LOGGING IN...";
-
-
-    try{
-
-        console.log(
-            "BOLTIV ADMIN LOGIN:"
-        );
-
-        console.log(
-            API_BASE +
-            "/api/admin/login"
-        );
-
-
-        const response =
-            await fetch(
-                API_BASE +
-                "/api/admin/login",
-                {
-                    method:"POST",
-
-                    headers:{
-                        "Content-Type":
-                            "application/json",
-                        "Accept":
-                            "application/json"
-                    },
-
-                    body:JSON.stringify({
-
-                        email:email,
-
-                        password:password
-
-                    })
-                }
-            );
-
-
-        const raw =
-            await response.text();
-
-
-        console.log(
-            "ADMIN HTTP STATUS:",
-            response.status
-        );
-
-
-        let data;
-
-
-        try{
-
-            data =
-                raw
-                ? JSON.parse(raw)
-                : {};
-
-        }catch(error){
-
-            console.error(
-                "INVALID JSON:",
-                raw
-            );
-
-            throw new Error(
-                "The server returned an invalid response."
-            );
-
-        }
-
-
-        console.log(
-            "ADMIN LOGIN RESPONSE:",
-            data
-        );
-
-
-        if(
-            !response.ok ||
-            !data.success
-        ){
-
-            throw new Error(
-                data.message ||
-                "Admin login failed."
-            );
-
-        }
-
-
-        /*
-         * The backend must return a token.
-         */
-
-        if(!data.token){
-
-            throw new Error(
-                "Admin login succeeded, but the server did not return an admin session token."
-            );
-
-        }
-
-
-        localStorage.setItem(
-            ADMIN_TOKEN_KEY,
-            data.token
-        );
-
-
-        localStorage.setItem(
-            "boltivAdminEmail",
-            data.admin?.email ||
-            email
-        );
-
-
-        showMessage(
-            "Admin login successful. Opening dashboard...",
-            "success"
-        );
-
-
-        /*
-         * IMPORTANT:
-         *
-         * Change this filename ONLY if your
-         * actual admin dashboard has another name.
-         */
-
-        setTimeout(function(){
-
-            window.location.href =
-                "admin.html";
-
-        },500);
-
-
-    }catch(error){
-
-        console.error(
-            "BOLTIV ADMIN LOGIN ERROR:",
-            error
-        );
-
-
-        showMessage(
-            error.message ||
-            "Unable to connect to BOLTIV server."
-        );
-
-
-    }finally{
-
-        loginButton.disabled =
-            false;
-
-        loginButton.textContent =
-            "LOGIN TO ADMIN";
-
-    }
+throw new Error(
+data.message||
+"Admin login failed."
+);
 
 }
 
+if(!data.token){
 
-/* =========================================
-   BUTTON
-========================================= */
-
-loginButton.addEventListener(
-    "click",
-    function(event){
-
-        event.preventDefault();
-
-        adminLogin();
-
-    }
+throw new Error(
+"No admin session token was returned."
 );
 
+}
 
-/* =========================================
-   ENTER KEY
-========================================= */
-
-emailInput.addEventListener(
-    "keydown",
-    function(event){
-
-        if(event.key==="Enter"){
-
-            event.preventDefault();
-
-            passwordInput.focus();
-
-        }
-
-    }
+localStorage.setItem(
+"boltivAdminToken",
+data.token
 );
 
-
-passwordInput.addEventListener(
-    "keydown",
-    function(event){
-
-        if(event.key==="Enter"){
-
-            event.preventDefault();
-
-            adminLogin();
-
-        }
-
-    }
+localStorage.setItem(
+"boltivAdminEmail",
+data.admin?.email||
+adminEmail
 );
 
-
-/* =========================================
-   START
-========================================= */
-
-console.log(
-    "BOLTIV ADMIN LOGIN INITIALIZED"
+showMessage(
+"Login successful. Opening dashboard...",
+"success"
 );
 
-console.log(
-    "API:",
-    API_BASE
+setTimeout(function(){
+
+window.location.href=
+"admin.html";
+
+},700);
+
+}catch(error){
+
+console.error(
+"BOLTIV ADMIN LOGIN ERROR:",
+error
 );
 
-console.log(
-    "ADMIN LOGIN ENDPOINT:",
-    API_BASE +
-    "/api/admin/login"
+showMessage(
+error.message||
+"Unable to connect to BOLTIV."
 );
 
+}finally{
+
+button.disabled=false;
+button.textContent=
+"LOGIN TO ADMIN";
+
+}
+
+}
+
+button.onclick=login;
+
+password.onkeydown=
+function(event){
+
+if(event.key==="Enter"){
+login();
+}
+
+};
+
+email.onkeydown=
+function(event){
+
+if(event.key==="Enter"){
+password.focus();
+}
+
+};
 </script>
 
 </body>

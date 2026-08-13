@@ -1018,3 +1018,840 @@ statusCode:503,
 message:result.message
 };
  }
+if(!result.success){
+
+await refundWallet(
+userId,
+amount
+);
+
+await insertTransaction({
+userId,
+service,
+amount,
+reference:ref,
+status:"failed",
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage,
+provider,
+responseData:result.data
+});
+
+const fw=await wallet(userId);
+
+return{
+success:false,
+statusCode:400,
+message:"VTU transaction failed.",
+reference:ref,
+balance:fw?fw.balance:0
+};
+}
+
+const providerData=result.data||{};
+
+const providerReference=
+providerData.reference||
+providerData.transaction_id||
+providerData.transactionId||
+null;
+
+await insertTransaction({
+userId,
+service,
+amount,
+reference:ref,
+providerReference,
+status:"successful",
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage,
+provider,
+responseData:providerData
+});
+
+const finalWallet=
+await wallet(userId);
+
+return{
+success:true,
+message:`${service} purchase successful.`,
+reference:ref,
+providerReference,
+service,
+amount,
+status:"successful",
+balance:finalWallet?
+finalWallet.balance:0,
+data:providerData
+};
+}
+
+const server=http.createServer(
+async(req,res)=>{
+
+res.setHeader(
+"Access-Control-Allow-Origin",
+"*"
+);
+
+res.setHeader(
+"Access-Control-Allow-Methods",
+"GET,POST,OPTIONS"
+);
+
+res.setHeader(
+"Access-Control-Allow-Headers",
+"Content-Type,Authorization"
+);
+
+if(req.method==="OPTIONS"){
+res.writeHead(204);
+return res.end();
+}
+
+const url=new URL(
+req.url,
+"http://localhost"
+);
+
+const path=url.pathname;
+
+try{
+
+if(
+req.method==="GET"&&
+path==="/api/health"
+){
+
+return send(res,200,{
+success:true,
+app:"BOLTIV",
+status:"online",
+paystack:
+PAYSTACK_SECRET_KEY?
+"configured":
+"not configured",
+database:
+DATABASE_URL?
+"configured":
+"not configured",
+vtu:
+VTU_API_URL&&VTU_API_KEY?
+"configured":
+"not configured",
+admin:
+ADMIN_EMAIL&&ADMIN_PASSWORD?
+"configured":
+"not configured",
+message:
+"BOLTIV backend is running"
+});
+}
+
+if(
+req.method==="POST"&&
+path==="/api/auth/register"
+){
+
+const b=await body(req);
+
+const result=
+await registerUser(
+clean(b.email).toLowerCase(),
+String(b.password||""),
+clean(b.name||b.fullName)
+);
+
+return send(
+res,
+result.success?200:400,
+result
+);
+}
+
+if(
+req.method==="POST"&&
+path==="/api/auth/login"
+){
+
+const b=await body(req);
+
+const result=
+await loginUser(
+clean(b.email).toLowerCase(),
+String(b.password||"")
+);
+
+return send(
+res,
+result.success?200:401,
+result
+);
+}
+
+if(
+req.method==="GET"&&
+path==="/api/auth/me"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+return send(res,200,{
+success:true,
+user:{
+id:String(user.user_id),
+userId:String(user.user_id),
+email:user.email,
+name:user.name||""
+}
+});
+}
+
+if(
+req.method==="POST"&&
+path==="/api/auth/logout"
+){
+
+return send(
+res,
+200,
+await logoutUser(req)
+);
+}
+
+if(
+req.method==="POST"&&
+path==="/api/wallet/create"
+){
+
+const b=await body(req);
+const userId=clean(b.userId);
+
+if(!userId){
+
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+await createWallet(userId);
+
+const w=await wallet(userId);
+
+return send(res,200,{
+success:true,
+message:"Wallet ready.",
+userId,
+balance:w?w.balance:0
+});
+}
+
+if(
+req.method==="GET"&&
+path==="/api/wallet"
+){
+
+const userId=clean(
+url.searchParams.get("userId")
+);
+
+if(!userId){
+
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+const w=await wallet(userId);
+
+if(!w){
+
+return send(res,404,{
+success:false,
+message:"Wallet not found."
+});
+}
+
+return send(res,200,{
+success:true,
+userId,
+balance:w.balance,
+transactions:
+await transactions(userId)
+});
+}
+
+if(
+req.method==="POST"&&
+path==="/api/wallet/fund"
+){
+
+const b=await body(req);
+
+const userId=clean(b.userId);
+const email=clean(b.email);
+const amount=Number(b.amount);
+
+if(!userId){
+
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+if(!validEmail(email)){
+
+return send(res,400,{
+success:false,
+message:"A valid email is required."
+});
+}
+
+if(!Number.isFinite(amount)||amount<100){
+
+return send(res,400,{
+success:false,
+message:
+"Minimum wallet funding amount is ₦100."
+});
+}
+
+await createWallet(userId);
+
+const result=
+await initializePayment(
+userId,
+email,
+amount
+);
+
+return send(
+res,
+result.success?200:400,
+result
+);
+}
+
+if(
+req.method==="GET"&&
+path==="/api/wallet/verify"
+){
+
+const ref=clean(
+url.searchParams.get("reference")
+);
+
+if(!ref){
+
+return send(res,400,{
+success:false,
+message:
+"Payment reference is required."
+});
+}
+
+const result=
+await verifyPayment(ref);
+
+return send(
+res,
+result.success?200:400,
+result
+);
+}
+if(
+req.method==="GET"&&
+path==="/api/transactions"
+){
+
+const userId=clean(
+url.searchParams.get("userId")
+);
+
+if(!userId){
+
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+return send(res,200,{
+success:true,
+transactions:
+await transactions(userId)
+});
+}
+
+if(
+req.method==="POST"&&
+path==="/api/vtu/airtime"
+){
+
+const b=await body(req);
+const userId=clean(b.userId);
+const phone=clean(b.phone);
+const network=clean(b.network);
+const amount=Number(b.amount);
+
+if(!userId||!validPhone(phone)||
+!network||!validAmount(amount)){
+
+return send(res,400,{
+success:false,
+message:"Invalid airtime details."
+});
+}
+
+const result=
+await processVTUService({
+userId,
+service:"Airtime",
+amount,
+provider:network,
+providerPayload:{
+service:"airtime",
+phone,
+network,
+amount
+},
+phone,
+network
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+
+if(
+req.method==="POST"&&
+path==="/api/vtu/data"
+){
+
+const b=await body(req);
+const userId=clean(b.userId);
+const phone=clean(b.phone);
+const network=clean(b.network);
+const plan=clean(b.plan||b.planId);
+const amount=Number(b.amount);
+
+if(!userId||!validPhone(phone)||
+!network||!plan||
+!validAmount(amount)){
+
+return send(res,400,{
+success:false,
+message:"Invalid data details."
+});
+}
+
+const result=
+await processVTUService({
+userId,
+service:"Data",
+amount,
+provider:network,
+providerPayload:{
+service:"data",
+phone,
+network,
+plan,
+amount
+},
+phone,
+network,
+plan
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+
+if(
+req.method==="POST"&&
+path==="/api/vtu/electricity"
+){
+
+const b=await body(req);
+const userId=clean(b.userId);
+const provider=clean(b.provider||b.disco);
+const meterNumber=clean(
+b.meterNumber||b.meter
+);
+const meterType=clean(
+b.meterType||"prepaid"
+);
+const amount=Number(b.amount);
+
+if(!userId||!provider||
+!meterNumber||!validAmount(amount)){
+
+return send(res,400,{
+success:false,
+message:"Invalid electricity details."
+});
+}
+
+const result=
+await processVTUService({
+userId,
+service:"Electricity",
+amount,
+provider,
+providerPayload:{
+service:"electricity",
+provider,
+meterNumber,
+meterType,
+amount
+},
+meterNumber,
+meterType,
+provider
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+
+if(
+req.method==="POST"&&
+path==="/api/vtu/cable"
+){
+
+const b=await body(req);
+const userId=clean(b.userId);
+const provider=clean(
+b.provider||b.cable
+);
+const smartcardNumber=clean(
+b.smartcardNumber||
+b.smartcard||
+b.iuc
+);
+const cablePackage=clean(
+b.cablePackage||
+b.package||
+b.plan
+);
+const amount=Number(b.amount);
+
+if(!userId||!provider||
+!smartcardNumber||
+!cablePackage||
+!validAmount(amount)){
+
+return send(res,400,{
+success:false,
+message:"Invalid cable details."
+});
+}
+
+const result=
+await processVTUService({
+userId,
+service:"Cable TV",
+amount,
+provider,
+providerPayload:{
+service:"cable",
+provider,
+smartcardNumber,
+cablePackage,
+amount
+},
+smartcardNumber,
+cablePackage,
+provider
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+
+if(
+req.method==="POST"&&
+path==="/api/admin/login"
+){
+
+const b=await body(req);
+
+const result=
+await adminLogin(
+clean(b.email).toLowerCase(),
+String(b.password||"")
+);
+
+return send(
+res,
+result.success?200:401,
+result
+);
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/me"
+){
+
+const a=await admin(req);
+
+if(!a){
+
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+return send(res,200,{
+success:true,
+admin:a
+});
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/stats"
+){
+
+const a=await admin(req);
+
+if(!a){
+
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+const users=await db(
+`SELECT COUNT(*)::int count,
+COALESCE(SUM(balance),0) balance
+FROM wallets`
+);
+
+const tx=await db(
+`SELECT COUNT(*)::int count
+FROM transactions`
+);
+
+const payments=await db(
+`SELECT COUNT(*)::int count,
+COALESCE(SUM(
+CASE WHEN status='success'
+THEN amount ELSE 0 END
+),0) successful
+FROM payments`
+);
+
+return send(res,200,{
+success:true,
+stats:{
+users:users.rows[0].count,
+walletBalance:
+Number(users.rows[0].balance),
+transactions:
+tx.rows[0].count,
+payments:
+payments.rows[0].count,
+successfulPayments:
+Number(payments.rows[0].successful)
+}
+});
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/users"
+){
+
+const a=await admin(req);
+
+if(!a){
+
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+const r=await db(
+`SELECT u.user_id,u.name,u.email,
+w.balance,w.created_at,w.updated_at
+FROM users u
+LEFT JOIN wallets w
+ON w.user_id=u.user_id
+ORDER BY u.id DESC
+LIMIT 100`
+);
+
+return send(res,200,{
+success:true,
+users:r.rows.map(x=>({
+...x,
+balance:Number(x.balance||0)
+}))
+});
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/transactions"
+){
+
+const a=await admin(req);
+
+if(!a){
+
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+const r=await db(
+`SELECT *
+FROM transactions
+ORDER BY date DESC
+LIMIT 100`
+);
+
+return send(res,200,{
+success:true,
+transactions:r.rows.map(x=>({
+...x,
+amount:Number(x.amount)
+}))
+});
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/payments"
+){
+
+const a=await admin(req);
+
+if(!a){
+
+return send(res,401,{
+success:false,
+message:"Unauthorized."
+});
+}
+
+const r=await db(
+`SELECT reference,user_id,email,
+amount,status,credited,
+created_at,credited_at
+FROM payments
+ORDER BY created_at DESC
+LIMIT 100`
+);
+
+return send(res,200,{
+success:true,
+payments:r.rows.map(x=>({
+...x,
+amount:Number(x.amount)
+}))
+});
+}
+
+if(
+req.method==="POST"&&
+path==="/api/admin/logout"
+){
+
+const h=req.headers.authorization||"";
+
+if(h.startsWith("Bearer ")){
+
+await db(
+`DELETE FROM admin_sessions
+WHERE token=$1`,
+[h.slice(7).trim()]
+);
+}
+
+return send(res,200,{
+success:true,
+message:"Admin logged out."
+});
+}
+
+return send(res,404,{
+success:false,
+message:"API route not found"
+});
+
+}catch(error){
+
+console.error(
+"SERVER ERROR:",
+error
+);
+
+return send(res,500,{
+success:false,
+message:"Internal server error."
+});
+}
+
+});
+
+setup().then(()=>{
+
+server.listen(
+PORT,
+"0.0.0.0",
+()=>{
+console.log(
+`BOLTIV API running on port ${PORT}`
+);
+});
+
+}).catch(error=>{
+
+console.error(
+"STARTUP ERROR:",
+error
+);
+
+process.exit(1);
+});

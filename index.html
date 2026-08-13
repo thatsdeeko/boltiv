@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#050505">
-<title>BOLTIV — Fast & Reliable Digital Services</title>
+<title>BOLTIV — Dashboard</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#050505;color:#fff;font-family:Arial,Helvetica,sans-serif}
@@ -16,13 +16,17 @@ a{text-decoration:none;color:inherit}
 .header{display:flex;align-items:center;justify-content:space-between;padding:24px 0}
 .brand{color:#d4af37;font-size:25px;font-weight:1000;letter-spacing:3px}
 .login{padding:10px 15px;border:1px solid #d4af37;border-radius:10px;background:transparent;color:#d4af37;font-size:9px;font-weight:1000}
-.hero{padding:35px 0 25px}
+.hero{padding:30px 0 25px}
 .hero-label{color:#d4af37;font-size:9px;font-weight:1000;letter-spacing:2px}
-.hero h1{margin:12px 0 0;font-size:38px;line-height:1.05;font-weight:1000;letter-spacing:-1px}
+.hero h1{margin:12px 0 0;font-size:32px;line-height:1.05;font-weight:1000}
 .hero h1 span{color:#d4af37}
-.hero p{margin:16px 0 0;color:#777;font-size:12px;line-height:1.7}
-.hero-button{margin-top:22px;padding:14px 20px;border:0;border-radius:12px;background:#d4af37;color:#050505;font-size:9px;font-weight:1000}
-.section{margin-top:35px}
+.hero p{margin:12px 0 0;color:#777;font-size:11px;line-height:1.7}
+.wallet{margin-top:22px;padding:20px;border:1px solid #3a3016;border-radius:20px;background:linear-gradient(145deg,#17140b,#0b0b0b)}
+.wallet-label{color:#777;font-size:8px;font-weight:1000;letter-spacing:1.5px}
+.wallet-balance{margin-top:8px;color:#d4af37;font-size:30px;font-weight:1000}
+.wallet-email{margin-top:7px;color:#666;font-size:8px}
+.hero-button{margin-top:15px;padding:13px 18px;border:0;border-radius:12px;background:#d4af37;color:#050505;font-size:9px;font-weight:1000}
+.section{margin-top:30px}
 .title{color:#777;font-size:8px;font-weight:1000;letter-spacing:1.5px;margin-bottom:13px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .card{min-height:125px;padding:17px;border:1px solid #242424;border-radius:19px;background:linear-gradient(145deg,#121212,#0b0b0b)}
@@ -47,72 +51,129 @@ a{text-decoration:none;color:inherit}
 .footer strong{color:#d4af37}
 </style>
 </head>
-<body>
-  <script>
-const SESSION_KEY = "boltivLoggedIn";
 
-if (localStorage.getItem(SESSION_KEY) !== "true") {
-    location.replace("login.html");
-}
-  </script>
+<body>
+
 <div class="page">
 <div class="container">
 
 <header class="header">
 <div class="brand">BOLTIV</div>
-<button class="login" onclick="location.href='login.html'">LOGIN</button>
+<button class="login" id="logoutButton">LOGOUT</button>
 </header>
 
 <section class="hero">
-<div class="hero-label">DIGITAL SERVICES MADE SIMPLE</div>
-<h1>Power your day with <span>BOLTIV.</span></h1>
-<p>Buy airtime and data, pay electricity bills, renew your cable subscription and manage your digital payments from one convenient platform.</p>
-<button class="hero-button" onclick="location.href='register.html'">GET STARTED</button>
+
+<div class="hero-label">WELCOME TO BOLTIV</div>
+
+<h1>
+Hello, <span id="userName">User.</span>
+</h1>
+
+<p>
+Manage your everyday digital services from one convenient platform.
+</p>
+
+<div class="wallet">
+
+<div class="wallet-label">
+WALLET BALANCE
+</div>
+
+<div class="wallet-balance" id="walletBalance">
+₦0.00
+</div>
+
+<div class="wallet-email" id="userEmail">
+Loading account...
+</div>
+
+</div>
+
+<button
+class="hero-button"
+onclick="location.href='wallet.html'">
+FUND WALLET
+</button>
+
 </section>
 
 <section class="section">
-<div class="title">OUR SERVICES</div>
+
+<div class="title">
+OUR SERVICES
+</div>
 
 <div class="grid">
 
-<div class="card">
+<div class="card"
+onclick="location.href='airtime.html'">
 <div class="icon">☎</div>
 <div class="name">Airtime</div>
-<div class="text">Recharge your phone quickly and conveniently.</div>
+<div class="text">
+Recharge your phone quickly and conveniently.
+</div>
 </div>
 
-<div class="card">
+<div class="card"
+onclick="location.href='data.html'">
 <div class="icon">◉</div>
 <div class="name">Data</div>
-<div class="text">Purchase affordable data bundles for your line.</div>
+<div class="text">
+Purchase affordable data bundles for your line.
+</div>
 </div>
 
-<div class="card">
+<div class="card"
+onclick="location.href='electricity.html'">
 <div class="icon">ϟ</div>
 <div class="name">Electricity</div>
-<div class="text">Pay your electricity bills conveniently.</div>
+<div class="text">
+Pay your electricity bills conveniently.
+</div>
 </div>
 
-<div class="card">
+<div class="card"
+onclick="location.href='cable.html'">
 <div class="icon">▣</div>
 <div class="name">Cable TV</div>
-<div class="text">Renew your TV subscription with ease.</div>
+<div class="text">
+Renew your TV subscription with ease.
+</div>
 </div>
 
 </div>
 </section>
 
 <section class="section">
-<div class="title">ABOUT BOLTIV</div>
+
+<div class="title">
+ABOUT BOLTIV
+</div>
+
 <div class="info">
-<h2>Fast. Simple. Reliable.</h2>
-<p>BOLTIV is a digital services platform designed to make everyday payments more convenient. Customers can fund their wallet and use their available balance to purchase airtime, data, electricity and cable TV services.</p>
-<p>Our goal is to provide a simple and convenient experience for managing essential digital services from one platform.</p>
+
+<h2>
+Fast. Simple. Reliable.
+</h2>
+
+<p>
+BOLTIV is a digital services platform designed to make everyday payments more convenient.
+Customers can fund their wallet and use their available balance to purchase airtime, data, electricity and cable TV services.
+</p>
+
+<p>
+Our goal is to provide a simple and convenient experience for managing essential digital services from one platform.
+</p>
+
 </div>
 </section>
 
 <section class="section">
-<div class="title">HOW IT WORKS</div>
+
+<div class="title">
+HOW IT WORKS
+</div>
 
 <div class="steps">
 
@@ -120,7 +181,9 @@ if (localStorage.getItem(SESSION_KEY) !== "true") {
 <div class="step-number">01</div>
 <div>
 <h3>Create an account</h3>
-<p>Register for a BOLTIV account to access the platform.</p>
+<p>
+Register for a BOLTIV account to access the platform.
+</p>
 </div>
 </div>
 
@@ -128,7 +191,9 @@ if (localStorage.getItem(SESSION_KEY) !== "true") {
 <div class="step-number">02</div>
 <div>
 <h3>Fund your wallet</h3>
-<p>Add funds securely to your BOLTIV wallet.</p>
+<p>
+Add funds securely to your BOLTIV wallet.
+</p>
 </div>
 </div>
 
@@ -136,7 +201,9 @@ if (localStorage.getItem(SESSION_KEY) !== "true") {
 <div class="step-number">03</div>
 <div>
 <h3>Choose a service</h3>
-<p>Select airtime, data, electricity or cable TV.</p>
+<p>
+Select airtime, data, electricity or cable TV.
+</p>
 </div>
 </div>
 
@@ -144,7 +211,9 @@ if (localStorage.getItem(SESSION_KEY) !== "true") {
 <div class="step-number">04</div>
 <div>
 <h3>Complete your transaction</h3>
-<p>Confirm your details and receive your service.</p>
+<p>
+Confirm your details and receive your service.
+</p>
 </div>
 </div>
 
@@ -152,7 +221,10 @@ if (localStorage.getItem(SESSION_KEY) !== "true") {
 </section>
 
 <section class="section">
-<div class="title">CONTACT BOLTIV</div>
+
+<div class="title">
+CONTACT BOLTIV
+</div>
 
 <div class="contact-card">
 
@@ -175,17 +247,28 @@ Our support team is available to assist customers with questions and transaction
 </section>
 
 <section class="section">
-<div class="title">LEGAL & INFORMATION</div>
+
+<div class="title">
+LEGAL & INFORMATION
+</div>
 
 <div class="info">
-<h2>Customer Information</h2>
-<p>Customers are responsible for providing accurate information when making transactions. Transaction details should be reviewed carefully before confirmation.</p>
+
+<h2>
+Customer Information
+</h2>
+
+<p>
+Customers are responsible for providing accurate information when making transactions.
+Transaction details should be reviewed carefully before confirmation.
+</p>
 
 <div class="links">
 <a href="privacy.html">Privacy Policy</a>
 <a href="terms.html">Terms & Conditions</a>
 <a href="contact.html">Contact Us</a>
 </div>
+
 </div>
 </section>
 
@@ -198,7 +281,208 @@ Digital services made simple.<br><br>
 </div>
 </div>
 
+<script>
+
+const API_BASE=
+"https://boltiv-backend.onrender.com";
+
+const TOKEN_KEY=
+"boltivAuthToken";
+
+const token=
+localStorage.getItem(TOKEN_KEY);
+
+const userName=
+document.getElementById("userName");
+
+const userEmail=
+document.getElementById("userEmail");
+
+const walletBalance=
+document.getElementById("walletBalance");
+
+const logoutButton=
+document.getElementById("logoutButton");
+
+
+async function loadAccount(){
+
+if(!token){
+
+location.replace("login.html");
+return;
+}
+
+try{
+
+const response=
+await fetch(
+API_BASE+
+"/api/auth/me",
+{
+method:"GET",
+headers:{
+"Authorization":
+"Bearer "+token
+}
+}
+);
+
+const data=
+await response.json();
+
+if(
+!response.ok||
+!data.success
+){
+
+throw new Error(
+data.message||
+"Session expired."
+);
+
+}
+
+if(data.user){
+
+localStorage.setItem(
+"boltivUser",
+JSON.stringify(
+data.user
+)
+);
+
+localStorage.setItem(
+"boltivUserEmail",
+data.user.email||""
+);
+
+userName.textContent=
+(data.user.name||"User")+". ";
+
+userEmail.textContent=
+data.user.email||"";
+}
+
+if(data.wallet){
+
+walletBalance.textContent=
+"₦"+
+Number(
+data.wallet.balance||0
+).toLocaleString(
+"en-NG",
+{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+}
+);
+
+}
+
+localStorage.setItem(
+"boltivLoggedIn",
+"true"
+);
+
+}catch(error){
+
+console.error(
+"BOLTIV SESSION ERROR:",
+error
+);
+
+localStorage.removeItem(
+"boltivLoggedIn"
+);
+
+localStorage.removeItem(
+"boltivUser"
+);
+
+localStorage.removeItem(
+"boltivUserEmail"
+);
+
+localStorage.removeItem(
+TOKEN_KEY
+);
+
+location.replace("login.html");
+
+}
+
+}
+
+
+logoutButton.onclick=
+async()=>{
+
+logoutButton.disabled=true;
+logoutButton.textContent=
+"LOGGING OUT...";
+
+try{
+
+if(token){
+
+await fetch(
+API_BASE+
+"/api/auth/logout",
+{
+method:"POST",
+headers:{
+"Authorization":
+"Bearer "+token
+}
+}
+);
+
+}
+
+}catch(error){
+
+console.error(
+"BOLTIV LOGOUT ERROR:",
+error
+);
+
+}
+
+localStorage.removeItem(
+"boltivLoggedIn"
+);
+
+localStorage.removeItem(
+"boltivUser"
+);
+
+localStorage.removeItem(
+"boltivUserEmail"
+);
+
+localStorage.removeItem(
+"boltivBalance"
+);
+
+localStorage.removeItem(
+"boltivTransactions"
+);
+
+localStorage.removeItem(
+TOKEN_KEY
+);
+
+location.replace(
+"login.html"
+);
+
+};
+
+
+loadAccount();
+
+</script>
+
 </body>
 </html>
-
-<!-- BOLTIV PUBLIC LANDING PAGE — PAYSTACK REVIEW VERSION -->

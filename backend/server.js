@@ -2558,11 +2558,11 @@ date:item.date
 
 
 async function adminPayments(){
+async function adminPayments(){
 
 const result=
 await db(
 `SELECT
-p.id,
 p.reference,
 p.user_id,
 p.email,
@@ -2581,7 +2581,6 @@ LIMIT 500`
 );
 
 return result.rows.map(item=>({
-id:item.id,
 reference:item.reference,
 user_id:item.user_id,
 name:item.name||"",

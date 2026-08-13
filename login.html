@@ -6,63 +6,434 @@
 <meta name="theme-color" content="#050505">
 <title>BOLTIV — Login</title>
 <link rel="stylesheet" href="style.css">
+
+<style>
+.auth-page{
+    min-height:100vh;
+    padding:45px 0 40px;
+}
+
+.auth-logo{
+    text-align:center;
+    color:#d4af37;
+    font-size:30px;
+    font-weight:1000;
+    letter-spacing:4px;
+}
+
+.auth-tagline{
+    text-align:center;
+    color:#555;
+    font-size:7px;
+    letter-spacing:2px;
+    margin-top:4px;
+}
+
+.auth-card{
+    margin-top:28px;
+    padding:22px;
+    border:1px solid #292929;
+    border-radius:22px;
+    background:linear-gradient(145deg,#151515,#090909);
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+}
+
+.auth-card h1{
+    margin:0;
+    color:#fff;
+    font-size:21px;
+    font-weight:1000;
+}
+
+.auth-subtitle{
+    margin:6px 0 22px;
+    color:#666;
+    font-size:9px;
+}
+
+.form-group{
+    margin-bottom:15px;
+}
+
+.auth-btn{
+    width:100%;
+    height:48px;
+    margin-top:5px;
+}
+
+.auth-links{
+    display:flex;
+    justify-content:center;
+    gap:15px;
+    margin-top:18px;
+    font-size:8px;
+}
+
+.auth-links a{
+    color:#777;
+}
+
+.auth-links a:first-child{
+    color:#d4af37;
+}
+
+.status-message{
+    display:none;
+    margin-bottom:15px;
+    padding:11px;
+    border-radius:10px;
+    font-size:8px;
+    line-height:1.5;
+}
+
+.status-message.show{
+    display:block;
+}
+
+.status-message.error{
+    color:#ff8b8b;
+    background:#211010;
+    border:1px solid #542323;
+}
+
+.status-message.success{
+    color:#d4af37;
+    background:#17140b;
+    border:1px solid #3a3016;
+}
+</style>
 </head>
+
 <body>
-<div class="page"><div class="container"><div class="auth-page">
+
+<div class="page">
+<div class="container">
+
+<div class="auth-page">
+
 <div class="auth-logo">BOLTIV</div>
-<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
+
+<div class="auth-tagline">
+FAST. SIMPLE. POWERFUL.
+</div>
+
 <div class="auth-card">
+
 <h1>Welcome Back</h1>
-<p class="auth-subtitle">Login to your BOLTIV account</p>
-<div class="form-group">
-<label class="label">Email</label>
-<input class="input" id="emailInput" type="email" placeholder="you@example.com">
+
+<p class="auth-subtitle">
+Login to your BOLTIV account
+</p>
+
+<div
+id="statusMessage"
+class="status-message">
 </div>
+
 <div class="form-group">
-<label class="label">Password</label>
-<input class="input" id="passwordInput" type="password" placeholder="Enter password">
+
+<label class="label">
+EMAIL
+</label>
+
+<input
+class="input"
+id="emailInput"
+type="email"
+autocomplete="email"
+placeholder="you@example.com">
+
 </div>
-<button class="btn btn-primary auth-btn" id="loginButton">Login</button>
+
+
+<div class="form-group">
+
+<label class="label">
+PASSWORD
+</label>
+
+<input
+class="input"
+id="passwordInput"
+type="password"
+autocomplete="current-password"
+placeholder="Enter password">
+
+</div>
+
+
+<button
+class="btn btn-primary auth-btn"
+id="loginButton">
+
+Login
+
+</button>
+
+
 <div class="auth-links">
-<a href="register.html">Create Account</a>
-<a href="forgot-password.html">Forgot Password?</a>
+
+<a href="register.html">
+Create Account
+</a>
+
+<a href="forgot-password.html">
+Forgot Password?
+</a>
+
+</div>
+
+</div>
+
 </div>
 </div>
-</div></div></div>
+</div>
+
+
 <script>
-// LOGIN + USER SESSION
-const SESSION_KEY="boltivLoggedIn";
-function getStoredUser(){
-try{return JSON.parse(localStorage.getItem("boltivUser")||"null")}catch(error){return null}
+
+const API_BASE =
+"https://boltiv-backend.onrender.com";
+
+
+const loginButton =
+document.getElementById("loginButton");
+
+const statusMessage =
+document.getElementById("statusMessage");
+
+
+function showStatus(message,type="error"){
+
+    statusMessage.textContent =
+        message;
+
+    statusMessage.className =
+        "status-message show " + type;
+
 }
-function createUserId(){
-if(window.crypto&&crypto.randomUUID)return"BOLTIV-"+crypto.randomUUID();
-return"BOLTIV-"+Date.now()+"-"+Math.random().toString(36).slice(2,10);
+
+
+function clearStatus(){
+
+    statusMessage.textContent = "";
+
+    statusMessage.className =
+        "status-message";
+
 }
-document.getElementById("loginButton").onclick=()=>{
-const email=document.getElementById("emailInput").value.trim();
-const password=document.getElementById("passwordInput").value;
-if(!email){alert("Enter your email.");return}
-if(!/^\S+@\S+\.\S+$/.test(email)){alert("Enter a valid email address.");return}
-if(!password){alert("Enter your password.");return}
-const existingUser=getStoredUser();
-let user=existingUser;
-if(!user||String(user.email||"").toLowerCase()!==email.toLowerCase()){
-user={email};
-}else{
-user.email=email;
+
+
+async function login(){
+
+    clearStatus();
+
+    const email =
+        document
+        .getElementById("emailInput")
+        .value
+        .trim()
+        .toLowerCase();
+
+    const password =
+        document
+        .getElementById("passwordInput")
+        .value;
+
+
+    if(!email){
+
+        showStatus(
+            "Enter your email."
+        );
+
+        return;
+    }
+
+
+    if(!/^\S+@\S+\.\S+$/.test(email)){
+
+        showStatus(
+            "Enter a valid email address."
+        );
+
+        return;
+    }
+
+
+    if(!password){
+
+        showStatus(
+            "Enter your password."
+        );
+
+        return;
+    }
+
+
+    loginButton.disabled = true;
+
+    loginButton.textContent =
+        "LOGGING IN...";
+
+
+    try{
+
+        const response =
+            await fetch(
+                API_BASE +
+                "/api/auth/login",
+                {
+                    method:"POST",
+
+                    headers:{
+                        "Content-Type":
+                        "application/json"
+                    },
+
+                    body:JSON.stringify({
+
+                        email:email,
+
+                        password:password
+
+                    })
+                }
+            );
+
+
+        let data;
+
+
+        try{
+
+            data =
+                await response.json();
+
+        }catch{
+
+            data = {
+                success:false,
+                message:
+                "Invalid server response."
+            };
+
+        }
+
+
+        if(
+            !response.ok ||
+            !data.success
+        ){
+
+            throw new Error(
+                data.message ||
+                "Invalid email or password."
+            );
+
+        }
+
+
+        /*
+        SAVE ONLY THE AUTH SESSION.
+
+        NEVER SAVE THE PASSWORD.
+        */
+
+        if(data.token){
+
+            localStorage.setItem(
+                "boltivAuthToken",
+                data.token
+            );
+
+        }
+
+
+        if(data.user){
+
+            localStorage.setItem(
+                "boltivUser",
+                JSON.stringify(
+                    data.user
+                )
+            );
+
+            if(data.user.email){
+
+                localStorage.setItem(
+                    "boltivUserEmail",
+                    data.user.email
+                );
+
+            }
+
+        }
+
+
+        localStorage.setItem(
+            "boltivLoggedIn",
+            "true"
+        );
+
+
+        showStatus(
+            "Login successful. Opening BOLTIV...",
+            "success"
+        );
+
+
+        setTimeout(()=>{
+
+            location.href =
+                "index.html";
+
+        },500);
+
+
+    }catch(error){
+
+        console.error(
+            "BOLTIV LOGIN ERROR:",
+            error
+        );
+
+        showStatus(
+            error.message ||
+            "Unable to connect to BOLTIV."
+        );
+
+
+    }finally{
+
+        loginButton.disabled =
+            false;
+
+        loginButton.textContent =
+            "Login";
+
+    }
+
 }
-if(!user.id&&!user.userId){
-user.id=createUserId();
-user.userId=user.id;
-}
-localStorage.setItem("boltivUser",JSON.stringify(user));
-localStorage.setItem(SESSION_KEY,"true");
-localStorage.setItem("boltivUserEmail",email);
-location.href="index.html";
-};
-// END LOGIN
+
+
+loginButton.onclick = login;
+
+
+document
+.getElementById("passwordInput")
+.addEventListener(
+    "keydown",
+    function(event){
+
+        if(event.key === "Enter"){
+            login();
+        }
+
+    }
+);
+
 </script>
+
 </body>
 </html>
-<!-- BOLTIV LOGIN UPDATED -->

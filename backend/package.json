@@ -1,0 +1,16 @@
+{
+  "name": "boltiv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BOLTIV frontend and backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

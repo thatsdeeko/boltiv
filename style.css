@@ -1,3 +1,14 @@
+
+/* BOLTIV Theme Palette */
+:root {
+  --primary: #2563EB;
+  --bright-blue: #3B82F6;
+  --background: #0B0F19;
+  --cards: #111827;
+  --text: #F8FAFC;
+  --muted: #94A3B8;
+}
+
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#050505;--card:#0d0d0d;--card2:#111;--gold:#d4af37;--gold2:#f1d77a;--text:#fff;--muted:#858585;--line:#292929;--danger:#ff5555;--success:#d4af37}
 html{scroll-behavior:smooth}

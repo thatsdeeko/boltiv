@@ -14,7 +14,10 @@ const VTU_API_URL=process.env.VTU_API_URL||"";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
-const MAIL_FROM=process.env.MAIL_FROM||"BOLTIV <onboarding@resend.dev>";
+// Use a Resend-safe sender for testing when MAIL_FROM is not configured.
+// For production, set MAIL_FROM to an address on a domain verified in Resend.
+const MAIL_FROM=(process.env.MAIL_FROM||"BOLTIV <onboarding@resend.dev>").trim();
+const FRONTEND_ORIGIN=process.env.FRONTEND_ORIGIN||(()=>{try{return new URL(FRONTEND_URL).origin}catch{return FRONTEND_URL}})();
 
 const pool=new Pool({
 connectionString:DATABASE_URL,
@@ -24,9 +27,14 @@ ssl:DATABASE_URL?{rejectUnauthorized:false}:false
 function send(res,status,data){
 res.writeHead(status,{
 "Content-Type":"application/json",
-"Access-Control-Allow-Origin":"*",
+"Access-Control-Allow-Origin":FRONTEND_ORIGIN,
+"Vary":"Origin",
 "Access-Control-Allow-Methods":"GET,POST,OPTIONS",
-"Access-Control-Allow-Headers":"Content-Type,Authorization"
+"Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
+"X-Content-Type-Options":"nosniff",
+"X-Frame-Options":"DENY",
+"Referrer-Policy":"strict-origin-when-cross-origin",
+"Cache-Control":"no-store"
 });
 res.end(JSON.stringify(data));
 return true;
@@ -223,6 +231,42 @@ date TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
 
 await db(`
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_reference TEXT`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recipient TEXT`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS metadata JSONB`);
+await db(`CREATE UNIQUE INDEX IF NOT EXISTS transactions_idempotency_idx ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS user_security(
+user_id TEXT PRIMARY KEY,
+transaction_pin_hash TEXT,
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS support_tickets(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+subject TEXT NOT NULL,
+message TEXT NOT NULL,
+status TEXT NOT NULL DEFAULT 'open',
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS notifications(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+title TEXT NOT NULL,
+message TEXT NOT NULL,
+type TEXT NOT NULL DEFAULT 'info',
+read BOOLEAN NOT NULL DEFAULT FALSE,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+
+await db(`
 CREATE TABLE IF NOT EXISTS payments(
 id BIGSERIAL PRIMARY KEY,
 reference TEXT UNIQUE NOT NULL,
@@ -368,7 +412,7 @@ async function getTransactions(userId){
 
 const result=
 await db(
-`SELECT *
+`SELECT id,user_id,type,service,amount,reference,status,date,idempotency_key,provider_reference,recipient,metadata
 FROM transactions
 WHERE user_id=$1
 ORDER BY date DESC
@@ -999,14 +1043,40 @@ If you didn't request this password reset, you can safely ignore this email.
 if(!emailResult.success){
 
 /*
-Do not expose the email-service failure
-to the user as an account-discovery signal.
+The reset token must never remain usable when the
+email could not be sent. Remove the token we just
+created so the user cannot end up with an unusable
+reset request.
 */
 
 console.error(
 "PASSWORD RESET EMAIL FAILED:",
 emailResult.message
 );
+
+try{
+
+await db(
+`DELETE FROM password_reset_tokens
+ WHERE user_id=$1
+ AND token_hash=$2`,
+[user.id,tokenHash]
+);
+
+}catch(cleanupError){
+
+console.error(
+"PASSWORD RESET TOKEN CLEANUP FAILED:",
+cleanupError
+);
+
+}
+
+return{
+success:false,
+message:
+"We couldn't send the password reset email right now. Please try again later."
+};
 
 }
 
@@ -2128,41 +2198,51 @@ result.rows[0].balance
 
 
 async function insertTransaction({
-userId,
-service,
-amount,
-reference,
-status,
-type="debit"
+userId,service,amount,reference,status,type="debit",idempotencyKey=null,
+providerReference=null,recipient=null,metadata=null
 }){
-
-const result=
-await db(
-`INSERT INTO transactions(
-user_id,
-type,
-service,
-amount,
-reference,
-status,
-date
+const result=await db(`
+INSERT INTO transactions(
+user_id,type,service,amount,reference,status,date,idempotency_key,
+provider_reference,recipient,metadata
 )
-VALUES(
-$1,$2,$3,$4,$5,$6,NOW()
-)
-RETURNING *`,
-[
-userId,
-type,
-service,
-Number(amount),
-reference,
-status
-]
-);
-
+VALUES($1,$2,$3,$4,$5,$6,NOW(),$7,$8,$9,$10)
+ON CONFLICT(idempotency_key) DO UPDATE SET reference=transactions.reference
+RETURNING *`,[
+userId,type,service,Number(amount),reference,status,idempotencyKey,
+providerReference,recipient,metadata?JSON.stringify(metadata):null
+]);
 return result.rows[0];
+}
 
+async function addNotification(userId,title,message,type="info"){
+try{await db(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[userId,title,message,type]);}
+catch(error){console.error("NOTIFICATION ERROR:",error.message);}
+}
+
+function hashTransactionPin(pin){return hashPassword(String(pin));}
+function verifyTransactionPin(pin,stored){return verifyPassword(String(pin),stored);}
+
+async function getSecurity(userId){
+const r=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1`,[userId]);
+return r.rows[0]||null;
+}
+
+async function setTransactionPin(userId,pin,currentPin=""){
+if(!/^\d{4}$/.test(String(pin||""))) return {success:false,message:"Transaction PIN must contain exactly 4 digits."};
+const existing=await getSecurity(userId);
+if(existing?.transaction_pin_hash){
+if(!currentPin || !verifyTransactionPin(currentPin,existing.transaction_pin_hash)) return {success:false,message:"Current transaction PIN is incorrect."};
+}
+await db(`INSERT INTO user_security(user_id,transaction_pin_hash,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET transaction_pin_hash=EXCLUDED.transaction_pin_hash,updated_at=NOW()`,[userId,hashTransactionPin(pin)]);
+return {success:true,message:existing?.transaction_pin_hash?"Transaction PIN changed successfully.":"Transaction PIN created successfully."};
+}
+
+async function requireTransactionPin(userId,pin){
+const security=await getSecurity(userId);
+if(!security?.transaction_pin_hash) return {success:true,required:false};
+if(!pin || !verifyTransactionPin(pin,security.transaction_pin_hash)) return {success:false,required:true,message:"Incorrect transaction PIN."};
+return {success:true,required:true};
 }
 
 
@@ -2240,191 +2320,49 @@ throw error;
 }
 
 
-async function processVTUTransaction(
-user,
-data
-){
-
-const userId=
-user.user_id;
-
-const amount=
-Number(data.amount);
-
-if(!userId){
-
-return{
-success:false,
-statusCode:400,
-message:
-"User ID is required."
-};
-
+async function processVTUTransaction(user,data){
+const userId=user.user_id;
+const amount=Number(data.amount);
+if(!userId) return {success:false,statusCode:400,message:"User ID is required."};
+if(!validAmount(amount)) return {success:false,statusCode:400,message:"Invalid amount."};
+const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
+if(!pinCheck.success) return {success:false,statusCode:401,message:pinCheck.message,code:"INVALID_TRANSACTION_PIN"};
+const idempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
+const existing=await db(`SELECT * FROM transactions WHERE idempotency_key=$1 LIMIT 1`,[idempotencyKey]);
+if(existing.rows.length){
+const t=existing.rows[0];
+return {success:t.status==="successful",statusCode:t.status==="successful"?200:409,message:t.status==="successful"?"Transaction already completed.":"This transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),balance:(await getWallet(userId))?.balance||0};
 }
-
-if(!validAmount(amount)){
-
-return{
-success:false,
-statusCode:400,
-message:
-"Invalid amount."
-};
-
-}
-
-await createWallet(
-userId
-);
-
-const current=
-await getWallet(
-userId
-);
-
-if(
-!current||
-current.balance<amount
-){
-
-return{
-success:false,
-statusCode:400,
-message:
-"Insufficient wallet balance.",
-balance:
-current?
-current.balance:
-0
-};
-
-}
-
-const referenceValue=
-reference("BOLTIV-TX");
-
-const debit=
-await debitWallet(
-userId,
-amount
-);
-
-if(!debit.success){
-
-return{
-success:false,
-statusCode:400,
-message:
-debit.message
-};
-
-}
-
-let providerResult;
-
+await createWallet(userId);
+const client=await pool.connect();
+let referenceValue=reference("BOLTIV-TX");
 try{
-
-providerResult=
-await callVTUProvider(
-data.providerPayload
-);
-
-}catch(error){
-
-console.error(
-"VTU PROVIDER ERROR:",
-error
-);
-
-await refundWallet(
-userId,
-amount
-);
-
-return{
-success:false,
-statusCode:502,
-message:
-"VTU provider connection failed."
-};
-
-}
-
-if(!providerResult.configured){
-
-await refundWallet(
-userId,
-amount
-);
-
-return{
-success:false,
-statusCode:503,
-message:
-providerResult.message
-};
-
-}
-
-const providerData=
-providerResult.data||{};
-
+await client.query("BEGIN");
+const debit=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,userId]);
+if(!debit.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Insufficient wallet balance.",balance:(await getWallet(userId))?.balance||0};}
+await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,idempotency_key,recipient,metadata) VALUES($1,'debit',$2,$3,$4,'processing',NOW(),$5,$6,$7)`,[userId,data.service||"VTU Service",amount,referenceValue,idempotencyKey,data.recipient||null,data.metadata?JSON.stringify(data.metadata):null]);
+await client.query("COMMIT");
+}catch(error){try{await client.query("ROLLBACK");}catch{} client.release(); console.error("TRANSACTION RESERVE ERROR:",error); return {success:false,statusCode:500,message:"Unable to start transaction."};}
+client.release();
+let providerResult;
+try{providerResult=await callVTUProvider(data.providerPayload||data);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
+if(!providerResult.configured){await refundWallet(userId,amount);await db(`UPDATE transactions SET status='failed',metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,[JSON.stringify({reason:"provider_not_configured"}),referenceValue]);await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
+const providerData=providerResult.data||{};
 if(!providerResult.success){
-
-await refundWallet(
-userId,
-amount
-);
-
-await insertTransaction({
-userId,
-service:data.service,
-amount,
-reference:referenceValue,
-status:"failed"
-});
-
-return{
-success:false,
-statusCode:400,
-message:
-"VTU transaction failed.",
-reference:
-referenceValue,
-balance:
-(await getWallet(userId)).balance
-};
-
+await refundWallet(userId,amount);
+await db(`UPDATE transactions SET status='failed',metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,[JSON.stringify({providerResponse:providerData}),referenceValue]);
+await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
+return {success:false,statusCode:400,message:"VTU transaction failed. Your wallet has been refunded.",reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};
+}
+const providerStatus=String(providerData.status||providerData.data?.status||"successful").toLowerCase();
+const pending=["pending","processing","queued","in_progress"].includes(providerStatus);
+const finalStatus=pending?"pending":"successful";
+await db(`UPDATE transactions SET status=$1,provider_reference=$2,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4`,[finalStatus,providerData.reference||providerData.data?.reference||null,JSON.stringify({providerResponse:providerData}),referenceValue]);
+await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
+const finalWallet=await getWallet(userId);
+return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,data:providerData};
 }
 
-await insertTransaction({
-userId,
-service:data.service,
-amount,
-reference:referenceValue,
-status:"successful"
-});
-
-const finalWallet=
-await getWallet(userId);
-
-return{
-success:true,
-message:
-`${data.service} purchase successful.`,
-reference:
-referenceValue,
-amount,
-status:"successful",
-balance:
-finalWallet?
-finalWallet.balance:
-0,
-data:
-providerData
-};
-
-  }
 async function adminStats(){
 
 const usersResult=
@@ -3067,6 +3005,33 @@ return null;
 }
 
 
+async function handleExtraUserRoutes(req,res,path,url){
+const user=await userFromToken(req);
+if(!user) return null;
+if(req.method==="GET"&&path==="/api/security"){
+const security=await getSecurity(user.user_id); return send(res,200,{success:true,transactionPinSet:Boolean(security?.transaction_pin_hash)});
+}
+if(req.method==="POST"&&path==="/api/security/transaction-pin"){
+const b=await body(req); const result=await setTransactionPin(user.user_id,b.pin,b.currentPin||""); return send(res,result.success?200:400,result);
+}
+if(req.method==="GET"&&path==="/api/transactions/detail"){
+const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0]; return send(res,200,{success:true,transaction:{...t,amount:Number(t.amount)}});
+}
+if(req.method==="GET"&&path==="/api/notifications"){
+const r=await db(`SELECT id,title,message,type,read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[user.user_id]); return send(res,200,{success:true,notifications:r.rows});
+}
+if(req.method==="POST"&&path==="/api/notifications/read"){
+const b=await body(req); if(b.id) await db(`UPDATE notifications SET read=TRUE WHERE id=$1 AND user_id=$2`,[b.id,user.user_id]); else await db(`UPDATE notifications SET read=TRUE WHERE user_id=$1`,[user.user_id]); return send(res,200,{success:true});
+}
+if(req.method==="POST"&&path==="/api/support/tickets"){
+const b=await body(req); const subject=clean(b.subject),message=clean(b.message); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."}); const r=await db(`INSERT INTO support_tickets(user_id,subject,message) VALUES($1,$2,$3) RETURNING id,subject,message,status,created_at`,[user.user_id,subject,message]); return send(res,201,{success:true,ticket:r.rows[0],message:`Support ticket #${r.rows[0].id} created.`});
+}
+if(req.method==="GET"&&path==="/api/support/tickets"){
+const r=await db(`SELECT id,subject,message,status,created_at,updated_at FROM support_tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,[user.user_id]); return send(res,200,{success:true,tickets:r.rows});
+}
+return null;
+}
+
 async function handleUserRoutes(
 req,
 res,
@@ -3288,7 +3253,7 @@ VTU TRANSACTION
 
 if(
 req.method==="POST"&&
-path==="/api/vtu/purchase"
+["/api/vtu/purchase","/api/vtu/airtime","/api/vtu/data","/api/vtu/cable","/api/vtu/electricity"].includes(path)
 ){
 
 const user=
@@ -3304,14 +3269,10 @@ message:
 
 }
 
-const b=
-await body(req);
-
-const result=
-await processVTUTransaction(
-user,
-b
-);
+const b=await body(req);
+if(!b.service){b.service=path.split("/").pop();}
+if(!b.providerPayload){b.providerPayload={...b,service:b.service};}
+const result=await processVTUTransaction(user,b);
 
 return send(
 res,
@@ -3332,7 +3293,8 @@ async(req,res)=>{
 if(req.method==="OPTIONS"){
 
 res.writeHead(204,{
-"Access-Control-Allow-Origin":"*",
+"Access-Control-Allow-Origin":FRONTEND_ORIGIN,
+"Vary":"Origin",
 "Access-Control-Allow-Methods":
 "GET,POST,OPTIONS",
 "Access-Control-Allow-Headers":
@@ -3451,6 +3413,10 @@ return;
 /*
 USER ROUTES
 */
+
+const extraHandled=await handleExtraUserRoutes(req,res,path,url);
+
+if(extraHandled){return;}
 
 const userHandled=
 await handleUserRoutes(

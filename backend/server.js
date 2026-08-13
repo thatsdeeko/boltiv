@@ -29,6 +29,7 @@ res.writeHead(status,{
 "Access-Control-Allow-Headers":"Content-Type,Authorization"
 });
 res.end(JSON.stringify(data));
+return true;
 }
 
 async function body(req){

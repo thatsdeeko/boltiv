@@ -127,80 +127,409 @@
 .boltiv-success-card{
     width:100%;
     max-width:390px;
-    padding:30px 22px 24px;
-    border:1px solid #d4af37;
-    border-radius:26px;
-    background:linear-gradient(145deg,#181818,#080808);
-    box-shadow:0 30px 90px rgba(0,0,0,.8);
+<style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    background:#ffffff;
+    color:#171717;
+}
+
+.auth-page{
+    min-height:100vh;
+    padding:40px 0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+}
+
+.auth-logo{
     text-align:center;
-    transform:translateY(25px) scale(.94);
-    transition:.3s ease;
+    color:#c49a25;
+    font-size:36px;
+    font-weight:1000;
+    letter-spacing:5px;
 }
 
-.boltiv-success-overlay.show .boltiv-success-card{
-    transform:translateY(0) scale(1);
+.auth-tagline{
+    text-align:center;
+    color:#777;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:2px;
+    margin-top:7px;
 }
 
-.success-ring{
-    width:70px;
-    height:70px;
-    margin:0 auto 17px;
+.auth-card{
+    margin-top:30px;
+    padding:28px;
+    border:1px solid #e4e4e4;
+    border-radius:20px;
+    background:#ffffff;
+    box-shadow:0 12px 35px rgba(0,0,0,.07);
+}
+
+.auth-card h1{
+    margin:0;
+    color:#111111;
+    font-size:27px;
+    font-weight:900;
+}
+
+.auth-subtitle{
+    margin:8px 0 26px;
+    color:#707070;
+    font-size:14px;
+    line-height:1.5;
+}
+
+.form-group{
+    margin-bottom:18px;
+}
+
+.label{
+    display:block;
+    margin-bottom:8px;
+    color:#333333;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.8px;
+}
+
+.input{
+    width:100%;
+    height:52px;
+    padding:0 15px;
+
+    border:1px solid #dcdcdc;
+    border-radius:11px;
+
+    background:#ffffff;
+    color:#171717;
+
+    font-size:15px;
+
+    outline:none;
+
+    transition:
+        border-color .2s,
+        box-shadow .2s;
+}
+
+.input::placeholder{
+    color:#aaa;
+}
+
+.input:focus{
+    border-color:#c49a25;
+    box-shadow:
+        0 0 0 3px
+        rgba(196,154,37,.12);
+}
+
+.auth-btn{
+    width:100%;
+    height:52px;
+    margin-top:4px;
+
+    border:none;
+    border-radius:11px;
+
+    background:#d4af37;
+    color:#111111;
+
+    font-size:15px;
+    font-weight:900;
+
+    cursor:pointer;
+
+    transition:
+        transform .15s,
+        background .2s,
+        box-shadow .2s;
+}
+
+.auth-btn:hover{
+    background:#c9a12f;
+    box-shadow:
+        0 8px 20px
+        rgba(196,154,37,.22);
+}
+
+.auth-btn:active{
+    transform:scale(.98);
+}
+
+.auth-btn:disabled{
+    opacity:.65;
+    cursor:not-allowed;
+}
+
+.auth-links{
+    display:flex;
+    justify-content:center;
+    margin-top:22px;
+    font-size:13px;
+}
+
+.auth-links a{
+    color:#b58a17;
+    text-decoration:none;
+    font-weight:700;
+}
+
+.auth-links a:hover{
+    text-decoration:underline;
+}
+
+
+/* =========================
+   STATUS MESSAGE
+========================= */
+
+.status-message{
+    display:none;
+
+    margin-bottom:17px;
+    padding:13px 14px;
+
+    border-radius:10px;
+
+    font-size:13px;
+    line-height:1.5;
+}
+
+.status-message.show{
+    display:block;
+}
+
+.status-message.error{
+    color:#a32929;
+    background:#fff4f4;
+    border:1px solid #f0caca;
+}
+
+.status-message.success{
+    color:#80620c;
+    background:#fffaf0;
+    border:1px solid #ead9a5;
+}
+
+
+/* =========================
+   SUCCESS MODAL
+========================= */
+
+.boltiv-success-overlay{
+    position:fixed;
+    inset:0;
+    z-index:99999;
+
     display:flex;
     align-items:center;
     justify-content:center;
-    border-radius:50%;
+
+    padding:20px;
+
+    background:rgba(255,255,255,.88);
+
+    backdrop-filter:blur(12px);
+
+    opacity:0;
+    visibility:hidden;
+
+    transition:.3s ease;
+}
+
+.boltiv-success-overlay.show{
+    opacity:1;
+    visibility:visible;
+}
+
+.boltiv-success-card{
+    width:100%;
+    max-width:390px;
+
+    padding:32px 24px 25px;
+
     border:1px solid #d4af37;
-    background:#17140b;
-    color:#d4af37;
+    border-radius:24px;
+
+    background:#ffffff;
+
+    box-shadow:
+        0 25px 70px
+        rgba(0,0,0,.16);
+
+    text-align:center;
+
+    transform:
+        translateY(25px)
+        scale(.94);
+
+    transition:.3s ease;
+}
+
+.boltiv-success-overlay.show
+.boltiv-success-card{
+
+    transform:
+        translateY(0)
+        scale(1);
+}
+
+.success-ring{
+
+    width:70px;
+    height:70px;
+
+    margin:0 auto 18px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:50%;
+
+    border:2px solid #d4af37;
+
+    background:#fffaf0;
+
+    color:#b58a17;
+
     font-size:32px;
     font-weight:1000;
 }
 
 .success-label{
-    color:#d4af37;
-    font-size:7px;
+
+    color:#b58a17;
+
+    font-size:10px;
     font-weight:1000;
+
     letter-spacing:2px;
-    margin-bottom:7px;
+
+    margin-bottom:8px;
 }
 
 .boltiv-success-card h2{
+
     margin:0;
-    color:#fff;
-    font-size:22px;
-    font-weight:1000;
+
+    color:#111111;
+
+    font-size:24px;
+
+    font-weight:900;
 }
 
 .success-message{
-    margin:9px auto 0;
-    max-width:290px;
-    color:#777;
-    font-size:9px;
+
+    margin:10px auto 0;
+
+    max-width:300px;
+
+    color:#707070;
+
+    font-size:13px;
+
     line-height:1.7;
 }
 
 .success-user{
-    margin-top:17px;
-    padding:11px;
-    border:1px solid #292929;
+
+    margin-top:18px;
+
+    padding:13px;
+
+    border:1px solid #e5e5e5;
+
     border-radius:12px;
-    background:#0d0d0d;
-    color:#d4af37;
-    font-size:9px;
-    font-weight:900;
+
+    background:#fafafa;
+
+    color:#b58a17;
+
+    font-size:13px;
+
+    font-weight:800;
 }
 
 .boltiv-success-btn{
+
     width:100%;
-    margin-top:16px;
+
+    margin-top:17px;
+
     padding:14px;
+
     border:0;
-    border-radius:13px;
-    background:linear-gradient(135deg,#d4af37,#a78320);
-    color:#050505;
-    font-size:9px;
+
+    border-radius:11px;
+
+    background:#d4af37;
+
+    color:#111111;
+
+    font-size:13px;
+
     font-weight:1000;
+
+    cursor:pointer;
+
+    transition:.2s;
 }
+
+.boltiv-success-btn:hover{
+
+    background:#c9a12f;
+
+    box-shadow:
+        0 8px 20px
+        rgba(196,154,37,.20);
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media(max-width:480px){
+
+    .container{
+        padding:0 16px;
+    }
+
+    .auth-page{
+        justify-content:flex-start;
+        padding-top:55px;
+    }
+
+    .auth-logo{
+        font-size:32px;
+    }
+
+    .auth-card{
+        margin-top:28px;
+        padding:23px 20px;
+        border-radius:18px;
+    }
+
+    .auth-card h1{
+        font-size:24px;
+    }
+
+    .auth-subtitle{
+        font-size:13px;
+    }
+
+}
+
 </style>
 </head>
 

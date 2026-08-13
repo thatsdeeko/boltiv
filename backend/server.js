@@ -1379,3 +1379,720 @@ data:providerData
 };
 
 }
+const server=http.createServer(
+async(req,res)=>{
+
+if(req.method==="OPTIONS"){
+
+res.writeHead(204,{
+"Access-Control-Allow-Origin":"*",
+"Access-Control-Allow-Methods":
+"GET,POST,OPTIONS",
+"Access-Control-Allow-Headers":
+"Content-Type,Authorization"
+});
+
+return res.end();
+}
+
+try{
+
+const url=new URL(
+req.url,
+`http://${req.headers.host||"localhost"}`
+);
+
+const path=url.pathname;
+
+if(
+req.method==="GET"&&
+path==="/api/health"
+){
+
+return send(res,200,{
+success:true,
+app:"BOLTIV",
+status:"online",
+paystack:
+PAYSTACK_SECRET_KEY?
+"configured":
+"not configured",
+database:
+DATABASE_URL?
+"configured":
+"not configured",
+vtu:
+VTU_API_URL&&VTU_API_KEY?
+"configured":
+"not configured",
+admin:
+ADMIN_EMAIL&&ADMIN_PASSWORD?
+"configured":
+"not configured",
+message:
+"BOLTIV backend is running"
+});
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/auth/register"
+){
+
+const b=await body(req);
+
+const name=clean(
+b.name||b.fullName
+);
+
+const phone=clean(
+b.phone||b.phoneNumber
+);
+
+const email=clean(
+b.email
+).toLowerCase();
+
+const password=
+String(b.password||"");
+
+const result=
+await registerUser(
+email,
+password,
+name,
+phone
+);
+
+return send(
+res,
+result.success?201:400,
+result
+);
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/auth/login"
+){
+
+const b=await body(req);
+
+const email=clean(
+b.email
+).toLowerCase();
+
+const password=
+String(b.password||"");
+
+const result=
+await loginUser(
+email,
+password
+);
+
+return send(
+res,
+result.success?200:401,
+result
+);
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/auth/logout"
+){
+
+const result=
+await logoutUser(req);
+
+return send(res,200,result);
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/auth/me"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+return send(res,200,{
+success:true,
+user
+});
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/wallet"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+await createWallet(
+user.user_id
+);
+
+const wallet=
+await getWallet(
+user.user_id
+);
+
+return send(res,200,{
+success:true,
+wallet
+});
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/transactions"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const transactions=
+await getTransactions(
+user.user_id
+);
+
+return send(res,200,{
+success:true,
+transactions
+});
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/payments/initialize"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const b=await body(req);
+
+const amount=Number(
+b.amount
+);
+
+if(!validAmount(amount)){
+
+return send(res,400,{
+success:false,
+message:
+"Invalid payment amount."
+});
+
+}
+
+const result=
+await initializePayment(
+user.user_id,
+user.email,
+amount
+);
+
+return send(
+res,
+result.success?200:400,
+result
+);
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/payments/verify"
+){
+
+const referenceValue=
+clean(
+url.searchParams.get(
+"reference"
+)
+);
+
+if(!referenceValue){
+
+return send(res,400,{
+success:false,
+message:
+"Payment reference is required."
+});
+
+}
+
+const result=
+await verifyPayment(
+referenceValue
+);
+
+return send(
+res,
+result.success?200:400,
+result
+);
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/paystack/webhook"
+){
+
+if(!PAYSTACK_SECRET_KEY){
+
+return send(res,503,{
+success:false,
+message:
+"Paystack is not configured."
+});
+
+}
+
+const signature=
+req.headers["x-paystack-signature"];
+
+const rawBody=
+await new Promise(
+(resolve,reject)=>{
+
+let data="";
+
+req.on(
+"data",
+chunk=>{
+data+=chunk;
+}
+);
+
+req.on(
+"end",
+()=>resolve(data)
+);
+
+req.on(
+"error",
+reject
+);
+
+});
+
+const expected=
+crypto.createHmac(
+"sha512",
+PAYSTACK_SECRET_KEY
+)
+.update(rawBody)
+.digest("hex");
+
+if(
+!signature||
+signature!==expected
+){
+
+return send(res,401,{
+success:false,
+message:
+"Invalid webhook signature."
+});
+
+}
+
+let event;
+
+try{
+
+event=JSON.parse(rawBody);
+
+}catch(error){
+
+return send(res,400,{
+success:false,
+message:
+"Invalid webhook payload."
+});
+
+}
+
+if(
+event.event===
+"charge.success"
+){
+
+const referenceValue=
+event.data&&
+event.data.reference;
+
+if(referenceValue){
+
+try{
+
+await verifyPayment(
+referenceValue
+);
+
+}catch(error){
+
+console.error(
+"WEBHOOK VERIFY ERROR:",
+error
+);
+
+}
+
+}
+
+}
+
+return send(res,200,{
+success:true
+});
+
+}
+if(
+req.method==="POST"&&
+path==="/api/admin/login"
+){
+
+const b=await body(req);
+
+const result=
+await adminLogin(
+b.email,
+b.password
+);
+
+return send(
+res,
+result.success?200:401,
+result
+);
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/admin/logout"
+){
+
+const authorization=
+req.headers.authorization||"";
+
+if(
+authorization.startsWith(
+"Bearer "
+)
+){
+
+await db(
+`DELETE FROM admin_sessions
+WHERE token=$1`,
+[
+authorization.slice(7).trim()
+]
+);
+
+}
+
+return send(res,200,{
+success:true,
+message:
+"Admin logged out."
+});
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/me"
+){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+return send(res,200,{
+success:true,
+admin
+});
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/users"
+){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const result=await db(
+`SELECT
+id,
+user_id,
+name,
+phone,
+email,
+created_at,
+updated_at
+FROM users
+ORDER BY created_at DESC
+LIMIT 500`
+);
+
+return send(res,200,{
+success:true,
+users:result.rows
+});
+
+}
+
+if(
+req.method==="GET"&&
+path==="/api/admin/transactions"
+){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const result=await db(
+`SELECT *
+FROM transactions
+ORDER BY date DESC
+LIMIT 500`
+);
+
+return send(res,200,{
+success:true,
+transactions:
+result.rows.map(item=>({
+...item,
+amount:Number(item.amount)
+}))
+});
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/services/vtu"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const b=await body(req);
+
+const result=
+await processVTUService({
+userId:user.user_id,
+amount:Number(b.amount),
+service:
+clean(b.service||"VTU"),
+providerPayload:
+b.providerPayload||b
+});
+
+return send(
+res,
+result.statusCode||
+(result.success?200:400),
+result
+);
+
+}
+
+if(
+req.method==="POST"&&
+path==="/api/admin/reset-password"
+){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+if(
+!ADMIN_EMAIL||
+!ADMIN_PASSWORD
+){
+
+return send(res,500,{
+success:false,
+message:
+"ADMIN_EMAIL or ADMIN_PASSWORD is missing."
+});
+
+}
+
+const passwordHash=
+hashPassword(
+ADMIN_PASSWORD
+);
+
+await db(
+`UPDATE admins
+SET
+password_hash=$1
+WHERE LOWER(email)=LOWER($2)`,
+[
+passwordHash,
+ADMIN_EMAIL
+]
+);
+
+return send(res,200,{
+success:true,
+message:
+"Admin password reset successfully."
+});
+
+}
+
+return send(res,404,{
+success:false,
+message:
+"API route not found"
+});
+
+}catch(error){
+
+console.error(
+"SERVER ERROR:",
+error
+);
+
+return send(res,500,{
+success:false,
+message:
+"Internal server error"
+});
+
+}
+
+});
+
+setup().then(()=>{
+
+server.listen(
+PORT,
+"0.0.0.0",
+()=>{
+
+console.log(
+`BOLTIV API running on port ${PORT}`
+);
+
+}
+
+);
+
+}).catch(error=>{
+
+console.error(
+"STARTUP ERROR:",
+error
+);
+
+process.exit(1);
+
+});

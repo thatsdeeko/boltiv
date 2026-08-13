@@ -34,7 +34,7 @@ height:40px;
 border:1px solid #e5e5e1;
 border-radius:12px;
 background:#ffffff;
-color:#c49a24;
+color:#b8860b;
 font-size:22px;
 }
 
@@ -47,7 +47,7 @@ color:#171717;
 .support-subtitle{
 margin-top:4px;
 color:#666;
-font-size:8.8px;
+font-size:10px;
 letter-spacing:.5px;
 }
 
@@ -70,7 +70,7 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #403513;
-color:#c49a24;
+color:#b8860b;
 font-size:23.1px;
 margin-bottom:14px;
 }
@@ -83,7 +83,7 @@ font-weight:1000;
 .hero-text{
 margin-top:6px;
 color:#777;
-font-size:8.8px;
+font-size:10px;
 line-height:1.7;
 }
 
@@ -105,7 +105,7 @@ transition:.2s ease;
 
 .issue-card:active{
 transform:scale(.98);
-border-color:#c49a24;
+border-color:#b8860b;
 }
 
 .issue-icon{
@@ -117,13 +117,13 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #403513;
-color:#c49a24;
+color:#b8860b;
 font-size:15.4px;
 margin-bottom:10px;
 }
 
 .issue-title{
-font-size:9.9px;
+font-size:11px;
 font-weight:1000;
 }
 
@@ -149,7 +149,7 @@ margin-bottom:16px;
 display:block;
 margin-bottom:8px;
 color:#777;
-font-size:8.8px;
+font-size:10px;
 font-weight:900;
 letter-spacing:.6px;
 }
@@ -180,7 +180,7 @@ line-height:1.6;
 
 .form-select:focus,
 .form-textarea:focus{
-border-color:#c49a24;
+border-color:#b8860b;
 box-shadow:0 0 0 2px rgba(212,175,55,.06);
 }
 
@@ -189,9 +189,9 @@ width:100%;
 height:48px;
 border:0;
 border-radius:13px;
-background:linear-gradient(135deg,#f5d76e,#c49a24,#b8860b);
+background:linear-gradient(135deg,#f5d76e,#b8860b,#b8860b);
 color:#f7f7f5;
-font-size:9.9px;
+font-size:11px;
 font-weight:1000;
 letter-spacing:.5px;
 }
@@ -219,7 +219,7 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #403513;
-color:#c49a24;
+color:#b8860b;
 font-size:22px;
 }
 
@@ -231,7 +231,7 @@ font-weight:1000;
 .contact-text{
 margin-top:6px;
 color:#666;
-font-size:8.8px;
+font-size:10px;
 line-height:1.6;
 }
 
@@ -250,7 +250,7 @@ width:100%;
 padding:13px;
 border-radius:12px;
 text-decoration:none;
-font-size:9.9px;
+font-size:11px;
 font-weight:1000;
 }
 
@@ -263,7 +263,7 @@ color:#70d47b;
 .email-button{
 background:#fffdf4;
 border:1px solid #403513;
-color:#c49a24;
+color:#b8860b;
 }
 
 .boltiv-message{
@@ -271,7 +271,7 @@ display:none;
 margin-top:12px;
 padding:12px;
 border-radius:11px;
-font-size:8.8px;
+font-size:10px;
 line-height:1.5;
 text-align:center;
 }
@@ -311,7 +311,7 @@ font-weight:900;
 }
 
 .nav-item.active{
-color:#c49a24;
+color:#b8860b;
 }
 
 .nav-icon{
@@ -546,7 +546,7 @@ document.querySelectorAll(".issue-card").forEach(item=>{
 item.style.borderColor="#e5e5e1";
 });
 
-card.style.borderColor="#c49a24";
+card.style.borderColor="#b8860b";
 
 document
 .querySelector(".form-card")
@@ -560,7 +560,7 @@ block:"center"
 });
 
 /* SEND SUPPORT REQUEST */
-sendBtn.onclick=()=>{
+sendBtn.onclick=async()=>{
 
 const selectedIssue=subject.value;
 const text=message.value.trim();
@@ -612,8 +612,13 @@ Issue: ${selectedIssue}
 Message:
 ${text}`;
 
-location.href=
-`https://wa.me/${phone}?text=${encodeURIComponent(supportMessage)}`;
+try{
+const r=await fetch("https://boltiv-backend.onrender.com/api/support/tickets",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({subject:selectedIssue,message:text})});
+const d=await r.json();
+if(!r.ok||!d.success)throw new Error(d.message||"Unable to create support ticket.");
+alert(d.message+" You can also continue with WhatsApp support.");
+}catch(e){console.error(e);alert("We could not create the ticket. You can still continue with WhatsApp support.");}
+location.href=`https://wa.me/${phone}?text=${encodeURIComponent(supportMessage)}`;
 
 };
 

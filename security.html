@@ -40,7 +40,7 @@ height:40px;
 border:1px solid #e5e5e1;
 border-radius:12px;
 background:#ffffff;
-color:#c49a24;
+color:#b8860b;
 font-size:22px;
 }
 
@@ -52,7 +52,7 @@ font-weight:1000;
 .security-subtitle{
 margin-top:4px;
 color:#666;
-font-size:8.8px;
+font-size:10px;
 }
 
 .security-hero{
@@ -74,7 +74,7 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #403513;
-color:#c49a24;
+color:#b8860b;
 font-size:22px;
 margin-bottom:14px;
 }
@@ -87,7 +87,7 @@ font-weight:1000;
 .hero-text{
 margin-top:6px;
 color:#777;
-font-size:8.8px;
+font-size:10px;
 line-height:1.6;
 }
 
@@ -129,7 +129,7 @@ font-size:15.4px;
 }
 
 .status-title{
-font-size:9.9px;
+font-size:11px;
 font-weight:1000;
 }
 
@@ -155,7 +155,7 @@ color:#777;
 .security-label{
 display:block;
 color:#777;
-font-size:8.8px;
+font-size:10px;
 font-weight:900;
 letter-spacing:.6px;
 margin-bottom:8px;
@@ -177,7 +177,7 @@ margin-bottom:15px;
 }
 
 .security-input:focus{
-border-color:#c49a24;
+border-color:#b8860b;
 box-shadow:0 0 0 2px rgba(212,175,55,.06);
 }
 
@@ -192,12 +192,12 @@ top:14px;
 border:0;
 background:transparent;
 color:#777;
-font-size:8.8px;
+font-size:10px;
 font-weight:900;
 }
 
 .show-pin:active{
-color:#c49a24;
+color:#b8860b;
 }
 
 .security-button{
@@ -205,9 +205,9 @@ width:100%;
 height:48px;
 border:0;
 border-radius:13px;
-background:linear-gradient(135deg,#f5d76e,#c49a24,#b8860b);
+background:linear-gradient(135deg,#f5d76e,#b8860b,#b8860b);
 color:#f7f7f5;
-font-size:9.9px;
+font-size:11px;
 font-weight:1000;
 letter-spacing:.5px;
 }
@@ -227,7 +227,7 @@ margin-top:12px;
 padding:12px;
 border-radius:11px;
 text-align:center;
-font-size:8.8px;
+font-size:10px;
 line-height:1.5;
 }
 
@@ -289,7 +289,7 @@ font-weight:900;
 }
 
 .nav-item.active{
-color:#c49a24;
+color:#b8860b;
 }
 
 .nav-icon{
@@ -326,7 +326,7 @@ max-width:370px;
 padding:25px 20px;
 border-radius:24px;
 background:linear-gradient(145deg,#fffdf4,#ffffff);
-border:1px solid #c49a24;
+border:1px solid #b8860b;
 text-align:center;
 transform:translateY(20px) scale(.96);
 transition:.25s;
@@ -345,8 +345,8 @@ display:flex;
 align-items:center;
 justify-content:center;
 background:#fffdf4;
-border:1px solid #c49a24;
-color:#c49a24;
+border:1px solid #b8860b;
+color:#b8860b;
 font-size:23.1px;
 }
 
@@ -358,7 +358,7 @@ font-weight:1000;
 .pin-modal-text{
 margin-top:7px;
 color:#777;
-font-size:8.8px;
+font-size:10px;
 line-height:1.6;
 }
 
@@ -372,7 +372,7 @@ margin-top:18px;
 .modal-btn{
 height:43px;
 border-radius:11px;
-font-size:8.8px;
+font-size:10px;
 font-weight:1000;
 }
 
@@ -384,7 +384,7 @@ color:#777;
 
 .modal-confirm{
 border:0;
-background:#c49a24;
+background:#b8860b;
 color:#f7f7f5;
 }
 </style>
@@ -985,112 +985,29 @@ successModal.classList.add("show");
 
 
 /* =========================
-   CHANGE PIN
+   CREATE / CHANGE PIN
 ========================= */
-
-document
-.getElementById("changePinBtn")
-.onclick=()=>{
-
-const oldPin=getPin();
-
-const current=
-currentPin.value.trim();
-
-const newValue=
-newPin.value.trim();
-
-const confirm=
-confirmPin.value.trim();
-
-
-if(!oldPin){
-
-updateStatus();
-
-return;
-
+const API_BASE="https://boltiv-backend.onrender.com";
+async function pinRequest(pin,currentPin=""){
+const r=await fetch(API_BASE+"/api/security/transaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
+return r.json();
 }
 
-
-if(current!==oldPin){
-
-showMessage(
-"Current PIN is incorrect.",
-"error"
-);
-
-currentPin.focus();
-
-return;
-
-}
-
-
-if(!/^\d{4}$/.test(newValue)){
-
-showMessage(
-"New PIN must contain exactly 4 digits.",
-"error"
-);
-
-newPin.focus();
-
-return;
-
-}
-
-
-if(newValue===oldPin){
-
-showMessage(
-"Your new PIN must be different from your current PIN.",
-"error"
-);
-
-newPin.focus();
-
-return;
-
-}
-
-
-if(newValue!==confirm){
-
-showMessage(
-"Your new PINs do not match.",
-"error"
-);
-
-confirmPin.focus();
-
-return;
-
-}
-
-
-localStorage.setItem(
-"boltivTransactionPin",
-newValue
-);
-
-
-currentPin.value="";
-newPin.value="";
-confirmPin.value="";
-
-
-updateStatus();
-
-showMessage(
-"Transaction PIN changed successfully.",
-"success"
-);
-
-successModal.classList.add("show");
-
+document.getElementById("createPinBtn").onclick=async()=>{
+const pin=createPin.value.trim(),confirm=createConfirmPin.value.trim();
+if(!/^\d{4}$/.test(pin))return showMessage("PIN must contain exactly 4 digits.","error");
+if(pin!==confirm)return showMessage("PINs do not match.","error");
+const result=await pinRequest(pin); if(!result.success)return showMessage(result.message||"Unable to create PIN.","error");
+createPin.value="";createConfirmPin.value="";updateStatus();showMessage(result.message,"success");successModal.classList.add("show");
 };
 
+document.getElementById("changePinBtn").onclick=async()=>{
+const current=currentPin.value.trim(),pin=newPin.value.trim(),confirm=confirmPin.value.trim();
+if(!/^\d{4}$/.test(pin))return showMessage("New PIN must contain exactly 4 digits.","error");
+if(pin!==confirm)return showMessage("New PINs do not match.","error");
+const result=await pinRequest(pin,current);if(!result.success)return showMessage(result.message||"Unable to change PIN.","error");
+currentPin.value="";newPin.value="";confirmPin.value="";updateStatus();showMessage(result.message,"success");successModal.classList.add("show");
+};
 
 /* =========================
    SUCCESS MODAL

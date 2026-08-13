@@ -208,3 +208,12 @@ textarea{resize:vertical;min-height:100px}
 .auth-card{padding:19px}
 .auth-logo{font-size:33px}
              }
+
+/* BOLTIV production UI tokens */
+:root{--boltiv-gold:#b8860b;--boltiv-gold-soft:#fff9e6;--boltiv-border:#e5e5e1;--boltiv-text:#171717}
+body{font-size:15px}
+.brand,.auth-logo,.footer-logo,.footer-logo,.brand-name{color:var(--boltiv-gold)!important}
+button,input,select,textarea{font-size:inherit}
+.boltiv-global-notice{position:fixed;left:14px;right:14px;bottom:84px;z-index:99999;display:none;padding:13px 15px;border:1px solid #ead99b;border-radius:14px;background:#fffdf4;box-shadow:0 14px 35px rgba(0,0,0,.16);color:#171717;font-size:13px;line-height:1.45}
+.boltiv-global-notice.show{display:block}
+.boltiv-global-notice strong{display:block;color:var(--boltiv-gold);margin-bottom:3px}

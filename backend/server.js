@@ -1012,3 +1012,891 @@ email:adminAccount.email
 /* =========================
    PART 1 COMPLETE
 ========================= */
+/* =========================
+   PAYSTACK
+========================= */
+
+async function paystack(path,options={}){
+if(!PAYSTACK_SECRET_KEY){
+return{
+status:500,
+data:{
+status:false,
+message:
+"Paystack is not configured on the server."
+}
+};
+}
+
+const response=await fetch(
+`https://api.paystack.co${path}`,
+{
+...options,
+headers:{
+Authorization:
+`Bearer ${PAYSTACK_SECRET_KEY}`,
+"Content-Type":
+"application/json",
+...(options.headers||{})
+}
+}
+);
+
+let data;
+
+try{
+data=await response.json();
+}catch(error){
+data={
+status:false,
+message:
+"Invalid response from Paystack."
+};
+}
+
+return{
+status:response.status,
+data
+};
+}
+
+/* =========================
+   INITIALIZE PAYMENT
+========================= */
+
+async function initializePayment(
+userId,
+email,
+amount
+){
+
+if(!PAYSTACK_SECRET_KEY){
+return{
+success:false,
+message:
+"Paystack is not configured on the server."
+};
+}
+
+const ref=
+reference("BOLTIV-PAY");
+
+const response=
+await paystack(
+"/transaction/initialize",
+{
+method:"POST",
+body:JSON.stringify({
+email,
+amount:String(
+Math.round(amount*100)
+),
+currency:"NGN",
+reference:ref,
+callback_url:
+`${FRONTEND_URL}/payment-success.html`,
+metadata:{
+userId,
+service:
+"BOLTIV Wallet Funding"
+}
+})
+}
+);
+
+if(!response.data.status){
+
+return{
+success:false,
+message:
+response.data.message||
+"Unable to initialize payment."
+};
+}
+
+await db(`
+INSERT INTO payments(
+reference,
+user_id,
+email,
+amount,
+amount_kobo,
+status,
+credited
+)
+VALUES(
+$1,$2,$3,$4,$5,$6,$7
+)
+`,[
+ref,
+userId,
+email,
+amount,
+Math.round(amount*100),
+"initialized",
+false
+]);
+
+return{
+success:true,
+message:
+"Payment initialized.",
+reference:ref,
+authorizationUrl:
+response.data.data
+.authorization_url,
+accessCode:
+response.data.data
+.access_code
+};
+}
+
+/* =========================
+   VERIFY PAYMENT
+========================= */
+
+async function verifyPayment(ref){
+
+if(!PAYSTACK_SECRET_KEY){
+return{
+success:false,
+message:
+"Paystack is not configured on the server."
+};
+}
+
+const paymentResult=
+await db(`
+SELECT *
+FROM payments
+WHERE reference=$1
+`,[
+ref
+]);
+
+if(!paymentResult.rows.length){
+
+return{
+success:false,
+message:
+"Payment reference not found."
+};
+}
+
+const payment=
+paymentResult.rows[0];
+
+if(payment.credited){
+
+const currentWallet=
+await getWallet(
+payment.user_id
+);
+
+return{
+success:true,
+alreadyCredited:true,
+reference:ref,
+balance:
+currentWallet?
+currentWallet.balance:
+0
+};
+}
+
+const response=
+await paystack(
+`/transaction/verify/${encodeURIComponent(ref)}`,
+{
+method:"GET"
+}
+);
+
+if(!response.data.status){
+
+return{
+success:false,
+message:
+response.data.message||
+"Unable to verify payment."
+};
+}
+
+const transaction=
+response.data.data;
+
+if(transaction.status!=="success"){
+
+await db(`
+UPDATE payments
+SET status=$1
+WHERE reference=$2
+`,[
+transaction.status,
+ref
+]);
+
+return{
+success:false,
+message:
+`Payment status: ${transaction.status}`,
+status:
+transaction.status
+};
+}
+
+if(transaction.currency!=="NGN"){
+
+return{
+success:false,
+message:
+"Invalid payment currency."
+};
+}
+
+if(
+Number(transaction.amount)!==
+Number(payment.amount_kobo)
+){
+
+return{
+success:false,
+message:
+"Payment amount does not match."
+};
+}
+
+const client=
+await pool.connect();
+
+try{
+
+await client.query(
+"BEGIN"
+);
+
+await client.query(`
+INSERT INTO wallets(
+user_id,
+balance
+)
+VALUES($1,0)
+ON CONFLICT(user_id)
+DO NOTHING
+`,[
+payment.user_id
+]);
+
+const walletResult=
+await client.query(`
+UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance
+`,[
+Number(payment.amount),
+payment.user_id
+]);
+
+await client.query(`
+INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+status
+)
+VALUES(
+$1,$2,$3,$4,$5,$6
+)
+ON CONFLICT(reference)
+DO NOTHING
+`,[
+payment.user_id,
+"credit",
+"Wallet Funding",
+Number(payment.amount),
+ref,
+"successful"
+]);
+
+await client.query(`
+UPDATE payments
+SET
+status='success',
+credited=TRUE,
+credited_at=NOW()
+WHERE reference=$1
+`,[
+ref
+]);
+
+await client.query(
+"COMMIT"
+);
+
+return{
+success:true,
+message:
+"Wallet funded successfully.",
+reference:ref,
+amount:
+Number(payment.amount),
+balance:
+Number(
+walletResult.rows[0].balance
+)
+};
+
+}catch(error){
+
+await client.query(
+"ROLLBACK"
+);
+
+throw error;
+
+}finally{
+
+client.release();
+
+}
+}
+
+/* =========================
+   WALLET DEBIT
+========================= */
+
+async function debitWallet(
+userId,
+amount
+){
+
+const client=
+await pool.connect();
+
+try{
+
+await client.query(
+"BEGIN"
+);
+
+await client.query(`
+INSERT INTO wallets(
+user_id,
+balance
+)
+VALUES($1,0)
+ON CONFLICT(user_id)
+DO NOTHING
+`,[
+userId
+]);
+
+const result=
+await client.query(`
+UPDATE wallets
+SET
+balance=balance-$1,
+updated_at=NOW()
+WHERE user_id=$2
+AND balance >= $1
+RETURNING balance
+`,[
+amount,
+userId
+]);
+
+if(!result.rows.length){
+
+await client.query(
+"ROLLBACK"
+);
+
+return{
+success:false,
+message:
+"Insufficient wallet balance."
+};
+}
+
+await client.query(
+"COMMIT"
+);
+
+return{
+success:true,
+balance:
+Number(
+result.rows[0].balance
+)
+};
+
+}catch(error){
+
+await client.query(
+"ROLLBACK"
+);
+
+throw error;
+
+}finally{
+
+client.release();
+
+}
+}
+
+/* =========================
+   WALLET REFUND
+========================= */
+
+async function refundWallet(
+userId,
+amount
+){
+
+await db(`
+UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+`,[
+amount,
+userId
+]);
+
+}
+
+/* =========================
+   TRANSACTION INSERT
+========================= */
+
+async function insertTransaction(
+client,
+data
+){
+
+const result=
+await client.query(`
+INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+provider_reference,
+status,
+phone,
+network,
+plan,
+meter_number,
+meter_type,
+smartcard_number,
+cable_package,
+provider,
+response_data
+)
+VALUES(
+$1,$2,$3,$4,$5,$6,$7,$8,
+$9,$10,$11,$12,$13,$14,$15,$16
+)
+RETURNING id
+`,[
+data.userId,
+data.type||"debit",
+data.service,
+data.amount,
+data.reference,
+data.providerReference||null,
+data.status,
+data.phone||null,
+data.network||null,
+data.plan||null,
+data.meterNumber||null,
+data.meterType||null,
+data.smartcardNumber||null,
+data.cablePackage||null,
+data.provider||null,
+data.responseData?
+JSON.stringify(
+data.responseData
+):
+null
+]);
+
+return result.rows[0];
+
+}
+
+/* =========================
+   VTU PROVIDER
+========================= */
+
+async function callVTUProvider(
+payload
+){
+
+if(
+!VTU_API_URL||
+!VTU_API_KEY
+){
+
+return{
+success:false,
+configured:false,
+message:
+"VTU provider is not configured on the server."
+};
+}
+
+const response=
+await fetch(
+VTU_API_URL,
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json",
+Authorization:
+`Bearer ${VTU_API_KEY}`
+},
+body:
+JSON.stringify(payload)
+}
+);
+
+let data;
+
+try{
+
+data=await response.json();
+
+}catch(error){
+
+try{
+data={
+raw:
+await response.text()
+};
+}catch{
+data={
+message:
+"Unable to read VTU response."
+};
+}
+
+}
+
+return{
+success:
+response.ok,
+configured:true,
+httpStatus:
+response.status,
+data
+};
+
+}
+
+/* =========================
+   VTU SERVICE PROCESSOR
+========================= */
+
+async function processVTUService({
+userId,
+service,
+amount,
+provider,
+providerPayload,
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage
+}){
+
+if(!userId){
+
+return{
+success:false,
+statusCode:400,
+message:
+"User ID is required."
+};
+}
+
+if(!validAmount(amount)){
+
+return{
+success:false,
+statusCode:400,
+message:
+"Invalid amount."
+};
+}
+
+await createWallet(
+userId
+);
+
+const currentWallet=
+await getWallet(
+userId
+);
+
+if(
+!currentWallet||
+currentWallet.balance<amount
+){
+
+return{
+success:false,
+statusCode:400,
+message:
+"Insufficient wallet balance.",
+balance:
+currentWallet?
+currentWallet.balance:
+0
+};
+}
+
+const ref=
+reference("BOLTIV-TX");
+
+const debit=
+await debitWallet(
+userId,
+amount
+);
+
+if(!debit.success){
+
+return{
+success:false,
+statusCode:400,
+message:
+debit.message
+};
+}
+
+let providerResult;
+
+try{
+
+providerResult=
+await callVTUProvider(
+providerPayload
+);
+
+}catch(error){
+
+console.error(
+"VTU PROVIDER ERROR:",
+error
+);
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:502,
+message:
+"VTU provider connection failed."
+};
+}
+
+/*
+If provider is not configured,
+refund the user's wallet.
+*/
+if(!providerResult.configured){
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:503,
+message:
+providerResult.message
+};
+}
+
+/*
+Provider rejected transaction.
+*/
+if(!providerResult.success){
+
+await refundWallet(
+userId,
+amount
+);
+
+const client=
+await pool.connect();
+
+try{
+
+await insertTransaction(
+client,
+{
+userId,
+type:"debit",
+service,
+amount,
+reference:ref,
+status:"failed",
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage,
+provider,
+responseData:
+providerResult.data
+}
+);
+
+}finally{
+
+client.release();
+
+}
+
+const refundedWallet=
+await getWallet(
+userId
+);
+
+return{
+success:false,
+statusCode:400,
+message:
+"VTU transaction failed.",
+reference:ref,
+balance:
+refundedWallet?
+refundedWallet.balance:
+0
+};
+}
+
+const providerData=
+providerResult.data;
+
+const providerReference=
+providerData?.reference||
+providerData?.transaction_id||
+providerData?.transactionId||
+providerData?.data?.reference||
+providerData?.data?.transaction_id||
+null;
+
+const client=
+await pool.connect();
+
+try{
+
+await insertTransaction(
+client,
+{
+userId,
+type:"debit",
+service,
+amount,
+reference:ref,
+providerReference,
+status:"successful",
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage,
+provider,
+responseData:
+providerData
+}
+);
+
+}finally{
+
+client.release();
+
+}
+
+const finalWallet=
+await getWallet(
+userId
+);
+
+return{
+success:true,
+message:
+`${service} purchase successful.`,
+reference:ref,
+providerReference,
+service,
+amount,
+status:"successful",
+balance:
+finalWallet?
+finalWallet.balance:
+0,
+data:
+providerData
+};
+
+}
+
+/* =========================
+   USER WALLET RESPONSE
+========================= */
+
+async function walletResponse(
+userId
+){
+
+await createWallet(
+userId
+);
+
+const currentWallet=
+await getWallet(
+userId
+);
+
+return{
+success:true,
+userId,
+balance:
+currentWallet?
+currentWallet.balance:
+0,
+transactions:
+await transactions(
+userId
+)
+};
+
+}
+
+/* =========================
+   PART 2 COMPLETE
+========================= */

@@ -705,3 +705,316 @@ success:false,
 message:"Payment amount does not match."
 };
   }
+const client=await pool.connect();
+
+try{
+await client.query("BEGIN");
+
+await client.query(
+`INSERT INTO wallets(user_id,balance)
+VALUES($1,0)
+ON CONFLICT(user_id) DO NOTHING`,
+[payment.user_id]
+);
+
+const w=await client.query(
+`UPDATE wallets
+SET balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance`,
+[
+Number(payment.amount),
+payment.user_id
+]
+);
+
+await client.query(
+`INSERT INTO transactions(
+user_id,type,service,amount,
+reference,status
+)
+VALUES($1,$2,$3,$4,$5,$6)
+ON CONFLICT(reference) DO NOTHING`,
+[
+payment.user_id,
+"credit",
+"Wallet Funding",
+Number(payment.amount),
+ref,
+"successful"
+]
+);
+
+await client.query(
+`UPDATE payments
+SET status='success',
+credited=TRUE,
+credited_at=NOW()
+WHERE reference=$1`,
+[ref]
+);
+
+await client.query("COMMIT");
+
+return{
+success:true,
+message:"Wallet funded successfully.",
+reference:ref,
+amount:Number(payment.amount),
+balance:Number(w.rows[0].balance)
+};
+
+}catch(error){
+
+await client.query("ROLLBACK");
+throw error;
+
+}finally{
+
+client.release();
+
+}
+}
+
+async function callVTUProvider(payload){
+
+if(!VTU_API_URL||!VTU_API_KEY){
+return{
+success:false,
+configured:false,
+message:
+"VTU provider is not configured on the server."
+};
+}
+
+const r=await fetch(
+VTU_API_URL,
+{
+method:"POST",
+headers:{
+"Content-Type":"application/json",
+Authorization:
+`Bearer ${VTU_API_KEY}`
+},
+body:JSON.stringify(payload)
+}
+);
+
+let data={};
+
+try{
+data=await r.json();
+}catch{}
+
+return{
+success:r.ok,
+configured:true,
+httpStatus:r.status,
+data
+};
+}
+
+async function debitWallet(userId,amount){
+
+const client=await pool.connect();
+
+try{
+
+await client.query("BEGIN");
+
+await client.query(
+`INSERT INTO wallets(user_id,balance)
+VALUES($1,0)
+ON CONFLICT(user_id) DO NOTHING`,
+[userId]
+);
+
+const r=await client.query(
+`UPDATE wallets
+SET balance=balance-$1,
+updated_at=NOW()
+WHERE user_id=$2
+AND balance >= $1
+RETURNING balance`,
+[amount,userId]
+);
+
+if(!r.rows.length){
+
+await client.query("ROLLBACK");
+
+return{
+success:false,
+message:"Insufficient wallet balance."
+};
+}
+
+await client.query("COMMIT");
+
+return{
+success:true,
+balance:Number(
+r.rows[0].balance
+)
+};
+
+}catch(error){
+
+await client.query("ROLLBACK");
+throw error;
+
+}finally{
+
+client.release();
+
+}
+}
+
+async function refundWallet(userId,amount){
+
+await db(
+`UPDATE wallets
+SET balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2`,
+[amount,userId]
+);
+}
+
+async function insertTransaction(data){
+
+await db(
+`INSERT INTO transactions(
+user_id,type,service,amount,
+reference,provider_reference,status,
+phone,network,plan,meter_number,
+meter_type,smartcard_number,
+cable_package,provider,response_data
+)
+VALUES(
+$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+$11,$12,$13,$14,$15,$16
+)`,
+[
+data.userId,
+data.type||"debit",
+data.service,
+data.amount,
+data.reference,
+data.providerReference||null,
+data.status,
+data.phone||null,
+data.network||null,
+data.plan||null,
+data.meterNumber||null,
+data.meterType||null,
+data.smartcardNumber||null,
+data.cablePackage||null,
+data.provider||null,
+data.responseData||null
+]
+);
+}
+
+async function processVTUService(data){
+
+const{
+userId,
+service,
+amount,
+provider,
+providerPayload,
+phone,
+network,
+plan,
+meterNumber,
+meterType,
+smartcardNumber,
+cablePackage
+}=data;
+
+if(!userId){
+return{
+success:false,
+statusCode:400,
+message:"User ID is required."
+};
+}
+
+if(!validAmount(amount)){
+return{
+success:false,
+statusCode:400,
+message:"Invalid amount."
+};
+}
+
+await createWallet(userId);
+
+const w=await wallet(userId);
+
+if(!w||w.balance<amount){
+return{
+success:false,
+statusCode:400,
+message:"Insufficient wallet balance.",
+balance:w?w.balance:0
+};
+}
+
+const ref=reference("BOLTIV-TX");
+
+const debit=await debitWallet(
+userId,
+amount
+);
+
+if(!debit.success){
+return{
+success:false,
+statusCode:400,
+message:debit.message
+};
+}
+
+let result;
+
+try{
+
+result=await callVTUProvider(
+providerPayload
+);
+
+}catch(error){
+
+console.error(
+"VTU PROVIDER ERROR:",
+error
+);
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:502,
+message:"VTU provider connection failed."
+};
+}
+
+if(!result.configured){
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:503,
+message:result.message
+};
+ }

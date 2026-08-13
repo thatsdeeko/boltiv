@@ -172,6 +172,7 @@ const missing=await db(
 `SELECT id FROM users
 WHERE user_id IS NULL`
 );
+}
 
 for(const row of missing.rows){
 

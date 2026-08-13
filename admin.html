@@ -4,20 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#050505">
-<title>BOLTIV — Admin Login</title>
+<title>BOLTIV — Admin Control Center</title>
 
 <style>
-*{box-sizing:border-box}
+*{box-sizing:border-box;margin:0;padding:0}
 
 body{
-margin:0;
-min-height:100vh;
 background:#050505;
 color:#fff;
 font-family:Arial,sans-serif;
+min-height:100vh;
 }
 
-.login{
+button,input{
+font:inherit;
+}
+
+button{
+cursor:pointer;
+}
+
+.hidden{
+display:none!important;
+}
+
+/* LOGIN */
+.login-page{
 min-height:100vh;
 display:flex;
 align-items:center;
@@ -25,7 +37,7 @@ justify-content:center;
 padding:20px;
 }
 
-.card{
+.login-card{
 width:100%;
 max-width:390px;
 padding:28px;
@@ -83,7 +95,7 @@ input:focus{
 border-color:#d4af37;
 }
 
-button{
+.login-btn{
 width:100%;
 height:48px;
 border:0;
@@ -91,10 +103,9 @@ border-radius:10px;
 background:#d4af37;
 color:#050505;
 font-weight:900;
-cursor:pointer;
 }
 
-button:disabled{
+.login-btn:disabled{
 opacity:.55;
 }
 
@@ -123,15 +134,267 @@ color:#d4af37;
 background:#17140b;
 border:1px solid #3a3016;
 }
+
+/* DASHBOARD */
+.dashboard{
+min-height:100vh;
+}
+
+.topbar{
+height:68px;
+padding:0 18px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+border-bottom:1px solid #202020;
+background:#090909;
+position:sticky;
+top:0;
+z-index:20;
+}
+
+.brand{
+color:#d4af37;
+font-size:20px;
+font-weight:1000;
+letter-spacing:3px;
+}
+
+.admin-label{
+color:#777;
+font-size:8px;
+margin-top:3px;
+}
+
+.logout-btn{
+padding:9px 13px;
+border:1px solid #3a3016;
+border-radius:9px;
+background:#17140b;
+color:#d4af37;
+font-size:8px;
+font-weight:900;
+}
+
+.container{
+width:100%;
+max-width:1100px;
+margin:auto;
+padding:20px;
+}
+
+.heading{
+margin-bottom:18px;
+}
+
+.heading h1{
+font-size:22px;
+font-weight:1000;
+}
+
+.heading p{
+margin-top:5px;
+color:#666;
+font-size:9px;
+}
+
+.stats{
+display:grid;
+grid-template-columns:
+repeat(4,minmax(0,1fr));
+gap:12px;
+margin-bottom:22px;
+}
+
+.stat{
+padding:17px;
+background:#101010;
+border:1px solid #242424;
+border-radius:15px;
+}
+
+.stat-label{
+color:#666;
+font-size:8px;
+font-weight:700;
+}
+
+.stat-value{
+margin-top:8px;
+color:#d4af37;
+font-size:20px;
+font-weight:1000;
+}
+
+.section{
+margin-top:18px;
+background:#101010;
+border:1px solid #242424;
+border-radius:17px;
+overflow:hidden;
+}
+
+.section-head{
+padding:15px 17px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+border-bottom:1px solid #242424;
+}
+
+.section-head h2{
+font-size:12px;
+font-weight:1000;
+}
+
+.refresh-btn{
+padding:7px 10px;
+border:1px solid #292929;
+border-radius:8px;
+background:#080808;
+color:#aaa;
+font-size:8px;
+}
+
+.table-wrap{
+width:100%;
+overflow-x:auto;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+min-width:650px;
+}
+
+th,td{
+padding:12px;
+text-align:left;
+border-bottom:1px solid #1e1e1e;
+font-size:8px;
+white-space:nowrap;
+}
+
+th{
+color:#777;
+font-size:7px;
+letter-spacing:.5px;
+}
+
+td{
+color:#ddd;
+}
+
+.amount{
+color:#d4af37;
+font-weight:900;
+}
+
+.status{
+display:inline-block;
+padding:4px 7px;
+border-radius:6px;
+font-size:7px;
+font-weight:900;
+}
+
+.status.successful{
+color:#d4af37;
+background:#17140b;
+}
+
+.status.failed{
+color:#ff8585;
+background:#211010;
+}
+
+.status.pending{
+color:#f0c95b;
+background:#17140b;
+}
+
+.empty{
+padding:25px;
+text-align:center;
+color:#555;
+font-size:9px;
+}
+
+.loading{
+padding:25px;
+text-align:center;
+color:#777;
+font-size:9px;
+}
+
+.error-box{
+padding:14px;
+margin:15px;
+border:1px solid #542323;
+border-radius:10px;
+background:#211010;
+color:#ff8585;
+font-size:9px;
+}
+
+/* MOBILE */
+@media(max-width:700px){
+
+.stats{
+grid-template-columns:
+repeat(2,minmax(0,1fr));
+}
+
+.container{
+padding:14px;
+}
+
+.topbar{
+padding:0 14px;
+}
+
+.brand{
+font-size:17px;
+}
+
+.heading h1{
+font-size:19px;
+}
+
+.stat-value{
+font-size:17px;
+}
+
+}
+
+@media(max-width:400px){
+
+.stats{
+grid-template-columns:1fr 1fr;
+gap:8px;
+}
+
+.stat{
+padding:13px;
+}
+
+}
 </style>
 </head>
 
 <body>
 
-<div class="login">
-<div class="card">
+<!-- LOGIN -->
 
-<div class="logo">BOLTIV</div>
+<div
+id="loginPage"
+class="login-page">
+
+<div class="login-card">
+
+<div class="logo">
+BOLTIV
+</div>
 
 <div class="title">
 ADMIN CONTROL CENTER
@@ -163,6 +426,7 @@ placeholder="Admin password">
 
 <button
 id="loginButton"
+class="login-btn"
 type="button">
 LOGIN TO ADMIN
 </button>
@@ -175,23 +439,252 @@ class="message">
 </div>
 </div>
 
+
+<!-- DASHBOARD -->
+
+<div
+id="dashboard"
+class="dashboard hidden">
+
+<div class="topbar">
+
+<div>
+<div class="brand">
+BOLTIV
+</div>
+
+<div class="admin-label">
+ADMIN CONTROL CENTER
+</div>
+</div>
+
+<button
+id="logoutButton"
+class="logout-btn">
+LOGOUT
+</button>
+
+</div>
+
+
+<div class="container">
+
+<div class="heading">
+
+<h1>
+Dashboard
+</h1>
+
+<p id="adminEmailDisplay">
+Loading administrator...
+</p>
+
+</div>
+
+
+<!-- STATS -->
+
+<div class="stats">
+
+<div class="stat">
+
+<div class="stat-label">
+TOTAL USERS
+</div>
+
+<div
+id="usersCount"
+class="stat-value">
+0
+</div>
+
+</div>
+
+
+<div class="stat">
+
+<div class="stat-label">
+WALLET BALANCE
+</div>
+
+<div
+id="walletBalance"
+class="stat-value">
+₦0.00
+</div>
+
+</div>
+
+
+<div class="stat">
+
+<div class="stat-label">
+TRANSACTIONS
+</div>
+
+<div
+id="transactionsCount"
+class="stat-value">
+0
+</div>
+
+</div>
+
+
+<div class="stat">
+
+<div class="stat-label">
+PAYMENTS
+</div>
+
+<div
+id="paymentsCount"
+class="stat-value">
+0
+</div>
+
+</div>
+
+</div>
+
+
+<!-- USERS -->
+
+<div class="section">
+
+<div class="section-head">
+
+<h2>
+USERS
+</h2>
+
+<button
+class="refresh-btn"
+onclick="loadUsers()">
+REFRESH
+</button>
+
+</div>
+
+<div
+id="usersArea"
+class="loading">
+Loading users...
+</div>
+
+</div>
+
+
+<!-- TRANSACTIONS -->
+
+<div class="section">
+
+<div class="section-head">
+
+<h2>
+TRANSACTIONS
+</h2>
+
+<button
+class="refresh-btn"
+onclick="loadTransactions()">
+REFRESH
+</button>
+
+</div>
+
+<div
+id="transactionsArea"
+class="loading">
+Loading transactions...
+</div>
+
+</div>
+
+
+<!-- PAYMENTS -->
+
+<div class="section">
+
+<div class="section-head">
+
+<h2>
+PAYMENTS
+</h2>
+
+<button
+class="refresh-btn"
+onclick="loadPayments()">
+REFRESH
+</button>
+
+</div>
+
+<div
+id="paymentsArea"
+class="loading">
+Loading payments...
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
 <script>
+
 const API=
 "https://boltiv-backend.onrender.com";
 
+const TOKEN_KEY=
+"boltivAdminToken";
+
+const EMAIL_KEY=
+"boltivAdminEmail";
+
+
+const loginPage=
+document.getElementById(
+"loginPage"
+);
+
+const dashboard=
+document.getElementById(
+"dashboard"
+);
+
 const email=
-document.getElementById("email");
+document.getElementById(
+"email"
+);
 
 const password=
-document.getElementById("password");
+document.getElementById(
+"password"
+);
 
-const button=
-document.getElementById("loginButton");
+const loginButton=
+document.getElementById(
+"loginButton"
+);
 
 const message=
-document.getElementById("message");
+document.getElementById(
+"message"
+);
 
-function showMessage(text,type="error"){
+const logoutButton=
+document.getElementById(
+"logoutButton"
+);
+
+
+function showMessage(
+text,
+type="error"
+){
 
 message.textContent=text;
 
@@ -200,15 +693,161 @@ message.className=
 
 }
 
+
+function hideLogin(){
+
+loginPage.classList.add(
+"hidden"
+);
+
+dashboard.classList.remove(
+"hidden"
+);
+
+}
+
+
+function showLogin(){
+
+dashboard.classList.add(
+"hidden"
+);
+
+loginPage.classList.remove(
+"hidden"
+);
+
+}
+
+
+function money(value){
+
+const number=
+Number(value||0);
+
+return "₦"+
+number.toLocaleString(
+"en-NG",
+{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+}
+);
+
+}
+
+
+function escapeHTML(value){
+
+return String(
+value??""
+)
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#039;");
+
+}
+
+
+async function api(
+path,
+options={}
+){
+
+const token=
+localStorage.getItem(
+TOKEN_KEY
+);
+
+const headers={
+"Accept":
+"application/json",
+...(options.headers||{})
+};
+
+if(options.body){
+headers["Content-Type"]=
+"application/json";
+}
+
+if(token){
+headers["Authorization"]=
+"Bearer "+token;
+}
+
+const response=
+await fetch(
+API+path,
+{
+...options,
+headers
+}
+);
+
+let data;
+
+try{
+
+data=
+await response.json();
+
+}catch(error){
+
+throw new Error(
+"Invalid server response."
+);
+
+}
+
+if(response.status===401){
+
+localStorage.removeItem(
+TOKEN_KEY
+);
+
+localStorage.removeItem(
+EMAIL_KEY
+);
+
+showLogin();
+
+throw new Error(
+"Admin session expired."
+);
+
+}
+
+if(
+!response.ok||
+!data.success
+){
+
+throw new Error(
+data.message||
+"Request failed."
+);
+
+}
+
+return data;
+
+}
+
+
 async function login(){
 
 const adminEmail=
-email.value.trim().toLowerCase();
+email.value.trim()
+.toLowerCase();
 
 const adminPassword=
 password.value;
 
-message.className="message";
+message.className=
+"message";
+
 message.textContent="";
 
 if(!adminEmail){
@@ -218,6 +857,7 @@ showMessage(
 );
 
 email.focus();
+
 return;
 }
 
@@ -228,45 +868,28 @@ showMessage(
 );
 
 password.focus();
+
 return;
 }
 
-button.disabled=true;
-button.textContent="LOGGING IN...";
+loginButton.disabled=true;
+
+loginButton.textContent=
+"LOGGING IN...";
 
 try{
 
-const response=
-await fetch(
-API+"/api/admin/login",
+const data=
+await api(
+"/api/admin/login",
 {
 method:"POST",
-
-headers:{
-"Content-Type":
-"application/json",
-"Accept":
-"application/json"
-},
-
 body:JSON.stringify({
 email:adminEmail,
 password:adminPassword
 })
 }
 );
-
-const data=
-await response.json();
-
-if(!response.ok||!data.success){
-
-throw new Error(
-data.message||
-"Admin login failed."
-);
-
-}
 
 if(!data.token){
 
@@ -277,27 +900,27 @@ throw new Error(
 }
 
 localStorage.setItem(
-"boltivAdminToken",
+TOKEN_KEY,
 data.token
 );
 
 localStorage.setItem(
-"boltivAdminEmail",
+EMAIL_KEY,
 data.admin?.email||
 adminEmail
 );
 
 showMessage(
-"Login successful. Opening dashboard...",
+"Login successful.",
 "success"
 );
 
-setTimeout(function(){
-
-window.location.href=
-"admin.html";
-
-},700);
+setTimeout(
+()=>{
+openDashboard();
+},
+400
+);
 
 }catch(error){
 
@@ -308,39 +931,546 @@ error
 
 showMessage(
 error.message||
-"Unable to connect to BOLTIV."
+"Admin login failed."
 );
 
 }finally{
 
-button.disabled=false;
-button.textContent=
+loginButton.disabled=false;
+
+loginButton.textContent=
 "LOGIN TO ADMIN";
 
 }
 
 }
 
-button.onclick=login;
 
-password.onkeydown=
+async function openDashboard(){
+
+try{
+
+const data=
+await api(
+"/api/admin/me"
+);
+
+document.getElementById(
+"adminEmailDisplay"
+).textContent=
+data.admin?.email||
+localStorage.getItem(
+EMAIL_KEY
+)||
+"Administrator";
+
+hideLogin();
+
+await loadAll();
+
+}catch(error){
+
+console.error(
+"ADMIN SESSION ERROR:",
+error
+);
+
+localStorage.removeItem(
+TOKEN_KEY
+);
+
+showLogin();
+
+showMessage(
+error.message||
+"Unable to verify admin session."
+);
+
+}
+
+}
+
+
+async function loadAll(){
+
+await Promise.all([
+loadStats(),
+loadUsers(),
+loadTransactions(),
+loadPayments()
+]);
+
+}
+
+
+async function loadStats(){
+
+try{
+
+const data=
+await api(
+"/api/admin/stats"
+);
+
+const stats=
+data.stats||{};
+
+document.getElementById(
+"usersCount"
+).textContent=
+stats.users||0;
+
+document.getElementById(
+"walletBalance"
+).textContent=
+money(
+stats.walletBalance
+);
+
+document.getElementById(
+"transactionsCount"
+).textContent=
+stats.transactions||0;
+
+document.getElementById(
+"paymentsCount"
+).textContent=
+stats.payments||0;
+
+}catch(error){
+
+console.error(
+"STATS ERROR:",
+error
+);
+
+}
+
+}
+
+
+async function loadUsers(){
+
+const area=
+document.getElementById(
+"usersArea"
+);
+
+area.innerHTML=
+'<div class="loading">Loading users...</div>';
+
+try{
+
+const data=
+await api(
+"/api/admin/users"
+);
+
+const users=
+data.users||[];
+
+if(!users.length){
+
+area.innerHTML=
+'<div class="empty">No users found.</div>';
+
+return;
+
+}
+
+let html=
+`<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>USER</th>
+<th>PHONE</th>
+<th>EMAIL</th>
+<th>BALANCE</th>
+<th>CREATED</th>
+</tr>
+</thead>
+<tbody>`;
+
+users.forEach(user=>{
+
+html+=`
+<tr>
+<td>${escapeHTML(
+user.name||"—"
+)}</td>
+<td>${escapeHTML(
+user.phone||"—"
+)}</td>
+<td>${escapeHTML(
+user.email||"—"
+)}</td>
+<td class="amount">${money(
+user.balance
+)}</td>
+<td>${escapeHTML(
+formatDate(user.created_at)
+)}</td>
+</tr>`;
+
+});
+
+html+=
+`</tbody>
+</table>
+</div>`;
+
+area.innerHTML=html;
+
+}catch(error){
+
+console.error(
+"USERS ERROR:",
+error
+);
+
+area.innerHTML=
+`<div class="error-box">${
+escapeHTML(error.message)
+}</div>`;
+
+}
+
+}
+
+
+async function loadTransactions(){
+
+const area=
+document.getElementById(
+"transactionsArea"
+);
+
+area.innerHTML=
+'<div class="loading">Loading transactions...</div>';
+
+try{
+
+const data=
+await api(
+"/api/admin/transactions"
+);
+
+const items=
+data.transactions||[];
+
+if(!items.length){
+
+area.innerHTML=
+'<div class="empty">No transactions found.</div>';
+
+return;
+
+}
+
+let html=
+`<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>REFERENCE</th>
+<th>USER</th>
+<th>SERVICE</th>
+<th>AMOUNT</th>
+<th>STATUS</th>
+<th>DATE</th>
+</tr>
+</thead>
+<tbody>`;
+
+items.forEach(item=>{
+
+const status=
+String(
+item.status||"pending"
+).toLowerCase();
+
+html+=`
+<tr>
+<td>${escapeHTML(
+item.reference||"—"
+)}</td>
+<td>${escapeHTML(
+item.user_id||"—"
+)}</td>
+<td>${escapeHTML(
+item.service||"—"
+)}</td>
+<td class="amount">${money(
+item.amount
+)}</td>
+<td>
+<span class="status ${escapeHTML(
+status
+)}">
+${escapeHTML(
+item.status||"pending"
+)}
+</span>
+</td>
+<td>${escapeHTML(
+formatDate(item.date)
+)}</td>
+</tr>`;
+
+});
+
+html+=
+`</tbody>
+</table>
+</div>`;
+
+area.innerHTML=html;
+
+}catch(error){
+
+console.error(
+"TRANSACTIONS ERROR:",
+error
+);
+
+area.innerHTML=
+`<div class="error-box">${
+escapeHTML(error.message)
+}</div>`;
+
+}
+
+}
+
+
+async function loadPayments(){
+
+const area=
+document.getElementById(
+"paymentsArea"
+);
+
+area.innerHTML=
+'<div class="loading">Loading payments...</div>';
+
+try{
+
+const data=
+await api(
+"/api/admin/payments"
+);
+
+const items=
+data.payments||[];
+
+if(!items.length){
+
+area.innerHTML=
+'<div class="empty">No payments found.</div>';
+
+return;
+
+}
+
+let html=
+`<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>REFERENCE</th>
+<th>EMAIL</th>
+<th>AMOUNT</th>
+<th>STATUS</th>
+<th>CREDITED</th>
+<th>DATE</th>
+</tr>
+</thead>
+<tbody>`;
+
+items.forEach(item=>{
+
+const status=
+String(
+item.status||"pending"
+).toLowerCase();
+
+html+=`
+<tr>
+<td>${escapeHTML(
+item.reference||"—"
+)}</td>
+<td>${escapeHTML(
+item.email||"—"
+)}</td>
+<td class="amount">${money(
+item.amount
+)}</td>
+<td>
+<span class="status ${escapeHTML(
+status
+)}">
+${escapeHTML(
+item.status||"pending"
+)}
+</span>
+</td>
+<td>${item.credited?"YES":"NO"}</td>
+<td>${escapeHTML(
+formatDate(item.created_at)
+)}</td>
+</tr>`;
+
+});
+
+html+=
+`</tbody>
+</table>
+</div>`;
+
+area.innerHTML=html;
+
+}catch(error){
+
+console.error(
+"PAYMENTS ERROR:",
+error
+);
+
+area.innerHTML=
+`<div class="error-box">${
+escapeHTML(error.message)
+}</div>`;
+
+}
+
+}
+
+
+function formatDate(value){
+
+if(!value){
+return "—";
+}
+
+const date=
+new Date(value);
+
+if(Number.isNaN(
+date.getTime()
+)){
+return String(value);
+}
+
+return date.toLocaleString(
+"en-NG",
+{
+dateStyle:"medium",
+timeStyle:"short"
+}
+);
+
+}
+
+
+async function logout(){
+
+const token=
+localStorage.getItem(
+TOKEN_KEY
+);
+
+try{
+
+if(token){
+
+await fetch(
+API+"/api/admin/logout",
+{
+method:"POST",
+headers:{
+"Authorization":
+"Bearer "+token,
+"Accept":
+"application/json"
+}
+}
+);
+
+}
+
+}catch(error){
+
+console.error(
+"ADMIN LOGOUT ERROR:",
+error
+);
+
+}
+
+localStorage.removeItem(
+TOKEN_KEY
+);
+
+localStorage.removeItem(
+EMAIL_KEY
+);
+
+showLogin();
+
+email.value="";
+password.value="";
+
+}
+
+
+loginButton.onclick=login;
+
+logoutButton.onclick=logout;
+
+password.addEventListener(
+"keydown",
 function(event){
 
 if(event.key==="Enter"){
 login();
 }
 
-};
+});
 
-email.onkeydown=
+email.addEventListener(
+"keydown",
 function(event){
 
 if(event.key==="Enter"){
 password.focus();
 }
 
-};
+});
+
+
+/* START */
+
+(function(){
+
+const savedToken=
+localStorage.getItem(
+TOKEN_KEY
+);
+
+if(savedToken){
+
+openDashboard();
+
+}else{
+
+showLogin();
+
+}
+
+})();
+
 </script>
 
 </body>
-</html>
+  </html>

@@ -357,20 +357,113 @@ localStorage.setItem(
 data.user.email||""
 );
 
+<script>
+const API_BASE="https://boltiv-backend.onrender.com";
+const TOKEN_KEY="boltivAuthToken";
+const USER_KEY="boltivUser";
+const EMAIL_KEY="boltivUserEmail";
+
+const token=localStorage.getItem(TOKEN_KEY);
+const userName=document.getElementById("userName");
+const userEmail=document.getElementById("userEmail");
+const walletBalance=document.getElementById("walletBalance");
+const logoutButton=document.getElementById("logoutButton");
+
+/* SHOW SAVED ACCOUNT */
+function showSavedUser(){
+const savedUser=localStorage.getItem(USER_KEY);
+const savedEmail=localStorage.getItem(EMAIL_KEY);
+
+if(savedUser){
+try{
+const user=JSON.parse(savedUser);
+
+userName.textContent=(user.name||"User")+".";
+userEmail.textContent=user.email||savedEmail||"";
+return;
+}catch(error){
+console.error("SAVED USER ERROR:",error);
+}
+}
+
+if(savedEmail){
+userEmail.textContent=savedEmail;
+}
+}
+
+/* LOAD ACCOUNT */
+async function loadAccount(){
+
+if(!token){
+location.replace("login.html");
+return;
+}
+
+showSavedUser();
+
+try{
+const response=await fetch(
+API_BASE+"/api/auth/me",
+{
+method:"GET",
+headers:{
+"Accept":"application/json",
+"Authorization":"Bearer "+token
+}
+}
+);
+
+let data;
+
+try{
+data=await response.json();
+}catch(error){
+data={success:false};
+}
+
+/* TOKEN IS DEFINITELY INVALID */
+if(response.status===401||response.status===403){
+throw new Error("SESSION_EXPIRED");
+}
+
+/* SERVER ERROR - KEEP LOCAL SESSION */
+if(!response.ok){
+console.error(
+"BOLTIV /api/auth/me ERROR:",
+response.status,
+data
+);
+return;
+}
+
+/* VALID ACCOUNT RESPONSE */
+if(data.success&&data.user){
+
+localStorage.setItem(
+USER_KEY,
+JSON.stringify(data.user)
+);
+
+localStorage.setItem(
+EMAIL_KEY,
+data.user.email||""
+);
+
 userName.textContent=
-(data.user.name||"User")+". ";
+(data.user.name||"User")+".";
 
 userEmail.textContent=
 data.user.email||"";
 }
 
-if(data.wallet){
+if(data.success&&data.wallet){
+
+const balance=
+Number(data.wallet.balance||0);
 
 walletBalance.textContent=
 "₦"+
-Number(
-data.wallet.balance||0
-).toLocaleString(
+balance.toLocaleString(
 "en-NG",
 {
 minimumFractionDigits:2,
@@ -378,6 +471,10 @@ maximumFractionDigits:2
 }
 );
 
+localStorage.setItem(
+"boltivBalance",
+String(balance)
+);
 }
 
 localStorage.setItem(
@@ -392,48 +489,42 @@ console.error(
 error
 );
 
-localStorage.removeItem(
-"boltivLoggedIn"
-);
+if(error.message==="SESSION_EXPIRED"){
 
-localStorage.removeItem(
-"boltivUser"
-);
-
-localStorage.removeItem(
-"boltivUserEmail"
-);
-
-localStorage.removeItem(
-TOKEN_KEY
-);
+localStorage.removeItem("boltivLoggedIn");
+localStorage.removeItem(USER_KEY);
+localStorage.removeItem(EMAIL_KEY);
+localStorage.removeItem(TOKEN_KEY);
 
 location.replace("login.html");
 
+return;
 }
 
+/* OTHER ERRORS DO NOT LOG USER OUT */
+console.warn(
+"Keeping local BOLTIV session."
+);
+}
 }
 
-
-logoutButton.onclick=
-async()=>{
+/* LOGOUT */
+logoutButton.onclick=async()=>{
 
 logoutButton.disabled=true;
-logoutButton.textContent=
-"LOGGING OUT...";
+logoutButton.textContent="LOGGING OUT...";
 
 try{
 
 if(token){
 
 await fetch(
-API_BASE+
-"/api/auth/logout",
+API_BASE+"/api/auth/logout",
 {
 method:"POST",
 headers:{
-"Authorization":
-"Bearer "+token
+"Accept":"application/json",
+"Authorization":"Bearer "+token
 }
 }
 );
@@ -449,40 +540,18 @@ error
 
 }
 
-localStorage.removeItem(
-"boltivLoggedIn"
-);
+localStorage.removeItem("boltivLoggedIn");
+localStorage.removeItem(USER_KEY);
+localStorage.removeItem(EMAIL_KEY);
+localStorage.removeItem("boltivBalance");
+localStorage.removeItem("boltivTransactions");
+localStorage.removeItem(TOKEN_KEY);
 
-localStorage.removeItem(
-"boltivUser"
-);
-
-localStorage.removeItem(
-"boltivUserEmail"
-);
-
-localStorage.removeItem(
-"boltivBalance"
-);
-
-localStorage.removeItem(
-"boltivTransactions"
-);
-
-localStorage.removeItem(
-TOKEN_KEY
-);
-
-location.replace(
-"login.html"
-);
-
+location.replace("login.html");
 };
 
-
+/* START */
 loadAccount();
-
 </script>
-
 </body>
 </html>

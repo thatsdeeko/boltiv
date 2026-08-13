@@ -1442,3 +1442,1888 @@ message:
 };
 
   }
+async function createPayment(
+userId,
+email,
+amount
+){
+
+if(!PAYSTACK_SECRET_KEY){
+
+return{
+success:false,
+message:
+"Paystack is not configured."
+};
+
+}
+
+const amountKobo=
+Math.round(
+Number(amount)*100
+);
+
+if(!Number.isFinite(amountKobo)||
+amountKobo<=0){
+
+return{
+success:false,
+message:
+"Invalid payment amount."
+};
+
+}
+
+const referenceValue=
+reference("BOLTIV-PAY");
+
+await db(
+`INSERT INTO payments(
+reference,
+user_id,
+email,
+amount,
+amount_kobo,
+status,
+credited,
+created_at
+)
+VALUES(
+$1,$2,$3,$4,$5,
+'pending',
+FALSE,
+NOW()
+)`,
+[
+referenceValue,
+userId,
+email,
+Number(amount),
+amountKobo
+]
+);
+
+try{
+
+const response=
+await fetch(
+`${PAYSTACK_API_URL}/transaction/initialize`,
+{
+method:"POST",
+headers:{
+"Authorization":
+`Bearer ${PAYSTACK_SECRET_KEY}`,
+"Content-Type":
+"application/json"
+},
+body:JSON.stringify({
+email,
+amount:amountKobo,
+reference:referenceValue,
+callback_url:
+`${FRONTEND_URL}/wallet.html`
+})
+}
+);
+
+const data=
+await response.json();
+
+if(!response.ok||
+!data.status){
+
+await db(
+`UPDATE payments
+SET status='failed'
+WHERE reference=$1`,
+[
+referenceValue
+]
+);
+
+return{
+success:false,
+message:
+data.message||
+"Unable to initialize payment."
+};
+
+}
+
+return{
+success:true,
+message:
+"Payment initialized successfully.",
+reference:
+referenceValue,
+authorization_url:
+data.data?.authorization_url||"",
+access_code:
+data.data?.access_code||""
+};
+
+}catch(error){
+
+console.error(
+"PAYSTACK INITIALIZE ERROR:",
+error
+);
+
+await db(
+`UPDATE payments
+SET status='failed'
+WHERE reference=$1`,
+[
+referenceValue
+]
+);
+
+return{
+success:false,
+message:
+"Unable to connect to Paystack."
+};
+
+}
+
+}
+
+
+async function initializePayment(
+userId,
+email,
+amount
+){
+
+return createPayment(
+userId,
+email,
+amount
+);
+
+}
+
+
+async function verifyPayment(
+referenceValue
+){
+
+referenceValue=
+clean(referenceValue);
+
+if(!referenceValue){
+
+return{
+success:false,
+message:
+"Payment reference is required."
+};
+
+}
+
+const paymentResult=
+await db(
+`SELECT *
+FROM payments
+WHERE reference=$1
+LIMIT 1`,
+[
+referenceValue
+]
+);
+
+if(!paymentResult.rows.length){
+
+return{
+success:false,
+message:
+"Payment record not found."
+};
+
+}
+
+const payment=
+paymentResult.rows[0];
+
+if(payment.credited){
+
+return{
+success:true,
+message:
+"Payment has already been credited.",
+reference:
+referenceValue,
+status:
+"success",
+credited:true
+};
+
+}
+
+if(!PAYSTACK_SECRET_KEY){
+
+return{
+success:false,
+message:
+"Paystack is not configured."
+};
+
+}
+
+try{
+
+const response=
+await fetch(
+`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(referenceValue)}`,
+{
+method:"GET",
+headers:{
+"Authorization":
+`Bearer ${PAYSTACK_SECRET_KEY}`,
+"Content-Type":
+"application/json"
+}
+}
+);
+
+const data=
+await response.json();
+
+if(!response.ok||
+!data.status){
+
+return{
+success:false,
+message:
+data.message||
+"Unable to verify payment."
+};
+
+}
+
+const transaction=
+data.data;
+
+if(
+transaction.status!=="success"
+){
+
+await db(
+`UPDATE payments
+SET status=$1
+WHERE reference=$2`,
+[
+transaction.status,
+referenceValue
+]
+);
+
+return{
+success:false,
+message:
+`Payment status: ${transaction.status}`,
+status:
+transaction.status
+};
+
+}
+
+if(
+Number(transaction.amount)!==
+Number(payment.amount_kobo)
+){
+
+await db(
+`UPDATE payments
+SET status='failed'
+WHERE reference=$1`,
+[
+referenceValue
+]
+);
+
+return{
+success:false,
+message:
+"Payment amount does not match."
+};
+
+}
+
+const client=
+await pool.connect();
+
+try{
+
+await client.query(
+"BEGIN"
+);
+
+await client.query(
+`SELECT id
+FROM payments
+WHERE reference=$1
+FOR UPDATE`,
+[
+referenceValue
+]
+);
+
+const latestPayment=
+await client.query(
+`SELECT *
+FROM payments
+WHERE reference=$1
+FOR UPDATE`,
+[
+referenceValue
+]
+);
+
+if(
+!latestPayment.rows.length
+){
+
+await client.query(
+"ROLLBACK"
+);
+
+return{
+success:false,
+message:
+"Payment record not found."
+};
+
+}
+
+const lockedPayment=
+latestPayment.rows[0];
+
+if(lockedPayment.credited){
+
+await client.query(
+"COMMIT"
+);
+
+return{
+success:true,
+message:
+"Payment has already been credited.",
+reference:
+referenceValue,
+status:
+"success",
+credited:true
+};
+
+}
+
+await client.query(
+`INSERT INTO wallets(
+user_id,
+balance
+)
+VALUES($1,0)
+ON CONFLICT(user_id)
+DO NOTHING`,
+[
+lockedPayment.user_id
+]
+);
+
+const walletResult=
+await client.query(
+`UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance`,
+[
+Number(lockedPayment.amount),
+lockedPayment.user_id
+]
+);
+
+if(!walletResult.rows.length){
+
+throw new Error(
+"Wallet could not be updated."
+);
+
+}
+
+await client.query(
+`UPDATE payments
+SET
+status='success',
+credited=TRUE,
+credited_at=NOW()
+WHERE reference=$1`,
+[
+referenceValue
+]
+);
+
+await client.query(
+`INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+status,
+date
+)
+VALUES(
+$1,
+'credit',
+'Wallet Funding',
+$2,
+$3,
+'successful',
+NOW()
+)
+ON CONFLICT(reference)
+DO NOTHING`,
+[
+lockedPayment.user_id,
+Number(lockedPayment.amount),
+referenceValue
+]
+);
+
+await client.query(
+"COMMIT"
+);
+
+return{
+success:true,
+message:
+"Payment verified and wallet credited.",
+reference:
+referenceValue,
+amount:
+Number(lockedPayment.amount),
+status:
+"success",
+credited:true,
+balance:
+Number(
+walletResult.rows[0].balance
+)
+};
+
+}catch(error){
+
+await client.query(
+"ROLLBACK"
+);
+
+console.error(
+"PAYMENT CREDIT ERROR:",
+error
+);
+
+return{
+success:false,
+message:
+"Payment verification succeeded but wallet credit failed."
+};
+
+}finally{
+
+client.release();
+
+}
+
+}catch(error){
+
+console.error(
+"PAYSTACK VERIFY ERROR:",
+error
+);
+
+return{
+success:false,
+message:
+"Unable to connect to Paystack."
+};
+
+}
+
+}
+
+
+async function debitWallet(
+userId,
+amount
+){
+
+if(!validAmount(amount)){
+
+return{
+success:false,
+message:
+"Invalid amount."
+};
+
+}
+
+const client=
+await pool.connect();
+
+try{
+
+await client.query(
+"BEGIN"
+);
+
+const result=
+await client.query(
+`UPDATE wallets
+SET
+balance=balance-$1,
+updated_at=NOW()
+WHERE user_id=$2
+AND balance>=$1
+RETURNING balance`,
+[
+Number(amount),
+userId
+]
+);
+
+if(!result.rows.length){
+
+await client.query(
+"ROLLBACK"
+);
+
+return{
+success:false,
+message:
+"Insufficient wallet balance."
+};
+
+}
+
+await client.query(
+"COMMIT"
+);
+
+return{
+success:true,
+balance:
+Number(
+result.rows[0].balance
+)
+};
+
+}catch(error){
+
+await client.query(
+"ROLLBACK"
+);
+
+console.error(
+"DEBIT WALLET ERROR:",
+error
+);
+
+return{
+success:false,
+message:
+"Unable to debit wallet."
+};
+
+}finally{
+
+client.release();
+
+}
+
+}
+
+
+async function refundWallet(
+userId,
+amount
+){
+
+if(!validAmount(amount)){
+
+return{
+success:false,
+message:
+"Invalid refund amount."
+};
+
+}
+
+const result=
+await db(
+`UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance`,
+[
+Number(amount),
+userId
+]
+);
+
+if(!result.rows.length){
+
+await createWallet(
+userId
+);
+
+const retry=
+await db(
+`UPDATE wallets
+SET
+balance=balance+$1,
+updated_at=NOW()
+WHERE user_id=$2
+RETURNING balance`,
+[
+Number(amount),
+userId
+]
+);
+
+if(!retry.rows.length){
+
+return{
+success:false,
+message:
+"Unable to refund wallet."
+};
+
+}
+
+return{
+success:true,
+balance:
+Number(
+retry.rows[0].balance
+)
+};
+
+}
+
+return{
+success:true,
+balance:
+Number(
+result.rows[0].balance
+)
+};
+
+}
+
+
+async function insertTransaction({
+userId,
+service,
+amount,
+reference,
+status,
+type="debit"
+}){
+
+const result=
+await db(
+`INSERT INTO transactions(
+user_id,
+type,
+service,
+amount,
+reference,
+status,
+date
+)
+VALUES(
+$1,$2,$3,$4,$5,$6,NOW()
+)
+RETURNING *`,
+[
+userId,
+type,
+service,
+Number(amount),
+reference,
+status
+]
+);
+
+return result.rows[0];
+
+}
+
+
+const PAYSTACK_API_URL=
+"https://api.paystack.co";
+
+async function callVTUProvider(
+payload
+){
+
+if(!VTU_API_URL||
+!VTU_API_KEY){
+
+return{
+success:false,
+configured:false,
+message:
+"VTU provider is not configured."
+};
+
+}
+
+try{
+
+const response=
+await fetch(
+VTU_API_URL,
+{
+method:"POST",
+headers:{
+"Content-Type":
+"application/json",
+"Authorization":
+`Bearer ${VTU_API_KEY}`
+},
+body:JSON.stringify(
+payload||{}
+)
+}
+);
+
+let data={};
+
+try{
+
+data=
+await response.json();
+
+}catch(error){
+
+data={};
+
+}
+
+return{
+success:
+response.ok,
+configured:true,
+statusCode:
+response.status,
+data
+};
+
+}catch(error){
+
+console.error(
+"VTU PROVIDER REQUEST ERROR:",
+error
+);
+
+throw error;
+
+}
+
+}
+
+
+async function processVTUTransaction(
+user,
+data
+){
+
+const userId=
+user.user_id;
+
+const amount=
+Number(data.amount);
+
+if(!userId){
+
+return{
+success:false,
+statusCode:400,
+message:
+"User ID is required."
+};
+
+}
+
+if(!validAmount(amount)){
+
+return{
+success:false,
+statusCode:400,
+message:
+"Invalid amount."
+};
+
+}
+
+await createWallet(
+userId
+);
+
+const current=
+await getWallet(
+userId
+);
+
+if(
+!current||
+current.balance<amount
+){
+
+return{
+success:false,
+statusCode:400,
+message:
+"Insufficient wallet balance.",
+balance:
+current?
+current.balance:
+0
+};
+
+}
+
+const referenceValue=
+reference("BOLTIV-TX");
+
+const debit=
+await debitWallet(
+userId,
+amount
+);
+
+if(!debit.success){
+
+return{
+success:false,
+statusCode:400,
+message:
+debit.message
+};
+
+}
+
+let providerResult;
+
+try{
+
+providerResult=
+await callVTUProvider(
+data.providerPayload
+);
+
+}catch(error){
+
+console.error(
+"VTU PROVIDER ERROR:",
+error
+);
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:502,
+message:
+"VTU provider connection failed."
+};
+
+}
+
+if(!providerResult.configured){
+
+await refundWallet(
+userId,
+amount
+);
+
+return{
+success:false,
+statusCode:503,
+message:
+providerResult.message
+};
+
+}
+
+const providerData=
+providerResult.data||{};
+
+if(!providerResult.success){
+
+await refundWallet(
+userId,
+amount
+);
+
+await insertTransaction({
+userId,
+service:data.service,
+amount,
+reference:referenceValue,
+status:"failed"
+});
+
+return{
+success:false,
+statusCode:400,
+message:
+"VTU transaction failed.",
+reference:
+referenceValue,
+balance:
+(await getWallet(userId)).balance
+};
+
+}
+
+await insertTransaction({
+userId,
+service:data.service,
+amount,
+reference:referenceValue,
+status:"successful"
+});
+
+const finalWallet=
+await getWallet(userId);
+
+return{
+success:true,
+message:
+`${data.service} purchase successful.`,
+reference:
+referenceValue,
+amount,
+status:"successful",
+balance:
+finalWallet?
+finalWallet.balance:
+0,
+data:
+providerData
+};
+
+  }
+async function adminStats(){
+
+const usersResult=
+await db(
+`SELECT COUNT(*)::int AS count
+FROM users`
+);
+
+const walletResult=
+await db(
+`SELECT COALESCE(
+SUM(balance),0
+) AS balance
+FROM wallets`
+);
+
+const transactionsResult=
+await db(
+`SELECT COUNT(*)::int AS count
+FROM transactions`
+);
+
+const paymentsResult=
+await db(
+`SELECT COUNT(*)::int AS count
+FROM payments`
+);
+
+return{
+users:
+Number(
+usersResult.rows[0]?.count||0
+),
+
+walletBalance:
+Number(
+walletResult.rows[0]?.balance||0
+),
+
+transactions:
+Number(
+transactionsResult.rows[0]?.count||0
+),
+
+payments:
+Number(
+paymentsResult.rows[0]?.count||0
+)
+};
+
+}
+
+
+async function adminUsers(){
+
+const result=
+await db(
+`SELECT
+u.id,
+u.user_id,
+u.name,
+u.phone,
+u.email,
+u.created_at,
+u.updated_at,
+COALESCE(
+w.balance,
+0
+) AS balance
+FROM users u
+LEFT JOIN wallets w
+ON w.user_id=u.user_id
+ORDER BY u.created_at DESC
+LIMIT 500`
+);
+
+return result.rows.map(user=>({
+id:user.id,
+user_id:user.user_id,
+name:user.name,
+phone:user.phone,
+email:user.email,
+balance:Number(
+user.balance||0
+),
+created_at:user.created_at,
+updated_at:user.updated_at
+}));
+
+}
+
+
+async function adminTransactions(){
+
+const result=
+await db(
+`SELECT
+t.id,
+t.user_id,
+t.type,
+t.service,
+t.amount,
+t.reference,
+t.status,
+t.date,
+u.name,
+u.email
+FROM transactions t
+LEFT JOIN users u
+ON u.user_id=t.user_id
+ORDER BY t.date DESC
+LIMIT 500`
+);
+
+return result.rows.map(item=>({
+id:item.id,
+user_id:item.user_id,
+name:item.name||"",
+email:item.email||"",
+type:item.type,
+service:item.service,
+amount:Number(
+item.amount||0
+),
+reference:item.reference,
+status:item.status,
+date:item.date
+}));
+
+}
+
+
+async function adminPayments(){
+
+const result=
+await db(
+`SELECT
+p.id,
+p.reference,
+p.user_id,
+p.email,
+p.amount,
+p.amount_kobo,
+p.status,
+p.credited,
+p.created_at,
+p.credited_at,
+u.name
+FROM payments p
+LEFT JOIN users u
+ON u.user_id=p.user_id
+ORDER BY p.created_at DESC
+LIMIT 500`
+);
+
+return result.rows.map(item=>({
+id:item.id,
+reference:item.reference,
+user_id:item.user_id,
+name:item.name||"",
+email:item.email,
+amount:Number(
+item.amount||0
+),
+amount_kobo:Number(
+item.amount_kobo||0
+),
+status:item.status,
+credited:Boolean(
+item.credited
+),
+created_at:item.created_at,
+credited_at:item.credited_at
+}));
+
+}
+
+
+async function adminMe(req){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return{
+success:false,
+statusCode:401,
+message:
+"Unauthorized."
+};
+
+}
+
+return{
+success:true,
+admin:{
+id:admin.id,
+email:admin.email
+}
+};
+
+}
+
+
+async function adminStatsResponse(req){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return{
+success:false,
+statusCode:401,
+message:
+"Unauthorized."
+};
+
+}
+
+const stats=
+await adminStats();
+
+return{
+success:true,
+stats
+};
+
+}
+
+
+async function adminUsersResponse(req){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return{
+success:false,
+statusCode:401,
+message:
+"Unauthorized."
+};
+
+}
+
+const users=
+await adminUsers();
+
+return{
+success:true,
+users
+};
+
+}
+
+
+async function adminTransactionsResponse(req){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return{
+success:false,
+statusCode:401,
+message:
+"Unauthorized."
+};
+
+}
+
+const transactions=
+await adminTransactions();
+
+return{
+success:true,
+transactions
+};
+
+}
+
+
+async function adminPaymentsResponse(req){
+
+const admin=
+await adminFromToken(req);
+
+if(!admin){
+
+return{
+success:false,
+statusCode:401,
+message:
+"Unauthorized."
+};
+
+}
+
+const payments=
+await adminPayments();
+
+return{
+success:true,
+payments
+};
+
+}
+
+
+async function handleAdminRoutes(
+req,
+res,
+path
+){
+
+/*
+ADMIN LOGIN
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/admin/login"
+){
+
+const b=
+await body(req);
+
+const result=
+await adminLogin(
+b.email,
+b.password
+);
+
+return send(
+res,
+result.success?200:401,
+result
+);
+
+}
+
+
+/*
+ADMIN SESSION CHECK
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/admin/me"
+){
+
+const result=
+await adminMe(req);
+
+return send(
+res,
+result.success?
+200:
+(result.statusCode||401),
+result
+);
+
+}
+
+
+/*
+ADMIN STATS
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/admin/stats"
+){
+
+const result=
+await adminStatsResponse(req);
+
+return send(
+res,
+result.success?
+200:
+(result.statusCode||401),
+result
+);
+
+}
+
+
+/*
+ADMIN USERS
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/admin/users"
+){
+
+const result=
+await adminUsersResponse(req);
+
+return send(
+res,
+result.success?
+200:
+(result.statusCode||401),
+result
+);
+
+}
+
+
+/*
+ADMIN TRANSACTIONS
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/admin/transactions"
+){
+
+const result=
+await adminTransactionsResponse(req);
+
+return send(
+res,
+result.success?
+200:
+(result.statusCode||401),
+result
+);
+
+}
+
+
+/*
+ADMIN PAYMENTS
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/admin/payments"
+){
+
+const result=
+await adminPaymentsResponse(req);
+
+return send(
+res,
+result.success?
+200:
+(result.statusCode||401),
+result
+);
+
+}
+
+
+/*
+ADMIN LOGOUT
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/admin/logout"
+){
+
+const result=
+await logoutAdmin(req);
+
+return send(
+res,
+200,
+result
+);
+
+}
+
+return null;
+
+}
+
+
+async function handlePasswordRoutes(
+req,
+res,
+path
+){
+
+/*
+FORGOT PASSWORD
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/auth/forgot-password"
+){
+
+const b=
+await body(req);
+
+const result=
+await requestPasswordReset(
+b.email
+);
+
+return send(
+res,
+result.success?
+200:
+400,
+result
+);
+
+}
+
+
+/*
+RESET PASSWORD
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/auth/reset-password"
+){
+
+const b=
+await body(req);
+
+const result=
+await resetPassword(
+b.token,
+b.password
+);
+
+return send(
+res,
+result.success?
+200:
+400,
+result
+);
+
+}
+
+return null;
+
+}
+
+
+async function handleAuthRoutes(
+req,
+res,
+path
+){
+
+/*
+REGISTER
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/auth/register"
+){
+
+const b=
+await body(req);
+
+const result=
+await registerUser(
+b.email,
+b.password,
+b.name,
+b.phone
+);
+
+return send(
+res,
+result.success?
+201:
+400,
+result
+);
+
+}
+
+
+/*
+LOGIN
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/auth/login"
+){
+
+const b=
+await body(req);
+
+const result=
+await loginUser(
+b.email,
+b.password
+);
+
+return send(
+res,
+result.success?
+200:
+401,
+result
+);
+
+}
+
+
+/*
+LOGOUT
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/auth/logout"
+){
+
+const result=
+await logoutUser(req);
+
+return send(
+res,
+200,
+result
+);
+
+}
+
+return null;
+
+}
+
+
+async function handleUserRoutes(
+req,
+res,
+path,
+url
+){
+
+/*
+CURRENT USER
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/me"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+return send(res,200,{
+success:true,
+user:{
+id:user.user_id,
+userId:user.user_id,
+name:user.name||"",
+phone:user.phone||"",
+email:user.email
+}
+});
+
+}
+
+
+/*
+WALLET
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/wallet"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+await createWallet(
+user.user_id
+);
+
+const wallet=
+await getWallet(
+user.user_id
+);
+
+return send(res,200,{
+success:true,
+wallet
+});
+
+}
+
+
+/*
+TRANSACTIONS
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/transactions"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const transactions=
+await getTransactions(
+user.user_id
+);
+
+return send(res,200,{
+success:true,
+transactions
+});
+
+}
+
+
+/*
+PAYMENT INITIALIZATION
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/payments/initialize"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const b=
+await body(req);
+
+const amount=
+Number(b.amount);
+
+if(!validAmount(amount)){
+
+return send(res,400,{
+success:false,
+message:
+"Invalid payment amount."
+});
+
+}
+
+const result=
+await initializePayment(
+user.user_id,
+user.email,
+amount
+);
+
+return send(
+res,
+result.success?
+200:
+400,
+result
+);
+
+}
+
+
+/*
+PAYMENT VERIFICATION
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/payments/verify"
+){
+
+const referenceValue=
+clean(
+url.searchParams.get(
+"reference"
+)
+);
+
+if(!referenceValue){
+
+return send(res,400,{
+success:false,
+message:
+"Payment reference is required."
+});
+
+}
+
+const result=
+await verifyPayment(
+referenceValue
+);
+
+return send(
+res,
+result.success?
+200:
+400,
+result
+);
+
+}
+
+
+/*
+VTU TRANSACTION
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/vtu/purchase"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const b=
+await body(req);
+
+const result=
+await processVTUTransaction(
+user,
+b
+);
+
+return send(
+res,
+result.success?
+200:
+(result.statusCode||400),
+result
+);
+
+}
+
+return null;
+
+  }

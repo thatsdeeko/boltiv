@@ -1900,3 +1900,221 @@ userId
 /* =========================
    PART 2 COMPLETE
 ========================= */
+if(req.method==="POST"&&path==="/api/vtu/data"){
+const b=await body(req);
+
+const userId=clean(b.userId);
+const phone=clean(b.phone);
+const network=clean(b.network);
+const plan=clean(
+b.plan||b.planId||b.product
+);
+const amount=Number(b.amount);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+if(!validPhone(phone)){
+return send(res,400,{
+success:false,
+message:"Enter a valid Nigerian phone number."
+});
+}
+
+if(!network){
+return send(res,400,{
+success:false,
+message:"Network is required."
+});
+}
+
+if(!plan){
+return send(res,400,{
+success:false,
+message:"Data plan is required."
+});
+}
+
+if(!validAmount(amount)){
+return send(res,400,{
+success:false,
+message:"Invalid data plan amount."
+});
+}
+
+const result=await processVTUService({
+userId,
+service:"Data",
+amount,
+provider:network,
+providerPayload:{
+service:"data",
+phone,
+network,
+plan,
+amount,
+reference:reference("BOLTIV-DATA")
+},
+phone,
+network,
+plan
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+
+if(req.method==="POST"&&path==="/api/vtu/electricity"){
+const b=await body(req);
+
+const userId=clean(b.userId);
+const provider=clean(
+b.provider||b.disco
+);
+const meterNumber=clean(
+b.meterNumber||b.meter
+);
+const meterType=clean(
+b.meterType||b.type||"prepaid"
+);
+const amount=Number(b.amount);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+if(!provider){
+return send(res,400,{
+success:false,
+message:"Electricity provider is required."
+});
+}
+
+if(!meterNumber){
+return send(res,400,{
+success:false,
+message:"Meter number is required."
+});
+}
+
+if(!validAmount(amount)){
+return send(res,400,{
+success:false,
+message:"Enter a valid electricity amount."
+});
+}
+
+const result=await processVTUService({
+userId,
+service:"Electricity",
+amount,
+provider,
+providerPayload:{
+service:"electricity",
+provider,
+meterNumber,
+meterType,
+amount,
+reference:reference("BOLTIV-ELEC")
+},
+meterNumber,
+meterType,
+provider
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+
+if(req.method==="POST"&&path==="/api/vtu/cable"){
+const b=await body(req);
+
+const userId=clean(b.userId);
+const provider=clean(
+b.provider||b.cable
+);
+const smartcardNumber=clean(
+b.smartcardNumber||
+b.smartcard||
+b.iuc
+);
+const cablePackage=clean(
+b.cablePackage||
+b.package||
+b.plan
+);
+const amount=Number(b.amount);
+
+if(!userId){
+return send(res,400,{
+success:false,
+message:"User ID is required."
+});
+}
+
+if(!provider){
+return send(res,400,{
+success:false,
+message:"Cable provider is required."
+});
+}
+
+if(!smartcardNumber){
+return send(res,400,{
+success:false,
+message:"Smartcard/IUC number is required."
+});
+}
+
+if(!cablePackage){
+return send(res,400,{
+success:false,
+message:"Cable package is required."
+});
+}
+
+if(!validAmount(amount)){
+return send(res,400,{
+success:false,
+message:"Invalid cable package amount."
+});
+}
+
+const result=await processVTUService({
+userId,
+service:"Cable TV",
+amount,
+provider,
+providerPayload:{
+service:"cable",
+provider,
+smartcardNumber,
+cablePackage,
+amount,
+reference:reference("BOLTIV-CABLE")
+},
+smartcardNumber,
+cablePackage,
+provider
+});
+
+return send(
+res,
+result.statusCode||200,
+result
+);
+}
+

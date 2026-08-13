@@ -3,86 +3,199 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#050505">
+<meta name="theme-color" content="#ffffff">
+
 <title>BOLTIV — Login</title>
+
 <link rel="stylesheet" href="style.css">
 
 <style>
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    background:#ffffff;
+    color:#171717;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+.page{
+    min-height:100vh;
+    background:#ffffff;
+}
+
+.container{
+    width:100%;
+    max-width:520px;
+    margin:auto;
+    padding:0 20px;
+}
+
 .auth-page{
     min-height:100vh;
-    padding:45px 0 40px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:35px 0;
 }
 
 .auth-logo{
     text-align:center;
-    color:#d4af37;
-    font-size:30px;
+    color:#c49a25;
+    font-size:36px;
     font-weight:1000;
-    letter-spacing:4px;
+    letter-spacing:5px;
 }
 
 .auth-tagline{
     text-align:center;
-    color:#555;
-    font-size:7px;
+    color:#777;
+    font-size:10px;
+    font-weight:700;
     letter-spacing:2px;
-    margin-top:4px;
+    margin-top:7px;
 }
 
 .auth-card{
-    margin-top:28px;
-    padding:22px;
-    border:1px solid #292929;
-    border-radius:22px;
-    background:linear-gradient(145deg,#151515,#090909);
-    box-shadow:0 20px 60px rgba(0,0,0,.4);
+    margin-top:32px;
+    padding:28px;
+    border:1px solid #e5e5e5;
+    border-radius:20px;
+    background:#ffffff;
+    box-shadow:
+        0 12px 35px rgba(0,0,0,.07);
 }
 
 .auth-card h1{
     margin:0;
-    color:#fff;
-    font-size:21px;
-    font-weight:1000;
+    color:#111111;
+    font-size:27px;
+    font-weight:900;
 }
 
 .auth-subtitle{
-    margin:6px 0 22px;
-    color:#666;
-    font-size:9px;
+    margin:8px 0 26px;
+    color:#707070;
+    font-size:14px;
+    line-height:1.5;
 }
 
 .form-group{
-    margin-bottom:15px;
+    margin-bottom:19px;
+}
+
+.label{
+    display:block;
+    margin-bottom:8px;
+    color:#333333;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.8px;
+}
+
+.input{
+    width:100%;
+    height:52px;
+    padding:0 15px;
+
+    border:1px solid #dcdcdc;
+    border-radius:11px;
+
+    background:#ffffff;
+    color:#171717;
+
+    font-size:15px;
+    outline:none;
+
+    transition:
+        border-color .2s,
+        box-shadow .2s;
+}
+
+.input::placeholder{
+    color:#aaa;
+}
+
+.input:focus{
+    border-color:#c49a25;
+    box-shadow:
+        0 0 0 3px rgba(196,154,37,.12);
 }
 
 .auth-btn{
     width:100%;
-    height:48px;
-    margin-top:5px;
+    height:52px;
+    margin-top:4px;
+
+    border:none;
+    border-radius:11px;
+
+    background:#d4af37;
+    color:#111111;
+
+    font-size:15px;
+    font-weight:900;
+
+    cursor:pointer;
+
+    transition:
+        transform .15s,
+        background .2s,
+        box-shadow .2s;
+}
+
+.auth-btn:hover{
+    background:#c9a12f;
+    box-shadow:
+        0 8px 20px rgba(196,154,37,.22);
+}
+
+.auth-btn:active{
+    transform:scale(.98);
+}
+
+.auth-btn:disabled{
+    opacity:.65;
+    cursor:not-allowed;
 }
 
 .auth-links{
     display:flex;
     justify-content:center;
-    gap:15px;
-    margin-top:18px;
-    font-size:8px;
+    gap:20px;
+    flex-wrap:wrap;
+
+    margin-top:22px;
+
+    font-size:13px;
 }
 
 .auth-links a{
-    color:#777;
+    color:#555;
+    text-decoration:none;
+    font-weight:700;
 }
 
 .auth-links a:first-child{
-    color:#d4af37;
+    color:#b58a17;
+}
+
+.auth-links a:hover{
+    text-decoration:underline;
 }
 
 .status-message{
     display:none;
-    margin-bottom:15px;
-    padding:11px;
+
+    margin-bottom:17px;
+    padding:13px 14px;
+
     border-radius:10px;
-    font-size:8px;
+
+    font-size:13px;
     line-height:1.5;
 }
 
@@ -91,49 +204,93 @@
 }
 
 .status-message.error{
-    color:#ff8b8b;
-    background:#211010;
-    border:1px solid #542323;
+    color:#a32929;
+    background:#fff4f4;
+    border:1px solid #f0caca;
 }
 
 .status-message.success{
-    color:#d4af37;
-    background:#17140b;
-    border:1px solid #3a3016;
+    color:#80620c;
+    background:#fffaf0;
+    border:1px solid #ead9a5;
 }
+
+@media(max-width:480px){
+
+    .container{
+        padding:0 16px;
+    }
+
+    .auth-page{
+        justify-content:flex-start;
+        padding-top:55px;
+    }
+
+    .auth-logo{
+        font-size:32px;
+    }
+
+    .auth-card{
+        margin-top:28px;
+        padding:23px 20px;
+        border-radius:18px;
+    }
+
+    .auth-card h1{
+        font-size:24px;
+    }
+
+    .auth-subtitle{
+        font-size:13px;
+    }
+
+}
+
 </style>
 </head>
 
 <body>
 
 <div class="page">
+
 <div class="container">
 
 <div class="auth-page">
 
-<div class="auth-logo">BOLTIV</div>
+<div class="auth-logo">
+BOLTIV
+</div>
 
 <div class="auth-tagline">
 FAST. SIMPLE. POWERFUL.
 </div>
 
+
 <div class="auth-card">
 
-<h1>Welcome Back</h1>
+<h1>
+Welcome Back
+</h1>
 
 <p class="auth-subtitle">
 Login to your BOLTIV account
 </p>
+
 
 <div
 id="statusMessage"
 class="status-message">
 </div>
 
+
 <div class="form-group">
 
-<label class="label">
+<label
+class="label"
+for="emailInput">
+
 EMAIL
+
 </label>
 
 <input
@@ -148,8 +305,12 @@ placeholder="you@example.com">
 
 <div class="form-group">
 
-<label class="label">
+<label
+class="label"
+for="passwordInput">
+
 PASSWORD
+
 </label>
 
 <input
@@ -157,13 +318,13 @@ class="input"
 id="passwordInput"
 type="password"
 autocomplete="current-password"
-placeholder="Enter password">
+placeholder="Enter your password">
 
 </div>
 
 
 <button
-class="btn btn-primary auth-btn"
+class="auth-btn"
 id="loginButton">
 
 Login
@@ -186,7 +347,9 @@ Forgot Password?
 </div>
 
 </div>
+
 </div>
+
 </div>
 
 
@@ -203,13 +366,17 @@ const statusMessage =
 document.getElementById("statusMessage");
 
 
-function showStatus(message,type="error"){
+function showStatus(
+    message,
+    type="error"
+){
 
     statusMessage.textContent =
         message;
 
     statusMessage.className =
-        "status-message show " + type;
+        "status-message show " +
+        type;
 
 }
 
@@ -292,11 +459,8 @@ async function login(){
                     },
 
                     body:JSON.stringify({
-
                         email:email,
-
                         password:password
-
                     })
                 }
             );
@@ -335,8 +499,7 @@ async function login(){
 
 
         /*
-        SAVE ONLY THE AUTH SESSION.
-
+        SAVE AUTH SESSION ONLY.
         NEVER SAVE THE PASSWORD.
         */
 
@@ -358,6 +521,7 @@ async function login(){
                     data.user
                 )
             );
+
 
             if(data.user.email){
 
@@ -427,7 +591,9 @@ document
     function(event){
 
         if(event.key === "Enter"){
+
             login();
+
         }
 
     }

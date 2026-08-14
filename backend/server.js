@@ -12,6 +12,7 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
 const VTU_API_URL=process.env.VTU_API_URL||"";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
+const VERIFYME_API_KEY=process.env.VERIFYME_API_KEY||"";
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -234,7 +235,14 @@ await db(
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`
 );
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_status TEXT NOT NULL DEFAULT 'not_started'`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_provider TEXT`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_reference TEXT`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_nin_last4 TEXT`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_verified_at TIMESTAMPTZ`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_failed_reason TEXT`);
 await db(`CREATE INDEX IF NOT EXISTS users_status_idx ON users(status)`);
+await db(`CREATE INDEX IF NOT EXISTS users_kyc_status_idx ON users(kyc_status)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS user_sessions(
@@ -1592,6 +1600,52 @@ message:
 };
 
   }
+function formatDobForVerifyMe(value){
+const v=clean(value);
+if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return "";
+const [y,m,d]=v.split("-");
+return `${d}-${m}-${y}`;
+}
+function splitFullName(name){
+const parts=clean(name).split(/\s+/).filter(Boolean);
+return {firstName:parts[0]||"",lastName:parts.length>1?parts[parts.length-1]:""};
+}
+async function getKycStatus(userId){
+const r=await db(`SELECT kyc_status,kyc_provider,kyc_reference,kyc_nin_last4,kyc_verified_at,kyc_failed_reason FROM users WHERE user_id=$1 LIMIT 1`,[userId]);
+if(!r.rows.length)return null;
+const u=r.rows[0];
+return {status:u.kyc_status||"not_started",provider:u.kyc_provider||null,reference:u.kyc_reference||null,ninLast4:u.kyc_nin_last4||null,verifiedAt:u.kyc_verified_at||null,reason:u.kyc_failed_reason||null};
+}
+async function verifyNinKyc(user,b){
+if(!VERIFYME_API_KEY)return {success:false,statusCode:503,message:"NIN verification is not configured yet."};
+const nin=clean(b.nin).replace(/\s+/g,"");
+const dob=clean(b.dob);
+if(!/^\d{11}$/.test(nin))return {success:false,statusCode:400,message:"Please enter a valid 11-digit NIN."};
+if(!/^\d{4}-\d{2}-\d{2}$/.test(dob))return {success:false,statusCode:400,message:"Please enter your date of birth."};
+const {firstName,lastName}=splitFullName(user.name);
+if(firstName.length<2||lastName.length<2)return {success:false,statusCode:400,message:"Please update your full name before completing KYC."};
+const kycRef=reference("KYC");
+await db(`UPDATE users SET kyc_status='pending',kyc_provider='verifyme',kyc_reference=$1,kyc_nin_last4=$2,kyc_failed_reason=NULL,updated_at=NOW() WHERE user_id=$3`,[kycRef,nin.slice(-4),user.user_id]);
+try{
+const response=await fetch(`https://vapi.verifyme.ng/v1/verifications/identities/nin/${encodeURIComponent(nin)}`,{method:"POST",headers:{"Authorization":`Bearer ${VERIFYME_API_KEY}`,"Content-Type":"application/json"},body:JSON.stringify({dob:formatDobForVerifyMe(dob),firstname:firstName,lastname:lastName})});
+const data=await response.json().catch(()=>({}));
+const matches=data?.data?.fieldMatches||{};
+const matchValues=Object.values(matches).filter(v=>typeof v==='boolean');
+const matched=String(data?.status||"").toLowerCase()==="success" && matchValues.length>0 && matchValues.every(Boolean);
+if(!response.ok||!matched){
+const reason=Object.entries(matches).filter(([,v])=>v===false).map(([k])=>k).join(", ")||data?.message||"The NIN details could not be verified.";
+await db(`UPDATE users SET kyc_status='failed',kyc_failed_reason=$1,updated_at=NOW() WHERE user_id=$2`,[reason.slice(0,500),user.user_id]);
+return {success:false,statusCode:400,message:"NIN verification failed. Please make sure your name and date of birth match your NIN records."};
+}
+await db(`UPDATE users SET kyc_status='verified',kyc_verified_at=NOW(),kyc_failed_reason=NULL,updated_at=NOW() WHERE user_id=$1`,[user.user_id]);
+return {success:true,message:"NIN verified successfully.",status:"verified",ninLast4:nin.slice(-4)};
+}catch(error){
+console.error("NIN VERIFICATION ERROR:",error.message);
+await db(`UPDATE users SET kyc_status='failed',kyc_failed_reason=$1,updated_at=NOW() WHERE user_id=$2`,["NIN verification service unavailable.",user.user_id]);
+return {success:false,statusCode:502,message:"NIN verification service is temporarily unavailable. Please try again later."};
+}
+}
+
 async function createPayment(
 userId,
 email,
@@ -3349,6 +3403,26 @@ email:user.email
 
 
 /*
+KYC
+*/
+if(req.method==="GET"&&path==="/api/kyc/status"){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+const kyc=await getKycStatus(user.user_id);
+return send(res,200,{success:true,kyc});
+}
+if(req.method==="POST"&&path==="/api/kyc/nin"){
+const rl=rateLimit(req,"kyc-nin",5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+const current=await getKycStatus(user.user_id);
+if(current?.status==="verified")return send(res,200,{success:true,message:"KYC is already verified.",kyc:current});
+const b=await body(req);
+const result=await verifyNinKyc(user,b);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+
+/*
 WALLET
 */
 
@@ -3454,6 +3528,9 @@ message:
 });
 
 }
+
+const kyc=await getKycStatus(user.user_id);
+if(kyc?.status!=="verified")return send(res,403,{success:false,code:"KYC_REQUIRED",message:"Complete and verify your NIN before funding your wallet."});
 
 const b=
 await body(req);

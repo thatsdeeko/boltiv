@@ -329,6 +329,7 @@ async function loadAccount(){
         minimumFractionDigits:2,maximumFractionDigits:2
       });
       localStorage.setItem("boltivBalance",String(balance));
+      localStorage.setItem("boltivWalletBalance",String(balance));
     }
 
     localStorage.setItem("boltivLoggedIn","true");

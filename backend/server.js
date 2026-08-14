@@ -17,17 +17,48 @@ const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
 // For production, set MAIL_FROM to an address on a domain verified in Resend.
 const MAIL_FROM=(process.env.MAIL_FROM||"BOLTIV <onboarding@resend.dev>").trim();
-const FRONTEND_ORIGIN=process.env.FRONTEND_ORIGIN||(()=>{try{return new URL(FRONTEND_URL).origin}catch{return FRONTEND_URL}})();
+const FRONTEND_ORIGINS=String(process.env.FRONTEND_ORIGIN||(()=>{try{return new URL(FRONTEND_URL).origin}catch{return FRONTEND_URL}})())
+.split(",")
+.map(v=>v.trim())
+.filter(Boolean);
+const DEFAULT_FRONTEND_ORIGIN=FRONTEND_ORIGINS[0]||"";
+function corsOrigin(req){
+const origin=String(req.headers.origin||"");
+if(origin&&FRONTEND_ORIGINS.includes(origin))return origin;
+return DEFAULT_FRONTEND_ORIGIN;
+}
 
 const pool=new Pool({
 connectionString:DATABASE_URL,
 ssl:DATABASE_URL?{rejectUnauthorized:false}:false
 });
 
+// Lightweight in-process abuse protection. For multi-instance deployments,
+// replace this with a shared store such as Redis.
+const rateBuckets=new Map();
+function requestIp(req){
+return String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"unknown").split(",")[0].trim();
+}
+function rateLimit(req,key,limit,windowMs){
+const now=Date.now();
+const bucketKey=`${key}:${requestIp(req)}`;
+let b=rateBuckets.get(bucketKey);
+if(!b||b.resetAt<=now)b={count:0,resetAt:now+windowMs};
+b.count++;
+rateBuckets.set(bucketKey,b);
+if(b.count>limit)return {allowed:false,retryAfter:Math.ceil((b.resetAt-now)/1000)};
+return {allowed:true};
+}
+function rateLimitedResponse(res,rl){
+res.setHeader("Retry-After",String(rl.retryAfter));
+return send(res,429,{success:false,message:"Too many requests. Please try again later."});
+}
+setInterval(()=>{const now=Date.now();for(const [k,v] of rateBuckets){if(v.resetAt<=now)rateBuckets.delete(k);}},10*60*1000).unref();
+
 function send(res,status,data){
 res.writeHead(status,{
 "Content-Type":"application/json",
-"Access-Control-Allow-Origin":FRONTEND_ORIGIN,
+"Access-Control-Allow-Origin":res.__corsOrigin||DEFAULT_FRONTEND_ORIGIN,
 "Vary":"Origin",
 "Access-Control-Allow-Methods":"GET,POST,OPTIONS",
 "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
@@ -46,6 +77,7 @@ let data="";
 
 req.on("data",chunk=>{
 data+=chunk;
+if(data.length>1024*1024){req.destroy();reject(new Error("Request body too large."));}
 });
 
 req.on("end",()=>{
@@ -201,6 +233,8 @@ await db(
 `ALTER TABLE users
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`
 );
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
+await db(`CREATE INDEX IF NOT EXISTS users_status_idx ON users(status)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS user_sessions(
@@ -236,6 +270,10 @@ await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_reference T
 await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS recipient TEXT`);
 await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS metadata JSONB`);
 await db(`CREATE UNIQUE INDEX IF NOT EXISTS transactions_idempotency_idx ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
+await db(`CREATE INDEX IF NOT EXISTS transactions_status_idx ON transactions(status)`);
+await db(`CREATE INDEX IF NOT EXISTS transactions_provider_reference_idx ON transactions(provider_reference) WHERE provider_reference IS NOT NULL`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS user_security(
@@ -295,6 +333,26 @@ admin_id BIGINT NOT NULL,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 expires_at TIMESTAMPTZ NOT NULL
 )`);
+await db(`CREATE TABLE IF NOT EXISTS admin_audit_logs(
+id BIGSERIAL PRIMARY KEY,
+admin_id BIGINT,
+action TEXT NOT NULL,
+target_type TEXT,
+target_id TEXT,
+details JSONB,
+ip TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS admin_audit_created_idx ON admin_audit_logs(created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS support_messages(
+id BIGSERIAL PRIMARY KEY,
+ticket_id BIGINT NOT NULL,
+sender_type TEXT NOT NULL,
+sender_id TEXT,
+message TEXT NOT NULL,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS support_messages_ticket_idx ON support_messages(ticket_id,created_at)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS password_reset_tokens(
@@ -454,12 +512,14 @@ u.id,
 u.user_id,
 u.name,
 u.phone,
-u.email
+u.email,
+u.status
 FROM user_sessions s
 JOIN users u
 ON u.id=s.user_id
 WHERE s.token=$1
-AND s.expires_at>NOW()`,
+AND s.expires_at>NOW()
+AND u.status='active' `,
 [sessionToken]
 );
 
@@ -620,7 +680,8 @@ user_id,
 name,
 phone,
 email,
-password_hash
+password_hash,
+status
 FROM users
 WHERE LOWER(email)=LOWER($1)`,
 [email]
@@ -638,6 +699,10 @@ message:
 
 const user=
 result.rows[0];
+
+if(user.status==="suspended"){
+return{success:false,message:"Your account is suspended. Please contact support."};
+}
 
 if(!verifyPassword(
 password,
@@ -1275,8 +1340,11 @@ error.message
 
 async function adminLogin(
 email,
-password
+password,
+req=null
 ){
+
+if(req){const rl=rateLimit(req,"admin-login",5,15*60*1000);if(!rl.allowed)return{success:false,statusCode:429,message:"Too many admin login attempts. Try again later."};}
 
 email=
 clean(email).toLowerCase();
@@ -1676,7 +1744,8 @@ amount
 
 
 async function verifyPayment(
-referenceValue
+referenceValue,
+expectedUserId=null
 ){
 
 referenceValue=
@@ -1715,6 +1784,10 @@ message:
 
 const payment=
 paymentResult.rows[0];
+
+if(expectedUserId && String(payment.user_id)!==String(expectedUserId)){
+return{success:false,statusCode:403,message:"You cannot verify another user's payment."};
+}
 
 if(payment.credited){
 
@@ -2117,83 +2190,49 @@ client.release();
 }
 
 
-async function refundWallet(
-userId,
-amount
-){
-
-if(!validAmount(amount)){
-
-return{
-success:false,
-message:
-"Invalid refund amount."
-};
-
+async function refundWallet(userId, amount){
+  if(!validAmount(amount)) return {success:false,message:"Invalid refund amount."};
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
+    const result=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(amount),userId]);
+    if(!result.rows.length){ await client.query("ROLLBACK"); return {success:false,message:"Unable to refund wallet."}; }
+    await client.query("COMMIT");
+    return {success:true,balance:Number(result.rows[0].balance)};
+  }catch(error){
+    try{await client.query("ROLLBACK");}catch{}
+    console.error("REFUND WALLET ERROR:",error);
+    return {success:false,message:"Unable to refund wallet."};
+  }finally{client.release();}
 }
 
-const result=
-await db(
-`UPDATE wallets
-SET
-balance=balance+$1,
-updated_at=NOW()
-WHERE user_id=$2
-RETURNING balance`,
-[
-Number(amount),
-userId
-]
-);
-
-if(!result.rows.length){
-
-await createWallet(
-userId
-);
-
-const retry=
-await db(
-`UPDATE wallets
-SET
-balance=balance+$1,
-updated_at=NOW()
-WHERE user_id=$2
-RETURNING balance`,
-[
-Number(amount),
-userId
-]
-);
-
-if(!retry.rows.length){
-
-return{
-success:false,
-message:
-"Unable to refund wallet."
-};
-
+async function markTransactionFailedAndRefund(referenceValue, reason, providerResponse=null){
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const r=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[referenceValue]);
+    if(!r.rows.length){await client.query("ROLLBACK");return {success:false,message:"Transaction not found."};}
+    const t=r.rows[0];
+    if(t.status==='refunded' || t.refunded_at){await client.query("COMMIT");return {success:true,alreadyRefunded:true,balance:(await getWallet(t.user_id))?.balance||0};}
+    if(t.type!=='debit' || !['processing','pending','failed'].includes(String(t.status))){await client.query("ROLLBACK");return {success:false,message:"Transaction is not eligible for refund."};}
+    await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[t.user_id]);
+    const w=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(t.amount),t.user_id]);
+    if(!w.rows.length){await client.query("ROLLBACK");return {success:false,message:"Unable to refund wallet."};}
+    const refundRef=`REF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const meta={original_reference:referenceValue,reason,providerResponse};
+    await client.query(`UPDATE transactions SET status='refunded',refunded_at=NOW(),completed_at=NOW(),metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,[JSON.stringify({refund:meta}),referenceValue]);
+    await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','Wallet refund',$2,$3,'successful',NOW(),$4)`,[t.user_id,Number(t.amount),refundRef,JSON.stringify(meta)]);
+    await client.query("COMMIT");
+    return {success:true,alreadyRefunded:false,balance:Number(w.rows[0].balance),refundReference:refundRef,userId:t.user_id,amount:Number(t.amount)};
+  }catch(error){try{await client.query("ROLLBACK");}catch{};console.error("ATOMIC REFUND ERROR:",error);return {success:false,message:"Unable to complete refund."};}
+  finally{client.release();}
 }
 
-return{
-success:true,
-balance:
-Number(
-retry.rows[0].balance
-)
-};
-
-}
-
-return{
-success:true,
-balance:
-Number(
-result.rows[0].balance
-)
-};
-
+async function finalizeVTUTransaction(referenceValue, providerData, pending){
+  const status=pending?'pending':'successful';
+  const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,providerData?.reference||providerData?.data?.reference||null,JSON.stringify({providerResponse:providerData}),referenceValue]);
+  return result.rows[0]||null;
 }
 
 
@@ -2240,8 +2279,8 @@ return {success:true,message:existing?.transaction_pin_hash?"Transaction PIN cha
 
 async function requireTransactionPin(userId,pin){
 const security=await getSecurity(userId);
-if(!security?.transaction_pin_hash) return {success:true,required:false};
-if(!pin || !verifyTransactionPin(pin,security.transaction_pin_hash)) return {success:false,required:true,message:"Incorrect transaction PIN."};
+if(!security?.transaction_pin_hash) return {success:false,required:true,code:"TRANSACTION_PIN_NOT_SET",message:"Set your 4-digit transaction PIN before making a transaction."};
+if(!pin || !verifyTransactionPin(pin,security.transaction_pin_hash)) return {success:false,required:true,code:"INVALID_TRANSACTION_PIN",message:"Incorrect transaction PIN."};
 return {success:true,required:true};
 }
 
@@ -2321,14 +2360,16 @@ throw error;
 
 
 async function processVTUTransaction(user,data){
+if(user.status==="suspended") return {success:false,statusCode:403,message:"Your account is suspended. Transactions are disabled."};
 const userId=user.user_id;
 const amount=Number(data.amount);
 if(!userId) return {success:false,statusCode:400,message:"User ID is required."};
 if(!validAmount(amount)) return {success:false,statusCode:400,message:"Invalid amount."};
 const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
 if(!pinCheck.success) return {success:false,statusCode:401,message:pinCheck.message,code:"INVALID_TRANSACTION_PIN"};
-const idempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
-const existing=await db(`SELECT * FROM transactions WHERE idempotency_key=$1 LIMIT 1`,[idempotencyKey]);
+const rawIdempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
+const idempotencyKey=crypto.createHash("sha256").update(`${userId}:${rawIdempotencyKey}`).digest("hex");
+const existing=await db(`SELECT * FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1`,[userId,idempotencyKey]);
 if(existing.rows.length){
 const t=existing.rows[0];
 return {success:t.status==="successful",statusCode:t.status==="successful"?200:409,message:t.status==="successful"?"Transaction already completed.":"This transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),balance:(await getWallet(userId))?.balance||0};
@@ -2346,21 +2387,165 @@ await client.query("COMMIT");
 client.release();
 let providerResult;
 try{providerResult=await callVTUProvider(data.providerPayload||data);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
-if(!providerResult.configured){await refundWallet(userId,amount);await db(`UPDATE transactions SET status='failed',metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,[JSON.stringify({reason:"provider_not_configured"}),referenceValue]);await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
+if(!providerResult.configured){const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_not_configured"); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
 const providerData=providerResult.data||{};
 if(!providerResult.success){
-await refundWallet(userId,amount);
-await db(`UPDATE transactions SET status='failed',metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,[JSON.stringify({providerResponse:providerData}),referenceValue]);
+const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
 await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
 return {success:false,statusCode:400,message:"VTU transaction failed. Your wallet has been refunded.",reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};
 }
 const providerStatus=String(providerData.status||providerData.data?.status||"successful").toLowerCase();
 const pending=["pending","processing","queued","in_progress"].includes(providerStatus);
 const finalStatus=pending?"pending":"successful";
-await db(`UPDATE transactions SET status=$1,provider_reference=$2,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4`,[finalStatus,providerData.reference||providerData.data?.reference||null,JSON.stringify({providerResponse:providerData}),referenceValue]);
+const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
 await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
 const finalWallet=await getWallet(userId);
 return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,data:providerData};
+}
+
+
+async function reconcilePendingTransactions(admin,req){
+  const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
+  return {success:true,count:r.rows.length,transactions:r.rows.map(t=>({...t,amount:Number(t.amount)}))};
+}
+
+async function adminAudit(admin,action,targetType,targetId,details,req){
+try{
+await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip)
+VALUES($1,$2,$3,$4,$5,$6)`,[
+admin?.id||null,action,targetType||null,targetId||null,
+JSON.stringify(details||{}),
+req?.headers?.["x-forwarded-for"]||req?.socket?.remoteAddress||null
+]);
+}catch(e){console.error("ADMIN AUDIT ERROR:",e.message);}
+}
+
+async function adminUserAction(req){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const b=await body(req), target=clean(b.userId||b.id), action=clean(b.action);
+if(!target||!["suspend","activate"].includes(action))
+return{success:false,statusCode:400,message:"Invalid user action."};
+const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);
+if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};
+const u=r.rows[0],status=action==="suspend"?"suspended":"active";
+await db(`UPDATE users SET status=$1,updated_at=NOW() WHERE user_id=$2`,[status,u.user_id]);
+if(action==="suspend") await db(`DELETE FROM user_sessions WHERE user_id=(SELECT id FROM users WHERE user_id=$1)`,[u.user_id]);
+await addNotification(u.user_id,action==="suspend"?"Account suspended":"Account activated",
+action==="suspend"?"Your BOLTIV account has been suspended. Please contact support.":"Your BOLTIV account has been activated.","security");
+await adminAudit(admin,`user_${action}`,"user",u.user_id,{email:u.email},req);
+return{success:true,message:`User ${status}.`,status};
+}
+
+async function adminWalletAdjust(req,mode){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"Admin wallet adjustment");
+if(!target||!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid amount."};
+const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);
+if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};
+const u=r.rows[0],c=await pool.connect();
+try{
+await c.query("BEGIN");
+await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);
+const q=mode==="credit"
+?`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`
+:`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`;
+const wr=await c.query(q,[amount,u.user_id]);
+if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient wallet balance."};}
+const ref=`ADM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata)
+VALUES($1,$2,'Admin wallet adjustment',$3,$4,'successful',NOW(),$5)`,
+[u.user_id,mode==="credit"?"credit":"debit",amount,ref,JSON.stringify({admin_id:admin.id,reason})]);
+await c.query("COMMIT");
+await adminAudit(admin,`wallet_${mode}`,"user",u.user_id,{amount,reason,reference:ref},req);
+await addNotification(u.user_id,mode==="credit"?"Wallet credited":"Wallet debited",
+`Your wallet was ${mode==="credit"?"credited with":"debited by"} ₦${amount.toLocaleString()}. Reason: ${reason}`,"payment");
+return{success:true,message:`Wallet ${mode} successful.`,balance:Number(wr.rows[0].balance),reference:ref};
+}catch(e){try{await c.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to adjust wallet."};}
+finally{c.release();}
+}
+
+async function adminRefund(req){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const b=await body(req),ref=clean(b.reference);
+if(!ref)return{success:false,statusCode:400,message:"Transaction reference is required."};
+const c=await pool.connect();
+try{
+await c.query("BEGIN");
+const r=await c.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);
+if(!r.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:404,message:"Transaction not found."};}
+const t=r.rows[0];
+if(t.type!=="debit"||t.status==="refunded"||t.refunded_at){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Transaction cannot be refunded."};}
+const amount=Number(t.amount);
+await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[t.user_id]);
+const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,t.user_id]);
+const refundRef=`REF-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+await c.query(`UPDATE transactions SET status='refunded',metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,
+[JSON.stringify({refunded_by:admin.id,reason:clean(b.reason||"Admin refund")}),ref]);
+await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata)
+VALUES($1,'credit','Refund',$2,$3,'successful',NOW(),$4)`,
+[t.user_id,amount,refundRef,JSON.stringify({original_reference:ref,admin_id:admin.id})]);
+await c.query("COMMIT");
+await adminAudit(admin,"transaction_refund","transaction",ref,{amount,refundReference:refundRef},req);
+await addNotification(t.user_id,"Transaction refunded",`₦${amount.toLocaleString()} has been refunded to your wallet. Reference: ${ref}`,"payment");
+return{success:true,message:"Transaction refunded successfully.",balance:Number(wr.rows[0].balance),refundReference:refundRef};
+}catch(e){try{await c.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to refund transaction."};}
+finally{c.release();}
+}
+
+async function adminNotifications(req){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const b=await body(req),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general"),recipient=clean(b.recipient||"all");
+if(title.length<2||message.length<2)return{success:false,statusCode:400,message:"Title and message are required."};
+let r;
+if(recipient==="selected"){
+const key=clean(b.userId||"");
+r=await db(`SELECT user_id FROM users WHERE user_id=$1 OR id::text=$1 OR lower(email)=lower($1) LIMIT 1`,[key]);
+}else if(recipient==="active")r=await db(`SELECT user_id FROM users WHERE status='active'`);
+else r=await db(`SELECT user_id FROM users`);
+if(!r.rows.length)return{success:false,statusCode:404,message:"No matching users."};
+const c=await pool.connect();
+try{
+await c.query("BEGIN");
+for(const u of r.rows)await c.query(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[u.user_id,title,message,type]);
+await c.query("COMMIT");
+await adminAudit(admin,"notification_send","notification",null,{recipient,count:r.rows.length,type,title},req);
+return{success:true,message:`Notification sent to ${r.rows.length} user${r.rows.length===1?"":"s"}.`,count:r.rows.length};
+}catch(e){try{await c.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to send notification."};}
+finally{c.release();}
+}
+
+async function adminSupport(req,action){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+if(req.method==="GET")return{success:true,tickets:(await db(`SELECT t.*,u.name,u.email FROM support_tickets t LEFT JOIN users u ON u.user_id=t.user_id ORDER BY t.updated_at DESC LIMIT 500`)).rows};
+const b=await body(req),id=Number(b.ticketId);
+const tr=await db(`SELECT * FROM support_tickets WHERE id=$1`,[id]);
+if(!tr.rows.length)return{success:false,statusCode:404,message:"Ticket not found."};
+const t=tr.rows[0];
+if(action==="reply"){
+const m=clean(b.message);
+if(m.length<2)return{success:false,statusCode:400,message:"Reply required."};
+await db(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'admin',$2,$3)`,[id,String(admin.id),m]);
+await db(`UPDATE support_tickets SET status='pending',updated_at=NOW() WHERE id=$1`,[id]);
+await addNotification(t.user_id,"Support ticket update",`Admin replied to support ticket #${id}.`,"general");
+await adminAudit(admin,"support_reply","ticket",String(id),{},req);
+return{success:true,message:"Reply sent."};
+}
+const status=["open","pending","resolved","closed"].includes(b.status)?b.status:null;
+if(!status)return{success:false,statusCode:400,message:"Invalid status."};
+await db(`UPDATE support_tickets SET status=$1,updated_at=NOW() WHERE id=$2`,[status,id]);
+await adminAudit(admin,"support_status","ticket",String(id),{status},req);
+return{success:true,message:"Ticket status updated.",status};
+}
+
+async function adminAuditResponse(req){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+return{success:true,logs:(await db(`SELECT a.*,ad.email FROM admin_audit_logs a LEFT JOIN admins ad ON ad.id=a.admin_id ORDER BY a.created_at DESC LIMIT 500`)).rows};
 }
 
 async function adminStats(){
@@ -2428,6 +2613,7 @@ u.phone,
 u.email,
 u.created_at,
 u.updated_at,
+u.status,
 COALESCE(
 w.balance,
 0
@@ -2449,7 +2635,8 @@ balance:Number(
 user.balance||0
 ),
 created_at:user.created_at,
-updated_at:user.updated_at
+updated_at:user.updated_at,
+status:user.status||"active"
 }));
 
 }
@@ -2695,7 +2882,7 @@ await body(req);
 const result=
 await adminLogin(
 b.email,
-b.password
+b.password,req
 );
 
 return send(
@@ -2822,6 +3009,17 @@ result
 }
 
 
+if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/credit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
+if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupport(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
+
 /*
 ADMIN LOGOUT
 */
@@ -2861,7 +3059,7 @@ if(
 req.method==="POST"&&
 path==="/api/auth/forgot-password"
 ){
-
+const rl=rateLimit(req,"forgot-password",5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=
 await body(req);
 
@@ -2889,7 +3087,7 @@ if(
 req.method==="POST"&&
 path==="/api/auth/reset-password"
 ){
-
+const rl=rateLimit(req,"reset-password",8,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=
 await body(req);
 
@@ -2928,7 +3126,7 @@ if(
 req.method==="POST"&&
 path==="/api/auth/register"
 ){
-
+const rl=rateLimit(req,"register",5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=
 await body(req);
 
@@ -2959,7 +3157,7 @@ if(
 req.method==="POST"&&
 path==="/api/auth/login"
 ){
-
+const rl=rateLimit(req,"login",10,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=
 await body(req);
 
@@ -3018,16 +3216,54 @@ if(req.method==="GET"&&path==="/api/transactions/detail"){
 const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0]; return send(res,200,{success:true,transaction:{...t,amount:Number(t.amount)}});
 }
 if(req.method==="GET"&&path==="/api/notifications"){
-const r=await db(`SELECT id,title,message,type,read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[user.user_id]); return send(res,200,{success:true,notifications:r.rows});
+const r=await db(`SELECT id,title,message,type,read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[user.user_id]);
+const unread=r.rows.filter(n=>!n.read).length;
+return send(res,200,{success:true,notifications:r.rows,unreadCount:unread});
 }
 if(req.method==="POST"&&path==="/api/notifications/read"){
 const b=await body(req); if(b.id) await db(`UPDATE notifications SET read=TRUE WHERE id=$1 AND user_id=$2`,[b.id,user.user_id]); else await db(`UPDATE notifications SET read=TRUE WHERE user_id=$1`,[user.user_id]); return send(res,200,{success:true});
 }
+if(req.method==="POST"&&path==="/api/profile/update"){
+const b=await body(req); const name=clean(b.name),phone=clean(b.phone),email=clean(b.email).toLowerCase();
+if(name.length<2)return send(res,400,{success:false,message:"Please enter your full name."});
+if(phone && !/^[0-9+()\-\s]{10,20}$/.test(phone))return send(res,400,{success:false,message:"Please enter a valid phone number."});
+if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return send(res,400,{success:false,message:"Please enter a valid email address."});
+try{
+const r=await db(`UPDATE users SET name=$1,phone=$2,email=$3,updated_at=NOW() WHERE user_id=$4 RETURNING user_id,name,phone,email,status,created_at`,[name,phone,email,user.user_id]);
+if(!r.rows.length)return send(res,404,{success:false,message:"User account not found."});
+return send(res,200,{success:true,user:r.rows[0],message:"Profile updated successfully."});
+}catch(e){if(e.code==="23505")return send(res,409,{success:false,message:"That email address is already in use."}); throw e;}
+}
 if(req.method==="POST"&&path==="/api/support/tickets"){
-const b=await body(req); const subject=clean(b.subject),message=clean(b.message); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."}); const r=await db(`INSERT INTO support_tickets(user_id,subject,message) VALUES($1,$2,$3) RETURNING id,subject,message,status,created_at`,[user.user_id,subject,message]); return send(res,201,{success:true,ticket:r.rows[0],message:`Support ticket #${r.rows[0].id} created.`});
+const b=await body(req); const subject=clean(b.subject),message=clean(b.message); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."});
+const client=await pool.connect();
+try{
+await client.query("BEGIN");
+const r=await client.query(`INSERT INTO support_tickets(user_id,subject,message) VALUES($1,$2,$3) RETURNING id,subject,message,status,created_at`,[user.user_id,subject,message]);
+await client.query(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'user',$2,$3)`,[r.rows[0].id,user.user_id,message]);
+await client.query("COMMIT");
+return send(res,201,{success:true,ticket:r.rows[0],message:`Support ticket #${r.rows[0].id} created.`});
+}catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
 if(req.method==="GET"&&path==="/api/support/tickets"){
 const r=await db(`SELECT id,subject,message,status,created_at,updated_at FROM support_tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,[user.user_id]); return send(res,200,{success:true,tickets:r.rows});
+}
+if(req.method==="GET"&&path==="/api/support/ticket"){
+const id=Number(url.searchParams.get("id")); if(!Number.isInteger(id)||id<1)return send(res,400,{success:false,message:"Invalid ticket."});
+const t=await db(`SELECT id,subject,message,status,created_at,updated_at FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
+if(!t.rows.length)return send(res,404,{success:false,message:"Support ticket not found."});
+const m=await db(`SELECT id,sender_type,message,created_at FROM support_messages WHERE ticket_id=$1 ORDER BY created_at ASC`,[id]);
+return send(res,200,{success:true,ticket:t.rows[0],messages:m.rows});
+}
+if(req.method==="POST"&&path==="/api/support/ticket/reply"){
+const b=await body(req); const id=Number(b.id),message=clean(b.message);
+if(!Number.isInteger(id)||id<1||message.length<2)return send(res,400,{success:false,message:"Please enter a message."});
+const t=await db(`SELECT id,status FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
+if(!t.rows.length)return send(res,404,{success:false,message:"Support ticket not found."});
+if(t.rows[0].status==="closed")return send(res,400,{success:false,message:"This ticket is closed. Please create a new ticket."});
+await db(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'user',$2,$3)`,[id,user.user_id,message]);
+await db(`UPDATE support_tickets SET status='open',updated_at=NOW() WHERE id=$1`,[id]);
+return send(res,200,{success:true,message:"Reply sent."});
 }
 return null;
 }
@@ -3078,6 +3314,14 @@ email:user.email
 /*
 WALLET
 */
+
+if(req.method==="POST"&&path==="/api/wallet/create"){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+await createWallet(user.user_id);
+const wallet=await getWallet(user.user_id);
+return send(res,200,{success:true,wallet});
+}
 
 if(
 req.method==="GET"&&
@@ -3158,6 +3402,9 @@ req.method==="POST"&&
 path==="/api/payments/initialize"
 ){
 
+const rl=rateLimit(req,"payment-initialize",10,60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+
 const user=
 await userFromToken(req);
 
@@ -3214,6 +3461,12 @@ req.method==="GET"&&
 path==="/api/payments/verify"
 ){
 
+const rl=rateLimit(req,"payment-verify",20,60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+
 const referenceValue=
 clean(
 url.searchParams.get(
@@ -3233,7 +3486,7 @@ message:
 
 const result=
 await verifyPayment(
-referenceValue
+referenceValue,user.user_id
 );
 
 return send(
@@ -3255,6 +3508,9 @@ if(
 req.method==="POST"&&
 ["/api/vtu/purchase","/api/vtu/airtime","/api/vtu/data","/api/vtu/cable","/api/vtu/electricity"].includes(path)
 ){
+
+const rl=rateLimit(req,"vtu-transaction",30,60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
 
 const user=
 await userFromToken(req);
@@ -3293,12 +3549,12 @@ async(req,res)=>{
 if(req.method==="OPTIONS"){
 
 res.writeHead(204,{
-"Access-Control-Allow-Origin":FRONTEND_ORIGIN,
+"Access-Control-Allow-Origin":corsOrigin(req),
 "Vary":"Origin",
 "Access-Control-Allow-Methods":
 "GET,POST,OPTIONS",
 "Access-Control-Allow-Headers":
-"Content-Type,Authorization"
+"Content-Type,Authorization,X-Idempotency-Key"
 });
 
 return res.end();
@@ -3306,6 +3562,8 @@ return res.end();
 }
 
 try{
+
+res.__corsOrigin=corsOrigin(req);
 
 const url=
 new URL(
@@ -3345,15 +3603,27 @@ if(
 req.method==="GET"&&
 path==="/api/health"
 ){
-
-return send(res,200,{
-success:true,
-message:
-"BOLTIV API is healthy.",
-status:
-"online",
-timestamp:
-new Date().toISOString()
+let database="not_configured";
+if(DATABASE_URL){
+try{
+await db("SELECT 1");
+database="connected";
+}catch(error){
+database="unavailable";
+}
+}
+const ready=database==="connected";
+return send(res,ready?200:503,{
+success:ready,
+message:ready?"BOLTIV API is healthy.":"BOLTIV API is not ready.",
+status:ready?"online":"degraded",
+database,
+configuration:{
+paystack:Boolean(PAYSTACK_SECRET_KEY),
+vtu:Boolean(VTU_API_URL&&VTU_API_KEY),
+mail:Boolean(RESEND_API_KEY)
+},
+timestamp:new Date().toISOString()
 });
 
 }

@@ -202,4 +202,130 @@ input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 
 <div class="heading"><h1>Settings</h1><p>Administrator and system preferences.</p></div>
 <div class="grid2">
 <div class="section"><div class="section-head"><h2>ADMIN PROFILE</h2></div><div class="section-body"><label>ADMIN EMAIL</label><input id="settingsEmail" readonly><label>ACCOUNT ROLE</label><input value="Administrator" readonly></div></div>
-<div class="section"><div class="section-head"><h2>SECURITY</h2></div><div class="section-body"><button class="btn" onclick="demo('Password change endpoint will be connected next.')">CHANGE PASSWORD</button><button class="btn" style="margin-left:6px" onclick="dem
+<div class="section"><div class="section-head"><h2>SECURITY</h2></div><div class="section-body"><button class="btn" onclick="demo('Password change endpoint will be connected next.')">CHANGE PASSWORD</button><button class="btn" style="margin-left:6px" onclick="demo('Two-factor authentication will be connected next.')">2FA SETTINGS</button></div></div>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+
+<div id="userModal" class="modal"><div class="modal-box"><div class="modal-head"><h2>USER DETAILS</h2><button class="close" onclick="closeModal('userModal')">×</button></div><div id="userModalContent"></div></div></div>
+
+<div id="walletModal" class="modal"><div class="modal-box" style="max-width:430px"><div class="modal-head"><h2 id="walletTitle">CREDIT WALLET</h2><button class="close" onclick="closeModal('walletModal')">×</button></div><div class="notice">This interface is prepared for the wallet adjustment backend.</div><label>USER ID / EMAIL</label><input id="walletUser" placeholder="Enter user ID or email"><label>AMOUNT</label><input id="walletAmount" type="number" min="0" placeholder="₦0.00"><label>REASON</label><input id="walletReason" placeholder="Reason"><div class="modal-actions"><button class="btn" onclick="closeModal('walletModal')">CANCEL</button><button class="btn primary" onclick="submitWallet()">CONFIRM</button></div></div></div>
+
+<script>
+const API="https://boltiv-backend.onrender.com";
+const TOKEN_KEY="boltivAdminToken";
+const EMAIL_KEY="boltivAdminEmail";
+let users=[],transactions=[],payments=[],walletType="credit";
+
+const $=id=>document.getElementById(id);
+const money=v=>"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+function date(v){if(!v)return"—";let d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString("en-NG",{dateStyle:"medium",timeStyle:"short"})}
+function demo(t){alert(t)}
+function openModal(id){$(id).classList.add("show")}
+function closeModal(id){$(id).classList.remove("show")}
+function setWalletType(type){walletType=type;$("walletTitle").textContent=type==="credit"?"CREDIT WALLET":"DEBIT WALLET"}
+
+function showMessage(text,type="error"){const m=$("message");m.textContent=text;m.className="message show "+type}
+function showLogin(){$("loginPage").classList.remove("hidden");$("app").classList.add("hidden")}
+function showApp(){$("loginPage").classList.add("hidden");$("app").classList.remove("hidden")}
+
+async function api(path,opt={}){
+const token=localStorage.getItem(TOKEN_KEY);
+const headers={"Accept":"application/json",...(opt.headers||{})};
+if(opt.body)headers["Content-Type"]="application/json";
+if(token)headers.Authorization="Bearer "+token;
+const r=await fetch(API+path,{...opt,headers});
+let d;try{d=await r.json()}catch{throw Error("Invalid server response.")}
+if(r.status===401){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(EMAIL_KEY);showLogin();throw Error("Admin session expired.")}
+if(!r.ok||!d.success)throw Error(d.message||"Request failed.");
+return d;
+}
+
+async function login(){
+const e=$("email").value.trim().toLowerCase(),p=$("password").value;
+if(!e)return showMessage("Enter your admin email.");
+if(!p)return showMessage("Enter your admin password.");
+$("loginButton").disabled=true;$("loginButton").textContent="LOGGING IN...";
+try{
+const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:e,password:p})});
+if(!d.token)throw Error("No admin session token returned.");
+localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(EMAIL_KEY,d.admin?.email||e);openDashboard();
+}catch(x){showMessage(x.message||"Login failed.")}
+finally{$("loginButton").disabled=false;$("loginButton").textContent="LOGIN TO ADMIN"}
+}
+
+async function openDashboard(){
+try{const d=await api("/api/admin/me");$("settingsEmail").value=d.admin?.email||localStorage.getItem(EMAIL_KEY)||"";showApp();await loadAll()}catch(x){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(EMAIL_KEY);showLogin();showMessage(x.message||"Session verification failed.")}
+}
+
+async function loadAll(){await Promise.allSettled([loadStats(),loadUsers(),loadTransactions(),loadPayments()]);loadRecent()}
+async function loadStats(){
+try{
+const d=await api("/api/admin/stats"),s=d.stats||{};
+$("dashUsers").textContent=s.users||0;$("dashWallet").textContent=money(s.walletBalance);$("dashTransactions").textContent=s.transactions||0;$("dashPayments").textContent=s.payments||0;
+$("analyticsUsers").textContent=s.users||0;$("analyticsTransactions").textContent=s.transactions||0;$("analyticsPayments").textContent=s.payments||0;$("analyticsWallet").textContent=money(s.walletBalance);
+$("metricUsers").textContent=s.users||0;$("metricTransactions").textContent=s.transactions||0;$("metricPayments").textContent=s.payments||0;$("metricWallet").textContent=money(s.walletBalance);$("walletTotal").textContent=money(s.walletBalance);
+}catch(e){console.error(e)}
+}
+
+async function loadUsers(){
+$("usersArea").innerHTML='<div class="loading">Loading users...</div>';
+try{const d=await api("/api/admin/users");users=d.users||[];renderUsers(users)}catch(e){$("usersArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
+}
+function renderUsers(list){
+$("userTotal").textContent=users.length;$("userActive").textContent=users.filter(x=>(x.status||"active")==="active").length;$("userSuspended").textContent=users.filter(x=>x.status==="suspended").length;$("userBalances").textContent=money(users.reduce((a,x)=>a+Number(x.balance||0),0));
+if(!list.length){$("usersArea").innerHTML='<div class="empty">No users found.</div>';return}
+$("usersArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>USER</th><th>PHONE</th><th>EMAIL</th><th>BALANCE</th><th>STATUS</th><th>JOINED</th><th></th></tr></thead><tbody>'+list.map((u,i)=>{let s=(u.status||"active").toLowerCase();return`<tr><td><strong>${esc(u.name||"Unnamed")}</strong><br><small>${esc(u.id||u.user_id||"—")}</small></td><td>${esc(u.phone||"—")}</td><td>${esc(u.email||"—")}</td><td class="amount">${money(u.balance)}</td><td><span class="badge ${s==="suspended"?"suspended":"active"}">${esc(s)}</span></td><td>${date(u.created_at)}</td><td><button class="btn" onclick="userDetails(${users.indexOf(u)})">VIEW</button></td></tr>`}).join("")+'</tbody></table></div>';
+}
+function filterUsers(){let q=$("userSearch").value.toLowerCase(),s=$("userStatus").value;renderUsers(users.filter(u=>(!q||`${u.name||""} ${u.email||""} ${u.phone||""} ${u.id||""}`.toLowerCase().includes(q))&&(!s||(u.status||"active").toLowerCase()===s)))}
+function userDetails(i){
+const u=users[i];if(!u)return;
+$("userModalContent").innerHTML=`<div class="profile"><div class="avatar">${esc((u.name||"U")[0].toUpperCase())}</div><div><strong>${esc(u.name||"Unnamed User")}</strong><br><small>${esc(u.email||"—")}</small></div></div><div class="grid3" style="margin-top:15px"><div class="stat"><div class="stat-label">BALANCE</div><div class="stat-value">${money(u.balance)}</div></div><div class="stat"><div class="stat-label">STATUS</div><div class="stat-value" style="font-size:13px">${esc(u.status||"active")}</div></div><div class="stat"><div class="stat-label">JOINED</div><div class="stat-value" style="font-size:11px">${date(u.created_at)}</div></div></div><div style="margin-top:15px"><div class="activity"><span>Phone</span><strong>${esc(u.phone||"—")}</strong></div><div class="activity"><span>User ID</span><strong>${esc(u.id||u.user_id||"—")}</strong></div></div><div class="modal-actions"><button class="btn" onclick="closeModal('userModal')">CLOSE</button><button class="btn primary" onclick="closeModal('userModal');openModal('walletModal')">WALLET</button></div>`;
+openModal("userModal");
+}
+
+async function loadTransactions(){
+$("transactionsArea").innerHTML='<div class="loading">Loading transactions...</div>';
+try{const d=await api("/api/admin/transactions");transactions=d.transactions||[];renderTransactions(transactions)}catch(e){$("transactionsArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
+}
+function renderTransactions(list){
+if(!list.length){$("transactionsArea").innerHTML='<div class="empty">No transactions found.</div>';return}
+$("transactionsArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>USER</th><th>SERVICE</th><th>AMOUNT</th><th>STATUS</th><th>DATE</th></tr></thead><tbody>'+list.map(x=>{let s=(x.status||"pending").toLowerCase();return`<tr><td>${esc(x.reference||"—")}</td><td>${esc(x.user_id||"—")}</td><td>${esc(x.service||"—")}</td><td class="amount">${money(x.amount)}</td><td><span class="badge ${esc(s)}">${esc(x.status||"pending")}</span></td><td>${date(x.date||x.created_at)}</td></tr>`}).join("")+'</tbody></table></div>';
+}
+function filterTransactions(){let q=$("transactionSearch").value.toLowerCase(),s=$("transactionStatus").value;renderTransactions(transactions.filter(x=>(!q||`${x.reference||""} ${x.service||""} ${x.user_id||""}`.toLowerCase().includes(q))&&(!s||(x.status||"pending").toLowerCase()===s)))}
+
+async function loadPayments(){
+$("paymentsArea").innerHTML='<div class="loading">Loading payments...</div>';
+try{const d=await api("/api/admin/payments");payments=d.payments||[];renderPayments(payments)}catch(e){$("paymentsArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
+}
+function renderPayments(list){
+$("paymentTotal").textContent=list.length;$("paymentSuccess").textContent=list.filter(x=>(x.status||"").toLowerCase()==="successful").length;$("paymentPending").textContent=list.filter(x=>(x.status||"").toLowerCase()==="pending").length;$("paymentFailed").textContent=list.filter(x=>(x.status||"").toLowerCase()==="failed").length;
+if(!list.length){$("paymentsArea").innerHTML='<div class="empty">No payments found.</div>';return}
+$("paymentsArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>EMAIL</th><th>AMOUNT</th><th>STATUS</th><th>CREDITED</th><th>DATE</th></tr></thead><tbody>'+list.map(x=>{let s=(x.status||"pending").toLowerCase();return`<tr><td>${esc(x.reference||"—")}</td><td>${esc(x.email||"—")}</td><td class="amount">${money(x.amount)}</td><td><span class="badge ${esc(s)}">${esc(x.status||"pending")}</span></td><td>${x.credited?"YES":"NO"}</td><td>${date(x.created_at)}</td></tr>`}).join("")+'</tbody></table></div>';
+}
+function filterPayments(){let q=$("paymentSearch").value.toLowerCase();renderPayments(payments.filter(x=>!q||`${x.reference||""} ${x.email||""}`.toLowerCase().includes(q)))}
+
+function loadRecent(){
+let list=[...payments.slice(0,4).map(x=>({title:"Payment",detail:x.email||x.reference,amount:money(x.amount),time:date(x.created_at)})),...transactions.slice(0,4).map(x=>({title:"Transaction",detail:x.service||x.reference,amount:money(x.amount),time:date(x.date||x.created_at)}))].slice(0,6);
+$("recentActivity").innerHTML=list.length?list.map(x=>`<div class="activity"><div><strong>${esc(x.title)}</strong><br><small>${esc(x.detail||"—")}</small></div><div style="text-align:right"><strong class="amount">${esc(x.amount)}</strong><br><small>${esc(x.time)}</small></div></div>`).join(""):'<div class="empty">No recent activity.</div>';
+}
+function loadDashboard(){loadStats();loadRecent()}
+function loadActivity(){demo("Admin activity backend endpoint will be connected here.")}
+function submitWallet(){let user=$("walletUser").value.trim(),amount=Number($("walletAmount").value),reason=$("walletReason").value.trim();if(!user||amount<=0||!reason)return alert("Enter user, amount and reason.");if(!confirm(`${walletType.toUpperCase()} ${money(amount)}?`))return;demo("Frontend ready. Connect the wallet adjustment endpoint before enabling live changes.");closeModal("walletModal")}
+function sendNotification(){let title=$("notificationTitle").value.trim(),msg=$("notificationMessage").value.trim();if(!title||!msg)return alert("Enter a title and message.");demo("Notification frontend ready. Connect the notification endpoint before sending.");}
+function goPage(page){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));$("page-"+page).classList.add("active");$("topTitle").textContent=page.charAt(0).toUpperCase()+page.slice(1);$("topSub").textContent="BOLTIV administration";$("sidebar").classList.remove("open");if(page==="users")loadUsers();if(page==="transactions")loadTransactions();if(page==="payments")loadPayments()}
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>goPage(b.dataset.page));
+$("menuButton").onclick=()=>$("sidebar").classList.toggle("open");
+$("loginButton").onclick=login;
+$("password").onkeydown=e=>{if(e.key==="Enter")login()};
+$("email").onkeydown=e=>{if(e.key==="Enter")$("password").focus()};
+$("logoutButton").onclick=async()=>{try{await fetch(API+"/api/admin/logout",{method:"POST",headers:{Authorization:"Bearer "+localStorage.getItem(TOKEN_KEY)}})}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(EMAIL_KEY);showLogin();$("email").value="";$("password").value=""};
+document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
+(function(){if(localStorage.getItem(TOKEN_KEY))openDashboard();else showLogin()})();
+</script>
+</body>
+</html>

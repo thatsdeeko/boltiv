@@ -5,556 +5,1095 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
 <title>BOLTIV — Admin Control Center</title>
+
 <style>
-/* BASE */
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#b8860b;--gold2:#9b7315;--bg:#f7f7f5;--card:#fff;--text:#171717;--muted:#777;--line:#e8e8e8;--danger:#b42318;--dangerbg:#fff1f0;--success:#18753b;--successbg:#edf9f1}
-body{background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;font-size:14.3px;min-height:100vh}
-button,input{font:inherit}
-button{cursor:pointer}
-.hidden{display:none!important}
+*{
+box-sizing:border-box;
+margin:0;
+padding:0;
+}
 
-/* LOGIN */
-.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.login-card{width:100%;max-width:400px;padding:30px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.08)}
-.logo{text-align:center;color:var(--gold2);font-size:35.2px;font-weight:1000;letter-spacing:5px}
-.title{text-align:center;margin-top:10px;font-size:17.6px;font-weight:1000}
-.sub{text-align:center;margin:7px 0 27px;color:#888;font-size:11px;letter-spacing:1px}
-label{display:block;margin-bottom:7px;color:#555;font-size:11px;font-weight:900;letter-spacing:.5px}
-input{width:100%;height:48px;margin-bottom:16px;padding:0 14px;border:1px solid #ddd;border-radius:11px;outline:none;background:#fff;color:#171717;font-size:15.4px}
-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
-.login-btn{width:100%;height:49px;border:0;border-radius:11px;background:var(--gold);color:#171717;font-weight:1000}
-.login-btn:hover{background:#b78d1f}
-.login-btn:disabled{opacity:.55}
-.message{display:none;margin-top:14px;padding:12px;border-radius:10px;text-align:center;font-size:11px;line-height:1.5}
-.message.show{display:block}
-.message.error{color:var(--danger);background:var(--dangerbg);border:1px solid #f1c7c2}
-.message.success{color:#856404;background:#fff9e6;border:1px solid #ead58a}
+:root{
+--gold:#b8860b;
+--gold2:#9b7315;
+--gold-light:#fff9e6;
 
-/* DASHBOARD */
-.dashboard{min-height:100vh}
-.topbar{height:70px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.brand{color:var(--gold2);font-size:23px;font-weight:1000;letter-spacing:3px}
-.admin-label{color:#888;font-size:10px;margin-top:3px;font-weight:700}
-.logout-btn{padding:10px 14px;border:1px solid #ead58a;border-radius:9px;background:#fff9e6;color:#8a6b10;font-size:10px;font-weight:1000}
-.container{width:100%;max-width:1100px;margin:auto;padding:22px}
-.heading{margin-bottom:20px}
-.heading h1{font-size:26.4px;font-weight:1000}
-.heading p{margin-top:6px;color:#888;font-size:11px}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
-.stat{padding:18px;background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:0 5px 20px rgba(0,0,0,.035)}
-.stat-label{color:#777;font-size:10px;font-weight:900;letter-spacing:.5px}
-.stat-value{margin-top:8px;color:var(--gold2);font-size:23.1px;font-weight:1000}
-.section{margin-top:18px;background:#fff;border:1px solid var(--line);border-radius:17px;overflow:hidden;box-shadow:0 5px 20px rgba(0,0,0,.035)}
-.section-head{padding:16px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
-.section-head h2{font-size:13.2px;font-weight:1000;letter-spacing:.5px}
-.refresh-btn{padding:8px 11px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#555;font-size:10px;font-weight:900}
-.refresh-btn:hover{border-color:var(--gold);color:var(--gold2)}
-.table-wrap{width:100%;overflow-x:auto}
-table{width:100%;border-collapse:collapse;min-width:650px}
-th,td{padding:13px;text-align:left;border-bottom:1px solid #eee;font-size:10px;white-space:nowrap}
-th{color:#888;font-size:7.7px;letter-spacing:.7px;background:#fafafa}
-td{color:#333}
-tr:last-child td{border-bottom:0}
-.amount{color:var(--gold2);font-weight:1000}
-.status{display:inline-block;padding:5px 8px;border-radius:6px;font-size:7.7px;font-weight:1000;text-transform:uppercase}
-.status.successful{color:var(--success);background:var(--successbg)}
-.status.failed{color:var(--danger);background:var(--dangerbg)}
-.status.pending{color:#856404;background:#fff9e6}
-.empty,.loading{padding:28px;text-align:center;color:#888;font-size:11px}
-.error-box{padding:14px;margin:15px;border:1px solid #f1c7c2;border-radius:10px;background:var(--dangerbg);color:var(--danger);font-size:11px}
+--bg:#f7f7f5;
+--card:#ffffff;
+--text:#171717;
+--muted:#777;
+--line:#e8e8e8;
 
-/* MOBILE */
-@media(max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.container{padding:15px}.topbar{padding:0 15px}.brand{font-size:23px}.heading h1{font-size:23.1px}.stat-value{font-size:19.8px}}
-@media(max-width:400px){.login-card{padding:24px 19px}.stats{gap:8px}.stat{padding:14px}.stat-value{font-size:17.6px}}
+--success:#18753b;
+--success-bg:#edf9f1;
+
+--danger:#b42318;
+--danger-bg:#fff1f0;
+
+--warning:#856404;
+--warning-bg:#fff9e6;
+
+--sidebar:245px;
+}
+
+body{
+background:var(--bg);
+color:var(--text);
+font-family:Arial,Helvetica,sans-serif;
+font-size:14px;
+min-height:100vh;
+}
+
+button,
+input,
+select{
+font:inherit;
+}
+
+button{
+cursor:pointer;
+}
+
+.hidden{
+display:none!important;
+}
+
+
+/* =========================
+   LOGIN
+========================= */
+
+.login-page{
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px;
+}
+
+.login-card{
+width:100%;
+max-width:400px;
+padding:30px;
+background:#fff;
+border:1px solid var(--line);
+border-radius:22px;
+box-shadow:0 20px 60px rgba(0,0,0,.08);
+}
+
+.logo{
+text-align:center;
+color:var(--gold2);
+font-size:35px;
+font-weight:1000;
+letter-spacing:5px;
+}
+
+.login-title{
+text-align:center;
+margin-top:10px;
+font-size:18px;
+font-weight:1000;
+}
+
+.login-sub{
+text-align:center;
+margin:7px 0 27px;
+color:#888;
+font-size:11px;
+letter-spacing:1px;
+}
+
+label{
+display:block;
+margin-bottom:7px;
+color:#555;
+font-size:11px;
+font-weight:900;
+letter-spacing:.5px;
+}
+
+input,
+select{
+width:100%;
+height:46px;
+padding:0 13px;
+border:1px solid #ddd;
+border-radius:10px;
+outline:none;
+background:#fff;
+color:#171717;
+}
+
+input:focus,
+select:focus{
+border-color:var(--gold);
+box-shadow:0 0 0 3px rgba(184,134,11,.10);
+}
+
+.login-card input{
+margin-bottom:16px;
+}
+
+.login-btn{
+width:100%;
+height:49px;
+border:0;
+border-radius:11px;
+background:var(--gold);
+color:#171717;
+font-weight:1000;
+}
+
+.login-btn:hover{
+background:#c19420;
+}
+
+.login-btn:disabled{
+opacity:.55;
+}
+
+.message{
+display:none;
+margin-top:14px;
+padding:12px;
+border-radius:10px;
+text-align:center;
+font-size:11px;
+line-height:1.5;
+}
+
+.message.show{
+display:block;
+}
+
+.message.error{
+color:var(--danger);
+background:var(--danger-bg);
+border:1px solid #f1c7c2;
+}
+
+.message.success{
+color:var(--warning);
+background:var(--warning-bg);
+border:1px solid #ead58a;
+}
+
+
+/* =========================
+   APP
+========================= */
+
+.app{
+min-height:100vh;
+}
+
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.sidebar{
+position:fixed;
+left:0;
+top:0;
+bottom:0;
+width:var(--sidebar);
+background:#fff;
+border-right:1px solid var(--line);
+z-index:100;
+display:flex;
+flex-direction:column;
+}
+
+.sidebar-brand{
+height:72px;
+padding:0 22px;
+display:flex;
+align-items:center;
+border-bottom:1px solid var(--line);
+}
+
+.sidebar-logo{
+color:var(--gold2);
+font-size:24px;
+font-weight:1000;
+letter-spacing:3px;
+}
+
+.sidebar-sub{
+font-size:8px;
+color:#999;
+margin-top:3px;
+font-weight:800;
+letter-spacing:.7px;
+}
+
+.sidebar-nav{
+padding:14px 10px;
+overflow-y:auto;
+flex:1;
+}
+
+.nav-label{
+padding:12px 10px 7px;
+font-size:8px;
+font-weight:1000;
+color:#999;
+letter-spacing:1px;
+}
+
+.nav-item{
+width:100%;
+display:flex;
+align-items:center;
+gap:11px;
+padding:11px 12px;
+margin-bottom:3px;
+border:0;
+border-radius:9px;
+background:transparent;
+color:#555;
+text-align:left;
+font-size:11px;
+font-weight:800;
+}
+
+.nav-item:hover{
+background:#faf7ec;
+color:var(--gold2);
+}
+
+.nav-item.active{
+background:var(--gold-light);
+color:var(--gold2);
+}
+
+.nav-icon{
+width:19px;
+text-align:center;
+font-size:15px;
+}
+
+.sidebar-bottom{
+padding:12px;
+border-top:1px solid var(--line);
+}
+
+.admin-mini{
+padding:10px;
+background:#fafafa;
+border-radius:10px;
+}
+
+.admin-mini-name{
+font-size:10px;
+font-weight:900;
+overflow:hidden;
+text-overflow:ellipsis;
+white-space:nowrap;
+}
+
+.admin-mini-role{
+font-size:8px;
+color:#999;
+margin-top:3px;
+}
+
+.sidebar-logout{
+width:100%;
+margin-top:8px;
+padding:9px;
+border:1px solid #ead58a;
+border-radius:8px;
+background:var(--gold-light);
+color:#8a6b10;
+font-size:9px;
+font-weight:1000;
+}
+
+
+/* =========================
+   MAIN
+========================= */
+
+.main{
+margin-left:var(--sidebar);
+min-height:100vh;
+}
+
+
+/* =========================
+   TOPBAR
+========================= */
+
+.topbar{
+height:72px;
+padding:0 25px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+background:#fff;
+border-bottom:1px solid var(--line);
+position:sticky;
+top:0;
+z-index:50;
+}
+
+.topbar-left{
+display:flex;
+align-items:center;
+gap:12px;
+}
+
+.mobile-menu{
+display:none;
+border:1px solid #ddd;
+background:#fff;
+border-radius:8px;
+width:36px;
+height:36px;
+}
+
+.page-title{
+font-size:18px;
+font-weight:1000;
+}
+
+.page-subtitle{
+font-size:9px;
+color:#999;
+margin-top:3px;
+}
+
+.topbar-right{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.notification-btn{
+width:36px;
+height:36px;
+border:1px solid #ddd;
+border-radius:9px;
+background:#fff;
+position:relative;
+}
+
+.notification-dot{
+position:absolute;
+right:6px;
+top:5px;
+width:6px;
+height:6px;
+border-radius:50%;
+background:#c33;
+}
+
+.admin-avatar{
+width:35px;
+height:35px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+background:var(--gold-light);
+color:var(--gold2);
+font-size:11px;
+font-weight:1000;
+}
+
+
+/* =========================
+   CONTENT
+========================= */
+
+.content{
+padding:25px;
+max-width:1400px;
+margin:auto;
+}
+
+.page{
+display:none;
+}
+
+.page.active{
+display:block;
+}
+
+
+/* =========================
+   PAGE HEADER
+========================= */
+
+.page-header{
+display:flex;
+align-items:flex-end;
+justify-content:space-between;
+gap:15px;
+margin-bottom:22px;
+}
+
+.page-header h1{
+font-size:25px;
+font-weight:1000;
+}
+
+.page-header p{
+margin-top:5px;
+font-size:10px;
+color:#888;
+}
+
+.header-actions{
+display:flex;
+gap:8px;
+}
+
+.btn{
+border:1px solid #ddd;
+background:#fff;
+border-radius:8px;
+padding:9px 13px;
+font-size:9px;
+font-weight:900;
+}
+
+.btn:hover{
+border-color:var(--gold);
+color:var(--gold2);
+}
+
+.btn-primary{
+background:var(--gold);
+border-color:var(--gold);
+color:#171717;
+}
+
+.btn-danger{
+background:var(--danger-bg);
+border-color:#f1c7c2;
+color:var(--danger);
+}
+
+
+/* =========================
+   STAT CARDS
+========================= */
+
+.stats{
+display:grid;
+grid-template-columns:repeat(4,minmax(0,1fr));
+gap:13px;
+margin-bottom:20px;
+}
+
+.stat{
+background:#fff;
+border:1px solid var(--line);
+border-radius:15px;
+padding:17px;
+box-shadow:0 4px 18px rgba(0,0,0,.025);
+}
+
+.stat-top{
+display:flex;
+align-items:center;
+justify-content:space-between;
+}
+
+.stat-label{
+font-size:9px;
+font-weight:900;
+color:#777;
+letter-spacing:.5px;
+}
+
+.stat-icon{
+width:30px;
+height:30px;
+display:flex;
+align-items:center;
+justify-content:center;
+border-radius:8px;
+background:var(--gold-light);
+font-size:14px;
+}
+
+.stat-value{
+margin-top:10px;
+font-size:22px;
+font-weight:1000;
+color:var(--gold2);
+}
+
+.stat-change{
+margin-top:7px;
+font-size:8px;
+font-weight:800;
+}
+
+.stat-change.up{
+color:var(--success);
+}
+
+.stat-change.down{
+color:var(--danger);
+}
+
+
+/* =========================
+   CARDS
+========================= */
+
+.grid-2{
+display:grid;
+grid-template-columns:1.5fr 1fr;
+gap:15px;
+}
+
+.grid-3{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:15px;
+}
+
+.card{
+background:#fff;
+border:1px solid var(--line);
+border-radius:15px;
+overflow:hidden;
+box-shadow:0 4px 18px rgba(0,0,0,.025);
+}
+
+.card-head{
+padding:15px 17px;
+border-bottom:1px solid var(--line);
+display:flex;
+align-items:center;
+justify-content:space-between;
+}
+
+.card-head h2{
+font-size:12px;
+font-weight:1000;
+}
+
+.card-body{
+padding:17px;
+}
+
+
+/* =========================
+   CHART PLACEHOLDER
+========================= */
+
+.chart{
+height:270px;
+display:flex;
+align-items:flex-end;
+gap:9px;
+padding:20px 10px 10px;
+}
+
+.bar{
+flex:1;
+background:linear-gradient(to top,#b8860b,#d5b64c);
+border-radius:5px 5px 0 0;
+min-height:20px;
+}
+
+.chart-labels{
+display:flex;
+gap:9px;
+padding:0 10px 15px;
+}
+
+.chart-labels span{
+flex:1;
+text-align:center;
+font-size:7px;
+color:#999;
+}
+
+
+/* =========================
+   TABLES
+========================= */
+
+.table-tools{
+padding:12px 15px;
+display:flex;
+gap:8px;
+border-bottom:1px solid var(--line);
+}
+
+.table-tools input{
+max-width:300px;
+height:36px;
+margin:0;
+font-size:10px;
+}
+
+.table-wrap{
+width:100%;
+overflow-x:auto;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+min-width:700px;
+}
+
+th,
+td{
+padding:12px;
+text-align:left;
+border-bottom:1px solid #eee;
+white-space:nowrap;
+font-size:9px;
+}
+
+th{
+background:#fafafa;
+color:#888;
+font-size:7px;
+letter-spacing:.7px;
+}
+
+td{
+color:#333;
+}
+
+tr:last-child td{
+border-bottom:0;
+}
+
+.amount{
+font-weight:1000;
+color:var(--gold2);
+}
+
+.status{
+display:inline-block;
+padding:5px 8px;
+border-radius:6px;
+font-size:7px;
+font-weight:1000;
+text-transform:uppercase;
+}
+
+.status.successful,
+.status.completed,
+.status.active{
+color:var(--success);
+background:var(--success-bg);
+}
+
+.status.failed,
+.status.suspended,
+.status.banned{
+color:var(--danger);
+background:var(--danger-bg);
+}
+
+.status.pending,
+.status.processing{
+color:var(--warning);
+background:var(--warning-bg);
+}
+
+
+/* =========================
+   ATTENTION
+========================= */
+
+.attention-list{
+display:flex;
+flex-direction:column;
+gap:9px;
+}
+
+.attention{
+padding:11px;
+border:1px solid var(--line);
+border-radius:9px;
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:10px;
+}
+
+.attention-left{
+display:flex;
+align-items:center;
+gap:9px;
+}
+
+.attention-icon{
+width:28px;
+height:28px;
+border-radius:7px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:var(--danger-bg);
+color:var(--danger);
+}
+
+.attention-title{
+font-size:9px;
+font-weight:900;
+}
+
+.attention-sub{
+font-size:7px;
+color:#999;
+margin-top:3px;
+}
+
+.attention-count{
+font-size:12px;
+font-weight:1000;
+color:var(--gold2);
+}
+
+
+/* =========================
+   QUICK ACTIONS
+========================= */
+
+.quick-actions{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:9px;
+}
+
+.quick-action{
+padding:13px;
+border:1px solid var(--line);
+border-radius:9px;
+background:#fff;
+text-align:left;
+}
+
+.quick-action:hover{
+border-color:#d7bd69;
+background:#fffdf5;
+}
+
+.quick-action-icon{
+font-size:18px;
+}
+
+.quick-action-title{
+margin-top:7px;
+font-size:9px;
+font-weight:1000;
+}
+
+.quick-action-sub{
+margin-top:3px;
+font-size:7px;
+color:#999;
+}
+
+
+/* =========================
+   USER CARDS
+========================= */
+
+.user-grid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:12px;
+}
+
+.user-card{
+padding:15px;
+border:1px solid var(--line);
+border-radius:12px;
+background:#fff;
+}
+
+.user-top{
+display:flex;
+align-items:center;
+gap:10px;
+}
+
+.user-avatar{
+width:37px;
+height:37px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+background:var(--gold-light);
+color:var(--gold2);
+font-size:10px;
+font-weight:1000;
+}
+
+.user-name{
+font-size:10px;
+font-weight:1000;
+}
+
+.user-email{
+font-size:8px;
+color:#999;
+margin-top:3px;
+}
+
+.user-info{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:8px;
+margin-top:14px;
+}
+
+.user-info div{
+padding:8px;
+background:#fafafa;
+border-radius:7px;
+}
+
+.user-info span{
+display:block;
+font-size:7px;
+color:#999;
+}
+
+.user-info strong{
+display:block;
+font-size:9px;
+margin-top:3px;
+}
+
+
+/* =========================
+   SETTINGS
+========================= */
+
+.settings-grid{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:15px;
+}
+
+.setting-row{
+padding:14px 0;
+border-bottom:1px solid #eee;
+}
+
+.setting-row:last-child{
+border-bottom:0;
+}
+
+.setting-label{
+font-size:10px;
+font-weight:900;
+}
+
+.setting-description{
+font-size:8px;
+color:#999;
+margin-top:4px;
+}
+
+.toggle{
+width:40px;
+height:22px;
+border:0;
+border-radius:20px;
+background:#ddd;
+position:relative;
+}
+
+.toggle.on{
+background:var(--gold);
+}
+
+.toggle:after{
+content:"";
+position:absolute;
+top:3px;
+left:3px;
+width:16px;
+height:16px;
+background:#fff;
+border-radius:50%;
+transition:.2s;
+}
+
+.toggle.on:after{
+left:21px;
+}
+
+
+/* =========================
+   SYSTEM STATUS
+========================= */
+
+.system-list{
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+
+.system-row{
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:13px;
+border:1px solid var(--line);
+border-radius:9px;
+}
+
+.system-name{
+font-size:9px;
+font-weight:900;
+}
+
+.system-status{
+display:flex;
+align-items:center;
+gap:6px;
+font-size:8px;
+font-weight:900;
+}
+
+.online-dot{
+width:7px;
+height:7px;
+border-radius:50%;
+background:#2d9b58;
+}
+
+
+/* =========================
+   OVERLAY
+========================= */
+
+.overlay{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.35);
+z-index:90;
+}
+
+.overlay.show{
+display:block;
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media(max-width:1000px){
+
+.stats{
+grid-template-columns:repeat(2,1fr);
+}
+
+.grid-2{
+grid-template-columns:1fr;
+}
+
+.user-grid{
+grid-template-columns:repeat(2,1fr);
+}
+
+}
+
+@media(max-width:700px){
+
+:root{
+--sidebar:245px;
+}
+
+.sidebar{
+transform:translateX(-100%);
+transition:.25s;
+}
+
+.sidebar.open{
+transform:translateX(0);
+}
+
+.main{
+margin-left:0;
+}
+
+.mobile-menu{
+display:block;
+}
+
+.topbar{
+padding:0 15px;
+}
+
+.content{
+padding:15px;
+}
+
+.page-header{
+align-items:flex-start;
+flex-direction:column;
+}
+
+.stats{
+grid-template-columns:repeat(2,1fr);
+gap:9px;
+}
+
+.stat{
+padding:13px;
+}
+
+.stat-value{
+font-size:18px;
+}
+
+.user-grid{
+grid-template-columns:1fr;
+}
+
+.settings-grid{
+grid-template-columns:1fr;
+}
+
+.topbar-right .notification-btn{
+display:none;
+}
+
+}
+
+@media(max-width:400px){
+
+.stats{
+grid-template-columns:1fr 1fr;
+}
+
+.stat-label{
+font-size:7px;
+}
+
+.stat-value{
+font-size:16px;
+}
+
+.content{
+padding:11px;
+}
+
+}
 </style>
 </head>
-<body>
 
-<!-- LOGIN -->
-<div id="loginPage" class="login-page">
-<div class="login-card">
-<div class="logo">BOLTIV</div>
-<div class="title">ADMIN CONTROL CENTER</div>
-<div class="sub">SECURE ADMINISTRATOR ACCESS</div>
-<label for="email">ADMIN EMAIL</label>
-<input id="email" type="email" autocomplete="username" placeholder="Admin email">
-<label for="password">ADMIN PASSWORD</label>
-<input id="password" type="password" autocomplete="current-password" placeholder="Admin password">
-<button id="loginButton" class="login-btn" type="button">LOGIN TO ADMIN</button>
-<div id="message" class="message"></div>
-</div>
-</div>
-
-<!-- DASHBOARD -->
-<div id="dashboard" class="dashboard hidden">
-<div class="topbar">
-<div>
-<div class="brand">BOLTIV</div>
-<div class="admin-label">ADMIN CONTROL CENTER</div>
-</div>
-<button id="logoutButton" class="logout-btn">LOGOUT</button>
-</div>
-
-<div class="container">
-<div class="heading">
-<h1>Dashboard</h1>
-<p id="adminEmailDisplay">Loading administrator...</p>
-</div>
-
-<!-- STATS -->
-<div class="stats">
-<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="usersCount" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">WALLET BALANCE</div><div id="walletBalance" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="transactionsCount" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PAYMENTS</div><div id="paymentsCount" class="stat-value">0</div></div>
-</div>
-
-<!-- USERS -->
-<div class="section">
-<div class="section-head"><h2>USERS</h2><button class="refresh-btn" onclick="loadUsers()">REFRESH</button></div>
-<div id="usersArea" class="loading">Loading users...</div>
-</div>
-
-<!-- TRANSACTIONS -->
-<div class="section">
-<div class="section-head"><h2>TRANSACTIONS</h2><button class="refresh-btn" onclick="loadTransactions()">REFRESH</button></div>
-<div id="transactionsArea" class="loading">Loading transactions...</div>
-</div>
-
-<!-- PAYMENTS -->
-<div class="section">
-<div class="section-head"><h2>PAYMENTS</h2><button class="refresh-btn" onclick="loadPayments()">REFRESH</button></div>
-<div id="paymentsArea" class="loading">Loading payments...</div>
-</div>
-</div>
-</div>
-
-<script>
-/* CONFIG */
-const API="https://boltiv-backend.onrender.com";
-const TOKEN_KEY="boltivAdminToken";
-const EMAIL_KEY="boltivAdminEmail";
-
-/* ELEMENTS */
-const loginPage=document.getElementById("loginPage");
-const dashboard=document.getElementById("dashboard");
-const email=document.getElementById("email");
-const password=document.getElementById("password");
-const loginButton=document.getElementById("loginButton");
-const message=document.getElementById("message");
-const logoutButton=document.getElementById("logoutButton");
-
-/* HELPERS */
-function showMessage(text,type="error"){
-message.textContent=text;
-message.className="message show "+type;
-}
-
-function hideLogin(){
-loginPage.classList.add("hidden");
-dashboard.classList.remove("hidden");
-}
-
-function showLogin(){
-dashboard.classList.add("hidden");
-loginPage.classList.remove("hidden");
-}
-
-function money(value){
-return "₦"+Number(value||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
-}
-
-function escapeHTML(value){
-return String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
-}
-
-function formatDate(value){
-if(!value)return "—";
-const date=new Date(value);
-if(Number.isNaN(date.getTime()))return String(value);
-return date.toLocaleString("en-NG",{dateStyle:"medium",timeStyle:"short"});
-}
-
-/* API */
-async function api(path,options={}){
-const token=localStorage.getItem(TOKEN_KEY);
-const headers={"Accept":"application/json",...(options.headers||{})};
-if(options.body)headers["Content-Type"]="application/json";
-if(token)headers["Authorization"]="Bearer "+token;
-
-const response=await fetch(API+path,{...options,headers});
-let data;
-
-try{data=await response.json()}catch{throw new Error("Invalid server response.")}
-
-if(response.status===401){
-localStorage.removeItem(TOKEN_KEY);
-localStorage.removeItem(EMAIL_KEY);
-showLogin();
-throw new Error("Admin session expired.");
-}
-
-if(!response.ok||!data.success)throw new Error(data.message||"Request failed.");
-return data;
-}
-
-/* LOGIN */
-async function login(){
-const adminEmail=email.value.trim().toLowerCase();
-const adminPassword=password.value;
-message.className="message";
-message.textContent="";
-
-if(!adminEmail){showMessage("Enter your admin email.");email.focus();return}
-if(!adminPassword){showMessage("Enter your admin password.");password.focus();return}
-
-loginButton.disabled=true;
-loginButton.textContent="LOGGING IN...";
-
-try{
-const data=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:adminEmail,password:adminPassword})});
-if(!data.token)throw new Error("No admin session token was returned.");
-
-localStorage.setItem(TOKEN_KEY,data.token);
-localStorage.setItem(EMAIL_KEY,data.admin?.email||adminEmail);
-showMessage("Login successful.","success");
-setTimeout(openDashboard,400);
-}catch(error){
-console.error("BOLTIV ADMIN LOGIN ERROR:",error);
-showMessage(error.message||"Admin login failed.");
-}finally{
-loginButton.disabled=false;
-loginButton.textContent="LOGIN TO ADMIN";
-}
-}
-/* DASHBOARD */
-async function openDashboard(){
-try{
-const data=await api("/api/admin/me");
-
-document.getElementById("adminEmailDisplay").textContent=
-data.admin?.email||
-localStorage.getItem(EMAIL_KEY)||
-"Administrator";
-
-hideLogin();
-await loadAll();
-
-}catch(error){
-console.error("ADMIN SESSION ERROR:",error);
-
-localStorage.removeItem(TOKEN_KEY);
-localStorage.removeItem(EMAIL_KEY);
-
-showLogin();
-
-showMessage(
-error.message||
-"Unable to verify admin session."
-);
-}
-}
-
-/* LOAD ALL DATA */
-async function loadAll(){
-await Promise.all([
-loadStats(),
-loadUsers(),
-loadTransactions(),
-loadPayments()
-]);
-}
-
-/* LOAD STATS */
-async function loadStats(){
-try{
-const data=await api("/api/admin/stats");
-const stats=data.stats||{};
-
-document.getElementById("usersCount").textContent=
-stats.users||0;
-
-document.getElementById("walletBalance").textContent=
-money(stats.walletBalance);
-
-document.getElementById("transactionsCount").textContent=
-stats.transactions||0;
-
-document.getElementById("paymentsCount").textContent=
-stats.payments||0;
-
-}catch(error){
-console.error("STATS ERROR:",error);
-}
-}
-
-/* LOAD USERS */
-async function loadUsers(){
-const area=document.getElementById("usersArea");
-
-area.innerHTML=
-'<div class="loading">Loading users...</div>';
-
-try{
-const data=await api("/api/admin/users");
-const users=data.users||[];
-
-if(!users.length){
-area.innerHTML=
-'<div class="empty">No users found.</div>';
-return;
-}
-
-let html=`
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>USER</th>
-<th>PHONE</th>
-<th>EMAIL</th>
-<th>BALANCE</th>
-<th>CREATED</th>
-</tr>
-</thead>
-<tbody>`;
-
-users.forEach(user=>{
-html+=`
-<tr>
-<td>${escapeHTML(user.name||"—")}</td>
-<td>${escapeHTML(user.phone||"—")}</td>
-<td>${escapeHTML(user.email||"—")}</td>
-<td class="amount">${money(user.balance)}</td>
-<td>${escapeHTML(formatDate(user.created_at))}</td>
-</tr>`;
-});
-
-html+=`
-</tbody>
-</table>
-</div>`;
-
-area.innerHTML=html;
-
-}catch(error){
-console.error("USERS ERROR:",error);
-
-area.innerHTML=
-`<div class="error-box">${escapeHTML(error.message)}</div>`;
-}
-}
-
-/* LOAD TRANSACTIONS */
-async function loadTransactions(){
-const area=document.getElementById("transactionsArea");
-
-area.innerHTML=
-'<div class="loading">Loading transactions...</div>';
-
-try{
-const data=await api("/api/admin/transactions");
-const items=data.transactions||[];
-
-if(!items.length){
-area.innerHTML=
-'<div class="empty">No transactions found.</div>';
-return;
-}
-
-let html=`
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>REFERENCE</th>
-<th>USER</th>
-<th>SERVICE</th>
-<th>AMOUNT</th>
-<th>STATUS</th>
-<th>DATE</th>
-</tr>
-</thead>
-<tbody>`;
-
-items.forEach(item=>{
-const status=String(
-item.status||"pending"
-).toLowerCase();
-
-html+=`
-<tr>
-<td>${escapeHTML(item.reference||"—")}</td>
-<td>${escapeHTML(item.user_id||"—")}</td>
-<td>${escapeHTML(item.service||"—")}</td>
-<td class="amount">${money(item.amount)}</td>
-<td>
-<span class="status ${escapeHTML(status)}">
-${escapeHTML(item.status||"pending")}
-</span>
-</td>
-<td>${escapeHTML(formatDate(item.date))}</td>
-</tr>`;
-});
-
-html+=`
-</tbody>
-</table>
-</div>`;
-
-area.innerHTML=html;
-
-}catch(error){
-console.error("TRANSACTIONS ERROR:",error);
-
-area.innerHTML=
-`<div class="error-box">${escapeHTML(error.message)}</div>`;
-}
-}
-
-/* LOAD PAYMENTS */
-async function loadPayments(){
-const area=document.getElementById("paymentsArea");
-
-area.innerHTML=
-'<div class="loading">Loading payments...</div>';
-
-try{
-const data=await api("/api/admin/payments");
-const items=data.payments||[];
-
-if(!items.length){
-area.innerHTML=
-'<div class="empty">No payments found.</div>';
-return;
-}
-
-let html=`
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>REFERENCE</th>
-<th>EMAIL</th>
-<th>AMOUNT</th>
-<th>STATUS</th>
-<th>CREDITED</th>
-<th>DATE</th>
-</tr>
-</thead>
-<tbody>`;
-
-items.forEach(item=>{
-const status=String(
-item.status||"pending"
-).toLowerCase();
-
-html+=`
-<tr>
-<td>${escapeHTML(item.reference||"—")}</td>
-<td>${escapeHTML(item.email||"—")}</td>
-<td class="amount">${money(item.amount)}</td>
-<td>
-<span class="status ${escapeHTML(status)}">
-${escapeHTML(item.status||"pending")}
-</span>
-</td>
-<td>${item.credited?"YES":"NO"}</td>
-<td>${escapeHTML(formatDate(item.created_at))}</td>
-</tr>`;
-});
-
-html+=`
-</tbody>
-</table>
-</div>`;
-
-area.innerHTML=html;
-
-}catch(error){
-console.error("PAYMENTS ERROR:",error);
-
-area.innerHTML=
-`<div class="error-box">${escapeHTML(error.message)}</div>`;
-}
-}
-
-/* DATE FORMAT */
-function formatDate(value){
-if(!value)return "—";
-
-const date=new Date(value);
-
-if(Number.isNaN(date.getTime())){
-return String(value);
-}
-
-return date.toLocaleString("en-NG",{
-dateStyle:"medium",
-timeStyle:"short"
-});
-}
-
-/* LOGOUT */
-async function logout(){
-const token=localStorage.getItem(TOKEN_KEY);
-
-try{
-if(token){
-await fetch(
-API+"/api/admin/logout",
-{
-method:"POST",
-headers:{
-"Authorization":"Bearer "+token,
-"Accept":"application/json"
-}
-}
-);
-}
-}catch(error){
-console.error("ADMIN LOGOUT ERROR:",error);
-}
-
-localStorage.removeItem(TOKEN_KEY);
-localStorage.removeItem(EMAIL_KEY);
-
-showLogin();
-
-email.value="";
-password.value="";
-}
-
-/* BUTTON EVENTS */
-loginButton.onclick=login;
-logoutButton.onclick=logout;
-
-/* PASSWORD ENTER KEY */
-password.addEventListener("keydown",event=>{
-if(event.key==="Enter"){
-login();
-}
-});
-
-/* EMAIL ENTER KEY */
-email.addEventListener("keydown",event=>{
-if(event.key==="Enter"){
-password.focus();
-}
-});
-
-/* START ADMIN */
-(function(){
-const savedToken=localStorage.getItem(TOKEN_KEY);
-
-if(savedToken){
-openDashboard();
-}else{
-showLogin();
-}
-})();
-</script>
-
-</body>
-</html>

@@ -240,14 +240,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 
 <section id="page-services" class="page">
 <div class="heading"><h1>Services</h1><p>Manage the services offered through BOLTIV.</p></div>
-<div class="grid3">
-<div class="service-card"><div class="service-icon">📱</div><div class="service-name">Airtime</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Airtime settings')">MANAGE</button></div>
-<div class="service-card"><div class="service-icon">🌐</div><div class="service-name">Data</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Data settings')">MANAGE</button></div>
-<div class="service-card"><div class="service-icon">💡</div><div class="service-name">Electricity</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Electricity settings')">MANAGE</button></div>
-<div class="service-card"><div class="service-icon">📺</div><div class="service-name">Cable TV</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Cable settings')">MANAGE</button></div>
-<div class="service-card"><div class="service-icon">🎫</div><div class="service-name">Education</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Education settings')">MANAGE</button></div>
-<div class="service-card"><div class="service-icon">⚙</div><div class="service-name">Service Settings</div><div class="service-status" style="color:#856404">● CONFIGURE</div><button class="btn" style="margin-top:12px" onclick="demo('Service configuration')">CONFIGURE</button></div>
-</div>
+<div class="toolbar"><button class="btn" onclick="loadServices()">REFRESH</button></div>
+<div id="servicesArea" class="grid3"><div class="loading">Loading...</div></div>
 </section>
 <section id="page-notifications" class="page">
 <div class="heading">
@@ -439,7 +433,7 @@ placeholder="Search ticket, user or subject..."
 <option value="resolved">Resolved</option>
 </select>
 
-<button class="btn" onclick="demo('Support refresh endpoint will be connected.')">
+<button class="btn" onclick="loadSupport()">
 REFRESH
 </button>
 
@@ -464,123 +458,24 @@ No support tickets available.
 </section>
 
 <section id="page-security" class="page">
-
-<div class="heading">
-<h1>Security</h1>
-<p>Monitor administrator access and platform security.</p>
-</div>
-
+<div class="heading"><h1>Security</h1><p>Monitor administrator access and platform security.</p></div>
 <div class="stats">
-
-<div class="stat">
-<div class="stat-label">SESSION</div>
-<div class="stat-value" style="font-size:14px">
-ACTIVE
+<div class="stat"><div class="stat-label">SESSION</div><div class="stat-value" style="font-size:14px">ACTIVE</div></div>
+<div class="stat"><div class="stat-label">ACTIVE SESSIONS</div><div id="activeSessionsCount" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">SECURITY EVENTS</div><div id="securityEventsCount" class="stat-value">0</div></div>
 </div>
-</div>
-
-<div class="stat">
-<div class="stat-label">FAILED LOGINS</div>
-<div class="stat-value">
-0
-</div>
-</div>
-
-<div class="stat">
-<div class="stat-label">ACTIVE SESSIONS</div>
-<div class="stat-value">
-1
-</div>
-</div>
-
-<div class="stat">
-<div class="stat-label">SECURITY EVENTS</div>
-<div class="stat-value">
-0
-</div>
-</div>
-
-</div>
-
 <div class="grid2">
-
-<div class="section">
-
-<div class="section-head">
-<h2>ADMIN SESSION</h2>
+<div class="section"><div class="section-head"><h2>ADMIN SESSION</h2></div><div class="section-body">
+<div class="activity"><span>Administrator</span><strong id="securityEmail">—</strong></div>
+<div class="activity"><span>Session Status</span><strong class="amount">ACTIVE</strong></div>
+<div class="activity"><span>Authentication</span><strong>Bearer Token</strong></div>
+<div class="activity"><span>Platform</span><strong>Web Admin</strong></div>
+</div></div>
+<div class="section"><div class="section-head"><h2>SECURITY CONTROLS</h2></div><div class="section-body">
+<button class="btn danger" onclick="revokeOtherSessions()">REVOKE OTHER SESSIONS</button>
+</div></div>
 </div>
-
-<div class="section-body">
-
-<div class="activity">
-<span>Administrator</span>
-<strong id="securityEmail">—</strong>
-</div>
-
-<div class="activity">
-<span>Session Status</span>
-<strong class="amount">ACTIVE</strong>
-</div>
-
-<div class="activity">
-<span>Authentication</span>
-<strong>Bearer Token</strong>
-</div>
-
-<div class="activity">
-<span>Platform</span>
-<strong>Web Admin</strong>
-</div>
-
-</div>
-
-</div>
-
-<div class="section">
-
-<div class="section-head">
-<h2>SECURITY CONTROLS</h2>
-</div>
-
-<div class="section-body">
-
-<button class="btn" onclick="demo('Change password will be connected to the backend.')">
-CHANGE PASSWORD
-</button>
-
-<button class="btn" onclick="demo('Two-factor authentication will be connected next.')">
-ENABLE 2FA
-</button>
-
-<button class="btn danger" onclick="demo('All other sessions will be revoked through the backend.')">
-REVOKE OTHER SESSIONS
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-<div class="section">
-
-<div class="section-head">
-<h2>SECURITY EVENTS</h2>
-<button class="btn" onclick="demo('Security events endpoint will be connected.')">
-REFRESH
-</button>
-</div>
-
-<div id="securityEvents">
-
-<div class="empty">
-No security events available.
-</div>
-
-</div>
-
-</div>
-
+<div class="section"><div class="section-head"><h2>SECURITY EVENTS</h2><button class="btn" onclick="loadSecurity()">REFRESH</button></div><div id="securityEvents"><div class="empty">Loading...</div></div></div>
 </section>
 
 <section id="page-audit" class="page">
@@ -631,9 +526,7 @@ placeholder="Search audit logs..."
 <option value="security">Security</option>
 </select>
 
-<button class="btn" onclick="demo('Audit logs will load from the backend.')">
-REFRESH
-</button>
+<button class="btn" onclick="loadAudit()">REFRESH</button>
 
 </div>
 
@@ -714,16 +607,7 @@ ACTIVE
 </strong>
 </div>
 
-<div style="margin-top:15px">
-
-<button class="btn">
-CHANGE PASSWORD
-</button>
-
-<button class="btn">
-ENABLE 2FA
-</button>
-
+<div style="margin-top:15px;font-size:10px;line-height:1.6">Admin password is controlled by the <code>ADMIN_PASSWORD</code> environment variable on the backend. Two-factor authentication is not enabled in this release.
 </div>
 
 </div>
@@ -747,11 +631,7 @@ ENABLE 2FA
 <small>Temporarily disable customer transactions.</small>
 </div>
 
-<button
-class="btn"
-onclick="demo('Maintenance mode will be connected to the backend.')">
-DISABLED
-</button>
+<button id="maintenanceBtn" class="btn" onclick="toggleMaintenance()">LOADING</button>
 
 </div>
 
@@ -763,9 +643,7 @@ DISABLED
 <small>Allow new customers to create accounts.</small>
 </div>
 
-<button class="btn">
-ENABLED
-</button>
+<button id="registrationBtn" class="btn" onclick="toggleRegistration()">LOADING</button>
 
 </div>
 
@@ -843,7 +721,7 @@ ENABLED
 <div id="adminModal" class="modal"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle">ADMIN ACTION</h2><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
 <script>
 
-const API=location.origin;
+const API="https://boltiv-backend.onrender.com";
 let token=localStorage.getItem("boltiv_admin_token")||"";
 let users=[],transactions=[],payments=[];
 const $=id=>document.getElementById(id);
@@ -862,11 +740,38 @@ function showApp(){$("loginPage").classList.add("hidden");$("app").classList.rem
 function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
 async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});token=d.token;localStorage.setItem("boltiv_admin_token",token);showApp();}catch(e){showMsg(e.message)}}
 $("loginButton").onclick=login;
-function go(page){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="users")loadUsers();if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="support")loadSupport();if(page==="audit")loadAudit();}
+function go(page){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="users")loadUsers();if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="services")loadServices();if(page==="security")loadSecurity();if(page==="settings")loadSettings();}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
+if($("supportSearch"))$("supportSearch").oninput=filterSupport;if($("supportFilter"))$("supportFilter").onchange=filterSupport;if($("auditSearch"))$("auditSearch").oninput=filterAudit;if($("auditType"))$("auditType").onchange=filterAudit;
 function closeModal(){$("adminModal").classList.remove("show")}
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("adminModal").classList.add("show")}
-async function loadAll(){loadUsers();loadPayments();loadTransactions();loadSupport();loadAudit();}
+async function loadAll(){
+  await Promise.allSettled([loadStats(),loadMe(),loadUsers(),loadPayments(),loadTransactions(),loadSupport(),loadAudit(),loadServices(),loadSecurity(),loadSettings()]);
+}
+async function loadStats(){
+ try{
+  const d=await api("/api/admin/stats");
+  const s=d.stats||{};
+  $("sUsers").textContent=Number(s.users||0).toLocaleString();
+  $("sWallet").textContent="₦"+Number(s.walletBalance||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+  $("sTransactions").textContent=Number(s.transactions||0).toLocaleString();
+  $("sPayments").textContent=Number(s.payments||0).toLocaleString();
+  $("sSuccessful").textContent=Number(s.successful||0).toLocaleString();
+  $("sPending").textContent=Number(s.pending||0).toLocaleString();
+  $("sFailed").textContent=Number(s.failed||0).toLocaleString();
+  $("sActive").textContent=Number(s.activeUsers||0).toLocaleString();
+ }catch(e){ console.error("Admin stats:",e); }
+}
+async function loadMe(){
+ try{const d=await api("/api/admin/me");if(d.admin&&$("settingsEmail"))$("settingsEmail").value=d.admin.email||"";}
+ catch(e){console.error("Admin profile:",e);}
+}
+async function logout(){
+ try{await api("/api/admin/logout",{method:"POST"});}
+ catch(e){console.warn("Logout request failed:",e.message);}
+ finally{token="";localStorage.removeItem("boltiv_admin_token");showLogin();showMsg("Logged out successfully.",true);}
+}
+$("logout").onclick=logout;
 async function loadUsers(){
  try{const d=await api("/api/admin/users");users=d.users||[];$("uTotal").textContent=users.length;$("uActive").textContent=users.filter(x=>x.status!=="suspended").length;$("uSuspended").textContent=users.filter(x=>x.status==="suspended").length;$("uBalance").textContent="₦"+users.reduce((a,x)=>a+Number(x.balance||0),0).toLocaleString(undefined,{minimumFractionDigits:2});renderUsers(users)}catch(e){$("usersArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
 }
@@ -897,6 +802,8 @@ async function loadPending(){
 }
 
 function filterPayments(){const q=$("paymentSearch").value.toLowerCase();renderPayments(payments.filter(p=>[p.reference,p.email,p.user_id].join(" ").toLowerCase().includes(q)))}
+function filterSupport(){const q=($("supportSearch")?.value||"").toLowerCase(),f=$("supportFilter")?.value||"";document.querySelectorAll("#supportTickets .ticket").forEach(t=>{const text=t.textContent.toLowerCase();const status=text.includes(" • "+f.toLowerCase()+" • ");t.style.display=(!q||text.includes(q))&&(!f||status)?"":"none";});}
+function filterAudit(){const q=($("auditSearch")?.value||"").toLowerCase(),f=$("auditType")?.value||"";document.querySelectorAll("#auditArea tbody tr").forEach(r=>{const text=r.textContent.toLowerCase();r.style.display=(!q||text.includes(q))&&(!f||text.includes(f.toLowerCase()))?"":"none";});}
 const notifyRecipient=$("notifyRecipient"),notifyTitle=$("notifyTitle"),notifyMessage=$("notifyMessage"),notifyType=$("notifyType"),notifyPriority=$("notifyPriority");
 if(notifyRecipient)notifyRecipient.onchange=()=>{const b=$("selectedUserBox");b.classList.toggle("hidden",notifyRecipient.value!=="selected")};
 function updateNotificationPreview(){if(!notifyTitle)return;$("previewTitle").textContent=notifyTitle.value||"Notification title";$("previewMessage").textContent=notifyMessage.value||"Your notification message will appear here.";$("previewType").textContent=(notifyType.value||"general").toUpperCase()+" • "+(notifyPriority.value||"normal").toUpperCase()}
@@ -906,7 +813,23 @@ async function sendNotification(){try{await api("/api/admin/notifications",{meth
 async function loadSupport(){try{const d=await api("/api/admin/support");const a=d.tickets||[];$("supportTickets").innerHTML=a.length?a.map(t=>`<div class="ticket"><div class="ticket-title">#${t.id} — ${esc(t.subject)}</div><div class="ticket-meta">${esc(t.name||t.email||t.user_id)} • ${esc(t.status)} • ${new Date(t.updated_at).toLocaleString()}</div><p style="font-size:9px;margin:10px 0">${esc(t.message)}</p><button class="btn" onclick="replyTicket(${t.id})">REPLY</button> <button class="btn" onclick="ticketStatus(${t.id},'pending')">PENDING</button> <button class="btn primary" onclick="ticketStatus(${t.id},'resolved')">RESOLVE</button></div>`).join(""):'<div class="empty">No support tickets available.</div>'}catch(e){$("supportTickets").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
 async function replyTicket(id){const m=prompt("Reply to ticket #"+id);if(!m)return;try{await api("/api/admin/support/reply",{method:"POST",body:JSON.stringify({ticketId:id,message:m})});loadSupport();alert("Reply sent.")}catch(e){alert(e.message)}}
 async function ticketStatus(id,status){try{await api("/api/admin/support/status",{method:"POST",body:JSON.stringify({ticketId:id,status})});loadSupport()}catch(e){alert(e.message)}}
-async function loadAudit(){try{const d=await api("/api/admin/audit");const a=d.logs||[];$("auditArea").innerHTML=a.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+a.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>'}catch(e){$("auditArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+async function loadServices(){try{const d=await api("/api/admin/services");const a=d.services||[];$('servicesArea').innerHTML=a.map(x=>`<div class="service-card"><div class="service-icon">${esc(x.icon||'⚙')}</div><div class="service-name">${esc(x.name)}</div><div class="service-status" style="color:${x.enabled&&!x.maintenance?'var(--green)':'var(--yellow)'}">● ${x.enabled&&!x.maintenance?'ACTIVE':'DISABLED'}</div><div style="font-size:10px;margin-top:8px">Fee: ₦${Number(x.fee||0).toLocaleString()}</div><button class="btn" style="margin-top:12px" onclick="manageService('${esc(x.key)}')">MANAGE</button></div>`).join('')}catch(e){$('servicesArea').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+async function manageService(key){try{const d=await api('/api/admin/services');const x=(d.services||[]).find(v=>v.key===key);if(!x)return;openModal('MANAGE '+String(x.name).toUpperCase(),`<label>STATUS</label><select id="svcEnabled"><option value="true" ${x.enabled?'selected':''}>ENABLED</option><option value="false" ${!x.enabled?'selected':''}>DISABLED</option></select><label>MAINTENANCE</label><select id="svcMaintenance"><option value="false" ${!x.maintenance?'selected':''}>OFF</option><option value="true" ${x.maintenance?'selected':''}>ON</option></select><label>FEE</label><input id="svcFee" type="number" min="0" step="0.01" value="${Number(x.fee||0)}"><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveService('${esc(x.key)}')">SAVE</button></div>`)}catch(e){alert(e.message)}}
+async function saveService(key){try{await api('/api/admin/services',{method:'PATCH',body:JSON.stringify({key,enabled:$('svcEnabled').value==='true',maintenance:$('svcMaintenance').value==='true',fee:Number($('svcFee').value)})});closeModal();loadServices();alert('Service updated.')}catch(e){alert(e.message)}}
+async function loadSettings(){try{const d=await api('/api/admin/settings');const s=d.settings||{};const m=$('maintenanceBtn'),r=$('registrationBtn');if(m){m.textContent=s.maintenance_mode?'ENABLED':'DISABLED';m.classList.toggle('primary',!s.maintenance_mode)}if(r){r.textContent=s.registration_enabled?'ENABLED':'DISABLED';r.classList.toggle('primary',s.registration_enabled)}}catch(e){console.error(e)}}
+async function updateSettings(patch){try{const d=await api('/api/admin/settings',{method:'PATCH',body:JSON.stringify(patch)});const s=d.settings||{};if($('maintenanceBtn'))$('maintenanceBtn').textContent=s.maintenance_mode?'ENABLED':'DISABLED';if($('registrationBtn'))$('registrationBtn').textContent=s.registration_enabled?'ENABLED':'DISABLED';return s}catch(e){alert(e.message);throw e}}
+async function toggleMaintenance(){const d=await api('/api/admin/settings');await updateSettings({maintenance_mode:!d.settings.maintenance_mode});}
+async function toggleRegistration(){const d=await api('/api/admin/settings');await updateSettings({registration_enabled:!d.settings.registration_enabled});}
+async function loadSecurity(){try{const [e,s]=await Promise.all([api('/api/admin/security/events'),api('/api/admin/security/sessions')]);const events=e.events||[],sessions=s.sessions||[];$('securityEventsCount').textContent=events.length;$('activeSessionsCount').textContent=sessions.length;$('securityEvents').innerHTML=events.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>EVENT</th><th>SEVERITY</th><th>ADMIN</th><th>DETAILS</th></tr></thead><tbody>'+events.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.event_type)}</td><td>${esc(x.severity)}</td><td>${esc(x.email||x.admin_id||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">No security events available.</div>'}catch(e){$('securityEvents').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+async function revokeOtherSessions(){if(!confirm('Revoke all other administrator sessions?'))return;try{const d=await api('/api/admin/security/revoke-sessions',{method:'POST'});await loadSecurity();alert(`${d.revoked||0} other session(s) revoked.`)}catch(e){alert(e.message)}}
+async function loadAudit(){
+ try{
+  const d=await api("/api/admin/audit");
+  const a=d.logs||[];
+  $("auditArea").innerHTML=a.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+a.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>';
+  filterAudit();
+ }catch(e){$("auditArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
+}
 if(token)api("/api/admin/me").then(showApp).catch(showLogin);else showLogin();
 
 </script>

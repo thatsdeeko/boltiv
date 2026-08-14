@@ -3,329 +3,986 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#fff">
 <title>BOLTIV — Admin Control Center</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--gold:#b8860b;--gold2:#9b7315;--bg:#f7f7f5;--card:#fff;--text:#171717;--muted:#777;--line:#e8e8e8;--danger:#b42318;--dangerbg:#fff1f0;--success:#18753b;--successbg:#edf9f1;--warn:#856404;--warnbg:#fff9e6}
-body{background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif;font-size:14px;min-height:100vh}
-button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
-.hidden{display:none!important}.muted{color:#888}.amount{color:var(--gold2);font-weight:1000}
-.login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.login-card{width:100%;max-width:400px;padding:30px;background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 20px 60px #0000000d}
-.logo{text-align:center;color:var(--gold2);font-size:35px;font-weight:1000;letter-spacing:5px}
-.login-title{text-align:center;margin-top:10px;font-size:18px;font-weight:1000}.sub{text-align:center;margin:7px 0 27px;color:#888;font-size:10px;letter-spacing:1px}
-label{display:block;margin-bottom:7px;color:#555;font-size:10px;font-weight:900;letter-spacing:.5px}
-input,select,textarea{width:100%;border:1px solid #ddd;border-radius:10px;outline:0;background:#fff;color:#171717}
-input,select{height:45px;padding:0 13px;margin-bottom:13px}textarea{padding:12px;resize:vertical;min-height:100px}
-input:focus,select:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px #d4af3720}
-.login-btn,.primary{background:var(--gold);color:#171717;border:0}.login-btn{width:100%;height:48px;border-radius:10px;font-weight:1000}
-.message{display:none;margin-top:13px;padding:11px;border-radius:9px;text-align:center;font-size:11px}.message.show{display:block}.message.error{color:var(--danger);background:var(--dangerbg);border:1px solid #f1c7c2}.message.success{color:var(--warn);background:var(--warnbg);border:1px solid #ead58a}
-.app{min-height:100vh;display:flex}.sidebar{width:235px;position:fixed;left:0;top:0;bottom:0;background:#fff;border-right:1px solid var(--line);z-index:40;overflow-y:auto}
-.side-brand{height:72px;padding:20px;color:var(--gold2);font-size:23px;font-weight:1000;letter-spacing:3px;border-bottom:1px solid var(--line)}
+:root{--g:#b8860b;--g2:#9b7315;--bg:#f6f6f4;--card:#fff;--text:#171717;--muted:#777;--line:#e7e7e5;--green:#18753b;--red:#b42318;--yellow:#856404;--gbg:#edf9f1;--rbg:#fff1f0;--ybg:#fff9e6}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{width:100%;max-width:410px;background:#fff;border:1px solid var(--line);border-radius:22px;padding:32px;box-shadow:0 20px 70px #0000000d}
+.logo{text-align:center;color:var(--g2);font-size:36px;font-weight:1000;letter-spacing:5px}
+.login-title{text-align:center;font-weight:1000;font-size:18px;margin-top:10px}.login-sub{text-align:center;color:#999;font-size:10px;margin:7px 0 28px;letter-spacing:1px}
+label{display:block;color:#555;font-size:9px;font-weight:1000;margin-bottom:6px;letter-spacing:.5px}
+input,select,textarea{width:100%;border:1px solid #ddd;border-radius:9px;background:#fff;outline:0;padding:11px 12px}
+input,select{height:43px;margin-bottom:13px}textarea{min-height:100px;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3px #d4af3720}
+.login-btn{width:100%;height:48px;border:0;border-radius:9px;background:var(--g);font-weight:1000}
+.message{display:none;margin-top:12px;padding:11px;border-radius:8px;text-align:center;font-size:10px}.message.show{display:block}.error{background:var(--rbg);color:var(--red);border:1px solid #efc8c4}.success{background:var(--ybg);color:var(--yellow);border:1px solid #ead58a}
+
+.app{display:flex;min-height:100vh}
+.sidebar{width:240px;position:fixed;left:0;top:0;bottom:0;background:#fff;border-right:1px solid var(--line);z-index:50;overflow:auto}
+.brand{height:72px;display:flex;align-items:center;padding:0 20px;color:var(--g2);font-size:23px;font-weight:1000;letter-spacing:3px;border-bottom:1px solid var(--line)}
 .side-label{padding:18px 18px 7px;color:#aaa;font-size:8px;font-weight:1000;letter-spacing:1px}
-.nav button{width:100%;padding:11px 18px;border:0;background:transparent;text-align:left;color:#666;font-size:10px;font-weight:900}
-.nav button:hover,.nav button.active{background:#fff9e6;color:var(--gold2);border-right:3px solid var(--gold)}
-.main{margin-left:235px;width:calc(100% - 235px);min-width:0}.topbar{height:72px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
-.mobile-menu{display:none;border:1px solid #ddd;background:#fff;border-radius:8px;padding:8px 10px}.top-title{font-size:13px;font-weight:1000}.top-sub{margin-top:3px;color:#999;font-size:9px}
-.logout{padding:9px 13px;border:1px solid #ead58a;border-radius:8px;background:var(--warnbg);color:#8a6b10;font-size:9px;font-weight:1000}
-.container{max-width:1250px;margin:auto;padding:22px}.page{display:none}.page.active{display:block}.heading{margin-bottom:18px}.heading h1{font-size:25px;font-weight:1000}.heading p{margin-top:5px;color:#888;font-size:10px}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:16px}.stat{padding:17px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px #00000008}.stat-label{color:#888;font-size:8px;font-weight:1000;letter-spacing:.5px}.stat-value{margin-top:8px;color:var(--gold2);font-size:22px;font-weight:1000}
-.section{background:#fff;border:1px solid var(--line);border-radius:15px;overflow:hidden;margin-top:14px;box-shadow:0 4px 18px #00000008}.section-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.section-head h2{font-size:11px;font-weight:1000}.section-body{padding:16px}
-.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:13px}.search{max-width:350px;margin:0}.filter{width:150px;margin:0}.btn{height:38px;padding:0 13px;border:1px solid #ddd;border-radius:8px;background:#fff;color:#555;font-size:9px;font-weight:1000}.btn:hover{border-color:var(--gold);color:var(--gold2)}.btn.primary{border:0}.btn.danger{color:var(--danger);background:var(--dangerbg);border-color:#f1c7c2}.btn.success{color:var(--success);background:var(--successbg);border-color:#bfe4cb}
-.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:700px}th,td{padding:12px 10px;text-align:left;border-bottom:1px solid #eee;white-space:nowrap;font-size:9px}th{background:#fafafa;color:#888;font-size:7px;letter-spacing:.7px}tr:last-child td{border-bottom:0}
-.badge{display:inline-block;padding:5px 8px;border-radius:6px;font-size:7px;font-weight:1000;text-transform:uppercase}.badge.active,.badge.successful{background:var(--successbg);color:var(--success)}.badge.suspended,.badge.failed{background:var(--dangerbg);color:var(--danger)}.badge.pending{background:var(--warnbg);color:var(--warn)}
-.empty,.loading{text-align:center;padding:30px;color:#888;font-size:10px}.error-box{padding:12px;background:var(--dangerbg);color:var(--danger);font-size:10px;border-radius:8px}
-.activity{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #eee;font-size:9px}.activity:last-child{border-bottom:0}.activity strong{font-size:10px}.activity small{color:#999}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.quick .btn{height:55px}
-.chart{height:230px;padding:15px;display:flex;align-items:flex-end;gap:7px}.bar{flex:1;background:#d4af37;border-radius:5px 5px 0 0;min-height:5px;position:relative}.bar span{position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);font-size:7px;color:#888}
-.modal{display:none;position:fixed;inset:0;background:#0008;z-index:100;padding:20px;align-items:center;justify-content:center}.modal.show{display:flex}.modal-box{width:100%;max-width:650px;max-height:90vh;overflow-y:auto;background:#fff;border-radius:17px;padding:18px;box-shadow:0 25px 70px #0003}.modal-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:13px;border-bottom:1px solid var(--line);margin-bottom:15px}.modal-head h2{font-size:12px;font-weight:1000}.close{border:0;background:#f5f5f5;border-radius:7px;width:30px;height:30px;font-size:18px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.form-group{margin-bottom:12px}.notice{padding:11px;background:var(--warnbg);border:1px solid #ead58a;border-radius:8px;color:var(--warn);font-size:9px;margin-bottom:13px}
-.profile{display:grid;grid-template-columns:60px 1fr;gap:12px;align-items:center}.avatar{width:60px;height:60px;border-radius:50%;background:#fff8df;color:var(--gold2);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000}
-@media(max-width:850px){.sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}.main{margin-left:0;width:100%}.mobile-menu{display:block}.stats{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
-@media(max-width:550px){.container{padding:14px}.topbar{padding:0 14px}.stats{gap:8px}.stat{padding:13px}.stat-value{font-size:18px}.toolbar{flex-wrap:wrap}.search,.filter{max-width:none;width:100%}.quick{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr}.modal{padding:10px}.modal-box{padding:15px}}
+.nav button{display:block;width:100%;padding:12px 19px;border:0;background:transparent;text-align:left;color:#666;font-size:10px;font-weight:900}
+.nav button:hover,.nav button.active{background:var(--ybg);color:var(--g2);border-right:3px solid var(--g)}
+.main{margin-left:240px;width:calc(100% - 240px);min-width:0}
+.top{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:40}
+.menu{display:none;border:1px solid #ddd;background:#fff;border-radius:8px;padding:8px}
+.top-title{font-size:13px;font-weight:1000}.top-sub{font-size:9px;color:#999;margin-top:3px}
+.logout{border:1px solid #ead58a;background:var(--ybg);color:var(--yellow);border-radius:8px;padding:9px 13px;font-size:9px;font-weight:1000}
+.container{max-width:1350px;margin:auto;padding:22px}.page{display:none}.page.active{display:block}
+.heading{margin-bottom:18px}.heading h1{font-size:26px;font-weight:1000}.heading p{font-size:10px;color:#888;margin-top:5px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:14px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 4px 18px #00000007}
+.stat-label{font-size:8px;color:#888;font-weight:1000;letter-spacing:.5px}.stat-value{font-size:22px;color:var(--g2);font-weight:1000;margin-top:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.section{background:#fff;border:1px solid var(--line);border-radius:15px;margin-top:14px;overflow:hidden;box-shadow:0 4px 18px #00000007}
+.section-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.section-head h2{font-size:10px;font-weight:1000;letter-spacing:.5px}.section-body{padding:16px}
+.btn{height:36px;padding:0 12px;border:1px solid #ddd;background:#fff;border-radius:8px;color:#555;font-size:9px;font-weight:1000}
+.btn:hover{border-color:var(--g);color:var(--g2)}.btn.primary{background:var(--g);border-color:var(--g);color:#171717}.btn.danger{background:var(--rbg);border-color:#efc8c4;color:var(--red)}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:13px}.toolbar input{max-width:350px;margin:0}.toolbar select{width:150px;margin:0}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:750px}th,td{padding:12px 10px;border-bottom:1px solid #eee;text-align:left;font-size:9px;white-space:nowrap}th{background:#fafafa;color:#888;font-size:7px;letter-spacing:.7px}tr:last-child td{border-bottom:0}
+.amount{color:var(--g2);font-weight:1000}.badge{display:inline-block;padding:5px 8px;border-radius:6px;font-size:7px;font-weight:1000;text-transform:uppercase}.active,.successful{background:var(--gbg);color:var(--green)}.failed,.suspended{background:var(--rbg);color:var(--red)}.pending{background:var(--ybg);color:var(--yellow)}
+.loading,.empty{text-align:center;padding:30px;color:#888;font-size:10px}.error-box{padding:12px;background:var(--rbg);color:var(--red);border-radius:8px;font-size:10px}
+.activity{display:flex;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #eee;font-size:9px}.activity:last-child{border-bottom:0}.activity strong{font-size:10px}.activity small{color:#999}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.quick button{height:55px}
+.chart{height:220px;padding:15px;display:flex;align-items:flex-end;gap:8px}.bar{flex:1;background:#d4af37;border-radius:5px 5px 0 0;min-height:5px;position:relative}.bar span{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:7px;color:#888}
+.service-card{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fff}.service-icon{font-size:22px;margin-bottom:10px}.service-name{font-weight:1000;font-size:11px}.service-status{margin-top:7px;font-size:8px;color:var(--green);font-weight:1000}
+.ticket{border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:8px}.ticket:last-child{margin-bottom:0}.ticket-title{font-weight:1000;font-size:10px}.ticket-meta{font-size:8px;color:#999;margin-top:5px}
+.modal{display:none;position:fixed;inset:0;background:#0008;z-index:100;align-items:center;justify-content:center;padding:15px}.modal.show{display:flex}.modal-box{width:100%;max-width:650px;max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:18px}.modal-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:15px}.modal-head h2{font-size:12px;font-weight:1000}.close{border:0;background:#f4f4f4;width:30px;height:30px;border-radius:7px;font-size:18px}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.notice{padding:11px;background:var(--ybg);border:1px solid #ead58a;border-radius:8px;color:var(--yellow);font-size:9px;margin-bottom:13px}
+.profile{display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:center}.avatar{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--ybg);color:var(--g2);font-size:21px;font-weight:1000}
+@media(max-width:900px){.sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}.main{margin-left:0;width:100%}.menu{display:block}.stats{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+@media(max-width:550px){.container{padding:14px}.top{padding:0 14px}.toolbar{flex-wrap:wrap}.toolbar input,.toolbar select{width:100%;max-width:none}.quick{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr}.stat{padding:13px}.stat-value{font-size:18px}}
 </style>
 </head>
 <body>
 
-<div id="loginPage" class="login-page">
-<div class="login-card">
+<div id="loginPage" class="login">
+<div class="login-box">
 <div class="logo">BOLTIV</div>
 <div class="login-title">ADMIN CONTROL CENTER</div>
-<div class="sub">SECURE ADMINISTRATOR ACCESS</div>
+<div class="login-sub">SECURE ADMINISTRATOR ACCESS</div>
 <label>ADMIN EMAIL</label>
-<input id="email" type="email" autocomplete="username" placeholder="Admin email">
+<input id="email" type="email" placeholder="Admin email" autocomplete="username">
 <label>ADMIN PASSWORD</label>
-<input id="password" type="password" autocomplete="current-password" placeholder="Admin password">
+<input id="password" type="password" placeholder="Admin password" autocomplete="current-password">
 <button id="loginButton" class="login-btn">LOGIN TO ADMIN</button>
 <div id="message" class="message"></div>
 </div>
 </div>
 
 <div id="app" class="app hidden">
+
 <aside id="sidebar" class="sidebar">
-<div class="side-brand">BOLTIV</div>
-<div class="side-label">MAIN</div>
+<div class="brand">BOLTIV</div>
+
+<div class="side-label">OVERVIEW</div>
 <div class="nav">
-<button class="active" data-page="dashboard">▦ DASHBOARD</button>
-<button data-page="users">♙ USERS</button>
-<button data-page="wallets">₦ WALLETS</button>
-<button data-page="transactions">↔ TRANSACTIONS</button>
-<button data-page="payments">▣ PAYMENTS</button>
+<button class="active" data-page="dashboard">▦ Dashboard</button>
+<button data-page="analytics">◫ Analytics</button>
 </div>
-<div class="side-label">MANAGEMENT</div>
+
+<div class="side-label">CUSTOMERS</div>
 <div class="nav">
-<button data-page="analytics">◫ ANALYTICS</button>
-<button data-page="notifications">♢ NOTIFICATIONS</button>
-<button data-page="activity">◷ ADMIN ACTIVITY</button>
-<button data-page="security">◇ SECURITY</button>
+<button data-page="users">♙ Users</button>
+<button data-page="wallets">₦ Wallets</button>
+<button data-page="support">☏ Support</button>
 </div>
+
+<div class="side-label">FINANCE</div>
+<div class="nav">
+<button data-page="payments">▣ Payments</button>
+<button data-page="transactions">↔ Transactions</button>
+</div>
+
+<div class="side-label">PLATFORM</div>
+<div class="nav">
+<button data-page="services">◈ Services</button>
+<button data-page="notifications">♢ Notifications</button>
+</div>
+
+<div class="side-label">SECURITY</div>
+<div class="nav">
+<button data-page="security">◇ Security</button>
+<button data-page="audit">◷ Audit Logs</button>
+</div>
+
 <div class="side-label">SYSTEM</div>
 <div class="nav">
-<button data-page="settings">⚙ SETTINGS</button>
+<button data-page="settings">⚙ Settings</button>
 </div>
 </aside>
 
 <main class="main">
-<header class="topbar">
+<header class="top">
 <div style="display:flex;align-items:center;gap:10px">
-<button id="menuButton" class="mobile-menu">☰</button>
-<div><div id="topTitle" class="top-title">Dashboard</div><div id="topSub" class="top-sub">BOLTIV administration</div></div>
+<button id="menu" class="menu">☰</button>
+<div><div id="topTitle" class="top-title">Dashboard</div><div class="top-sub">BOLTIV Administration</div></div>
 </div>
-<button id="logoutButton" class="logout">LOGOUT</button>
+<button id="logout" class="logout">LOGOUT</button>
 </header>
 
 <div class="container">
 
 <section id="page-dashboard" class="page active">
-<div class="heading"><h1>Dashboard</h1><p>Overview of your BOLTIV platform.</p></div>
+<div class="heading"><h1>Dashboard</h1><p>Complete overview of your BOLTIV platform.</p></div>
+
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="dashUsers" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">WALLET BALANCE</div><div id="dashWallet" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="dashTransactions" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PAYMENTS</div><div id="dashPayments" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="sUsers" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">WALLET BALANCE</div><div id="sWallet" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="sTransactions" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">PAYMENTS</div><div id="sPayments" class="stat-value">0</div></div>
+</div>
+
+<div class="stats">
+<div class="stat"><div class="stat-label">SUCCESSFUL</div><div id="sSuccessful" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">PENDING</div><div id="sPending" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">FAILED</div><div id="sFailed" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">ACTIVE USERS</div><div id="sActive" class="stat-value">0</div></div>
+</div>
+
+<div class="grid2">
+<div class="section">
+<div class="section-head"><h2>REVENUE / ACTIVITY</h2><button class="btn" onclick="loadAll()">REFRESH</button></div>
+<div class="chart">
+<div class="bar" style="height:28%"><span>MON</span></div>
+<div class="bar" style="height:48%"><span>TUE</span></div>
+<div class="bar" style="height:40%"><span>WED</span></div>
+<div class="bar" style="height:68%"><span>THU</span></div>
+<div class="bar" style="height:54%"><span>FRI</span></div>
+<div class="bar" style="height:82%"><span>SAT</span></div>
+<div class="bar" style="height:65%"><span>SUN</span></div>
+</div>
+</div>
+
+<div class="section">
+<div class="section-head"><h2>QUICK ACTIONS</h2></div>
+<div class="section-body">
+<div class="quick">
+<button class="btn" onclick="openModal('walletModal')">CREDIT WALLET</button>
+<button class="btn" onclick="openWalletDebit()">DEBIT WALLET</button>
+<button class="btn" onclick="go('users')">MANAGE USERS</button>
+<button class="btn" onclick="go('payments')">PAYMENTS</button>
+<button class="btn" onclick="go('transactions')">TRANSACTIONS</button>
+<button class="btn" onclick="go('notifications')">NOTIFY USERS</button>
+</div>
+</div>
+</div>
+</div>
+
+<div class="section">
+<div class="section-head"><h2>RECENT ACTIVITY</h2></div>
+<div id="recent" class="section-body"><div class="loading">Loading...</div></div>
+</div>
+</section>
+
+<section id="page-analytics" class="page">
+<div class="heading"><h1>Analytics</h1><p>Monitor growth, financial activity and platform performance.</p></div>
+<div class="stats">
+<div class="stat"><div class="stat-label">USERS</div><div id="aUsers" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="aTransactions" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">PAYMENTS</div><div id="aPayments" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">WALLET VALUE</div><div id="aWallet" class="stat-value">₦0.00</div></div>
 </div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>RECENT ACTIVITY</h2><button class="btn" onclick="loadDashboard()">REFRESH</button></div><div id="recentActivity" class="section-body"><div class="loading">Loading...</div></div></div>
-<div class="section"><div class="section-head"><h2>QUICK ACTIONS</h2></div><div class="section-body"><div class="quick">
-<button class="btn" onclick="openModal('walletModal')">CREDIT WALLET</button>
-<button class="btn" onclick="openModal('walletModal');setWalletType('debit')">DEBIT WALLET</button>
-<button class="btn" onclick="goPage('users')">MANAGE USERS</button>
-<button class="btn" onclick="goPage('transactions')">VIEW TRANSACTIONS</button>
-<button class="btn" onclick="goPage('payments')">VIEW PAYMENTS</button>
-<button class="btn" onclick="goPage('notifications')">SEND NOTICE</button>
-</div></div></div>
+<div class="section"><div class="section-head"><h2>USER GROWTH</h2></div><div class="chart"><div class="bar" style="height:30%"><span>1</span></div><div class="bar" style="height:38%"><span>2</span></div><div class="bar" style="height:45%"><span>3</span></div><div class="bar" style="height:53%"><span>4</span></div><div class="bar" style="height:67%"><span>5</span></div><div class="bar" style="height:76%"><span>6</span></div><div class="bar" style="height:90%"><span>7</span></div></div></div>
+<div class="section"><div class="section-head"><h2>TRANSACTION ACTIVITY</h2></div><div class="chart"><div class="bar" style="height:45%"><span>MON</span></div><div class="bar" style="height:62%"><span>TUE</span></div><div class="bar" style="height:35%"><span>WED</span></div><div class="bar" style="height:72%"><span>THU</span></div><div class="bar" style="height:58%"><span>FRI</span></div><div class="bar" style="height:86%"><span>SAT</span></div><div class="bar" style="height:70%"><span>SUN</span></div></div></div>
 </div>
 </section>
 
 <section id="page-users" class="page">
-<div class="heading"><h1>Users</h1><p>Manage customer accounts and wallet activity.</p></div>
+<div class="heading"><h1>Users</h1><p>Manage all BOLTIV customer accounts.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="userTotal" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">ACTIVE</div><div id="userActive" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">SUSPENDED</div><div id="userSuspended" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">TOTAL BALANCE</div><div id="userBalances" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="uTotal" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">ACTIVE</div><div id="uActive" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">SUSPENDED</div><div id="uSuspended" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">TOTAL BALANCE</div><div id="uBalance" class="stat-value">₦0.00</div></div>
 </div>
-<div class="toolbar"><input id="userSearch" class="search" placeholder="Search name, email, phone..." oninput="filterUsers()"><select id="userStatus" class="filter" onchange="filterUsers()"><option value="">All Status</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="btn" onclick="loadUsers()">REFRESH</button></div>
-<div class="section"><div class="section-head"><h2>ALL USERS</h2></div><div id="usersArea"><div class="loading">Loading users...</div></div></div>
+<div class="toolbar"><input id="userSearch" placeholder="Search name, email, phone..." oninput="filterUsers()"><select id="userFilter" onchange="filterUsers()"><option value="">All Users</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="btn" onclick="loadUsers()">REFRESH</button></div>
+<div class="section"><div class="section-head"><h2>USER DIRECTORY</h2></div><div id="usersArea"><div class="loading">Loading users...</div></div></div>
 </section>
 
 <section id="page-wallets" class="page">
-<div class="heading"><h1>Wallet Management</h1><p>Monitor balances and manage wallet adjustments.</p></div>
+<div class="heading"><h1>Wallets</h1><p>Control and monitor customer wallet balances.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL WALLET FUNDS</div><div id="walletTotal" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">CREDITS</div><div id="walletCredits" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">DEBITS</div><div id="walletDebits" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">ADJUSTMENTS</div><div id="walletAdjustments" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">TOTAL FUNDS</div><div id="wTotal" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">CREDITS</div><div class="stat-value">—</div></div>
+<div class="stat"><div class="stat-label">DEBITS</div><div class="stat-value">—</div></div>
+<div class="stat"><div class="stat-label">ADJUSTMENTS</div><div class="stat-value">—</div></div>
 </div>
-<div class="section"><div class="section-head"><h2>WALLET CONTROL</h2><button class="btn primary" onclick="openModal('walletModal')">+ ADJUST WALLET</button></div><div class="section-body"><div class="notice">Wallet adjustment controls are ready on the frontend. Connect the corresponding backend endpoint before making live balance changes.</div><div id="walletInfo" class="empty">Wallet adjustment history will appear here when the backend endpoint is connected.</div></div></div>
-</section>
-
-<section id="page-transactions" class="page">
-<div class="heading"><h1>Transactions</h1><p>Monitor service transactions across BOLTIV.</p></div>
-<div class="toolbar"><input id="transactionSearch" class="search" placeholder="Search reference or service..." oninput="filterTransactions()"><select id="transactionStatus" class="filter" onchange="filterTransactions()"><option value="">All Status</option><option value="successful">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option></select><button class="btn" onclick="loadTransactions()">REFRESH</button></div>
-<div class="section"><div class="section-head"><h2>TRANSACTION HISTORY</h2></div><div id="transactionsArea"><div class="loading">Loading transactions...</div></div></div>
+<div class="grid2">
+<div class="section"><div class="section-head"><h2>CREDIT / DEBIT WALLET</h2></div><div class="section-body"><div class="notice">Frontend control is ready. Live wallet adjustments should be connected to a protected backend endpoint.</div><button class="btn primary" onclick="openWalletCredit()">CREDIT USER</button> <button class="btn danger" onclick="openWalletDebit()">DEBIT USER</button></div></div>
+<div class="section"><div class="section-head"><h2>WALLET HISTORY</h2></div><div class="section-body"><div class="empty">Wallet adjustment history will appear here.</div></div></div>
+</div>
 </section>
 
 <section id="page-payments" class="page">
-<div class="heading"><h1>Payments</h1><p>Monitor deposits and Paystack payment activity.</p></div>
+<div class="heading"><h1>Payments</h1><p>Monitor deposits and payment processing.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL PAYMENTS</div><div id="paymentTotal" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">SUCCESSFUL</div><div id="paymentSuccess" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PENDING</div><div id="paymentPending" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">FAILED</div><div id="paymentFailed" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">TOTAL</div><div id="pTotal" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">SUCCESSFUL</div><div id="pSuccess" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">PENDING</div><div id="pPending" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">FAILED</div><div id="pFailed" class="stat-value">0</div></div>
 </div>
-<div class="toolbar"><input id="paymentSearch" class="search" placeholder="Search reference or email..." oninput="filterPayments()"><button class="btn" onclick="loadPayments()">REFRESH</button></div>
-<div class="section"><div class="section-head"><h2>PAYMENT HISTORY</h2></div><div id="paymentsArea"><div class="loading">Loading payments...</div></div></div>
+<div class="toolbar"><input id="paymentSearch" placeholder="Search reference or email..." oninput="filterPayments()"><button class="btn" onclick="loadPayments()">REFRESH</button></div>
+<div class="section"><div class="section-head"><h2>PAYMENT HISTORY</h2></div><div id="paymentsArea"><div class="loading">Loading...</div></div></div>
 </section>
 
-<section id="page-analytics" class="page">
-<div class="heading"><h1>Analytics</h1><p>Platform performance overview.</p></div>
-<div class="stats">
-<div class="stat"><div class="stat-label">USERS</div><div id="analyticsUsers" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="analyticsTransactions" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PAYMENTS</div><div id="analyticsPayments" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">WALLET VALUE</div><div id="analyticsWallet" class="stat-value">₦0.00</div></div>
-</div>
-<div class="grid2"><div class="section"><div class="section-head"><h2>PLATFORM METRICS</h2></div><div class="section-body"><div class="activity"><span>Users</span><strong id="metricUsers">0</strong></div><div class="activity"><span>Transactions</span><strong id="metricTransactions">0</strong></div><div class="activity"><span>Payments</span><strong id="metricPayments">0</strong></div><div class="activity"><span>Wallet balance</span><strong id="metricWallet">₦0.00</strong></div></div></div><div class="section"><div class="section-head"><h2>VISUAL ANALYTICS</h2></div><div class="chart"><div class="bar" style="height:25%"><span>MON</span></div><div class="bar" style="height:42%"><span>TUE</span></div><div class="bar" style="height:35%"><span>WED</span></div><div class="bar" style="height:65%"><span>THU</span></div><div class="bar" style="height:52%"><span>FRI</span></div><div class="bar" style="height:75%"><span>SAT</span></div><div class="bar" style="height:60%"><span>SUN</span></div></div></div></div>
+<section id="page-transactions" class="page">
+<div class="heading"><h1>Transactions</h1><p>Track every service transaction.</p></div>
+<div class="toolbar"><input id="transactionSearch" placeholder="Search reference, service or user..." oninput="filterTransactions()"><select id="transactionFilter" onchange="filterTransactions()"><option value="">All Status</option><option value="successful">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option></select><button class="btn" onclick="loadTransactions()">REFRESH</button></div>
+<div class="section"><div class="section-head"><h2>TRANSACTION HISTORY</h2></div><div id="transactionsArea"><div class="loading">Loading...</div></div></div>
 </section>
 
+<section id="page-services" class="page">
+<div class="heading"><h1>Services</h1><p>Manage the services offered through BOLTIV.</p></div>
+<div class="grid3">
+<div class="service-card"><div class="service-icon">📱</div><div class="service-name">Airtime</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Airtime settings')">MANAGE</button></div>
+<div class="service-card"><div class="service-icon">🌐</div><div class="service-name">Data</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Data settings')">MANAGE</button></div>
+<div class="service-card"><div class="service-icon">💡</div><div class="service-name">Electricity</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Electricity settings')">MANAGE</button></div>
+<div class="service-card"><div class="service-icon">📺</div><div class="service-name">Cable TV</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Cable settings')">MANAGE</button></div>
+<div class="service-card"><div class="service-icon">🎫</div><div class="service-name">Education</div><div class="service-status">● ACTIVE</div><button class="btn" style="margin-top:12px" onclick="demo('Education settings')">MANAGE</button></div>
+<div class="service-card"><div class="service-icon">⚙</div><div class="service-name">Service Settings</div><div class="service-status" style="color:#856404">● CONFIGURE</div><button class="btn" style="margin-top:12px" onclick="demo('Service configuration')">CONFIGURE</button></div>
+</div>
+</section>
 <section id="page-notifications" class="page">
-<div class="heading"><h1>Notifications</h1><p>Prepare customer notifications and announcements.</p></div>
+<div class="heading">
+<h1>Notifications</h1>
+<p>Send announcements, alerts and important messages to BOLTIV users.</p>
+</div>
+
+<div class="stats">
+<div class="stat">
+<div class="stat-label">TOTAL SENT</div>
+<div id="nTotal" class="stat-value">0</div>
+</div>
+<div class="stat">
+<div class="stat-label">TODAY</div>
+<div id="nToday" class="stat-value">0</div>
+</div>
+<div class="stat">
+<div class="stat-label">READ</div>
+<div id="nRead" class="stat-value">0</div>
+</div>
+<div class="stat">
+<div class="stat-label">UNREAD</div>
+<div id="nUnread" class="stat-value">0</div>
+</div>
+</div>
+
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>COMPOSE NOTIFICATION</h2></div><div class="section-body">
-<div class="form-group"><label>RECIPIENT</label><select id="notificationRecipient"><option>All Users</option><option>Selected User</option></select></div>
-<div class="form-group"><label>TITLE</label><input id="notificationTitle" placeholder="Notification title"></div>
-<div class="form-group"><label>MESSAGE</label><textarea id="notificationMessage" placeholder="Write your message..."></textarea></div>
+
+<div class="section">
+<div class="section-head">
+<h2>CREATE NOTIFICATION</h2>
+</div>
+
+<div class="section-body">
+
+<label>RECIPIENT</label>
+<select id="notifyRecipient">
+<option value="all">ALL USERS</option>
+<option value="active">ACTIVE USERS</option>
+<option value="selected">SELECTED USER</option>
+</select>
+
+<div id="selectedUserBox" class="hidden">
+<label>USER EMAIL / ID</label>
+<input id="notifyUser" placeholder="Enter user email or ID">
+</div>
+
+<label>TITLE</label>
+<input id="notifyTitle" placeholder="Notification title">
+
+<label>MESSAGE</label>
+<textarea id="notifyMessage" placeholder="Write your notification message..."></textarea>
+
+<label>TYPE</label>
+<select id="notifyType">
+<option value="general">GENERAL</option>
+<option value="announcement">ANNOUNCEMENT</option>
+<option value="payment">PAYMENT</option>
+<option value="security">SECURITY</option>
+<option value="maintenance">MAINTENANCE</option>
+<option value="promotion">PROMOTION</option>
+</select>
+
+<label>PRIORITY</label>
+<select id="notifyPriority">
+<option value="normal">NORMAL</option>
+<option value="high">HIGH</option>
+<option value="urgent">URGENT</option>
+</select>
+
+<div class="actions">
+<button class="btn" onclick="clearNotificationForm()">CLEAR</button>
 <button class="btn primary" onclick="sendNotification()">SEND NOTIFICATION</button>
-</div></div>
-<div class="section"><div class="section-head"><h2>NOTIFICATION HISTORY</h2></div><div class="section-body"><div class="empty">Notification history will appear when the notification backend is connected.</div></div></div>
+</div>
+
+</div>
+</div>
+
+<div class="section">
+<div class="section-head">
+<h2>NOTIFICATION PREVIEW</h2>
+</div>
+
+<div class="section-body">
+
+<div id="notificationPreview" style="border:1px solid var(--line);border-radius:12px;padding:16px;background:#fafafa">
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+<div style="width:40px;height:40px;border-radius:50%;background:var(--ybg);display:flex;align-items:center;justify-content:center;color:var(--g2);font-weight:1000">
+B
+</div>
+
+<div>
+<div id="previewTitle" style="font-size:11px;font-weight:1000">
+Notification title
+</div>
+
+<div id="previewType" style="font-size:8px;color:#999;margin-top:3px">
+GENERAL
+</div>
+</div>
+</div>
+
+<div id="previewMessage" style="font-size:10px;color:#555;line-height:1.6">
+Your notification message will appear here.
+</div>
+
+<div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee;font-size:8px;color:#999">
+BOLTIV • Just now
+</div>
+
+</div>
+
+<div style="margin-top:15px" class="notice">
+Notifications sent from this panel should be recorded in the admin audit log.
+</div>
+
+</div>
+</div>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>NOTIFICATION HISTORY</h2>
+
+<div style="display:flex;gap:6px">
+<button class="btn" onclick="filterNotificationHistory('all')">ALL</button>
+<button class="btn" onclick="filterNotificationHistory('announcement')">ANNOUNCEMENTS</button>
+<button class="btn" onclick="filterNotificationHistory('security')">SECURITY</button>
+</div>
+
+</div>
+
+<div id="notificationHistory">
+
+<div class="empty">
+No notification history loaded yet.
+</div>
+
+</div>
+
 </div>
 </section>
 
-<section id="page-activity" class="page">
-<div class="heading"><h1>Admin Activity</h1><p>Track administrative actions and system events.</p></div>
-<div class="section"><div class="section-head"><h2>ACTIVITY LOG</h2><button class="btn" onclick="loadActivity()">REFRESH</button></div><div id="activityArea"><div class="empty">Admin activity endpoint will be connected here.</div></div></div>
+<section id="page-support" class="page">
+
+<div class="heading">
+<h1>Support</h1>
+<p>Manage customer complaints, questions and support requests.</p>
+</div>
+
+<div class="stats">
+
+<div class="stat">
+<div class="stat-label">OPEN TICKETS</div>
+<div class="stat-value">0</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">PENDING</div>
+<div class="stat-value">0</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">RESOLVED</div>
+<div class="stat-value">0</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">TODAY</div>
+<div class="stat-value">0</div>
+</div>
+
+</div>
+
+<div class="toolbar">
+
+<input
+id="supportSearch"
+placeholder="Search ticket, user or subject..."
+>
+
+<select id="supportFilter">
+<option value="">All Tickets</option>
+<option value="open">Open</option>
+<option value="pending">Pending</option>
+<option value="resolved">Resolved</option>
+</select>
+
+<button class="btn" onclick="demo('Support refresh endpoint will be connected.')">
+REFRESH
+</button>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>SUPPORT TICKETS</h2>
+</div>
+
+<div id="supportTickets">
+
+<div class="empty">
+No support tickets available.
+</div>
+
+</div>
+
+</div>
+
 </section>
 
 <section id="page-security" class="page">
-<div class="heading"><h1>Security</h1><p>Monitor administrator security and sessions.</p></div>
-<div class="stats">
-<div class="stat"><div class="stat-label">ACTIVE SESSION</div><div class="stat-value">1</div></div>
-<div class="stat"><div class="stat-label">FAILED LOGINS</div><div class="stat-value">—</div></div>
-<div class="stat"><div class="stat-label">SECURITY EVENTS</div><div class="stat-value">—</div></div>
-<div class="stat"><div class="stat-label">SESSION</div><div class="stat-value" style="font-size:15px">SECURE</div></div>
+
+<div class="heading">
+<h1>Security</h1>
+<p>Monitor administrator access and platform security.</p>
 </div>
-<div class="section"><div class="section-head"><h2>SECURITY CENTER</h2></div><div class="section-body"><div class="notice">Security monitoring controls are prepared on the frontend. Login and session authentication currently use the existing admin API.</div></div></div>
+
+<div class="stats">
+
+<div class="stat">
+<div class="stat-label">SESSION</div>
+<div class="stat-value" style="font-size:14px">
+ACTIVE
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">FAILED LOGINS</div>
+<div class="stat-value">
+0
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">ACTIVE SESSIONS</div>
+<div class="stat-value">
+1
+</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">SECURITY EVENTS</div>
+<div class="stat-value">
+0
+</div>
+</div>
+
+</div>
+
+<div class="grid2">
+
+<div class="section">
+
+<div class="section-head">
+<h2>ADMIN SESSION</h2>
+</div>
+
+<div class="section-body">
+
+<div class="activity">
+<span>Administrator</span>
+<strong id="securityEmail">—</strong>
+</div>
+
+<div class="activity">
+<span>Session Status</span>
+<strong class="amount">ACTIVE</strong>
+</div>
+
+<div class="activity">
+<span>Authentication</span>
+<strong>Bearer Token</strong>
+</div>
+
+<div class="activity">
+<span>Platform</span>
+<strong>Web Admin</strong>
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>SECURITY CONTROLS</h2>
+</div>
+
+<div class="section-body">
+
+<button class="btn" onclick="demo('Change password will be connected to the backend.')">
+CHANGE PASSWORD
+</button>
+
+<button class="btn" onclick="demo('Two-factor authentication will be connected next.')">
+ENABLE 2FA
+</button>
+
+<button class="btn danger" onclick="demo('All other sessions will be revoked through the backend.')">
+REVOKE OTHER SESSIONS
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>SECURITY EVENTS</h2>
+<button class="btn" onclick="demo('Security events endpoint will be connected.')">
+REFRESH
+</button>
+</div>
+
+<div id="securityEvents">
+
+<div class="empty">
+No security events available.
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section id="page-audit" class="page">
+
+<div class="heading">
+<h1>Audit Logs</h1>
+<p>Every important administrator action should be recorded here.</p>
+</div>
+
+<div class="stats">
+
+<div class="stat">
+<div class="stat-label">TOTAL EVENTS</div>
+<div class="stat-value">0</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">TODAY</div>
+<div class="stat-value">0</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">ADMIN ACTIONS</div>
+<div class="stat-value">0</div>
+</div>
+
+<div class="stat">
+<div class="stat-label">SECURITY EVENTS</div>
+<div class="stat-value">0</div>
+</div>
+
+</div>
+
+<div class="toolbar">
+
+<input
+id="auditSearch"
+placeholder="Search audit logs..."
+>
+
+<select id="auditType">
+<option value="">All Actions</option>
+<option value="login">Login</option>
+<option value="logout">Logout</option>
+<option value="wallet">Wallet</option>
+<option value="user">User</option>
+<option value="payment">Payment</option>
+<option value="security">Security</option>
+</select>
+
+<button class="btn" onclick="demo('Audit logs will load from the backend.')">
+REFRESH
+</button>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>ADMIN ACTIVITY</h2>
+</div>
+
+<div id="auditArea">
+
+<div class="empty">
+No audit logs available.
+</div>
+
+</div>
+
+</div>
+
 </section>
 
 <section id="page-settings" class="page">
-<div class="heading"><h1>Settings</h1><p>Administrator and system preferences.</p></div>
-<div class="grid2">
-<div class="section"><div class="section-head"><h2>ADMIN PROFILE</h2></div><div class="section-body"><label>ADMIN EMAIL</label><input id="settingsEmail" readonly><label>ACCOUNT ROLE</label><input value="Administrator" readonly></div></div>
-<div class="section"><div class="section-head"><h2>SECURITY</h2></div><div class="section-body"><button class="btn" onclick="demo('Password change endpoint will be connected next.')">CHANGE PASSWORD</button><button class="btn" style="margin-left:6px" onclick="demo('Two-factor authentication will be connected next.')">2FA SETTINGS</button></div></div>
+
+<div class="heading">
+<h1>Settings</h1>
+<p>Manage your administrator account and BOLTIV platform configuration.</p>
 </div>
+
+<div class="grid2">
+
+<div class="section">
+
+<div class="section-head">
+<h2>ADMIN PROFILE</h2>
+</div>
+
+<div class="section-body">
+
+<label>ADMIN EMAIL</label>
+<input id="settingsEmail" readonly>
+
+<label>ROLE</label>
+<input value="SUPER ADMINISTRATOR" readonly>
+
+<label>ACCOUNT STATUS</label>
+<input value="ACTIVE" readonly>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>SECURITY SETTINGS</h2>
+</div>
+
+<div class="section-body">
+
+<div class="activity">
+<span>Two-Factor Authentication</span>
+<strong style="color:var(--yellow)">
+NOT ENABLED
+</strong>
+</div>
+
+<div class="activity">
+<span>Session Protection</span>
+<strong style="color:var(--green)">
+ACTIVE
+</strong>
+</div>
+
+<div class="activity">
+<span>Admin Authentication</span>
+<strong style="color:var(--green)">
+ACTIVE
+</strong>
+</div>
+
+<div style="margin-top:15px">
+
+<button class="btn">
+CHANGE PASSWORD
+</button>
+
+<button class="btn">
+ENABLE 2FA
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>PLATFORM SETTINGS</h2>
+</div>
+
+<div class="section-body">
+
+<div class="activity">
+<div>
+<strong>Maintenance Mode</strong>
+<br>
+<small>Temporarily disable customer transactions.</small>
+</div>
+
+<button
+class="btn"
+onclick="demo('Maintenance mode will be connected to the backend.')">
+DISABLED
+</button>
+
+</div>
+
+<div class="activity">
+
+<div>
+<strong>New User Registration</strong>
+<br>
+<small>Allow new customers to create accounts.</small>
+</div>
+
+<button class="btn">
+ENABLED
+</button>
+
+</div>
+
+<div class="activity">
+
+<div>
+<strong>Wallet Transactions</strong>
+<br>
+<small>Allow users to fund and spend wallet balance.</small>
+</div>
+
+<button class="btn">
+ENABLED
+</button>
+
+</div>
+
+<div class="activity">
+
+<div>
+<strong>Payment Processing</strong>
+<br>
+<small>Allow Paystack payments.</small>
+</div>
+
+<button class="btn">
+ENABLED
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<div class="section-head">
+<h2>SYSTEM INFORMATION</h2>
+</div>
+
+<div class="section-body">
+
+<div class="activity">
+<span>Application</span>
+<strong>BOLTIV</strong>
+</div>
+
+<div class="activity">
+<span>Admin Panel</span>
+<strong>Control Center</strong>
+</div>
+
+<div class="activity">
+<span>Backend</span>
+<strong>Render</strong>
+</div>
+
+<div class="activity">
+<span>Payment Gateway</span>
+<strong>Paystack</strong>
+</div>
+
+<div class="activity">
+<span>Environment</span>
+<strong>Production</strong>
+</div>
+
+</div>
+
+</div>
+
 </section>
 
-</div>
-</main>
-</div>
-
-<div id="userModal" class="modal"><div class="modal-box"><div class="modal-head"><h2>USER DETAILS</h2><button class="close" onclick="closeModal('userModal')">×</button></div><div id="userModalContent"></div></div></div>
-
-<div id="walletModal" class="modal"><div class="modal-box" style="max-width:430px"><div class="modal-head"><h2 id="walletTitle">CREDIT WALLET</h2><button class="close" onclick="closeModal('walletModal')">×</button></div><div class="notice">This interface is prepared for the wallet adjustment backend.</div><label>USER ID / EMAIL</label><input id="walletUser" placeholder="Enter user ID or email"><label>AMOUNT</label><input id="walletAmount" type="number" min="0" placeholder="₦0.00"><label>REASON</label><input id="walletReason" placeholder="Reason"><div class="modal-actions"><button class="btn" onclick="closeModal('walletModal')">CANCEL</button><button class="btn primary" onclick="submitWallet()">CONFIRM</button></div></div></div>
-
 <script>
-const API="https://boltiv-backend.onrender.com";
-const TOKEN_KEY="boltivAdminToken";
-const EMAIL_KEY="boltivAdminEmail";
-let users=[],transactions=[],payments=[],walletType="credit";
+/* NOTIFICATION UI */
 
-const $=id=>document.getElementById(id);
-const money=v=>"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
-const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
-function date(v){if(!v)return"—";let d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleString("en-NG",{dateStyle:"medium",timeStyle:"short"})}
-function demo(t){alert(t)}
-function openModal(id){$(id).classList.add("show")}
-function closeModal(id){$(id).classList.remove("show")}
-function setWalletType(type){walletType=type;$("walletTitle").textContent=type==="credit"?"CREDIT WALLET":"DEBIT WALLET"}
+const notifyRecipient=document.getElementById("notifyRecipient");
+const notifyTitle=document.getElementById("notifyTitle");
+const notifyMessage=document.getElementById("notifyMessage");
+const notifyType=document.getElementById("notifyType");
+const notifyPriority=document.getElementById("notifyPriority");
 
-function showMessage(text,type="error"){const m=$("message");m.textContent=text;m.className="message show "+type}
-function showLogin(){$("loginPage").classList.remove("hidden");$("app").classList.add("hidden")}
-function showApp(){$("loginPage").classList.add("hidden");$("app").classList.remove("hidden")}
+if(notifyRecipient){
+notifyRecipient.addEventListener("change",function(){
+const box=document.getElementById("selectedUserBox");
 
-async function api(path,opt={}){
-const token=localStorage.getItem(TOKEN_KEY);
-const headers={"Accept":"application/json",...(opt.headers||{})};
-if(opt.body)headers["Content-Type"]="application/json";
-if(token)headers.Authorization="Bearer "+token;
-const r=await fetch(API+path,{...opt,headers});
-let d;try{d=await r.json()}catch{throw Error("Invalid server response.")}
-if(r.status===401){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(EMAIL_KEY);showLogin();throw Error("Admin session expired.")}
-if(!r.ok||!d.success)throw Error(d.message||"Request failed.");
-return d;
+if(this.value==="selected"){
+box.classList.remove("hidden");
+}else{
+box.classList.add("hidden");
+}
+});
 }
 
-async function login(){
-const e=$("email").value.trim().toLowerCase(),p=$("password").value;
-if(!e)return showMessage("Enter your admin email.");
-if(!p)return showMessage("Enter your admin password.");
-$("loginButton").disabled=true;$("loginButton").textContent="LOGGING IN...";
-try{
-const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:e,password:p})});
-if(!d.token)throw Error("No admin session token returned.");
-localStorage.setItem(TOKEN_KEY,d.token);localStorage.setItem(EMAIL_KEY,d.admin?.email||e);openDashboard();
-}catch(x){showMessage(x.message||"Login failed.")}
-finally{$("loginButton").disabled=false;$("loginButton").textContent="LOGIN TO ADMIN"}
+function updateNotificationPreview(){
+
+if(!notifyTitle)return;
+
+document.getElementById("previewTitle").textContent=
+notifyTitle.value||"Notification title";
+
+document.getElementById("previewMessage").textContent=
+notifyMessage.value||
+"Your notification message will appear here.";
+
+document.getElementById("previewType").textContent=
+(notifyType.value||"general").toUpperCase()+
+" • "+
+(notifyPriority.value||"normal").toUpperCase();
+
 }
 
-async function openDashboard(){
-try{const d=await api("/api/admin/me");$("settingsEmail").value=d.admin?.email||localStorage.getItem(EMAIL_KEY)||"";showApp();await loadAll()}catch(x){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(EMAIL_KEY);showLogin();showMessage(x.message||"Session verification failed.")}
+if(notifyTitle)notifyTitle.addEventListener("input",updateNotificationPreview);
+if(notifyMessage)notifyMessage.addEventListener("input",updateNotificationPreview);
+if(notifyType)notifyType.addEventListener("change",updateNotificationPreview);
+if(notifyPriority)notifyPriority.addEventListener("change",updateNotificationPreview);
+
+function clearNotificationForm(){
+
+if(notifyTitle)notifyTitle.value="";
+if(notifyMessage)notifyMessage.value="";
+if(document.getElementById("notifyUser"))
+document.getElementById("notifyUser").value="";
+
+updateNotificationPreview();
+
 }
 
-async function loadAll(){await Promise.allSettled([loadStats(),loadUsers(),loadTransactions(),loadPayments()]);loadRecent()}
-async function loadStats(){
-try{
-const d=await api("/api/admin/stats"),s=d.stats||{};
-$("dashUsers").textContent=s.users||0;$("dashWallet").textContent=money(s.walletBalance);$("dashTransactions").textContent=s.transactions||0;$("dashPayments").textContent=s.payments||0;
-$("analyticsUsers").textContent=s.users||0;$("analyticsTransactions").textContent=s.transactions||0;$("analyticsPayments").textContent=s.payments||0;$("analyticsWallet").textContent=money(s.walletBalance);
-$("metricUsers").textContent=s.users||0;$("metricTransactions").textContent=s.transactions||0;$("metricPayments").textContent=s.payments||0;$("metricWallet").textContent=money(s.walletBalance);$("walletTotal").textContent=money(s.walletBalance);
-}catch(e){console.error(e)}
+function sendNotification(){
+
+const title=notifyTitle.value.trim();
+const message=notifyMessage.value.trim();
+const recipient=notifyRecipient.value;
+
+if(!title){
+alert("Enter a notification title.");
+notifyTitle.focus();
+return;
 }
 
-async function loadUsers(){
-$("usersArea").innerHTML='<div class="loading">Loading users...</div>';
-try{const d=await api("/api/admin/users");users=d.users||[];renderUsers(users)}catch(e){$("usersArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
-}
-function renderUsers(list){
-$("userTotal").textContent=users.length;$("userActive").textContent=users.filter(x=>(x.status||"active")==="active").length;$("userSuspended").textContent=users.filter(x=>x.status==="suspended").length;$("userBalances").textContent=money(users.reduce((a,x)=>a+Number(x.balance||0),0));
-if(!list.length){$("usersArea").innerHTML='<div class="empty">No users found.</div>';return}
-$("usersArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>USER</th><th>PHONE</th><th>EMAIL</th><th>BALANCE</th><th>STATUS</th><th>JOINED</th><th></th></tr></thead><tbody>'+list.map((u,i)=>{let s=(u.status||"active").toLowerCase();return`<tr><td><strong>${esc(u.name||"Unnamed")}</strong><br><small>${esc(u.id||u.user_id||"—")}</small></td><td>${esc(u.phone||"—")}</td><td>${esc(u.email||"—")}</td><td class="amount">${money(u.balance)}</td><td><span class="badge ${s==="suspended"?"suspended":"active"}">${esc(s)}</span></td><td>${date(u.created_at)}</td><td><button class="btn" onclick="userDetails(${users.indexOf(u)})">VIEW</button></td></tr>`}).join("")+'</tbody></table></div>';
-}
-function filterUsers(){let q=$("userSearch").value.toLowerCase(),s=$("userStatus").value;renderUsers(users.filter(u=>(!q||`${u.name||""} ${u.email||""} ${u.phone||""} ${u.id||""}`.toLowerCase().includes(q))&&(!s||(u.status||"active").toLowerCase()===s)))}
-function userDetails(i){
-const u=users[i];if(!u)return;
-$("userModalContent").innerHTML=`<div class="profile"><div class="avatar">${esc((u.name||"U")[0].toUpperCase())}</div><div><strong>${esc(u.name||"Unnamed User")}</strong><br><small>${esc(u.email||"—")}</small></div></div><div class="grid3" style="margin-top:15px"><div class="stat"><div class="stat-label">BALANCE</div><div class="stat-value">${money(u.balance)}</div></div><div class="stat"><div class="stat-label">STATUS</div><div class="stat-value" style="font-size:13px">${esc(u.status||"active")}</div></div><div class="stat"><div class="stat-label">JOINED</div><div class="stat-value" style="font-size:11px">${date(u.created_at)}</div></div></div><div style="margin-top:15px"><div class="activity"><span>Phone</span><strong>${esc(u.phone||"—")}</strong></div><div class="activity"><span>User ID</span><strong>${esc(u.id||u.user_id||"—")}</strong></div></div><div class="modal-actions"><button class="btn" onclick="closeModal('userModal')">CLOSE</button><button class="btn primary" onclick="closeModal('userModal');openModal('walletModal')">WALLET</button></div>`;
-openModal("userModal");
+if(!message){
+alert("Enter a notification message.");
+notifyMessage.focus();
+return;
 }
 
-async function loadTransactions(){
-$("transactionsArea").innerHTML='<div class="loading">Loading transactions...</div>';
-try{const d=await api("/api/admin/transactions");transactions=d.transactions||[];renderTransactions(transactions)}catch(e){$("transactionsArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
+if(recipient==="selected" &&
+!document.getElementById("notifyUser").value.trim()){
+alert("Enter the selected user's email or ID.");
+return;
 }
-function renderTransactions(list){
-if(!list.length){$("transactionsArea").innerHTML='<div class="empty">No transactions found.</div>';return}
-$("transactionsArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>USER</th><th>SERVICE</th><th>AMOUNT</th><th>STATUS</th><th>DATE</th></tr></thead><tbody>'+list.map(x=>{let s=(x.status||"pending").toLowerCase();return`<tr><td>${esc(x.reference||"—")}</td><td>${esc(x.user_id||"—")}</td><td>${esc(x.service||"—")}</td><td class="amount">${money(x.amount)}</td><td><span class="badge ${esc(s)}">${esc(x.status||"pending")}</span></td><td>${date(x.date||x.created_at)}</td></tr>`}).join("")+'</tbody></table></div>';
-}
-function filterTransactions(){let q=$("transactionSearch").value.toLowerCase(),s=$("transactionStatus").value;renderTransactions(transactions.filter(x=>(!q||`${x.reference||""} ${x.service||""} ${x.user_id||""}`.toLowerCase().includes(q))&&(!s||(x.status||"pending").toLowerCase()===s)))}
 
-async function loadPayments(){
-$("paymentsArea").innerHTML='<div class="loading">Loading payments...</div>';
-try{const d=await api("/api/admin/payments");payments=d.payments||[];renderPayments(payments)}catch(e){$("paymentsArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
-}
-function renderPayments(list){
-$("paymentTotal").textContent=list.length;$("paymentSuccess").textContent=list.filter(x=>(x.status||"").toLowerCase()==="successful").length;$("paymentPending").textContent=list.filter(x=>(x.status||"").toLowerCase()==="pending").length;$("paymentFailed").textContent=list.filter(x=>(x.status||"").toLowerCase()==="failed").length;
-if(!list.length){$("paymentsArea").innerHTML='<div class="empty">No payments found.</div>';return}
-$("paymentsArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>EMAIL</th><th>AMOUNT</th><th>STATUS</th><th>CREDITED</th><th>DATE</th></tr></thead><tbody>'+list.map(x=>{let s=(x.status||"pending").toLowerCase();return`<tr><td>${esc(x.reference||"—")}</td><td>${esc(x.email||"—")}</td><td class="amount">${money(x.amount)}</td><td><span class="badge ${esc(s)}">${esc(x.status||"pending")}</span></td><td>${x.credited?"YES":"NO"}</td><td>${date(x.created_at)}</td></tr>`}).join("")+'</tbody></table></div>';
-}
-function filterPayments(){let q=$("paymentSearch").value.toLowerCase();renderPayments(payments.filter(x=>!q||`${x.reference||""} ${x.email||""}`.toLowerCase().includes(q)))}
+/*
+Frontend only for now.
+Backend notification endpoint can be connected later.
+*/
 
-function loadRecent(){
-let list=[...payments.slice(0,4).map(x=>({title:"Payment",detail:x.email||x.reference,amount:money(x.amount),time:date(x.created_at)})),...transactions.slice(0,4).map(x=>({title:"Transaction",detail:x.service||x.reference,amount:money(x.amount),time:date(x.date||x.created_at)}))].slice(0,6);
-$("recentActivity").innerHTML=list.length?list.map(x=>`<div class="activity"><div><strong>${esc(x.title)}</strong><br><small>${esc(x.detail||"—")}</small></div><div style="text-align:right"><strong class="amount">${esc(x.amount)}</strong><br><small>${esc(x.time)}</small></div></div>`).join(""):'<div class="empty">No recent activity.</div>';
+alert(
+"Notification form is ready.\n\n"+
+"Recipient: "+
+recipient+
+"\nTitle: "+
+title+
+"\nType: "+
+notifyType.value+
+"\nPriority: "+
+notifyPriority.value
+);
+
 }
-function loadDashboard(){loadStats();loadRecent()}
-function loadActivity(){demo("Admin activity backend endpoint will be connected here.")}
-function submitWallet(){let user=$("walletUser").value.trim(),amount=Number($("walletAmount").value),reason=$("walletReason").value.trim();if(!user||amount<=0||!reason)return alert("Enter user, amount and reason.");if(!confirm(`${walletType.toUpperCase()} ${money(amount)}?`))return;demo("Frontend ready. Connect the wallet adjustment endpoint before enabling live changes.");closeModal("walletModal")}
-function sendNotification(){let title=$("notificationTitle").value.trim(),msg=$("notificationMessage").value.trim();if(!title||!msg)return alert("Enter a title and message.");demo("Notification frontend ready. Connect the notification endpoint before sending.");}
-function goPage(page){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));$("page-"+page).classList.add("active");$("topTitle").textContent=page.charAt(0).toUpperCase()+page.slice(1);$("topSub").textContent="BOLTIV administration";$("sidebar").classList.remove("open");if(page==="users")loadUsers();if(page==="transactions")loadTransactions();if(page==="payments")loadPayments()}
-document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>goPage(b.dataset.page));
-$("menuButton").onclick=()=>$("sidebar").classList.toggle("open");
-$("loginButton").onclick=login;
-$("password").onkeydown=e=>{if(e.key==="Enter")login()};
-$("email").onkeydown=e=>{if(e.key==="Enter")$("password").focus()};
-$("logoutButton").onclick=async()=>{try{await fetch(API+"/api/admin/logout",{method:"POST",headers:{Authorization:"Bearer "+localStorage.getItem(TOKEN_KEY)}})}catch{}localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(EMAIL_KEY);showLogin();$("email").value="";$("password").value=""};
-document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
-(function(){if(localStorage.getItem(TOKEN_KEY))openDashboard();else showLogin()})();
+
+function filterNotificationHistory(type){
+
+const history=document.getElementById("notificationHistory");
+
+if(!history)return;
+
+history.innerHTML=
+'<div class="empty">No '+type+
+' notification history available yet.</div>';
+
+}
+
+/* SUPPORT */
+
+const supportSearch=document.getElementById("supportSearch");
+const supportFilter=document.getElementById("supportFilter");
+
+if(supportSearch){
+supportSearch.addEventListener("input",function(){
+console.log("Support search:",this.value);
+});
+}
+
+if(supportFilter){
+supportFilter.addEventListener("change",function(){
+console.log("Support filter:",this.value);
+});
+}
+
+/* AUDIT */
+
+const auditSearch=document.getElementById("auditSearch");
+const auditType=document.getElementById("auditType");
+
+if(auditSearch){
+auditSearch.addEventListener("input",function(){
+console.log("Audit search:",this.value);
+});
+}
+
+if(auditType){
+auditType.addEventListener("change",function(){
+console.log("Audit type:",this.value);
+});
+}
 </script>
 </body>
 </html>
+

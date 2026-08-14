@@ -1019,7 +1019,7 @@ enableEdit();
    SAVE PROFILE
 ========================= */
 
-saveBtn.onclick=()=>{
+saveBtn.onclick=async()=>{
 
 const name=nameInput.value.trim();
 const phone=phoneInput.value.trim();
@@ -1083,26 +1083,29 @@ return;
 }
 
 
-/* SAVE */
-
+/* SAVE TO SERVER */
+const token=localStorage.getItem("boltivAuthToken")||"";
+saveBtn.disabled=true;
+saveBtn.textContent="SAVING...";
+try{
+const r=await fetch("https://boltiv-backend.onrender.com/api/profile/update",{
+method:"POST",
+headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},
+body:JSON.stringify({name,phone,email})
+});
+const d=await r.json();
+if(!r.ok||!d.success)throw new Error(d.message||"Unable to update profile.");
 const oldUser=getUser();
-
-const updatedUser={
-...oldUser,
-name:name,
-fullName:name,
-phone:phone,
-phoneNumber:phone,
-email:email
-};
-
-saveUser(updatedUser);
-
+saveUser({...oldUser,...d.user,fullName:d.user.name,phoneNumber:d.user.phone});
 loadProfile();
-
 disableEdit();
-
 successModal.classList.add("show");
+}catch(error){
+showMessage(error.message||"Unable to update profile.","error");
+}finally{
+saveBtn.disabled=false;
+saveBtn.textContent="SAVE CHANGES";
+}
 
 };
 

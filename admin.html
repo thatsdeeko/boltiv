@@ -233,7 +233,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 
 <section id="page-transactions" class="page">
 <div class="heading"><h1>Transactions</h1><p>Track every service transaction.</p></div>
-<div class="toolbar"><input id="transactionSearch" placeholder="Search reference, service or user..." oninput="filterTransactions()"><select id="transactionFilter" onchange="filterTransactions()"><option value="">All Status</option><option value="successful">Successful</option><option value="pending">Pending</option><option value="failed">Failed</option></select><button class="btn" onclick="loadTransactions()">REFRESH</button></div>
+<div class="toolbar"><input id="transactionSearch" placeholder="Search reference, service or user..." oninput="filterTransactions()"><select id="transactionFilter" onchange="filterTransactions()"><option value="">All Status</option><option value="successful">Successful</option><option value="processing">Processing</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select><button class="btn" onclick="loadTransactions()">REFRESH</button><button class="btn" onclick="loadPending()">CHECK PENDING</button></div>
+<div id="pendingBox" class="section" style="display:none;margin-top:12px"><div class="section-head"><h2>PENDING MONITOR</h2><span id="pendingCount" class="badge pending">0</span></div><div id="pendingArea"></div></div>
 <div class="section"><div class="section-head"><h2>TRANSACTION HISTORY</h2></div><div id="transactionsArea"><div class="loading">Loading...</div></div></div>
 </section>
 
@@ -839,149 +840,75 @@ ENABLED
 
 </section>
 
+<div id="adminModal" class="modal"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle">ADMIN ACTION</h2><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
 <script>
-/* NOTIFICATION UI */
 
-const notifyRecipient=document.getElementById("notifyRecipient");
-const notifyTitle=document.getElementById("notifyTitle");
-const notifyMessage=document.getElementById("notifyMessage");
-const notifyType=document.getElementById("notifyType");
-const notifyPriority=document.getElementById("notifyPriority");
-
-if(notifyRecipient){
-notifyRecipient.addEventListener("change",function(){
-const box=document.getElementById("selectedUserBox");
-
-if(this.value==="selected"){
-box.classList.remove("hidden");
-}else{
-box.classList.add("hidden");
+const API=location.origin;
+let token=localStorage.getItem("boltiv_admin_token")||"";
+let users=[],transactions=[],payments=[];
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+async function api(path,opt={}){
+ const headers={"Content-Type":"application/json",...(opt.headers||{})};
+ if(token)headers.Authorization="Bearer "+token;
+ const r=await fetch(API+path,{...opt,headers});
+ let d={};try{d=await r.json()}catch{}
+ if(r.status===401){token="";localStorage.removeItem("boltiv_admin_token");showLogin();}
+ if(!r.ok)throw Error(d.message||"Request failed");
+ return d;
 }
-});
+function showLogin(){$("loginPage").classList.remove("hidden");$("app").classList.add("hidden");}
+function showApp(){$("loginPage").classList.add("hidden");$("app").classList.remove("hidden");loadAll();}
+function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
+async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});token=d.token;localStorage.setItem("boltiv_admin_token",token);showApp();}catch(e){showMsg(e.message)}}
+$("loginButton").onclick=login;
+function go(page){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="users")loadUsers();if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="support")loadSupport();if(page==="audit")loadAudit();}
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
+function closeModal(){$("adminModal").classList.remove("show")}
+function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("adminModal").classList.add("show")}
+async function loadAll(){loadUsers();loadPayments();loadTransactions();loadSupport();loadAudit();}
+async function loadUsers(){
+ try{const d=await api("/api/admin/users");users=d.users||[];$("uTotal").textContent=users.length;$("uActive").textContent=users.filter(x=>x.status!=="suspended").length;$("uSuspended").textContent=users.filter(x=>x.status==="suspended").length;$("uBalance").textContent="₦"+users.reduce((a,x)=>a+Number(x.balance||0),0).toLocaleString(undefined,{minimumFractionDigits:2});renderUsers(users)}catch(e){$("usersArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
 }
-
-function updateNotificationPreview(){
-
-if(!notifyTitle)return;
-
-document.getElementById("previewTitle").textContent=
-notifyTitle.value||"Notification title";
-
-document.getElementById("previewMessage").textContent=
-notifyMessage.value||
-"Your notification message will appear here.";
-
-document.getElementById("previewType").textContent=
-(notifyType.value||"general").toUpperCase()+
-" • "+
-(notifyPriority.value||"normal").toUpperCase();
-
-}
-
-if(notifyTitle)notifyTitle.addEventListener("input",updateNotificationPreview);
-if(notifyMessage)notifyMessage.addEventListener("input",updateNotificationPreview);
-if(notifyType)notifyType.addEventListener("change",updateNotificationPreview);
-if(notifyPriority)notifyPriority.addEventListener("change",updateNotificationPreview);
-
-function clearNotificationForm(){
-
-if(notifyTitle)notifyTitle.value="";
-if(notifyMessage)notifyMessage.value="";
-if(document.getElementById("notifyUser"))
-document.getElementById("notifyUser").value="";
-
-updateNotificationPreview();
-
-}
-
-function sendNotification(){
-
-const title=notifyTitle.value.trim();
-const message=notifyMessage.value.trim();
-const recipient=notifyRecipient.value;
-
-if(!title){
-alert("Enter a notification title.");
-notifyTitle.focus();
-return;
+function renderUsers(list){$("usersArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>USER</th><th>EMAIL</th><th>PHONE</th><th>BALANCE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>'+list.map(u=>`<tr><td>${esc(u.name||"—")}</td><td>${esc(u.email)}</td><td>${esc(u.phone)}</td><td class="amount">₦${Number(u.balance||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td><td><span class="badge ${u.status==="suspended"?"suspended":"active"}">${esc(u.status||"active")}</span></td><td><button class="btn" onclick="wallet('${esc(u.user_id)}','credit')">CREDIT</button> <button class="btn" onclick="wallet('${esc(u.user_id)}','debit')">DEBIT</button> <button class="btn danger" onclick="toggleUser('${esc(u.user_id)}','${u.status==="suspended"?"activate":"suspend"}')">${u.status==="suspended"?"ACTIVATE":"SUSPEND"}</button></td></tr>`).join("")+"</tbody></table></div>"}
+function filterUsers(){const q=$("userSearch").value.toLowerCase(),f=$("userFilter").value;renderUsers(users.filter(u=>(!q||[u.name,u.email,u.phone,u.user_id].join(" ").toLowerCase().includes(q))&&(!f||(f==="suspended"?u.status==="suspended":u.status!=="suspended"))))}
+async function toggleUser(id,action){if(!confirm(action==="suspend"?"Suspend this user?":"Activate this user?"))return;try{await api("/api/admin/users/action",{method:"POST",body:JSON.stringify({userId:id,action})});loadUsers();alert("User updated.")}catch(e){alert(e.message)}}
+function wallet(id,mode){openModal((mode==="credit"?"CREDIT":"DEBIT")+" WALLET",`<label>AMOUNT</label><input id="adjAmount" type="number" min="1" step="0.01"><label>REASON</label><input id="adjReason" placeholder="Reason"><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="doWallet('${id}','${mode}')">CONFIRM</button></div>`)}
+async function doWallet(id,mode){try{const amount=Number($("adjAmount").value);const reason=$("adjReason").value;await api("/api/admin/wallet/"+mode,{method:"POST",body:JSON.stringify({userId:id,amount,reason})});closeModal();loadUsers();alert("Wallet updated.")}catch(e){alert(e.message)}}
+async function loadTransactions(){try{const d=await api("/api/admin/transactions");transactions=d.transactions||[];renderTransactions(transactions)}catch(e){$("transactionsArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+function renderTransactions(list){$("transactionsArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>USER</th><th>SERVICE</th><th>AMOUNT</th><th>STATUS</th><th>DATE</th><th>ACTION</th></tr></thead><tbody>'+list.map(t=>`<tr><td>${esc(t.reference)}</td><td>${esc(t.email||t.user_id)}</td><td>${esc(t.service)}</td><td class="amount">₦${Number(t.amount||0).toLocaleString()}</td><td><span class="badge ${esc(t.status)}">${esc(t.status)}</span></td><td>${new Date(t.date).toLocaleString()}</td><td><button class="btn" onclick="transactionDetails('${esc(t.reference)}')">VIEW</button> ${t.type==="debit"&&t.status!=="refunded"?`<button class="btn danger" onclick="refund('${esc(t.reference)}')">REFUND</button>`:""}</td></tr>`).join("")+"</tbody></table></div>"}
+function filterTransactions(){const q=$("transactionSearch").value.toLowerCase(),f=$("transactionFilter").value;renderTransactions(transactions.filter(t=>(!q||[t.reference,t.service,t.email,t.user_id].join(" ").toLowerCase().includes(q))&&(!f||t.status===f)))}
+function transactionDetails(ref){const t=transactions.find(x=>String(x.reference)===String(ref));if(!t)return;openModal("TRANSACTION DETAILS",`<div class="detail-grid"><p><b>Reference</b><br>${esc(t.reference)}</p><p><b>User</b><br>${esc(t.email||t.user_id)}</p><p><b>Service</b><br>${esc(t.service)}</p><p><b>Amount</b><br>₦${Number(t.amount||0).toLocaleString()}</p><p><b>Status</b><br>${esc(t.status)}</p><p><b>Type</b><br>${esc(t.type)}</p><p><b>Provider Reference</b><br>${esc(t.provider_reference||"—")}</p><p><b>Date</b><br>${new Date(t.date).toLocaleString()}</p></div><div class="actions"><button class="btn" onclick="closeModal()">CLOSE</button></div>`)}
+async function refund(ref){const reason=prompt("Refund reason","Admin approved refund");if(reason===null)return;try{await api("/api/admin/transactions/refund",{method:"POST",body:JSON.stringify({reference:ref,reason})});loadTransactions();alert("Refund completed.")}catch(e){alert(e.message)}}
+async function loadPayments(){try{const d=await api("/api/admin/payments");payments=d.payments||[];$("pTotal").textContent=payments.length;$("pSuccess").textContent=payments.filter(x=>x.status==="success").length;$("pPending").textContent=payments.filter(x=>x.status==="pending").length;$("pFailed").textContent=payments.filter(x=>x.status==="failed").length;renderPayments(payments)}catch(e){$("paymentsArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+function renderPayments(list){$("paymentsArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>USER</th><th>AMOUNT</th><th>STATUS</th><th>CREDITED</th><th>DATE</th></tr></thead><tbody>'+list.map(p=>`<tr><td>${esc(p.reference)}</td><td>${esc(p.email)}</td><td class="amount">₦${Number(p.amount||0).toLocaleString()}</td><td><span class="badge ${p.status==="success"?"successful":esc(p.status)}">${esc(p.status)}</span></td><td>${p.credited?"YES":"NO"}</td><td>${new Date(p.created_at).toLocaleString()}</td></tr>`).join("")+"</tbody></table></div>"}
+async function loadPending(){
+ try{
+  const d=await api("/api/admin/transactions/pending");
+  const a=d.transactions||[];
+  $("pendingBox").style.display="block";
+  $("pendingCount").textContent=a.length;
+  if(!a.length){$("pendingArea").innerHTML='<div class="empty">No pending transactions.</div>';return;}
+  $("pendingArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>SERVICE</th><th>AMOUNT</th><th>STATUS</th><th>PROVIDER REF</th><th>DATE</th></tr></thead><tbody>'+a.map(t=>'<tr><td>'+esc(t.reference)+'</td><td>'+esc(t.service)+'</td><td class="amount">₦'+Number(t.amount||0).toLocaleString()+'</td><td><span class="badge pending">'+esc(t.status)+'</span></td><td>'+esc(t.provider_reference||"—")+'</td><td>'+new Date(t.date).toLocaleString()+'</td></tr>').join('')+'</tbody></table></div>';
+ }catch(e){
+  $("pendingBox").style.display="block";
+  $("pendingArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';
+ }
 }
 
-if(!message){
-alert("Enter a notification message.");
-notifyMessage.focus();
-return;
-}
+function filterPayments(){const q=$("paymentSearch").value.toLowerCase();renderPayments(payments.filter(p=>[p.reference,p.email,p.user_id].join(" ").toLowerCase().includes(q)))}
+const notifyRecipient=$("notifyRecipient"),notifyTitle=$("notifyTitle"),notifyMessage=$("notifyMessage"),notifyType=$("notifyType"),notifyPriority=$("notifyPriority");
+if(notifyRecipient)notifyRecipient.onchange=()=>{const b=$("selectedUserBox");b.classList.toggle("hidden",notifyRecipient.value!=="selected")};
+function updateNotificationPreview(){if(!notifyTitle)return;$("previewTitle").textContent=notifyTitle.value||"Notification title";$("previewMessage").textContent=notifyMessage.value||"Your notification message will appear here.";$("previewType").textContent=(notifyType.value||"general").toUpperCase()+" • "+(notifyPriority.value||"normal").toUpperCase()}
+if(notifyTitle)notifyTitle.oninput=updateNotificationPreview;if(notifyMessage)notifyMessage.oninput=updateNotificationPreview;if(notifyType)notifyType.onchange=updateNotificationPreview;if(notifyPriority)notifyPriority.onchange=updateNotificationPreview;
+function clearNotificationForm(){notifyTitle.value="";notifyMessage.value="";if($("notifyUser"))$("notifyUser").value="";updateNotificationPreview()}
+async function sendNotification(){try{await api("/api/admin/notifications",{method:"POST",body:JSON.stringify({recipient:notifyRecipient.value,userId:$("notifyUser")?.value,title:notifyTitle.value,message:notifyMessage.value,type:notifyType.value})});alert("Notification sent.");clearNotificationForm();}catch(e){alert(e.message)}}
+async function loadSupport(){try{const d=await api("/api/admin/support");const a=d.tickets||[];$("supportTickets").innerHTML=a.length?a.map(t=>`<div class="ticket"><div class="ticket-title">#${t.id} — ${esc(t.subject)}</div><div class="ticket-meta">${esc(t.name||t.email||t.user_id)} • ${esc(t.status)} • ${new Date(t.updated_at).toLocaleString()}</div><p style="font-size:9px;margin:10px 0">${esc(t.message)}</p><button class="btn" onclick="replyTicket(${t.id})">REPLY</button> <button class="btn" onclick="ticketStatus(${t.id},'pending')">PENDING</button> <button class="btn primary" onclick="ticketStatus(${t.id},'resolved')">RESOLVE</button></div>`).join(""):'<div class="empty">No support tickets available.</div>'}catch(e){$("supportTickets").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+async function replyTicket(id){const m=prompt("Reply to ticket #"+id);if(!m)return;try{await api("/api/admin/support/reply",{method:"POST",body:JSON.stringify({ticketId:id,message:m})});loadSupport();alert("Reply sent.")}catch(e){alert(e.message)}}
+async function ticketStatus(id,status){try{await api("/api/admin/support/status",{method:"POST",body:JSON.stringify({ticketId:id,status})});loadSupport()}catch(e){alert(e.message)}}
+async function loadAudit(){try{const d=await api("/api/admin/audit");const a=d.logs||[];$("auditArea").innerHTML=a.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+a.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>'}catch(e){$("auditArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+if(token)api("/api/admin/me").then(showApp).catch(showLogin);else showLogin();
 
-if(recipient==="selected" &&
-!document.getElementById("notifyUser").value.trim()){
-alert("Enter the selected user's email or ID.");
-return;
-}
-
-/*
-Frontend only for now.
-Backend notification endpoint can be connected later.
-*/
-
-alert(
-"Notification form is ready.\n\n"+
-"Recipient: "+
-recipient+
-"\nTitle: "+
-title+
-"\nType: "+
-notifyType.value+
-"\nPriority: "+
-notifyPriority.value
-);
-
-}
-
-function filterNotificationHistory(type){
-
-const history=document.getElementById("notificationHistory");
-
-if(!history)return;
-
-history.innerHTML=
-'<div class="empty">No '+type+
-' notification history available yet.</div>';
-
-}
-
-/* SUPPORT */
-
-const supportSearch=document.getElementById("supportSearch");
-const supportFilter=document.getElementById("supportFilter");
-
-if(supportSearch){
-supportSearch.addEventListener("input",function(){
-console.log("Support search:",this.value);
-});
-}
-
-if(supportFilter){
-supportFilter.addEventListener("change",function(){
-console.log("Support filter:",this.value);
-});
-}
-
-/* AUDIT */
-
-const auditSearch=document.getElementById("auditSearch");
-const auditType=document.getElementById("auditType");
-
-if(auditSearch){
-auditSearch.addEventListener("input",function(){
-console.log("Audit search:",this.value);
-});
-}
-
-if(auditType){
-auditType.addEventListener("change",function(){
-console.log("Audit type:",this.value);
-});
-}
 </script>
 </body>
 </html>

@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: boltiv-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        value: https://thatsdeeko.github.io/boltiv
+      - key: FRONTEND_ORIGIN
+        value: https://thatsdeeko.github.io
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: VTU_API_URL
+        sync: false
+      - key: VTU_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false

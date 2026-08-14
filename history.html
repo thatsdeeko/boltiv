@@ -588,6 +588,27 @@ document.getElementById("balance")
 
 }
 
+async function syncTransactions(){
+try{
+const token=localStorage.getItem("boltivAuthToken")||"";
+if(!token)return;
+const r=await fetch("https://boltiv-backend.onrender.com/api/transactions",{headers:{Authorization:"Bearer "+token}});
+const d=await r.json();
+if(!r.ok||!d.success)return;
+const mapped=(d.transactions||[]).map(t=>({
+...t,
+title:t.service||"Transaction",
+direction:t.type==="credit"?"credit":"debit",
+type:(/airtime/i.test(t.service||""))?"airtime":(/data/i.test(t.service||""))?"data":(/cable/i.test(t.service||""))?"cable":(/electric/i.test(t.service||""))?"electricity":"wallet",
+phone:t.recipient||"",
+id:t.reference||t.id,
+provider:t.provider_reference||""
+}));
+localStorage.setItem("boltivTransactions",JSON.stringify(mapped));
+renderHistory();
+}catch(e){console.warn("Transaction sync failed",e);}
+}
+
 function getTransactions(){
 
 try{

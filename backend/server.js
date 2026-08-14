@@ -60,7 +60,7 @@ res.writeHead(status,{
 "Content-Type":"application/json",
 "Access-Control-Allow-Origin":res.__corsOrigin||DEFAULT_FRONTEND_ORIGIN,
 "Vary":"Origin",
-"Access-Control-Allow-Methods":"GET,POST,OPTIONS",
+"Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
 "X-Content-Type-Options":"nosniff",
 "X-Frame-Options":"DENY",
@@ -353,6 +353,13 @@ message TEXT NOT NULL,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
 await db(`CREATE INDEX IF NOT EXISTS support_messages_ticket_idx ON support_messages(ticket_id,created_at)`);
+
+await db(`CREATE TABLE IF NOT EXISTS platform_settings(key TEXT PRIMARY KEY,value JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS services(key TEXT PRIMARY KEY,name TEXT NOT NULL,icon TEXT,enabled BOOLEAN NOT NULL DEFAULT TRUE,fee NUMERIC(14,2) NOT NULL DEFAULT 0,maintenance BOOLEAN NOT NULL DEFAULT FALSE,config JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['education','Education','🎫']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
 await db(`
 CREATE TABLE IF NOT EXISTS password_reset_tokens(
@@ -1462,6 +1469,8 @@ admin.password_hash
 )
 ){
 
+await recordSecurityEvent('admin_login_failed','warning',{email},req,null);
+
 return{
 success:false,
 message:
@@ -1477,6 +1486,8 @@ WHERE expires_at<NOW()`
 
 const sessionToken=
 token();
+
+await recordSecurityEvent('admin_login_success','info',{email:admin.email},req,admin.id);
 
 await db(
 `INSERT INTO admin_sessions(
@@ -2360,6 +2371,9 @@ throw error;
 
 
 async function processVTUTransaction(user,data){
+if(Boolean(await getPlatformSetting('maintenance_mode',false)))return{success:false,statusCode:503,message:'BOLTIV is currently in maintenance mode. Transactions are temporarily disabled.'};
+const service=await getService(data.service);
+if(service&&(!service.enabled||service.maintenance))return{success:false,statusCode:503,message:`${service.name} is currently unavailable.`};
 if(user.status==="suspended") return {success:false,statusCode:403,message:"Your account is suspended. Transactions are disabled."};
 const userId=user.user_id;
 const amount=Number(data.amount);
@@ -2408,6 +2422,16 @@ async function reconcilePendingTransactions(admin,req){
   const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
   return {success:true,count:r.rows.length,transactions:r.rows.map(t=>({...t,amount:Number(t.amount)}))};
 }
+
+async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
+async function setPlatformSetting(key,value){await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[key,JSON.stringify(value)]);}
+function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable',education:'education'})[v]||v;}
+async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
+async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
+
+async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const config=b.config===undefined?existing.config:(b.config||{});const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
+async function adminSettings(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='get')return{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}};const b=await body(req);if(b.maintenance_mode!==undefined)await setPlatformSetting('maintenance_mode',Boolean(b.maintenance_mode));if(b.registration_enabled!==undefined)await setPlatformSetting('registration_enabled',Boolean(b.registration_enabled));const settings={maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))};await adminAudit(admin,'platform_settings_updated','settings','platform',settings,req);return{success:true,settings};}
+async function adminSecurity(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='events'){const r=await db(`SELECT s.*,a.email FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id ORDER BY s.created_at DESC LIMIT 500`);return{success:true,events:r.rows};}if(action==='sessions'){const r=await db(`SELECT id,created_at,expires_at FROM admin_sessions WHERE admin_id=$1 AND expires_at>NOW() ORDER BY created_at DESC`,[admin.id]);return{success:true,sessions:r.rows};}if(action==='revoke'){const auth=String(req.headers.authorization||'');const current=auth.startsWith('Bearer ')?auth.slice(7).trim():'';const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current]);await recordSecurityEvent('sessions_revoked','warning',{revoked:Number(r.rowCount||0)},req,admin.id);await adminAudit(admin,'sessions_revoked','admin',String(admin.id),{revoked:Number(r.rowCount||0)},req);return{success:true,revoked:Number(r.rowCount||0)};}return{success:false,statusCode:400,message:'Unknown security action.'};}
 
 async function adminAudit(admin,action,targetType,targetId,details,req){
 try{
@@ -2576,26 +2600,31 @@ await db(
 FROM payments`
 );
 
+const transactionStatusResult=
+await db(
+`SELECT
+COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) IN ('successful','success','completed'))::int AS successful,
+COUNT(*) FILTER (WHERE LOWER(COALESCE(status,''))='pending')::int AS pending,
+COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) IN ('failed','failure'))::int AS failed
+FROM transactions`
+);
+
+const activeUsersResult=
+await db(
+`SELECT COUNT(*)::int AS count
+FROM users
+WHERE LOWER(COALESCE(status,'active'))='active'`
+);
+
 return{
-users:
-Number(
-usersResult.rows[0]?.count||0
-),
-
-walletBalance:
-Number(
-walletResult.rows[0]?.balance||0
-),
-
-transactions:
-Number(
-transactionsResult.rows[0]?.count||0
-),
-
-payments:
-Number(
-paymentsResult.rows[0]?.count||0
-)
+users:Number(usersResult.rows[0]?.count||0),
+walletBalance:Number(walletResult.rows[0]?.balance||0),
+transactions:Number(transactionsResult.rows[0]?.count||0),
+payments:Number(paymentsResult.rows[0]?.count||0),
+successful:Number(transactionStatusResult.rows[0]?.successful||0),
+pending:Number(transactionStatusResult.rows[0]?.pending||0),
+failed:Number(transactionStatusResult.rows[0]?.failed||0),
+activeUsers:Number(activeUsersResult.rows[0]?.count||0)
 };
 
 }
@@ -3019,6 +3048,13 @@ if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupp
 if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/services"){const result=await adminServices(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path==="/api/admin/services"){const result=await adminServices(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/settings"){const result=await adminSettings(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path==="/api/admin/settings"){const result=await adminSettings(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/security/events"){const result=await adminSecurity(req,"events");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/security/sessions"){const result=await adminSecurity(req,"sessions");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/security/revoke-sessions"){const result=await adminSecurity(req,"revoke");return send(res,result.success?200:(result.statusCode||400),result);}
 
 /*
 ADMIN LOGOUT
@@ -3127,6 +3163,7 @@ req.method==="POST"&&
 path==="/api/auth/register"
 ){
 const rl=rateLimit(req,"register",5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
+if(!Boolean(await getPlatformSetting('registration_enabled',true)))return send(res,403,{success:false,message:'New user registration is currently disabled.'});
 const b=
 await body(req);
 
@@ -3662,6 +3699,12 @@ if(passwordHandled){
 return;
 }
 
+
+/*
+PUBLIC PLATFORM CONFIGURATION
+*/
+if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config FROM services ORDER BY key`);return send(res,200,{success:true,services:r.rows});}
+if(req.method==='GET'&&path==='/api/platform/settings'){return send(res,200,{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}});}
 
 /*
 AUTH ROUTES

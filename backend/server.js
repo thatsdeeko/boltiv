@@ -3334,6 +3334,9 @@ message:
 
 }
 
+await createWallet(user.user_id);
+const wallet=await getWallet(user.user_id);
+
 return send(res,200,{
 success:true,
 user:{
@@ -3342,7 +3345,8 @@ userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
 email:user.email
-}
+},
+wallet
 });
 
 }

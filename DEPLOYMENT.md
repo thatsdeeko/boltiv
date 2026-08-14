@@ -48,3 +48,13 @@ After deployment verify:
 8. Admin login works.
 9. Admin audit logs are populated.
 10. A suspended user cannot use an existing session.
+
+
+## Customer NIN KYC
+
+BOLTIV now requires a verified NIN before wallet funding. The backend uses VerifyMe's Nigerian NIN verification endpoint. Set `VERIFYME_API_KEY` in the Render backend environment. Never expose this key in frontend code.
+
+The customer flow is:
+`Register -> NIN KYC -> Verified -> Fund Wallet -> Paystack`
+
+No customer withdrawal flow is enabled.

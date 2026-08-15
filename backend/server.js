@@ -333,6 +333,11 @@ admin_id BIGINT NOT NULL,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 expires_at TIMESTAMPTZ NOT NULL
 )`);
+await db(`CREATE TABLE IF NOT EXISTS admin_wallets(admin_id BIGINT PRIMARY KEY,balance NUMERIC(14,2) NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS admin_wallet_ledger(id BIGSERIAL PRIMARY KEY,admin_id BIGINT NOT NULL,type TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,balance_after NUMERIC(14,2) NOT NULL,reference TEXT UNIQUE NOT NULL,description TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS admin_wallet_ledger_admin_idx ON admin_wallet_ledger(admin_id,created_at DESC)`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS recipient_type TEXT NOT NULL DEFAULT 'user'`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS admin_id BIGINT`);
 await db(`CREATE TABLE IF NOT EXISTS admin_audit_logs(
 id BIGSERIAL PRIMARY KEY,
 admin_id BIGINT,
@@ -2516,34 +2521,15 @@ await adminAudit(admin,`user_${action}`,"user",u.user_id,{email:u.email},req);
 return{success:true,message:`User ${status}.`,status};
 }
 
-async function adminWalletAdjust(req,mode){
-const admin=await adminFromToken(req);
-if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"Admin wallet adjustment");
-if(!target||!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid amount."};
-const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);
-if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};
-const u=r.rows[0],c=await pool.connect();
-try{
-await c.query("BEGIN");
-await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);
-const q=mode==="credit"
-?`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`
-:`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`;
-const wr=await c.query(q,[amount,u.user_id]);
-if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient wallet balance."};}
-const ref=`ADM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata)
-VALUES($1,$2,'Admin wallet adjustment',$3,$4,'successful',NOW(),$5)`,
-[u.user_id,mode==="credit"?"credit":"debit",amount,ref,JSON.stringify({admin_id:admin.id,reason})]);
-await c.query("COMMIT");
-await adminAudit(admin,`wallet_${mode}`,"user",u.user_id,{amount,reason,reference:ref},req);
-await addNotification(u.user_id,mode==="credit"?"Wallet credited":"Wallet debited",
-`Your wallet was ${mode==="credit"?"credited with":"debited by"} ₦${amount.toLocaleString()}. Reason: ${reason}`,"payment");
-return{success:true,message:`Wallet ${mode} successful.`,balance:Number(wr.rows[0].balance),reference:ref};
-}catch(e){try{await c.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to adjust wallet."};}
-finally{c.release();}
-}
+async function ensureAdminWallet(client,adminId){await client.query(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);}
+async function getAdminWallet(adminId){const r=await db(`SELECT admin_id,balance,created_at,updated_at FROM admin_wallets WHERE admin_id=$1`,[adminId]);return r.rows.length?{...r.rows[0],balance:Number(r.rows[0].balance||0)}:{admin_id:adminId,balance:0};}
+async function addAdminLedger(client,adminId,type,amount,balanceAfter,description,reference){await client.query(`INSERT INTO admin_wallet_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6)`,[adminId,type,amount,balanceAfter,reference,description]);}
+async function creditAdminFromPayment(client,payment){await ensureAdminWallet(client,payment.admin_id);const wr=await client.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(payment.amount),payment.admin_id]);if(!wr.rows.length)throw new Error('Admin wallet update failed.');const balanceAfter=Number(wr.rows[0].balance);await addAdminLedger(client,payment.admin_id,'funding',Number(payment.amount),balanceAfter,'Paystack admin wallet funding',`AF-${payment.reference}`);await client.query(`UPDATE payments SET status='success',credited=TRUE,credited_at=NOW() WHERE reference=$1`,[payment.reference]);return balanceAfter;}
+async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
+async function initializeAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:'Enter an amount of at least ₦100.'};const ref=reference('ADM-FUND');await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited,recipient_type,admin_id,created_at) VALUES($1,$2,$3,$4,$5,'pending',FALSE,'admin',$6,NOW())`,[ref,`ADMIN:${admin.id}`,admin.email,amount,Math.round(amount*100),admin.id]);try{const response=await fetch(`${PAYSTACK_API_URL}/transaction/initialize`,{method:'POST',headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({email:admin.email,amount:Math.round(amount*100),reference:ref,callback_url:`${FRONTEND_URL}/admin.html?admin_funding=${encodeURIComponent(ref)}`})});const data=await response.json();if(!response.ok||!data.status){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:400,message:data.message||'Unable to initialize payment.'};}return{success:true,reference:ref,authorization_url:data.data?.authorization_url||''};}catch(e){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}}
+async function verifyAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),ref=clean(b.reference);if(!ref)return{success:false,statusCode:400,message:'Payment reference is required.'};const pr=await db(`SELECT * FROM payments WHERE reference=$1 AND recipient_type='admin' AND admin_id=$2 LIMIT 1`,[ref,admin.id]);if(!pr.rows.length)return{success:false,statusCode:404,message:'Admin funding payment not found.'};const payment=pr.rows[0];if(payment.credited)return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};const response=await fetch(`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(ref)}`,{headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'}});const data=await response.json();if(!response.ok||!data.status)return{success:false,statusCode:400,message:data.message||'Unable to verify payment.'};const tx=data.data||{};if(tx.status!=='success'){await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[tx.status,ref]);return{success:false,statusCode:400,message:`Payment status: ${tx.status}`};}if(Number(tx.amount)!==Number(payment.amount_kobo))return{success:false,statusCode:400,message:'Payment amount does not match.'};const client=await pool.connect();try{await client.query('BEGIN');const locked=(await client.query(`SELECT * FROM payments WHERE reference=$1 FOR UPDATE`,[ref])).rows[0];if(!locked||locked.credited){await client.query('COMMIT');return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};}const balance=await creditAdminFromPayment(client,locked);await client.query('COMMIT');await adminAudit(admin,'admin_wallet_funded','admin_wallet',String(admin.id),{amount:Number(payment.amount),reference:ref},req);return{success:true,message:'Admin wallet funded successfully.',reference:ref,balance};}catch(e){try{await client.query('ROLLBACK')}catch{}return{success:false,statusCode:500,message:'Unable to credit admin wallet.'};}finally{client.release();}}
+
+async function adminWalletAdjust(req,mode){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"Admin wallet transfer");if(!target||!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid amount."};const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};const u=r.rows[0],c=await pool.connect();try{await c.query("BEGIN");await ensureAdminWallet(c,admin.id);const ref=`ADM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;if(mode==="credit"){const ar=await c.query(`UPDATE admin_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 AND balance>=$1 RETURNING balance`,[amount,admin.id]);if(!ar.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient admin wallet balance. Fund the admin wallet first."};}const adminBalance=Number(ar.rows[0].balance);await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,u.user_id]);await addAdminLedger(c,admin.id,'transfer_out',amount,adminBalance,`Transfer to ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,source:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_credit_from_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet credited',`Your wallet was credited with ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'Wallet credited from admin wallet.',balance:Number(wr.rows[0].balance),adminBalance,reference:ref};}const wr=await c.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,u.user_id]);if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient user wallet balance."};}const userBalance=Number(wr.rows[0].balance);const ar=await c.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);const adminBalance=Number(ar.rows[0].balance);await addAdminLedger(c,admin.id,'transfer_in',amount,adminBalance,`Transfer from ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'debit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,destination:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_debit_to_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet debited',`Your wallet was debited by ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'User wallet debited to admin wallet.',balance:userBalance,adminBalance,reference:ref};}catch(e){try{await c.query("ROLLBACK")}catch{}console.error('ADMIN WALLET TRANSFER ERROR',e);return{success:false,statusCode:500,message:"Unable to adjust wallet."};}finally{c.release();}}
 
 async function adminRefund(req){
 const admin=await adminFromToken(req);
@@ -2675,6 +2661,7 @@ const profitResult=await db(
 `SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS profit
 FROM transactions`
 );
+const adminWalletResult=await db(`SELECT COALESCE(SUM(balance),0) AS balance FROM admin_wallets`);
 
 return{
 users:Number(usersResult.rows[0]?.count||0),
@@ -2685,7 +2672,8 @@ successful:Number(transactionStatusResult.rows[0]?.successful||0),
 pending:Number(transactionStatusResult.rows[0]?.pending||0),
 failed:Number(transactionStatusResult.rows[0]?.failed||0),
 activeUsers:Number(activeUsersResult.rows[0]?.count||0),
-grossProfit:Number(profitResult.rows[0]?.profit||0)
+grossProfit:Number(profitResult.rows[0]?.profit||0),
+adminWalletBalance:Number(adminWalletResult.rows[0]?.balance||0)
 };
 
 }
@@ -3103,6 +3091,9 @@ result
 }
 
 
+if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/credit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
@@ -4057,6 +4048,12 @@ message:
 "Payment already credited."
 });
 
+}
+
+if(String(lockedPayment.recipient_type||'user')==='admin'){
+const balance=await creditAdminFromPayment(client,lockedPayment);
+await client.query("COMMIT");
+return send(res,200,{success:true,message:"Admin wallet funded.",reference:referenceValue,balance});
 }
 
 await client.query(

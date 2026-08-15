@@ -2303,74 +2303,80 @@ return {success:true,required:true};
 const PAYSTACK_API_URL=
 "https://api.paystack.co";
 
-async function callVTUProvider(
-payload
-){
-
-if(!VTU_API_URL||
-!VTU_API_KEY){
-
-return{
-success:false,
-configured:false,
-message:
-"VTU provider is not configured."
-};
-
+function vtuProviderName(){
+  return String(process.env.VTU_PROVIDER||"vtugate").trim().toLowerCase();
 }
 
-try{
-
-const response=
-await fetch(
-VTU_API_URL,
-{
-method:"POST",
-headers:{
-"Content-Type":
-"application/json",
-"Authorization":
-`Bearer ${VTU_API_KEY}`
-},
-body:JSON.stringify(
-payload||{}
-)
-}
-);
-
-let data={};
-
-try{
-
-data=
-await response.json();
-
-}catch(error){
-
-data={};
-
+function vtugateEndpoint(service){
+  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'');
+  const cleanBase=base.replace(/\/api\/v1$/i,'');
+  const map={
+    airtime:"/api/v1/buyairtime",
+    data:"/api/v1/buydata",
+    cable:"/api/v1/buycabletv",
+    electricity:"/api/v1/buyelectricity"
+  };
+  return cleanBase+(map[service]||"");
 }
 
-return{
-success:
-response.ok,
-configured:true,
-statusCode:
-response.status,
-data
-};
-
-}catch(error){
-
-console.error(
-"VTU PROVIDER REQUEST ERROR:",
-error
-);
-
-throw error;
-
+function buildVTUGateForm(payload){
+  const p=payload&&typeof payload==='object'?payload:{};
+  const service=serviceKey(p.service||"");
+  const form=new URLSearchParams();
+  const put=(key,value)=>{if(value!==undefined&&value!==null&&String(value)!=="")form.set(key,String(value));};
+  if(service==='airtime'){
+    put('network',p.network);
+    put('phone',p.phone||p.recipient);
+    put('amount',p.amount);
+  }else if(service==='data'){
+    put('network',p.network);
+    put('phone',p.phone||p.recipient);
+    put('plan',p.plan||p.plan_code||p.planCode);
+    put('amount',p.amount);
+  }else if(service==='cable'){
+    put('provider',p.provider);
+    put('smartcard',p.smartcard||p.iuc||p.iucNumber);
+    put('plan',p.plan);
+    put('amount',p.amount);
+  }else if(service==='electricity'){
+    put('provider',p.provider);
+    put('meter_number',p.meterNumber||p.meter_number);
+    put('meter_type',p.meterType||p.meter_type);
+    put('amount',p.amount);
+  }else{
+    for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
+  }
+  return form;
 }
 
+async function callVTUProvider(payload){
+  if(!VTU_API_KEY){
+    return{success:false,configured:false,message:"VTU provider is not configured."};
+  }
+  const provider=vtuProviderName();
+  const service=serviceKey(payload?.service||"");
+  const url=provider==='vtugate'?vtugateEndpoint(service):String(VTU_API_URL||"").replace(/\/+$/,'');
+  if(!url){return{success:false,configured:false,message:"VTU provider URL is not configured."};}
+  try{
+    const isVTUGate=provider==='vtugate';
+    const form=isVTUGate?buildVTUGateForm(payload):null;
+    const response=await fetch(url,{
+      method:"POST",
+      headers:{
+        "Content-Type":isVTUGate?"application/x-www-form-urlencoded":"application/json",
+        "Authorization":`Bearer ${VTU_API_KEY}`,
+        "Accept":"application/json"
+      },
+      body:isVTUGate?form.toString():JSON.stringify(payload||{})
+    });
+    let data={};
+    try{data=await response.json();}catch{data={};}
+    const providerOk=typeof data?.status==='boolean'?data.status:response.ok;
+    return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
+  }catch(error){
+    console.error("VTU PROVIDER REQUEST ERROR:",error);
+    return{success:false,configured:true,statusCode:502,data:{},error:true,message:"VTU provider request failed."};
+  }
 }
 
 

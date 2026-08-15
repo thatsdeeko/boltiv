@@ -724,14 +724,14 @@ ENABLED
 <script>
 
 const API="https://boltiv-backend.onrender.com";
-let token=null||"";
+let sessionReady = false;";
 let users=[],transactions=[],payments=[];
 const $=id=>document.getElementById(id);
 function esc(v){return String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 async function api(path,opt={}){
  const headers={"Content-Type":"application/json",...(opt.headers||{})};
  if(token)headers.Authorization="Bearer "+token;
- const r=await fetch(API+path,{...opt,headers});
+ const r=await fetch(API+path, {credentials:"include",...opt,headers});
  let d={};try{d=await r.json()}catch{}
  if(r.status===401){token="";showLogin();}
  if(!r.ok)throw Error(d.message||"Request failed");
@@ -847,7 +847,9 @@ async function loadAudit(){
   filterAudit();
  }catch(e){$("auditArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
 }
-if(token)api("/api/admin/me").then(showApp).catch(showLogin);else showLogin();
+api("/api/admin/me")
+  .then(d=>{ if(d && d.success){ sessionReady=true; showApp(d); } else { showLogin(); } })
+  .catch(()=>showLogin());
 
 verifyAdminFundingFromUrl();
 </script>

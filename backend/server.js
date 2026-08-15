@@ -2240,9 +2240,11 @@ async function markTransactionFailedAndRefund(referenceValue, reason, providerRe
   finally{client.release();}
 }
 
-async function finalizeVTUTransaction(referenceValue, providerData, pending){
+async function finalizeVTUTransaction(referenceValue, providerData, pending, pricingMeta=null){
   const status=pending?'pending':'successful';
-  const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,providerData?.reference||providerData?.data?.reference||null,JSON.stringify({providerResponse:providerData}),referenceValue]);
+  const meta={providerResponse:providerData};
+  if(pricingMeta)Object.assign(meta,{pricing:pricingMeta});
+  const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,providerData?.reference||providerData?.data?.reference||null,JSON.stringify(meta),referenceValue]);
   return result.rows[0]||null;
 }
 
@@ -2370,6 +2372,53 @@ throw error;
 }
 
 
+
+function pricingConfig(service){
+  const cfg=service?.config&&typeof service.config==='object'?service.config:{};
+  const pricing=cfg.pricing&&typeof cfg.pricing==='object'?cfg.pricing:{};
+  const mode=String(pricing.mode||'discount').toLowerCase();
+  const discount=Number(pricing.discount_pct||0);
+  const fixedProfit=Number(pricing.fixed_profit||0);
+  return {
+    mode:['discount','fixed'].includes(mode)?mode:'discount',
+    discount_pct:Number.isFinite(discount)&&discount>=0?discount:0,
+    fixed_profit:Number.isFinite(fixedProfit)&&fixedProfit>=0?fixedProfit:0
+  };
+}
+
+function estimatedProviderCost(service,customerAmount){
+  const rule=pricingConfig(service);
+  const amount=Number(customerAmount);
+  let cost=amount;
+  let source='no_pricing_rule';
+  if(rule.mode==='fixed'&&rule.fixed_profit>0){
+    cost=Math.max(0,amount-rule.fixed_profit);
+    source='fixed_profit';
+  }else if(rule.mode==='discount'&&rule.discount_pct>0){
+    cost=Math.max(0,amount*(1-rule.discount_pct/100));
+    source='discount_pct';
+  }
+  return {cost:Number(cost.toFixed(2)),source,rule};
+}
+
+function providerCostFromResponse(providerData,customerAmount){
+  const candidates=[
+    providerData?.provider_cost,
+    providerData?.cost,
+    providerData?.charged_amount,
+    providerData?.amount_charged,
+    providerData?.data?.provider_cost,
+    providerData?.data?.cost,
+    providerData?.data?.charged_amount,
+    providerData?.data?.amount_charged
+  ];
+  for(const value of candidates){
+    const n=Number(value);
+    if(Number.isFinite(n)&&n>=0)return Number(n.toFixed(2));
+  }
+  return null;
+}
+
 async function processVTUTransaction(user,data){
 if(Boolean(await getPlatformSetting('maintenance_mode',false)))return{success:false,statusCode:503,message:'BOLTIV is currently in maintenance mode. Transactions are temporarily disabled.'};
 const service=await getService(data.service);
@@ -2379,6 +2428,8 @@ const userId=user.user_id;
 const amount=Number(data.amount);
 if(!userId) return {success:false,statusCode:400,message:"User ID is required."};
 if(!validAmount(amount)) return {success:false,statusCode:400,message:"Invalid amount."};
+const pricing=estimatedProviderCost(service,amount);
+if(pricing.cost>amount){return {success:false,statusCode:400,message:"Service pricing would cost more than the customer price. Update the service pricing before enabling sales."};}
 const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
 if(!pinCheck.success) return {success:false,statusCode:401,message:pinCheck.message,code:"INVALID_TRANSACTION_PIN"};
 const rawIdempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
@@ -2403,6 +2454,10 @@ let providerResult;
 try{providerResult=await callVTUProvider(data.providerPayload||data);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
 if(!providerResult.configured){const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_not_configured"); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
 const providerData=providerResult.data||{};
+const actualProviderCost=providerCostFromResponse(providerData,amount);
+const providerCost=actualProviderCost===null?pricing.cost:actualProviderCost;
+const pricingSource=actualProviderCost===null?pricing.source:'provider_response';
+const grossProfit=Number((amount-providerCost).toFixed(2));
 if(!providerResult.success){
 const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
 await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
@@ -2411,7 +2466,7 @@ return {success:false,statusCode:400,message:"VTU transaction failed. Your walle
 const providerStatus=String(providerData.status||providerData.data?.status||"successful").toLowerCase();
 const pending=["pending","processing","queued","in_progress"].includes(providerStatus);
 const finalStatus=pending?"pending":"successful";
-const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
+const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending,{customerAmount:amount,providerCost,grossProfit,pricingSource,pricingRule:pricing.rule}); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
 await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
 const finalWallet=await getWallet(userId);
 return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,data:providerData};
@@ -2429,7 +2484,7 @@ function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'
 async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
 async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
 
-async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const config=b.config===undefined?existing.config:(b.config||{});const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
+async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const incomingConfig=b.config===undefined?{}:(b.config||{});const oldConfig=existing.config&&typeof existing.config==='object'?existing.config:{};const config={...oldConfig,...incomingConfig,pricing:{...(oldConfig.pricing||{}),...(incomingConfig.pricing||{})}};if(config.pricing){const mode=String(config.pricing.mode||'discount').toLowerCase();const discount=Number(config.pricing.discount_pct||0);const fixed=Number(config.pricing.fixed_profit||0);if(!['discount','fixed'].includes(mode)||!Number.isFinite(discount)||discount<0||discount>100||!Number.isFinite(fixed)||fixed<0)return{success:false,statusCode:400,message:'Invalid pricing configuration.'};config.pricing={mode,discount_pct:discount,fixed_profit:fixed};}const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
 async function adminSettings(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='get')return{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}};const b=await body(req);if(b.maintenance_mode!==undefined)await setPlatformSetting('maintenance_mode',Boolean(b.maintenance_mode));if(b.registration_enabled!==undefined)await setPlatformSetting('registration_enabled',Boolean(b.registration_enabled));const settings={maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))};await adminAudit(admin,'platform_settings_updated','settings','platform',settings,req);return{success:true,settings};}
 async function adminSecurity(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='events'){const r=await db(`SELECT s.*,a.email FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id ORDER BY s.created_at DESC LIMIT 500`);return{success:true,events:r.rows};}if(action==='sessions'){const r=await db(`SELECT id,created_at,expires_at FROM admin_sessions WHERE admin_id=$1 AND expires_at>NOW() ORDER BY created_at DESC`,[admin.id]);return{success:true,sessions:r.rows};}if(action==='revoke'){const auth=String(req.headers.authorization||'');const current=auth.startsWith('Bearer ')?auth.slice(7).trim():'';const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current]);await recordSecurityEvent('sessions_revoked','warning',{revoked:Number(r.rowCount||0)},req,admin.id);await adminAudit(admin,'sessions_revoked','admin',String(admin.id),{revoked:Number(r.rowCount||0)},req);return{success:true,revoked:Number(r.rowCount||0)};}return{success:false,statusCode:400,message:'Unknown security action.'};}
 
@@ -2616,6 +2671,11 @@ FROM users
 WHERE LOWER(COALESCE(status,'active'))='active'`
 );
 
+const profitResult=await db(
+`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS profit
+FROM transactions`
+);
+
 return{
 users:Number(usersResult.rows[0]?.count||0),
 walletBalance:Number(walletResult.rows[0]?.balance||0),
@@ -2624,7 +2684,8 @@ payments:Number(paymentsResult.rows[0]?.count||0),
 successful:Number(transactionStatusResult.rows[0]?.successful||0),
 pending:Number(transactionStatusResult.rows[0]?.pending||0),
 failed:Number(transactionStatusResult.rows[0]?.failed||0),
-activeUsers:Number(activeUsersResult.rows[0]?.count||0)
+activeUsers:Number(activeUsersResult.rows[0]?.count||0),
+grossProfit:Number(profitResult.rows[0]?.profit||0)
 };
 
 }
@@ -2684,6 +2745,7 @@ t.amount,
 t.reference,
 t.status,
 t.date,
+t.metadata,
 u.name,
 u.email
 FROM transactions t
@@ -2705,7 +2767,10 @@ item.amount||0
 ),
 reference:item.reference,
 status:item.status,
-date:item.date
+date:item.date,
+metadata:item.metadata||{},
+grossProfit:Number(item.metadata?.pricing?.grossProfit||0),
+providerCost:Number(item.metadata?.pricing?.providerCost||0)
 }));
 
 }
@@ -3334,9 +3399,6 @@ message:
 
 }
 
-await createWallet(user.user_id);
-const wallet=await getWallet(user.user_id);
-
 return send(res,200,{
 success:true,
 user:{
@@ -3345,8 +3407,7 @@ userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
 email:user.email
-},
-wallet
+}
 });
 
 }

@@ -323,22 +323,8 @@ async function loadAccount(){
       userEmail.textContent=data.user.email||"";
     }
 
-    // Keep the Home-page balance sourced from the same wallet endpoint
-    // used by wallet.html so both pages always display the same database balance.
-    const walletResponse=await fetch(API_BASE+"/api/wallet",{
-      method:"GET",
-      headers:{"Accept":"application/json","Authorization":"Bearer "+token}
-    });
-
-    let walletData={success:false};
-    try{ walletData=await walletResponse.json(); }catch(e){}
-
-    if(walletResponse.status===401 || walletResponse.status===403){
-      throw new Error("SESSION_EXPIRED");
-    }
-
-    if(walletResponse.ok && walletData.success && walletData.wallet){
-      const balance=Number(walletData.wallet.balance||0);
+    if(data.wallet){
+      const balance=Number(data.wallet.balance||0);
       walletBalance.textContent="₦"+balance.toLocaleString("en-NG",{
         minimumFractionDigits:2,maximumFractionDigits:2
       });

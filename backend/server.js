@@ -62,7 +62,6 @@ res.writeHead(status,{
 "Vary":"Origin",
 "Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
-"Access-Control-Allow-Credentials":"true",
 "X-Content-Type-Options":"nosniff",
 "X-Frame-Options":"DENY",
 "Referrer-Policy":"strict-origin-when-cross-origin",
@@ -1527,52 +1526,34 @@ email:admin.email
 }
 
 
-
-function getAdminSessionToken(req){
-  const cookieHeader = req.headers.cookie || "";
-  const match = cookieHeader.match(/(?:^|;\s*)boltiv_admin_session=([^;]+)/);
-  if (match) {
-    try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
-  }
-  const auth = req.headers.authorization || "";
-  if (auth.startsWith("Bearer ")) return auth.slice(7);
-  return null;
-}
-
-function setAdminSessionCookie(res, token){
-  const parts = [
-    `boltiv_admin_session=${encodeURIComponent(token)}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=None",
-    "Max-Age=86400"
-  ];
-  if (process.env.NODE_ENV === "production") parts.push("Secure");
-  res.setHeader("Set-Cookie", parts.join("; "));
-}
-
-function clearAdminSessionCookie(res){
-  const parts = [
-    "boltiv_admin_session=",
-    "Path=/",
-    "HttpOnly",
-    "SameSite=None",
-    "Max-Age=0"
-  ];
-  if (process.env.NODE_ENV === "production") parts.push("Secure");
-  res.setHeader("Set-Cookie", parts.join("; "));
-}
-
 async function adminFromToken(req){
 
-const sessionToken=getAdminSessionToken(req);
-if(!sessionToken)return null;
+const authorization=
+req.headers.authorization||"";
 
-const result=await db(
-`SELECT a.id,a.email
- FROM admin_sessions s
- JOIN admins a ON a.id=s.admin_id
- WHERE s.token=$1 AND s.expires_at>NOW()`,
+if(!authorization.startsWith(
+"Bearer "
+)){
+return null;
+}
+
+const sessionToken=
+authorization.slice(7).trim();
+
+if(!sessionToken){
+return null;
+}
+
+const result=
+await db(
+`SELECT
+a.id,
+a.email
+FROM admin_sessions s
+JOIN admins a
+ON a.id=s.admin_id
+WHERE s.token=$1
+AND s.expires_at>NOW()`,
 [sessionToken]
 );
 
@@ -1580,20 +1561,42 @@ return result.rows[0]||null;
 
 }
 
+
 async function logoutAdmin(req){
 
-const sessionToken=getAdminSessionToken(req);
+const authorization=
+req.headers.authorization||"";
+
+if(
+authorization.startsWith(
+"Bearer "
+)
+){
+
+const sessionToken=
+authorization.slice(7).trim();
+
 if(sessionToken){
-await db(`DELETE FROM admin_sessions WHERE token=$1`,[sessionToken]);
+
+await db(
+`DELETE FROM admin_sessions
+WHERE token=$1`,
+[
+sessionToken
+]
+);
+
+}
+
 }
 
 return{
 success:true,
-message:"Admin logged out successfully."
+message:
+"Admin logged out successfully."
 };
 
-}
-
+  }
 async function createPayment(
 userId,
 email,
@@ -2964,13 +2967,6 @@ b.email,
 b.password,req
 );
 
-if(result.success&&result.token){
-setAdminSessionCookie(res,result.token);
-const safeResult={...result};
-delete safeResult.token;
-return send(res,200,safeResult);
-}
-
 return send(
 res,
 result.success?200:401,
@@ -3095,6 +3091,61 @@ result
 }
 
 
+/*
+TEMPORARY PAYSTACK DVA ACCESS TEST
+
+Admin-authenticated only. This checks DVA provider access without
+creating a customer, creating a virtual account, or moving money.
+Remove this endpoint after the test is complete.
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/admin/test-paystack-dva"
+){
+
+const admin=await adminFromToken(req);
+
+if(!admin){
+return send(res,401,{success:false,message:"Unauthorized."});
+}
+
+if(!PAYSTACK_SECRET_KEY){
+return send(res,503,{success:false,message:"Paystack is not configured."});
+}
+
+try{
+const response=await fetch(
+`${PAYSTACK_API_URL}/dedicated_account/available_providers`,
+{
+method:"GET",
+headers:{
+Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,
+"Content-Type":"application/json"
+}
+}
+);
+
+const data=await response.json();
+
+return send(res,response.ok?200:(response.status||502),{
+success:Boolean(response.ok&&data.status),
+paystack_status:Boolean(data.status),
+message:data.message||"Paystack DVA access test completed.",
+providers:Array.isArray(data.data)?data.data:[]
+});
+
+}catch(error){
+console.error("PAYSTACK DVA ACCESS TEST ERROR:",error?.message||error);
+return send(res,502,{
+success:false,
+message:"Unable to connect to Paystack for the DVA access test."
+});
+}
+
+}
+
+
 if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -3124,9 +3175,9 @@ if(
 req.method==="POST"&&
 path==="/api/admin/logout"
 ){
+
 const result=
 await logoutAdmin(req);
-clearAdminSessionCookie(res);
 
 return send(
 res,
@@ -3394,9 +3445,6 @@ message:
 
 }
 
-await createWallet(user.user_id);
-const wallet=await getWallet(user.user_id);
-
 return send(res,200,{
 success:true,
 user:{
@@ -3405,8 +3453,7 @@ userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
 email:user.email
-},
-wallet
+}
 });
 
 }
@@ -3655,8 +3702,7 @@ res.writeHead(204,{
 "Access-Control-Allow-Methods":
 "GET,POST,OPTIONS",
 "Access-Control-Allow-Headers":
-"Content-Type,Authorization,X-Idempotency-Key",
-"Access-Control-Allow-Credentials":"true"
+"Content-Type,Authorization,X-Idempotency-Key"
 });
 
 return res.end();

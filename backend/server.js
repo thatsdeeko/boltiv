@@ -2361,7 +2361,24 @@ async function resolveVTUGateServiceId(serviceType,network){
 }
 
 const VTUGATE_DATA_PLAN_CACHE=new Map();
-const VTUGATE_DATA_PLAN_CACHE_TTL_MS=2*60*1000;
+const VTUGATE_DATA_PLAN_CACHE_TTL_MS=30*1000;
+// Plans that VTUGATE has explicitly rejected are temporarily hidden from customers.
+// This prevents a stale/unavailable bundle from repeatedly appearing in the catalog.
+const VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE=new Map();
+const VTUGATE_UNAVAILABLE_DATA_PLAN_TTL_MS=15*60*1000;
+function dataPlanKey(network,serviceId,code){return `${String(network||'').trim().toLowerCase()}:${String(serviceId||'').trim()}:${String(code||'').trim()}`;}
+function markVTUGateDataPlanUnavailable(network,serviceId,code){
+  const key=dataPlanKey(network,serviceId,code);
+  if(!key.endsWith(':'))VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE.set(key,Date.now());
+  VTUGATE_DATA_PLAN_CACHE.delete(String(network||'').trim().toLowerCase());
+}
+function isVTUGateDataPlanUnavailable(network,serviceId,code){
+  const key=dataPlanKey(network,serviceId,code);
+  const at=VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE.get(key);
+  if(!at)return false;
+  if(Date.now()-at>=VTUGATE_UNAVAILABLE_DATA_PLAN_TTL_MS){VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE.delete(key);return false;}
+  return true;
+}
 
 async function fetchVTUGateDataPlans(network){
   const wanted=String(network||'').trim().toLowerCase();
@@ -2403,6 +2420,7 @@ async function fetchVTUGateDataPlans(network){
         const code=String(plan?.code||plan?.plan_code||'').trim();
         if(!code) continue;
         const row={...plan,code,plan_code:code,service_id:Number(plan?.service_id||serviceId)};
+        if(isVTUGateDataPlanUnavailable(wanted,row.service_id,code)) continue;
         const key=`${row.service_id}:${code}`;
         if(!merged.has(key)) merged.set(key,row);
       }
@@ -2457,6 +2475,80 @@ async function buildVTUGateForm(payload){
     for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
   }
   return form;
+}
+
+function extractVTUProviderMessage(providerData){
+  const candidates=[
+    providerData?.message,
+    providerData?.provider_message,
+    providerData?.data?.message,
+    providerData?.data?.provider_message,
+    providerData?.data?.data?.message,
+    providerData?.data?.data?.provider_message
+  ];
+  for(const value of candidates){
+    const text=clean(value);
+    if(text) return text;
+  }
+  return '';
+}
+
+function isVTUGateBundleUnavailable(providerData){
+  const text=extractVTUProviderMessage(providerData).toLowerCase();
+  return /cannot purchase|not available|unavailable|not currently|at the moment|explore other.*plans/.test(text);
+}
+
+async function findVTUGateDataFallback(originalPayload,providerData){
+  try{
+    const network=clean(originalPayload?.network).toUpperCase();
+    const currentCode=clean(originalPayload?.plan_code||originalPayload?.planCode||originalPayload?.plan);
+    const currentServiceId=Number(originalPayload?.service_id||0);
+    const amount=Number(originalPayload?.amount||0);
+    if(!network||!currentCode||!amount)return null;
+
+    // Force a fresh catalog after a provider-side bundle rejection.
+    VTUGATE_DATA_PLAN_CACHE.delete(network.toLowerCase());
+    const plans=await fetchVTUGateDataPlans(network);
+    if(!Array.isArray(plans)||!plans.length)return null;
+
+    // The original plan has just been rejected by VTUGATE, so immediately remove it from the customer catalog.
+    markVTUGateDataPlanUnavailable(network,currentServiceId,currentCode);
+    const currentPlan=plans.find(plan=>String(plan.code||plan.plan_code||'')===currentCode && Number(plan.service_id||0)===currentServiceId);
+    const targetSize=Number(currentPlan?.size_mb||providerData?.data?.size_mb||0);
+    const targetValidity=Number(currentPlan?.validity_days||providerData?.data?.validity_days||0);
+    const targetName=clean(currentPlan?.name||'').toLowerCase();
+
+    const candidates=plans.filter(plan=>{
+      const code=clean(plan.code||plan.plan_code);
+      const serviceId=Number(plan.service_id||0);
+      const price=Number(plan.price||0);
+      if(!code||!serviceId||code===currentCode&&serviceId===currentServiceId)return false;
+      if(!Number.isFinite(price)||price<=0||price>amount)return false;
+      const size=Number(plan.size_mb||0), validity=Number(plan.validity_days||0);
+      if(targetSize>0 && size!==targetSize)return false;
+      if(targetValidity>0 && validity!==targetValidity)return false;
+      const name=clean(plan.name||'').toLowerCase();
+      // Prefer the same named bundle when the catalog provides multiple providers.
+      if(targetName && name && name!==targetName && targetSize===0)return false;
+      return true;
+    });
+    candidates.sort((a,b)=>{
+      const ar=a.delivery_rate===null||a.delivery_rate===undefined?-1:Number(a.delivery_rate);
+      const br=b.delivery_rate===null||b.delivery_rate===undefined?-1:Number(b.delivery_rate);
+      return br-ar || Number(a.price||0)-Number(b.price||0);
+    });
+    const fallback=candidates[0];
+    if(!fallback)return null;
+    return {
+      ...originalPayload,
+      plan_code:clean(fallback.code||fallback.plan_code),
+      service_id:Number(fallback.service_id),
+      amount:Number(fallback.price||amount)
+    };
+  }catch(error){
+    console.error('VTUGATE DATA FALLBACK LOOKUP ERROR:',error?.message||error);
+    return null;
+  }
 }
 
 async function callVTUProvider(payload){
@@ -2594,15 +2686,30 @@ client.release();
 let providerResult;
 try{providerResult=await callVTUProvider(data.providerPayload||data);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
 if(!providerResult.configured){const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_not_configured"); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
-const providerData=providerResult.data||{};
+let providerData=providerResult.data||{};
 const actualProviderCost=providerCostFromResponse(providerData,amount);
 const providerCost=actualProviderCost===null?pricing.cost:actualProviderCost;
 const pricingSource=actualProviderCost===null?pricing.source:'provider_response';
 const grossProfit=Number((amount-providerCost).toFixed(2));
+if(!providerResult.success && serviceKey(data.service)==='data' && vtuProviderName()==='vtugate' && isVTUGateBundleUnavailable(providerData)){
+  const fallbackPayload=await findVTUGateDataFallback(data.providerPayload||data,providerData);
+  if(fallbackPayload){
+    console.warn('VTUGATE DATA BUNDLE REJECTED; RETRYING ALTERNATE LIVE PLAN:',JSON.stringify({network:fallbackPayload.network,service_id:fallbackPayload.service_id,plan_code:fallbackPayload.plan_code,amount:fallbackPayload.amount}));
+    const retryResult=await callVTUProvider(fallbackPayload);
+    if(retryResult.success){
+      providerResult=retryResult;
+      providerData=retryResult.data||{};
+      data.providerPayload=fallbackPayload;
+    }else if(isVTUGateBundleUnavailable(retryResult.data||{})){
+      markVTUGateDataPlanUnavailable(fallbackPayload.network,fallbackPayload.service_id,fallbackPayload.plan_code);
+    }
+  }
+}
 if(!providerResult.success){
 const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
+const providerMessage=extractVTUProviderMessage(providerData);
 await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
-return {success:false,statusCode:400,message:"VTU transaction failed. Your wallet has been refunded.",reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};
+return {success:false,statusCode:400,message:providerMessage||"VTU transaction failed. Your wallet has been refunded.",provider_message:providerMessage||null,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};
 }
 const providerStatus=String(providerData.status||providerData.data?.status||"successful").toLowerCase();
 const pending=["pending","processing","queued","in_progress"].includes(providerStatus);
@@ -3759,6 +3866,7 @@ try{
   for(const plan of rawPlans){
     const code=clean(plan.code||plan.plan_code);
     if(!code)continue;
+    if(isVTUGateDataPlanUnavailable(network,plan.service_id,code))continue;
     const size=Number(plan.size_mb||0);
     const validity=Number(plan.validity_days||0);
     const price=Number(plan.price||0);

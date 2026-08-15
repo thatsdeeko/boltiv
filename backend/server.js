@@ -62,6 +62,7 @@ res.writeHead(status,{
 "Vary":"Origin",
 "Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
+"Access-Control-Allow-Credentials":"true",
 "X-Content-Type-Options":"nosniff",
 "X-Frame-Options":"DENY",
 "Referrer-Policy":"strict-origin-when-cross-origin",
@@ -1543,7 +1544,7 @@ function setAdminSessionCookie(res, token){
     `boltiv_admin_session=${encodeURIComponent(token)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    "SameSite=None",
     "Max-Age=86400"
   ];
   if (process.env.NODE_ENV === "production") parts.push("Secure");
@@ -1555,7 +1556,7 @@ function clearAdminSessionCookie(res){
     "boltiv_admin_session=",
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    "SameSite=None",
     "Max-Age=0"
   ];
   if (process.env.NODE_ENV === "production") parts.push("Secure");
@@ -1564,32 +1565,14 @@ function clearAdminSessionCookie(res){
 
 async function adminFromToken(req){
 
-const authorization=
-req.headers.authorization||"";
+const sessionToken=getAdminSessionToken(req);
+if(!sessionToken)return null;
 
-if(!authorization.startsWith(
-"Bearer "
-)){
-return null;
-}
-
-const sessionToken=
-authorization.slice(7).trim();
-
-if(!sessionToken){
-return null;
-}
-
-const result=
-await db(
-`SELECT
-a.id,
-a.email
-FROM admin_sessions s
-JOIN admins a
-ON a.id=s.admin_id
-WHERE s.token=$1
-AND s.expires_at>NOW()`,
+const result=await db(
+`SELECT a.id,a.email
+ FROM admin_sessions s
+ JOIN admins a ON a.id=s.admin_id
+ WHERE s.token=$1 AND s.expires_at>NOW()`,
 [sessionToken]
 );
 
@@ -1597,42 +1580,20 @@ return result.rows[0]||null;
 
 }
 
-
 async function logoutAdmin(req){
 
-const authorization=
-req.headers.authorization||"";
-
-if(
-authorization.startsWith(
-"Bearer "
-)
-){
-
-const sessionToken=
-authorization.slice(7).trim();
-
+const sessionToken=getAdminSessionToken(req);
 if(sessionToken){
-
-await db(
-`DELETE FROM admin_sessions
-WHERE token=$1`,
-[
-sessionToken
-]
-);
-
-}
-
+await db(`DELETE FROM admin_sessions WHERE token=$1`,[sessionToken]);
 }
 
 return{
 success:true,
-message:
-"Admin logged out successfully."
+message:"Admin logged out successfully."
 };
 
-  }
+}
+
 async function createPayment(
 userId,
 email,
@@ -3003,6 +2964,13 @@ b.email,
 b.password,req
 );
 
+if(result.success&&result.token){
+setAdminSessionCookie(res,result.token);
+const safeResult={...result};
+delete safeResult.token;
+return send(res,200,safeResult);
+}
+
 return send(
 res,
 result.success?200:401,
@@ -3155,11 +3123,10 @@ ADMIN LOGOUT
 if(
 req.method==="POST"&&
 path==="/api/admin/logout"
-){clearAdminSessionCookie(res);
-
-
+){
 const result=
 await logoutAdmin(req);
+clearAdminSessionCookie(res);
 
 return send(
 res,
@@ -3427,6 +3394,9 @@ message:
 
 }
 
+await createWallet(user.user_id);
+const wallet=await getWallet(user.user_id);
+
 return send(res,200,{
 success:true,
 user:{
@@ -3435,7 +3405,8 @@ userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
 email:user.email
-}
+},
+wallet
 });
 
 }
@@ -3684,7 +3655,8 @@ res.writeHead(204,{
 "Access-Control-Allow-Methods":
 "GET,POST,OPTIONS",
 "Access-Control-Allow-Headers":
-"Content-Type,Authorization,X-Idempotency-Key"
+"Content-Type,Authorization,X-Idempotency-Key",
+"Access-Control-Allow-Credentials":"true"
 });
 
 return res.end();

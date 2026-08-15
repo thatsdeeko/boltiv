@@ -3981,7 +3981,7 @@ res.writeHead(204,{
 "Access-Control-Allow-Origin":corsOrigin(req),
 "Vary":"Origin",
 "Access-Control-Allow-Methods":
-"GET,POST,OPTIONS",
+"GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":
 "Content-Type,Authorization,X-Idempotency-Key",
 "Access-Control-Allow-Credentials":"true"

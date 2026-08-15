@@ -1,0 +1,20 @@
+BOLTIV VTUGATE DATA PLAN FIX
+
+Changes in this build:
+1. Added POST /api/vtu/data/plans.
+2. The backend reads VTUGate's managed data services for the selected network.
+3. It fetches plans using POST /api/v1/fetchdataplans with the required service_id.
+4. Multiple service IDs are supported (important because one network can expose more than one service_id).
+5. Plans are merged and the cheapest matching plan is kept.
+6. The data page now loads live plans instead of hard-coded 500MB/1GB/etc.
+7. Data purchases now send service_id + plan_code, as required by VTUGate's documentation.
+8. Phone number and network are sent in the documented purchase payload.
+
+Deployment:
+- Deploy backend/server.js and backend/package.json together.
+- Keep the VTUGATE API key only on the backend/server environment.
+- The frontend continues calling https://boltiv-backend.onrender.com.
+
+Important:
+- This build does not invent data plans. If VTUGate has no active service for a network, the page will show that no plans are available.
+- Profit/markup should be configured separately in the BOLTIV service pricing settings; the live provider plan price is used as the customer price in this catalog.

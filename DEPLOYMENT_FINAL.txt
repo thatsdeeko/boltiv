@@ -17,3 +17,6 @@ Deployment:
 - Redeploy the GitHub Pages frontend.
 - Log into admin once, then leave Chrome and return. The admin session should remain until logout, cookie clearing, or 24-hour expiry.
 - For the user home balance, reload the home page after the backend redeploy; it will read the live wallet balance from /api/me.
+
+
+VTUGATE airtime service IDs are resolved dynamically from /api/v1/fetchservices for the selected network (MTN, AIRTEL, GLO, 9MOBILE), with a 5-minute server cache. VTU_AIRTIME_SERVICE_ID may be left blank; if set, it overrides dynamic lookup.

@@ -48,3 +48,6 @@ After deployment verify:
 8. Admin login works.
 9. Admin audit logs are populated.
 10. A suspended user cannot use an existing session.
+
+
+VTUGATE airtime service IDs are resolved dynamically from /api/v1/fetchservices for the selected network (MTN, AIRTEL, GLO, 9MOBILE), with a 5-minute server cache. VTU_AIRTIME_SERVICE_ID may be left blank; if set, it overrides dynamic lookup.

@@ -3921,7 +3921,10 @@ try{
     const previous=byPlan.get(key);
     if(!previous||row.customer_price<previous.customer_price)byPlan.set(key,row);
   }
-  const plans=Array.from(byPlan.values()).sort((a,b)=>a.price-b.price||a.size_mb-b.size_mb);
+  const plans=Array.from(byPlan.values())
+    .filter(plan=>plan && plan.delivery_rate!==null && plan.delivery_rate!==undefined && Number.isFinite(Number(plan.delivery_rate)) && Number(plan.delivery_rate)>=95)
+    .sort((a,b)=>Number(b.delivery_rate)-Number(a.delivery_rate) || Number(a.customer_price)-Number(b.customer_price) || Number(a.size_mb)-Number(b.size_mb))
+    .slice(0,13);
   return send(res,200,{success:true,network,plans});
 }catch(error){
   console.error("VTU DATA PLAN CATALOG ERROR:",error);

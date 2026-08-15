@@ -1,0 +1,19 @@
+BOLTIV FINAL DEPLOYMENT PACKAGE — FIXED
+
+Fixes included:
+1. Admin login now creates an HttpOnly session cookie.
+2. Admin cookie uses SameSite=None + Secure in production for the GitHub Pages -> Render cross-site frontend.
+3. Backend sends Access-Control-Allow-Credentials: true.
+4. Admin session validation reads the cookie.
+5. Admin logout revokes the cookie-backed session and clears the cookie.
+6. Admin frontend sends credentials with API requests and no longer references the old token variable/localStorage admin token.
+7. /api/me now includes the user's wallet, so the home page can display the same live balance shown on the Wallet page.
+
+Deployment:
+- Replace the whole project with this package if desired.
+- Keep the existing production database.
+- Keep the existing Render environment variables.
+- Redeploy the Render backend first.
+- Redeploy the GitHub Pages frontend.
+- Log into admin once, then leave Chrome and return. The admin session should remain until logout, cookie clearing, or 24-hour expiry.
+- For the user home balance, reload the home page after the backend redeploy; it will read the live wallet balance from /api/me.

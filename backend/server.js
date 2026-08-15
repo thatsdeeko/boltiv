@@ -2372,6 +2372,10 @@ async function callVTUProvider(payload){
     let data={};
     try{data=await response.json();}catch{data={};}
     const providerOk=typeof data?.status==='boolean'?data.status:response.ok;
+    // Safe diagnostic: log only status/response metadata, never the API key or request headers.
+    if(!response.ok || !providerOk){
+      console.error("VTU PROVIDER RESPONSE:", JSON.stringify({provider,service,statusCode:response.status,data}));
+    }
     return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
   }catch(error){
     console.error("VTU PROVIDER REQUEST ERROR:",error);
@@ -3728,7 +3732,7 @@ status:ready?"online":"degraded",
 database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
-vtu:Boolean(VTU_API_KEY&&VTU_API_BASE_URL),
+vtu:Boolean(process.env.VTU_API_KEY&& (process.env.VTU_API_BASE_URL||process.env.VTU_API_URL)),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()
@@ -4285,7 +4289,7 @@ PAYSTACK_SECRET_KEY?
 
 console.log(
 `VTU configured: ${
-VTU_API_KEY&&VTU_API_BASE_URL?
+process.env.VTU_API_KEY&&(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL)?
 "YES":
 "NO"
 }`

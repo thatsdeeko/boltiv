@@ -589,8 +589,6 @@ document.getElementById("balance")
 }
 
 async function syncTransactions(){
-if(syncing)return;
-syncing=true;
 try{
 const token=localStorage.getItem("boltivAuthToken")||"";
 if(!token)return;
@@ -607,8 +605,8 @@ id:t.reference||t.id,
 provider:t.provider_reference||""
 }));
 localStorage.setItem("boltivTransactions",JSON.stringify(mapped));
+renderHistory();
 }catch(e){console.warn("Transaction sync failed",e);}
-finally{syncing=false;renderHistory();}
 }
 
 function getTransactions(){
@@ -665,7 +663,6 @@ return String(value??"")
 
 let currentFilter="all";
 let searchText="";
-let syncing=false;
 
 function getFiltered(){
 
@@ -1080,8 +1077,6 @@ window.addEventListener(
 ()=>{
 updateBalance();
 renderHistory();
-syncTransactions();
-window.addEventListener("pageshow",()=>{renderHistory();syncTransactions();});
 }
 );
 

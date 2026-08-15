@@ -44,32 +44,8 @@
 <script>
 const list=document.getElementById("transactionList"),empty=document.getElementById("emptyState"),emptyTitle=document.getElementById("emptyTitle"),emptyText=document.getElementById("emptyText"),count=document.getElementById("transactionCount"),search=document.getElementById("transactionSearch"),clear=document.getElementById("clearSearch"),modal=document.getElementById("transactionModal"),modalIcon=document.getElementById("modalIcon"),modalService=document.getElementById("modalService"),modalStatus=document.getElementById("modalStatus"),modalDetails=document.getElementById("modalDetails");
 let filter="all",term="";
-let syncing=false;
 
 function getTransactions(){try{const x=JSON.parse(localStorage.getItem("boltivTransactions")||"[]");return Array.isArray(x)?x:[]}catch(e){return[]}}
-
-async function syncTransactions(){
-  if(syncing)return;
-  const token=localStorage.getItem("boltivAuthToken")||"";
-  if(!token)return;
-  syncing=true;
-  try{
-    const r=await fetch("https://boltiv-backend.onrender.com/api/transactions",{headers:{Authorization:"Bearer "+token}});
-    const d=await r.json();
-    if(!r.ok||!d.success)throw new Error(d.message||"Unable to load transactions.");
-    const mapped=(d.transactions||[]).map(t=>{
-      const service=String(t.service||"").toLowerCase();
-      const type=service.includes("airtime")?"airtime":service.includes("data")?"data":service.includes("electric")?"electricity":service.includes("cable")?"cable":"wallet";
-      return {...t,type,title:type==="airtime"?"Airtime Purchase":type==="data"?"Data Purchase":type==="electricity"?"Electricity Payment":type==="cable"?"Cable TV Subscription":(t.service||"Transaction"),direction:t.type==="credit"?"credit":"debit",phone:t.recipient||"",id:t.reference||t.id,createdAt:t.date||""};
-    });
-    localStorage.setItem("boltivTransactions",JSON.stringify(mapped));
-  }catch(e){
-    console.warn("Transaction sync failed:",e);
-  }finally{
-    syncing=false;
-    render();
-  }
-}
 function icon(type){return type==="airtime"?"☎":type==="data"?"◉":type==="electricity"?"ϟ":type==="cable"?"▣":"₦"}
 function title(type){return type==="airtime"?"Airtime Purchase":type==="data"?"Data Purchase":type==="electricity"?"Electricity Payment":type==="cable"?"Cable TV Subscription":"Transaction"}
 function number(t){return t.phone||t.meterNumber||t.smartcard||t.number||t.reference||t.id||"BOLTIV TRANSACTION"}
@@ -123,8 +99,7 @@ document.getElementById("closeModal").onclick=()=>modal.classList.remove("show")
 modal.onclick=e=>{if(e.target===modal)modal.classList.remove("show")};
 document.querySelectorAll(".nav-item").forEach(i=>i.onclick=()=>location.href=i.dataset.page);
 render();
-syncTransactions();
-window.addEventListener("pageshow",()=>{render();syncTransactions();});
+window.addEventListener("pageshow",render);
 </script>
 </body>
 </html>

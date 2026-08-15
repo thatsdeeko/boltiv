@@ -12,6 +12,9 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
 const VTU_API_URL=process.env.VTU_API_URL||"";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
+const VTU_SIMULATOR_ENABLED=String(process.env.VTU_SIMULATOR_ENABLED||"false").toLowerCase()==="true";
+const VTU_SIMULATOR_DEFAULT_MODE=String(process.env.VTU_SIMULATOR_MODE||"success").toLowerCase();
+const VTU_SIMULATOR_DEFAULT_DELAY_MS=Math.max(0,Math.min(10000,Number(process.env.VTU_SIMULATOR_DELAY_MS||300)));
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -2306,9 +2309,49 @@ return {success:true,required:true};
 const PAYSTACK_API_URL=
 "https://api.paystack.co";
 
+function simulatorModeValue(value){
+  const mode=String(value||"").toLowerCase();
+  return ["success","failed","pending"].includes(mode)?mode:"success";
+}
+
+async function getVTUSimulatorConfig(){
+  const mode=simulatorModeValue(await getPlatformSetting("vtu_simulator_mode",VTU_SIMULATOR_DEFAULT_MODE));
+  const rawDelay=Number(await getPlatformSetting("vtu_simulator_delay_ms",VTU_SIMULATOR_DEFAULT_DELAY_MS));
+  const delayMs=Number.isFinite(rawDelay)?Math.max(0,Math.min(10000,rawDelay)):VTU_SIMULATOR_DEFAULT_DELAY_MS;
+  return {enabled:VTU_SIMULATOR_ENABLED,mode,delayMs};
+}
+
+async function simulateVTUProvider(payload){
+  const config=await getVTUSimulatorConfig();
+  if(config.delayMs) await new Promise(resolve=>setTimeout(resolve,config.delayMs));
+  const mode=config.mode;
+  const amount=Number(payload?.amount||0);
+  const providerReference=reference("SIM-VTU");
+  const providerCost=Number(Math.max(0,amount*0.98).toFixed(2));
+  const base={
+    simulator:true,
+    mode,
+    reference:providerReference,
+    provider_cost:providerCost,
+    service:payload?.service||"VTU Service",
+    simulated_at:new Date().toISOString()
+  };
+  if(mode==="failed"){
+    return {success:false,configured:true,statusCode:400,data:{...base,status:"failed",message:"Simulated provider failure."}};
+  }
+  if(mode==="pending"){
+    return {success:true,configured:true,statusCode:200,data:{...base,status:"pending",message:"Simulated provider transaction is pending."}};
+  }
+  return {success:true,configured:true,statusCode:200,data:{...base,status:"successful",message:"Simulated provider transaction completed successfully."}};
+}
+
 async function callVTUProvider(
 payload
 ){
+
+if(VTU_SIMULATOR_ENABLED){
+return simulateVTUProvider(payload);
+}
 
 if(!VTU_API_URL||
 !VTU_API_KEY){
@@ -2943,6 +2986,57 @@ payments
 }
 
 
+async function adminSimulator(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(!VTU_SIMULATOR_ENABLED)return{success:false,statusCode:503,message:"VTU simulator is disabled. Set VTU_SIMULATOR_ENABLED=true on Render first."};
+  if(action==="get"){
+    const config=await getVTUSimulatorConfig();
+    return{success:true,simulator:config};
+  }
+  if(action==="update"){
+    const b=await body(req);
+    const mode=simulatorModeValue(b.mode);
+    const delayMs=Number(b.delay_ms===undefined?VTU_SIMULATOR_DEFAULT_DELAY_MS:b.delay_ms);
+    if(!Number.isFinite(delayMs)||delayMs<0||delayMs>10000)return{success:false,statusCode:400,message:"delay_ms must be between 0 and 10000."};
+    await setPlatformSetting("vtu_simulator_mode",mode);
+    await setPlatformSetting("vtu_simulator_delay_ms",Math.floor(delayMs));
+    const config=await getVTUSimulatorConfig();
+    await adminAudit(admin,"vtu_simulator_updated","simulator","vtu",config,req);
+    return{success:true,simulator:config};
+  }
+  if(action==="pending"){
+    const r=await db(`SELECT id,user_id,service,amount,reference,status,date,metadata,recipient FROM transactions WHERE type='debit' AND status='pending' AND metadata->'providerResponse'->>'simulator'='true' ORDER BY date DESC LIMIT 100`);
+    return{success:true,transactions:r.rows.map(t=>({...t,amount:Number(t.amount)}))};
+  }
+  if(action==="resolve"){
+    const b=await body(req);
+    const referenceValue=clean(b.reference);
+    const outcome=simulatorModeValue(b.outcome);
+    if(!referenceValue)return{success:false,statusCode:400,message:"Transaction reference is required."};
+    if(!["success","failed"].includes(outcome))return{success:false,statusCode:400,message:"outcome must be success or failed."};
+    const r=await db(`SELECT * FROM transactions WHERE reference=$1 AND type='debit' LIMIT 1`,[referenceValue]);
+    if(!r.rows.length)return{success:false,statusCode:404,message:"Transaction not found."};
+    const tx=r.rows[0];
+    if(tx.status!=="pending")return{success:false,statusCode:409,message:`Transaction is ${tx.status}; only pending simulator transactions can be resolved.`};
+    let result;
+    if(outcome==="success"){
+      const providerData={simulator:true,mode:"success",reference:tx.provider_reference||reference("SIM-VTU"),status:"successful",message:"Pending simulator transaction resolved successfully."};
+      result=await finalizeVTUTransaction(referenceValue,providerData,false,{customerAmount:Number(tx.amount),providerCost:Number(tx.amount),grossProfit:0,pricingSource:"simulator_resolve",pricingRule:{mode:"simulator"}});
+      if(result)await addNotification(tx.user_id,"Transaction successful",`${tx.service||"Service"} was completed successfully. Reference: ${referenceValue}`,"success");
+    }else{
+      const refundResult=await markTransactionFailedAndRefund(referenceValue,"simulator_resolved_failure",{simulator:true,status:"failed"});
+      if(!refundResult.success)return{success:false,statusCode:500,message:refundResult.message};
+      result={refunded:true,refundReference:refundResult.refundReference,balance:refundResult.balance};
+      await addNotification(tx.user_id,"Transaction failed",`${tx.service||"Service"} failed in the simulator and your wallet was refunded. Reference: ${referenceValue}`,"error");
+    }
+    if(!result)return{success:false,statusCode:409,message:"Transaction could not be resolved."};
+    await adminAudit(admin,"vtu_simulator_resolved","transaction",referenceValue,{outcome},req);
+    return{success:true,outcome,reference:referenceValue,result};
+  }
+  return{success:false,statusCode:400,message:"Unknown simulator action."};
+}
+
 async function handleAdminRoutes(
 req,
 res,
@@ -3145,6 +3239,11 @@ message:"Unable to connect to Paystack for the DVA access test."
 
 }
 
+
+if(req.method==="GET"&&path==="/api/admin/simulator"){const result=await adminSimulator(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path==="/api/admin/simulator"){const result=await adminSimulator(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/simulator/pending"){const result=await adminSimulator(req,"pending");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/simulator/resolve"){const result=await adminSimulator(req,"resolve");return send(res,result.success?200:(result.statusCode||400),result);}
 
 if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -3769,6 +3868,7 @@ database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
 vtu:Boolean(VTU_API_URL&&VTU_API_KEY),
+simulator:VTU_SIMULATOR_ENABLED,
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()

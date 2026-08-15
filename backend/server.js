@@ -2360,6 +2360,62 @@ async function resolveVTUGateServiceId(serviceType,network){
   return String(match.service_id);
 }
 
+const VTUGATE_DATA_PLAN_CACHE=new Map();
+const VTUGATE_DATA_PLAN_CACHE_TTL_MS=2*60*1000;
+
+async function fetchVTUGateDataPlans(network){
+  const wanted=String(network||'').trim().toLowerCase();
+  if(!wanted) throw new Error('Network is required.');
+  const now=Date.now();
+  const cached=VTUGATE_DATA_PLAN_CACHE.get(wanted);
+  if(cached && now-cached.time < VTUGATE_DATA_PLAN_CACHE_TTL_MS) return cached.data;
+
+  const services=await fetchVTUGateServices('data');
+  const matching=services.filter(item=>
+    String(item?.network_name||item?.network||'').trim().toLowerCase()===wanted && item?.service_id!==undefined
+  );
+  if(!matching.length) throw new Error(`No VTUGATE data service is available for ${network}.`);
+
+  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||'https://api.vtugate.com').replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
+  const url=base+'/api/v1/fetchdataplans';
+  const merged=new Map();
+
+  for(const service of matching){
+    const serviceId=String(service.service_id);
+    try{
+      const response=await fetch(url,{
+        method:'POST',
+        headers:{
+          'Authorization':`Bearer ${VTU_API_KEY}`,
+          'Accept':'application/json',
+          'Content-Type':'application/x-www-form-urlencoded'
+        },
+        body:new URLSearchParams({service_id:serviceId}).toString()
+      });
+      let data={};
+      try{data=await response.json();}catch{data={};}
+      if(!response.ok || data?.status!==true){
+        console.error('VTUGATE DATA PLANS RESPONSE:',JSON.stringify({serviceId,statusCode:response.status,data}));
+        continue;
+      }
+      const plans=Array.isArray(data?.data?.data_plans)?data.data.data_plans:[];
+      for(const plan of plans){
+        const code=String(plan?.code||plan?.plan_code||'').trim();
+        if(!code) continue;
+        const row={...plan,code,plan_code:code,service_id:Number(plan?.service_id||serviceId)};
+        const key=`${row.service_id}:${code}`;
+        if(!merged.has(key)) merged.set(key,row);
+      }
+    }catch(error){
+      console.error('VTUGATE DATA PLANS REQUEST ERROR:',JSON.stringify({serviceId,message:error?.message||'request failed'}));
+    }
+  }
+
+  const plans=Array.from(merged.values()).sort((a,b)=>Number(a.price||0)-Number(b.price||0));
+  VTUGATE_DATA_PLAN_CACHE.set(wanted,{time:now,data:plans});
+  return plans;
+}
+
 async function buildVTUGateForm(payload){
   const p=payload&&typeof payload==='object'?payload:{};
   const service=serviceKey(p.service||"");
@@ -2375,9 +2431,17 @@ async function buildVTUGateForm(payload){
     put('network_provider',p.network);
     put('amount',p.amount);
   }else if(service==='data'){
+    const phone=String(p.phone||p.recipient||'').trim();
+    const planCode=String(p.plan_code||p.planCode||p.plan||'').trim();
+    const serviceId=String(p.service_id||'').trim();
+    if(!serviceId || !planCode){
+      throw new Error('Data service_id and plan_code are required.');
+    }
+    put('service_id',serviceId);
+    put('plan_code',planCode);
+    put('phone',phone);
+    put('phone_number',phone);
     put('network',p.network);
-    put('phone',p.phone||p.recipient);
-    put('plan',p.plan||p.plan_code||p.planCode);
     put('amount',p.amount);
   }else if(service==='cable'){
     put('provider',p.provider);
@@ -3675,6 +3739,52 @@ result
 
 }
 
+
+/*
+VTU DATA PLAN CATALOG
+*/
+
+if(
+req.method==="POST"&&
+path==="/api/vtu/data/plans"
+){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+const b=await body(req);
+const network=clean(b.network).toUpperCase();
+if(!network)return send(res,400,{success:false,message:"Network is required."});
+try{
+  const rawPlans=await fetchVTUGateDataPlans(network);
+  const byPlan=new Map();
+  for(const plan of rawPlans){
+    const code=clean(plan.code||plan.plan_code);
+    if(!code)continue;
+    const size=Number(plan.size_mb||0);
+    const validity=Number(plan.validity_days||0);
+    const price=Number(plan.price||0);
+    if(!Number.isFinite(price)||price<=0)continue;
+    const key=`${code}|${size}|${validity}`;
+    const row={
+      code,
+      name:clean(plan.name||code),
+      price,
+      network_name:clean(plan.network_name||network).toUpperCase(),
+      service_id:Number(plan.service_id),
+      size_mb:size,
+      validity_days:validity,
+      delivery_rate:plan.delivery_rate===null||plan.delivery_rate===undefined?null:Number(plan.delivery_rate),
+      delivery_comment:clean(plan.delivery_comment||"")
+    };
+    const previous=byPlan.get(key);
+    if(!previous||row.price<previous.price)byPlan.set(key,row);
+  }
+  const plans=Array.from(byPlan.values()).sort((a,b)=>a.price-b.price||a.size_mb-b.size_mb);
+  return send(res,200,{success:true,network,plans});
+}catch(error){
+  console.error("VTU DATA PLAN CATALOG ERROR:",error);
+  return send(res,502,{success:false,message:error?.message||"Unable to fetch data plans."});
+}
+}
 
 /*
 VTU TRANSACTION

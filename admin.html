@@ -181,6 +181,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 </div>
 </div>
 
+
+<div class="section">
+<div class="section-head"><h2>VTU TRANSACTION SIMULATOR</h2><button class="btn primary" onclick="loadSimulator()">REFRESH</button></div>
+<div class="section-body">
+<div class="notice">Admin-only test simulator. It replaces the external VTU provider only when <b>VTU_SIMULATOR_ENABLED=true</b> is set on Render. It never calls a real VTU provider.</div>
+<div class="grid2" style="margin-top:14px">
+<div><label>MODE</label><select id="simMode"><option value="success">SUCCESS</option><option value="pending">PENDING</option><option value="failed">FAILED / REFUND</option></select></div>
+<div><label>DELAY (MS)</label><input id="simDelay" type="number" min="0" max="10000" step="50" value="300"></div>
+</div>
+<div class="actions" style="margin-top:12px"><button class="btn primary" onclick="saveSimulator()">SAVE SIMULATOR MODE</button><button class="btn" onclick="loadSimulatorPending()">SHOW PENDING TESTS</button></div>
+<div id="simulatorStatus" class="empty" style="margin-top:12px">Simulator status not loaded.</div>
+<div id="simulatorPending" style="margin-top:12px"></div>
+</div>
+</div>
+
 <div class="section">
 <div class="section-head"><h2>RECENT ACTIVITY</h2></div>
 <div id="recent" class="section-body"><div class="loading">Loading...</div></div>
@@ -756,7 +771,7 @@ if($("supportSearch"))$("supportSearch").oninput=filterSupport;if($("supportFilt
 function closeModal(){$("adminModal").classList.remove("show")}
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("adminModal").classList.add("show")}
 async function loadAll(){
-  await Promise.allSettled([loadStats(),loadMe(),loadUsers(),loadPayments(),loadTransactions(),loadSupport(),loadAudit(),loadServices(),loadSecurity(),loadSettings()]);
+  await Promise.allSettled([loadStats(),loadMe(),loadUsers(),loadPayments(),loadTransactions(),loadSupport(),loadAudit(),loadServices(),loadSecurity(),loadSettings(),loadSimulator()]);
 }
 async function loadStats(){
  try{
@@ -839,6 +854,39 @@ async function loadAudit(){
   $("auditArea").innerHTML=a.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+a.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>';
   filterAudit();
  }catch(e){$("auditArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
+}
+
+async function loadSimulator(){
+ try{
+  const d=await api('/api/admin/simulator');
+  const x=d.simulator||{};
+  if($('simMode'))$('simMode').value=x.mode||'success';
+  if($('simDelay'))$('simDelay').value=Number(x.delayMs||0);
+  if($('simulatorStatus'))$('simulatorStatus').innerHTML='<div class="notice"><strong>Simulator: ENABLED</strong><br>Mode: '+esc(String(x.mode||'success').toUpperCase())+'<br>Delay: '+Number(x.delayMs||0)+' ms</div>';
+  await loadSimulatorPending();
+ }catch(e){
+  if($('simulatorStatus'))$('simulatorStatus').innerHTML='<div class="error-box">'+esc(e.message||'Simulator unavailable.')+'</div>';
+ }
+}
+async function saveSimulator(){
+ try{
+  const d=await api('/api/admin/simulator',{method:'PATCH',body:JSON.stringify({mode:$('simMode').value,delay_ms:Number($('simDelay').value)})});
+  const x=d.simulator||{};
+  $('simulatorStatus').innerHTML='<div class="notice">Saved. Simulator mode is <strong>'+esc(String(x.mode||'success').toUpperCase())+'</strong> with '+Number(x.delayMs||0)+' ms delay.</div>';
+ }catch(e){alert(e.message)}
+}
+async function loadSimulatorPending(){
+ try{
+  const d=await api('/api/admin/simulator/pending');
+  const a=d.transactions||[];
+  if(!$('simulatorPending'))return;
+  if(!a.length){$('simulatorPending').innerHTML='<div class="empty">No pending simulator transactions.</div>';return;}
+  $('simulatorPending').innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>USER</th><th>SERVICE</th><th>AMOUNT</th><th>ACTION</th></tr></thead><tbody>'+a.map(t=>`<tr><td>${esc(t.reference)}</td><td>${esc(t.user_id)}</td><td>${esc(t.service)}</td><td class="amount">₦${Number(t.amount||0).toLocaleString()}</td><td><button class="btn primary" onclick="resolveSimulator('${esc(t.reference)}','success')">SUCCESS</button> <button class="btn danger" onclick="resolveSimulator('${esc(t.reference)}','failed')">FAIL + REFUND</button></td></tr>`).join('')+'</tbody></table></div>';
+ }catch(e){if($('simulatorPending'))$('simulatorPending').innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
+}
+async function resolveSimulator(reference,outcome){
+ if(!confirm(outcome==='success'?'Complete this pending simulator transaction successfully?':'Fail this simulator transaction and refund the wallet?'))return;
+ try{await api('/api/admin/simulator/resolve',{method:'POST',body:JSON.stringify({reference,outcome})});await loadSimulatorPending();await loadTransactions();alert(outcome==='success'?'Simulator transaction completed.':'Simulator transaction failed and was refunded.');}catch(e){alert(e.message)}
 }
 
 async function testPaystackDva(){

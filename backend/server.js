@@ -2360,15 +2360,48 @@ async function callVTUProvider(payload){
   try{
     const isVTUGate=provider==='vtugate';
     const form=isVTUGate?buildVTUGateForm(payload):null;
-    const response=await fetch(url,{
-      method:"POST",
-      headers:{
-        "Content-Type":isVTUGate?"application/x-www-form-urlencoded":"application/json",
-        "Authorization":`Bearer ${VTU_API_KEY}`,
-        "Accept":"application/json"
-      },
-      body:isVTUGate?form.toString():JSON.stringify(payload||{})
-    });
+    const requestHeaders={
+      "Authorization":`Bearer ${VTU_API_KEY}`,
+      "Accept":"application/json"
+    };
+    // VTUGATE's homepage documents a JSON request body, while its FAQ also says
+    // endpoints accept form-urlencoded. Use JSON first because the live endpoint
+    // has been returning "Phone number is required" when the form body is used.
+    // If that exact validation response occurs, retry once as form-urlencoded.
+    let response;
+    if(isVTUGate){
+      response=await fetch(url,{
+        method:"POST",
+        headers:{...requestHeaders,"Content-Type":"application/json"},
+        body:JSON.stringify({
+          network:payload?.network,
+          phone:payload?.phone||payload?.recipient,
+          amount:Number(payload?.amount)
+        })
+      });
+      let firstData={};
+      try{firstData=await response.json();}catch{firstData={};}
+      const firstMessage=String(firstData?.message||firstData?.error||"").toLowerCase();
+      if(response.status===400 && firstMessage.includes("phone number is required")){
+        response=await fetch(url,{
+          method:"POST",
+          headers:{...requestHeaders,"Content-Type":"application/x-www-form-urlencoded"},
+          body:form.toString()
+        });
+      } else {
+        const providerOk=typeof firstData?.status==='boolean'?firstData.status:response.ok;
+        if(!response.ok || !providerOk){
+          console.error("VTU PROVIDER RESPONSE:", JSON.stringify({provider,service,statusCode:response.status,data:firstData}));
+        }
+        return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data:firstData};
+      }
+    } else {
+      response=await fetch(url,{
+        method:"POST",
+        headers:{...requestHeaders,"Content-Type":"application/json"},
+        body:JSON.stringify(payload||{})
+      });
+    }
     let data={};
     try{data=await response.json();}catch{data={};}
     const providerOk=typeof data?.status==='boolean'?data.status:response.ok;

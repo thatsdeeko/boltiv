@@ -323,14 +323,8 @@ async function loadAccount(){
       userEmail.textContent=data.user.email||"";
     }
 
-    let walletData=data.wallet||null;
-    try{
-      const walletResponse=await fetch(API_BASE+"/api/wallet",{method:"GET",headers:{"Accept":"application/json","Authorization":"Bearer "+token}});
-      if(walletResponse.ok){const wd=await walletResponse.json();if(wd.success&&wd.wallet) walletData=wd.wallet;}
-    }catch(e){console.warn("BOLTIV WALLET LOAD ERROR",e);}
-
-    if(walletData){
-      const balance=Number(walletData.balance||0);
+    if(data.wallet){
+      const balance=Number(data.wallet.balance||0);
       walletBalance.textContent="₦"+balance.toLocaleString("en-NG",{
         minimumFractionDigits:2,maximumFractionDigits:2
       });

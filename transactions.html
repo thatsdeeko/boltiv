@@ -43,53 +43,92 @@
 
 <script>
 const list=document.getElementById("transactionList"),empty=document.getElementById("emptyState"),emptyTitle=document.getElementById("emptyTitle"),emptyText=document.getElementById("emptyText"),count=document.getElementById("transactionCount"),search=document.getElementById("transactionSearch"),clear=document.getElementById("clearSearch"),modal=document.getElementById("transactionModal"),modalIcon=document.getElementById("modalIcon"),modalService=document.getElementById("modalService"),modalStatus=document.getElementById("modalStatus"),modalDetails=document.getElementById("modalDetails");
-let filter="all",term="";
+let filter="all",term="",allTransactions=[],loading=true;
+const API="https://boltiv-backend.onrender.com";
 
-function getTransactions(){try{const x=JSON.parse(localStorage.getItem("boltivTransactions")||"[]");return Array.isArray(x)?x:[]}catch(e){return[]}}
+function authHeaders(){return {"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")}}
+function localTransactions(){try{const x=JSON.parse(localStorage.getItem("boltivTransactions")||"[]");return Array.isArray(x)?x:[]}catch(e){return[]}}
 function icon(type){return type==="airtime"?"☎":type==="data"?"◉":type==="electricity"?"ϟ":type==="cable"?"▣":"₦"}
 function title(type){return type==="airtime"?"Airtime Purchase":type==="data"?"Data Purchase":type==="electricity"?"Electricity Payment":type==="cable"?"Cable TV Subscription":"Transaction"}
-function number(t){return t.phone||t.meterNumber||t.smartcard||t.number||t.reference||t.id||"BOLTIV TRANSACTION"}
+function meta(t){let m=t&&t.metadata; if(typeof m==="string"){try{m=JSON.parse(m)}catch(e){m={}}} return m&&typeof m==="object"?m:{}}
+function field(t,key){const m=meta(t);return t[key]??m[key]??m.request?.[key]??m.providerPayload?.[key]??null}
+function number(t){return field(t,"phone")||field(t,"meterNumber")||field(t,"smartcard")||field(t,"number")||t.recipient||t.reference||t.id||"BOLTIV TRANSACTION"}
 function status(t){return String(t.status||"Successful")}
-function statusClass(s){s=s.toLowerCase();return s.includes("fail")?"status-failed":s.includes("pending")?"status-pending":"status-success"}
+function statusClass(s){s=s.toLowerCase();return s.includes("fail")||s.includes("refund")?"status-failed":s.includes("pending")||s.includes("processing")?"status-pending":"status-success"}
 function money(v){return"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})}
-function dateValue(t){return t.createdAt||t.date||""}
+function dateValue(t){return t.date||t.createdAt||t.created_at||""}
 function formatDate(t){const d=new Date(dateValue(t));return isNaN(d)?"Unknown date":d.toLocaleDateString("en-NG",{day:"numeric",month:"short",year:"numeric"})}
 function formatTime(t){const d=new Date(dateValue(t));return isNaN(d)?"Unknown time":d.toLocaleTimeString("en-NG",{hour:"2-digit",minute:"2-digit"})}
-function matches(t){if(!term)return true;return[t.type,title(t.type),t.phone,t.network,t.provider,t.plan,t.smartcard,t.meterNumber,t.meterType,t.amount,t.id,t.reference,t.date,t.createdAt].filter(Boolean).join(" ").toLowerCase().includes(term.toLowerCase())}
+function matches(t){if(!term)return true;return[t.type,title(t.type),field(t,"phone"),field(t,"network"),field(t,"provider"),field(t,"plan"),field(t,"smartcard"),field(t,"meterNumber"),field(t,"meterType"),t.amount,t.id,t.reference,t.date].filter(Boolean).join(" ").toLowerCase().includes(term.toLowerCase())}
+
+async function loadTransactions(){
+  loading=true;
+  empty.style.display="none";
+  list.innerHTML='<div style="padding:35px 20px;text-align:center;color:#777;font-size:11px">Loading transactions...</div>';
+  try{
+    const token=localStorage.getItem("boltivAuthToken")||"";
+    if(!token) throw new Error("Please log in again to view your transactions.");
+    const r=await fetch(API+"/api/transactions",{method:"GET",headers:authHeaders()});
+    const d=await r.json();
+    if(!r.ok||!d.success) throw new Error(d.message||"Unable to load transactions.");
+    allTransactions=Array.isArray(d.transactions)?d.transactions:[];
+    // Keep legacy local transactions only as a temporary fallback when the backend has none.
+    // Backend records remain the authoritative source once any exist.
+    if(!allTransactions.length){
+      const local=localTransactions();
+      if(local.length) allTransactions=local;
+    }
+  }catch(e){
+    console.error("BOLTIV TRANSACTIONS LOAD ERROR:",e);
+    allTransactions=[];
+    emptyTitle.textContent="Unable to Load Transactions";
+    emptyText.textContent=e.message||"Please check your connection and try again.";
+  }finally{
+    loading=false;
+    render();
+  }
+}
 
 function render(){
-let data=getTransactions();
-if(filter!=="all")data=data.filter(t=>t.type===filter);
-data=data.filter(matches);
-data.sort((a,b)=>new Date(dateValue(b))-new Date(dateValue(a)));
-count.textContent=data.length;
-list.innerHTML="";
-if(!data.length){empty.style.display="block";emptyTitle.textContent=term?"No Transaction Found":"No Transactions Yet";emptyText.textContent=term?"We couldn't find a transaction matching your search.":"Your Airtime, Data, Electricity and Cable TV transactions will appear here after you make a purchase.";return}
-empty.style.display="none";
-data.forEach(t=>{
-const item=document.createElement("button");
-item.type="button";item.className="transaction-item";
-const s=status(t);
-item.innerHTML=`<div class="transaction-icon">${icon(t.type)}</div><div class="transaction-info"><div class="transaction-name">${title(t.type)}</div><div class="transaction-number">${number(t)}</div></div><div class="transaction-right"><div class="transaction-amount">${money(t.amount)}</div><div class="transaction-status ${statusClass(s)}">${s.toUpperCase()}</div></div>`;
-item.onclick=()=>show(t);
-list.appendChild(item);
-});
+  if(loading)return;
+  let data=allTransactions.slice();
+  if(filter!=="all")data=data.filter(t=>String(t.type).toLowerCase()===filter);
+  data=data.filter(matches);
+  data.sort((a,b)=>new Date(dateValue(b))-new Date(dateValue(a)));
+  count.textContent=data.length;
+  list.innerHTML="";
+  if(!data.length){
+    empty.style.display="block";
+    if(emptyTitle.textContent!=="Unable to Load Transactions") emptyTitle.textContent=term?"No Transaction Found":"No Transactions Yet";
+    if(emptyTitle.textContent!=="Unable to Load Transactions") emptyText.textContent=term?"We couldn't find a transaction matching your search.":"Your Airtime, Data, Electricity and Cable TV transactions will appear here after you make a purchase.";
+    return;
+  }
+  empty.style.display="none";
+  data.forEach(t=>{
+    const item=document.createElement("button");
+    item.type="button";item.className="transaction-item";
+    const s=status(t);
+    item.innerHTML=`<div class="transaction-icon">${icon(t.type)}</div><div class="transaction-info"><div class="transaction-name">${title(t.type)}</div><div class="transaction-number">${number(t)}</div></div><div class="transaction-right"><div class="transaction-amount">${money(t.amount)}</div><div class="transaction-status ${statusClass(s)}">${s.toUpperCase()}</div></div>`;
+    item.onclick=()=>show(t);
+    list.appendChild(item);
+  });
 }
 
 function show(t){
-const s=status(t);
-modalIcon.textContent=icon(t.type);
-modalService.textContent=title(t.type);
-modalStatus.textContent="● "+s.toUpperCase();
-modalStatus.className="modal-service-status "+statusClass(s);
-let rows=`<div class="detail-row"><span>Service</span><strong>${title(t.type)}</strong></div><div class="detail-row"><span>Amount</span><strong>${money(t.amount)}</strong></div>`;
-if(t.type==="airtime")rows+=`<div class="detail-row"><span>Phone</span><strong>${t.phone||"—"}</strong></div><div class="detail-row"><span>Network</span><strong>${t.network||"—"}</strong></div>`;
-if(t.type==="data")rows+=`<div class="detail-row"><span>Phone</span><strong>${t.phone||"—"}</strong></div><div class="detail-row"><span>Network</span><strong>${t.network||"—"}</strong></div><div class="detail-row"><span>Data Plan</span><strong>${t.plan||"—"}</strong></div>`;
-if(t.type==="cable")rows+=`<div class="detail-row"><span>Provider</span><strong>${t.provider||"—"}</strong></div><div class="detail-row"><span>Smartcard / IUC</span><strong>${t.smartcard||"—"}</strong></div><div class="detail-row"><span>Plan</span><strong>${t.plan||"—"}</strong></div>`;
-if(t.type==="electricity")rows+=`<div class="detail-row"><span>Provider</span><strong>${t.provider||"—"}</strong></div><div class="detail-row"><span>Meter</span><strong>${t.meterNumber||"—"}</strong></div><div class="detail-row"><span>Meter Type</span><strong>${t.meterType||"—"}</strong></div>`;
-rows+=`<div class="detail-row"><span>Date</span><strong>${formatDate(t)}</strong></div><div class="detail-row"><span>Time</span><strong>${formatTime(t)}</strong></div><div class="detail-row"><span>Transaction ID</span><strong>${t.id||t.reference||"—"}</strong></div>`;
-modalDetails.innerHTML=rows;
-modal.classList.add("show");
+  const s=status(t),m=meta(t);
+  modalIcon.textContent=icon(t.type);
+  modalService.textContent=title(t.type);
+  modalStatus.textContent="● "+s.toUpperCase();
+  modalStatus.className="modal-service-status "+statusClass(s);
+  let rows=`<div class="detail-row"><span>Service</span><strong>${title(t.type)}</strong></div><div class="detail-row"><span>Amount</span><strong>${money(t.amount)}</strong></div>`;
+  if(t.type==="airtime")rows+=`<div class="detail-row"><span>Phone</span><strong>${field(t,"phone")||"—"}</strong></div><div class="detail-row"><span>Network</span><strong>${field(t,"network")||"—"}</strong></div>`;
+  if(t.type==="data")rows+=`<div class="detail-row"><span>Phone</span><strong>${field(t,"phone")||"—"}</strong></div><div class="detail-row"><span>Network</span><strong>${field(t,"network")||"—"}</strong></div><div class="detail-row"><span>Data Plan</span><strong>${field(t,"plan")||"—"}</strong></div>`;
+  if(t.type==="cable")rows+=`<div class="detail-row"><span>Provider</span><strong>${field(t,"provider")||"—"}</strong></div><div class="detail-row"><span>Smartcard / IUC</span><strong>${field(t,"smartcard")||"—"}</strong></div><div class="detail-row"><span>Plan</span><strong>${field(t,"plan")||"—"}</strong></div>`;
+  if(t.type==="electricity")rows+=`<div class="detail-row"><span>Provider</span><strong>${field(t,"provider")||"—"}</strong></div><div class="detail-row"><span>Meter</span><strong>${field(t,"meterNumber")||"—"}</strong></div><div class="detail-row"><span>Meter Type</span><strong>${field(t,"meterType")||"—"}</strong></div>`;
+  rows+=`<div class="detail-row"><span>Date</span><strong>${formatDate(t)}</strong></div><div class="detail-row"><span>Time</span><strong>${formatTime(t)}</strong></div><div class="detail-row"><span>Transaction ID</span><strong>${t.id||t.reference||"—"}</strong></div>`;
+  if(t.provider_reference)rows+=`<div class="detail-row"><span>Provider Reference</span><strong>${t.provider_reference}</strong></div>`;
+  modalDetails.innerHTML=rows;
+  modal.classList.add("show");
 }
 
 document.querySelectorAll(".filter-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");filter=b.dataset.filter;render()});
@@ -98,8 +137,9 @@ clear.onclick=()=>{search.value="";term="";clear.classList.remove("show");search
 document.getElementById("closeModal").onclick=()=>modal.classList.remove("show");
 modal.onclick=e=>{if(e.target===modal)modal.classList.remove("show")};
 document.querySelectorAll(".nav-item").forEach(i=>i.onclick=()=>location.href=i.dataset.page);
-render();
-window.addEventListener("pageshow",render);
+loadTransactions();
+window.addEventListener("pageshow",loadTransactions);
+window.addEventListener("focus",loadTransactions);
 </script>
 </body>
 </html>

@@ -2319,17 +2319,57 @@ function vtugateEndpoint(service){
   return cleanBase+(map[service]||"");
 }
 
-function buildVTUGateForm(payload){
+const VTUGATE_SERVICE_CACHE=new Map();
+const VTUGATE_SERVICE_CACHE_TTL_MS=5*60*1000;
+
+async function fetchVTUGateServices(serviceType){
+  const now=Date.now();
+  const cached=VTUGATE_SERVICE_CACHE.get(serviceType);
+  if(cached && now-cached.time < VTUGATE_SERVICE_CACHE_TTL_MS) return cached.data;
+  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
+  const url=base+'/api/v1/fetchservices';
+  const response=await fetch(url,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${VTU_API_KEY}`,
+      'Accept':'application/json',
+      'Content-Type':'application/x-www-form-urlencoded'
+    },
+    body:new URLSearchParams({service_type:serviceType}).toString()
+  });
+  let data={};
+  try{data=await response.json();}catch{data={};}
+  if(!response.ok || data?.status!==true){
+    console.error('VTUGATE SERVICE LOOKUP RESPONSE:',JSON.stringify({serviceType,statusCode:response.status,data}));
+    throw new Error(data?.message||`VTUGATE service lookup failed (${response.status})`);
+  }
+  const services=Array.isArray(data.data)?data.data:[];
+  VTUGATE_SERVICE_CACHE.set(serviceType,{time:now,data:services});
+  return services;
+}
+
+async function resolveVTUGateServiceId(serviceType,network){
+  const explicit=String(process.env[`VTU_${String(serviceType).toUpperCase()}_SERVICE_ID`]||'').trim();
+  if(explicit) return explicit;
+  const services=await fetchVTUGateServices(serviceType);
+  const wanted=String(network||'').trim().toLowerCase();
+  const match=services.find(item=>String(item?.network_name||item?.network||'').trim().toLowerCase()===wanted);
+  if(!match?.service_id){
+    throw new Error(`No VTUGATE ${serviceType} service is available for ${network||'the selected network'}.`);
+  }
+  return String(match.service_id);
+}
+
+async function buildVTUGateForm(payload){
   const p=payload&&typeof payload==='object'?payload:{};
   const service=serviceKey(p.service||"");
   const form=new URLSearchParams();
   const put=(key,value)=>{if(value!==undefined&&value!==null&&String(value)!=="")form.set(key,String(value));};
   if(service==='airtime'){
     const phone=String(p.phone||p.recipient||'').trim();
+    const serviceId=String(p.service_id||await resolveVTUGateServiceId('airtime',p.network)).trim();
+    put('service_id',serviceId);
     put('network',p.network);
-    // VTUGATE's public docs call the field `phone`, while the live
-    // validator has been observed returning `Phone number is required`.
-    // Send both aliases so the request works with either validator version.
     put('phone',phone);
     put('phone_number',phone);
     put('network_provider',p.network);
@@ -2365,7 +2405,7 @@ async function callVTUProvider(payload){
   if(!url){return{success:false,configured:false,message:"VTU provider URL is not configured."};}
   try{
     const isVTUGate=provider==='vtugate';
-    const form=isVTUGate?buildVTUGateForm(payload):null;
+    const form=isVTUGate?await buildVTUGateForm(payload):null;
     const requestHeaders={
       "Authorization":`Bearer ${VTU_API_KEY}`,
       "Accept":"application/json"

@@ -13,8 +13,8 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 const VTU_API_URL=process.env.VTU_API_URL||"";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
 const VTU_SIMULATOR_ENABLED=String(process.env.VTU_SIMULATOR_ENABLED||"false").toLowerCase()==="true";
-const VTU_SIMULATOR_DEFAULT_MODE=String(process.env.VTU_SIMULATOR_MODE||"success").toLowerCase();
-const VTU_SIMULATOR_DEFAULT_DELAY_MS=Math.max(0,Math.min(10000,Number(process.env.VTU_SIMULATOR_DELAY_MS||300)));
+const VTU_SIMULATOR_MODE=String(process.env.VTU_SIMULATOR_MODE||"success").toLowerCase();
+const VTU_SIMULATOR_DELAY_MS=Math.max(0,Number(process.env.VTU_SIMULATOR_DELAY_MS||300)||300);
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -65,6 +65,7 @@ res.writeHead(status,{
 "Vary":"Origin",
 "Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
+"Access-Control-Allow-Credentials":"true",
 "X-Content-Type-Options":"nosniff",
 "X-Frame-Options":"DENY",
 "Referrer-Policy":"strict-origin-when-cross-origin",
@@ -1529,34 +1530,52 @@ email:admin.email
 }
 
 
+
+function getAdminSessionToken(req){
+  const cookieHeader = req.headers.cookie || "";
+  const match = cookieHeader.match(/(?:^|;\s*)boltiv_admin_session=([^;]+)/);
+  if (match) {
+    try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
+  }
+  const auth = req.headers.authorization || "";
+  if (auth.startsWith("Bearer ")) return auth.slice(7);
+  return null;
+}
+
+function setAdminSessionCookie(res, token){
+  const parts = [
+    `boltiv_admin_session=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=None",
+    "Max-Age=86400"
+  ];
+  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
+}
+
+function clearAdminSessionCookie(res){
+  const parts = [
+    "boltiv_admin_session=",
+    "Path=/",
+    "HttpOnly",
+    "SameSite=None",
+    "Max-Age=0"
+  ];
+  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
+}
+
 async function adminFromToken(req){
 
-const authorization=
-req.headers.authorization||"";
+const sessionToken=getAdminSessionToken(req);
+if(!sessionToken)return null;
 
-if(!authorization.startsWith(
-"Bearer "
-)){
-return null;
-}
-
-const sessionToken=
-authorization.slice(7).trim();
-
-if(!sessionToken){
-return null;
-}
-
-const result=
-await db(
-`SELECT
-a.id,
-a.email
-FROM admin_sessions s
-JOIN admins a
-ON a.id=s.admin_id
-WHERE s.token=$1
-AND s.expires_at>NOW()`,
+const result=await db(
+`SELECT a.id,a.email
+ FROM admin_sessions s
+ JOIN admins a ON a.id=s.admin_id
+ WHERE s.token=$1 AND s.expires_at>NOW()`,
 [sessionToken]
 );
 
@@ -1564,42 +1583,20 @@ return result.rows[0]||null;
 
 }
 
-
 async function logoutAdmin(req){
 
-const authorization=
-req.headers.authorization||"";
-
-if(
-authorization.startsWith(
-"Bearer "
-)
-){
-
-const sessionToken=
-authorization.slice(7).trim();
-
+const sessionToken=getAdminSessionToken(req);
 if(sessionToken){
-
-await db(
-`DELETE FROM admin_sessions
-WHERE token=$1`,
-[
-sessionToken
-]
-);
-
-}
-
+await db(`DELETE FROM admin_sessions WHERE token=$1`,[sessionToken]);
 }
 
 return{
 success:true,
-message:
-"Admin logged out successfully."
+message:"Admin logged out successfully."
 };
 
-  }
+}
+
 async function createPayment(
 userId,
 email,
@@ -2309,48 +2306,17 @@ return {success:true,required:true};
 const PAYSTACK_API_URL=
 "https://api.paystack.co";
 
-function simulatorModeValue(value){
-  const mode=String(value||"").toLowerCase();
-  return ["success","failed","pending"].includes(mode)?mode:"success";
-}
-
-async function getVTUSimulatorConfig(){
-  const mode=simulatorModeValue(await getPlatformSetting("vtu_simulator_mode",VTU_SIMULATOR_DEFAULT_MODE));
-  const rawDelay=Number(await getPlatformSetting("vtu_simulator_delay_ms",VTU_SIMULATOR_DEFAULT_DELAY_MS));
-  const delayMs=Number.isFinite(rawDelay)?Math.max(0,Math.min(10000,rawDelay)):VTU_SIMULATOR_DEFAULT_DELAY_MS;
-  return {enabled:VTU_SIMULATOR_ENABLED,mode,delayMs};
-}
-
-async function simulateVTUProvider(payload){
-  const config=await getVTUSimulatorConfig();
-  if(config.delayMs) await new Promise(resolve=>setTimeout(resolve,config.delayMs));
-  const mode=config.mode;
-  const amount=Number(payload?.amount||0);
-  const providerReference=reference("SIM-VTU");
-  const providerCost=Number(Math.max(0,amount*0.98).toFixed(2));
-  const base={
-    simulator:true,
-    mode,
-    reference:providerReference,
-    provider_cost:providerCost,
-    service:payload?.service||"VTU Service",
-    simulated_at:new Date().toISOString()
-  };
-  if(mode==="failed"){
-    return {success:false,configured:true,statusCode:400,data:{...base,status:"failed",message:"Simulated provider failure."}};
-  }
-  if(mode==="pending"){
-    return {success:true,configured:true,statusCode:200,data:{...base,status:"pending",message:"Simulated provider transaction is pending."}};
-  }
-  return {success:true,configured:true,statusCode:200,data:{...base,status:"successful",message:"Simulated provider transaction completed successfully."}};
-}
-
 async function callVTUProvider(
 payload
 ){
 
 if(VTU_SIMULATOR_ENABLED){
-return simulateVTUProvider(payload);
+  if(VTU_SIMULATOR_DELAY_MS>0) await new Promise(resolve=>setTimeout(resolve,VTU_SIMULATOR_DELAY_MS));
+  const mode=VTU_SIMULATOR_MODE;
+  const providerReference=`SIM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+  if(mode==="failed"||mode==="failure") return {success:false,configured:true,statusCode:400,data:{status:"failed",provider_reference:providerReference,simulator:true,message:"Simulated VTU failure."}};
+  if(mode==="pending"||mode==="processing") return {success:true,configured:true,statusCode:200,data:{status:"pending",provider_reference:providerReference,simulator:true,message:"Simulated VTU transaction is pending."}};
+  return {success:true,configured:true,statusCode:200,data:{status:"successful",provider_reference:providerReference,simulator:true,message:"Simulated VTU transaction successful."}};
 }
 
 if(!VTU_API_URL||
@@ -2571,31 +2537,6 @@ async function creditAdminFromPayment(client,payment){await ensureAdminWallet(cl
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
 async function initializeAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:'Enter an amount of at least ₦100.'};const ref=reference('ADM-FUND');await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited,recipient_type,admin_id,created_at) VALUES($1,$2,$3,$4,$5,'pending',FALSE,'admin',$6,NOW())`,[ref,`ADMIN:${admin.id}`,admin.email,amount,Math.round(amount*100),admin.id]);try{const response=await fetch(`${PAYSTACK_API_URL}/transaction/initialize`,{method:'POST',headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({email:admin.email,amount:Math.round(amount*100),reference:ref,callback_url:`${FRONTEND_URL}/admin.html?admin_funding=${encodeURIComponent(ref)}`})});const data=await response.json();if(!response.ok||!data.status){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:400,message:data.message||'Unable to initialize payment.'};}return{success:true,reference:ref,authorization_url:data.data?.authorization_url||''};}catch(e){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}}
 async function verifyAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),ref=clean(b.reference);if(!ref)return{success:false,statusCode:400,message:'Payment reference is required.'};const pr=await db(`SELECT * FROM payments WHERE reference=$1 AND recipient_type='admin' AND admin_id=$2 LIMIT 1`,[ref,admin.id]);if(!pr.rows.length)return{success:false,statusCode:404,message:'Admin funding payment not found.'};const payment=pr.rows[0];if(payment.credited)return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};const response=await fetch(`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(ref)}`,{headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'}});const data=await response.json();if(!response.ok||!data.status)return{success:false,statusCode:400,message:data.message||'Unable to verify payment.'};const tx=data.data||{};if(tx.status!=='success'){await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[tx.status,ref]);return{success:false,statusCode:400,message:`Payment status: ${tx.status}`};}if(Number(tx.amount)!==Number(payment.amount_kobo))return{success:false,statusCode:400,message:'Payment amount does not match.'};const client=await pool.connect();try{await client.query('BEGIN');const locked=(await client.query(`SELECT * FROM payments WHERE reference=$1 FOR UPDATE`,[ref])).rows[0];if(!locked||locked.credited){await client.query('COMMIT');return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};}const balance=await creditAdminFromPayment(client,locked);await client.query('COMMIT');await adminAudit(admin,'admin_wallet_funded','admin_wallet',String(admin.id),{amount:Number(payment.amount),reference:ref},req);return{success:true,message:'Admin wallet funded successfully.',reference:ref,balance};}catch(e){try{await client.query('ROLLBACK')}catch{}return{success:false,statusCode:500,message:'Unable to credit admin wallet.'};}finally{client.release();}}
-
-async function adminSimulatorTestFund(req){
-  const admin=await adminFromToken(req);
-  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  if(!VTU_SIMULATOR_ENABLED)return{success:false,statusCode:503,message:"Simulator test funding is disabled."};
-  const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"VTU simulator test funding");
-  if(!target||!Number.isFinite(amount)||amount<=0||amount>100000)return{success:false,statusCode:400,message:"Enter a test amount between ₦1 and ₦100,000."};
-  const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);
-  if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};
-  const u=r.rows[0],c=await pool.connect();
-  try{
-    await c.query("BEGIN");
-    await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);
-    const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,u.user_id]);
-    if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:500,message:"Unable to fund test wallet."};}
-    const balance=Number(wr.rows[0].balance);
-    const ref=`SIM-FUND-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-    await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','VTU simulator test funding',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({source:'vtu_simulator_test',simulator:true,admin_id:admin.id,reason})]);
-    await c.query("COMMIT");
-    await adminAudit(admin,'simulator_test_funding','user',u.user_id,{amount,reason,reference:ref,balance},req);
-    await addNotification(u.user_id,'Test wallet funded',`Your wallet received ₦${amount.toLocaleString()} of simulator test funds.`, 'payment');
-    return{success:true,message:'Simulator test funds added. No Paystack charge was made.',balance,reference:ref,testOnly:true};
-  }catch(e){try{await c.query("ROLLBACK")}catch{}console.error('SIMULATOR TEST FUND ERROR',e);return{success:false,statusCode:500,message:"Unable to fund test wallet."};}
-  finally{c.release();}
-}
 
 async function adminWalletAdjust(req,mode){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"Admin wallet transfer");if(!target||!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid amount."};const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};const u=r.rows[0],c=await pool.connect();try{await c.query("BEGIN");await ensureAdminWallet(c,admin.id);const ref=`ADM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;if(mode==="credit"){const ar=await c.query(`UPDATE admin_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 AND balance>=$1 RETURNING balance`,[amount,admin.id]);if(!ar.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient admin wallet balance. Fund the admin wallet first."};}const adminBalance=Number(ar.rows[0].balance);await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,u.user_id]);await addAdminLedger(c,admin.id,'transfer_out',amount,adminBalance,`Transfer to ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,source:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_credit_from_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet credited',`Your wallet was credited with ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'Wallet credited from admin wallet.',balance:Number(wr.rows[0].balance),adminBalance,reference:ref};}const wr=await c.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,u.user_id]);if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient user wallet balance."};}const userBalance=Number(wr.rows[0].balance);const ar=await c.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);const adminBalance=Number(ar.rows[0].balance);await addAdminLedger(c,admin.id,'transfer_in',amount,adminBalance,`Transfer from ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'debit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,destination:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_debit_to_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet debited',`Your wallet was debited by ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'User wallet debited to admin wallet.',balance:userBalance,adminBalance,reference:ref};}catch(e){try{await c.query("ROLLBACK")}catch{}console.error('ADMIN WALLET TRANSFER ERROR',e);return{success:false,statusCode:500,message:"Unable to adjust wallet."};}finally{c.release();}}
 
@@ -3011,57 +2952,6 @@ payments
 }
 
 
-async function adminSimulator(req,action){
-  const admin=await adminFromToken(req);
-  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  if(!VTU_SIMULATOR_ENABLED)return{success:false,statusCode:503,message:"VTU simulator is disabled. Set VTU_SIMULATOR_ENABLED=true on Render first."};
-  if(action==="get"){
-    const config=await getVTUSimulatorConfig();
-    return{success:true,simulator:config};
-  }
-  if(action==="update"){
-    const b=await body(req);
-    const mode=simulatorModeValue(b.mode);
-    const delayMs=Number(b.delay_ms===undefined?VTU_SIMULATOR_DEFAULT_DELAY_MS:b.delay_ms);
-    if(!Number.isFinite(delayMs)||delayMs<0||delayMs>10000)return{success:false,statusCode:400,message:"delay_ms must be between 0 and 10000."};
-    await setPlatformSetting("vtu_simulator_mode",mode);
-    await setPlatformSetting("vtu_simulator_delay_ms",Math.floor(delayMs));
-    const config=await getVTUSimulatorConfig();
-    await adminAudit(admin,"vtu_simulator_updated","simulator","vtu",config,req);
-    return{success:true,simulator:config};
-  }
-  if(action==="pending"){
-    const r=await db(`SELECT id,user_id,service,amount,reference,status,date,metadata,recipient FROM transactions WHERE type='debit' AND status='pending' AND metadata->'providerResponse'->>'simulator'='true' ORDER BY date DESC LIMIT 100`);
-    return{success:true,transactions:r.rows.map(t=>({...t,amount:Number(t.amount)}))};
-  }
-  if(action==="resolve"){
-    const b=await body(req);
-    const referenceValue=clean(b.reference);
-    const outcome=simulatorModeValue(b.outcome);
-    if(!referenceValue)return{success:false,statusCode:400,message:"Transaction reference is required."};
-    if(!["success","failed"].includes(outcome))return{success:false,statusCode:400,message:"outcome must be success or failed."};
-    const r=await db(`SELECT * FROM transactions WHERE reference=$1 AND type='debit' LIMIT 1`,[referenceValue]);
-    if(!r.rows.length)return{success:false,statusCode:404,message:"Transaction not found."};
-    const tx=r.rows[0];
-    if(tx.status!=="pending")return{success:false,statusCode:409,message:`Transaction is ${tx.status}; only pending simulator transactions can be resolved.`};
-    let result;
-    if(outcome==="success"){
-      const providerData={simulator:true,mode:"success",reference:tx.provider_reference||reference("SIM-VTU"),status:"successful",message:"Pending simulator transaction resolved successfully."};
-      result=await finalizeVTUTransaction(referenceValue,providerData,false,{customerAmount:Number(tx.amount),providerCost:Number(tx.amount),grossProfit:0,pricingSource:"simulator_resolve",pricingRule:{mode:"simulator"}});
-      if(result)await addNotification(tx.user_id,"Transaction successful",`${tx.service||"Service"} was completed successfully. Reference: ${referenceValue}`,"success");
-    }else{
-      const refundResult=await markTransactionFailedAndRefund(referenceValue,"simulator_resolved_failure",{simulator:true,status:"failed"});
-      if(!refundResult.success)return{success:false,statusCode:500,message:refundResult.message};
-      result={refunded:true,refundReference:refundResult.refundReference,balance:refundResult.balance};
-      await addNotification(tx.user_id,"Transaction failed",`${tx.service||"Service"} failed in the simulator and your wallet was refunded. Reference: ${referenceValue}`,"error");
-    }
-    if(!result)return{success:false,statusCode:409,message:"Transaction could not be resolved."};
-    await adminAudit(admin,"vtu_simulator_resolved","transaction",referenceValue,{outcome},req);
-    return{success:true,outcome,reference:referenceValue,result};
-  }
-  return{success:false,statusCode:400,message:"Unknown simulator action."};
-}
-
 async function handleAdminRoutes(
 req,
 res,
@@ -3085,6 +2975,13 @@ await adminLogin(
 b.email,
 b.password,req
 );
+
+if(result.success&&result.token){
+setAdminSessionCookie(res,result.token);
+const safeResult={...result};
+delete safeResult.token;
+return send(res,200,safeResult);
+}
 
 return send(
 res,
@@ -3210,71 +3107,10 @@ result
 }
 
 
-/*
-TEMPORARY PAYSTACK DVA ACCESS TEST
-
-Admin-authenticated only. This checks DVA provider access without
-creating a customer, creating a virtual account, or moving money.
-Remove this endpoint after the test is complete.
-*/
-
-if(
-req.method==="GET"&&
-path==="/api/admin/test-paystack-dva"
-){
-
-const admin=await adminFromToken(req);
-
-if(!admin){
-return send(res,401,{success:false,message:"Unauthorized."});
-}
-
-if(!PAYSTACK_SECRET_KEY){
-return send(res,503,{success:false,message:"Paystack is not configured."});
-}
-
-try{
-const response=await fetch(
-`${PAYSTACK_API_URL}/dedicated_account/available_providers`,
-{
-method:"GET",
-headers:{
-Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,
-"Content-Type":"application/json"
-}
-}
-);
-
-const data=await response.json();
-
-return send(res,response.ok?200:(response.status||502),{
-success:Boolean(response.ok&&data.status),
-paystack_status:Boolean(data.status),
-message:data.message||"Paystack DVA access test completed.",
-providers:Array.isArray(data.data)?data.data:[]
-});
-
-}catch(error){
-console.error("PAYSTACK DVA ACCESS TEST ERROR:",error?.message||error);
-return send(res,502,{
-success:false,
-message:"Unable to connect to Paystack for the DVA access test."
-});
-}
-
-}
-
-
-if(req.method==="GET"&&path==="/api/admin/simulator"){const result=await adminSimulator(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="PATCH"&&path==="/api/admin/simulator"){const result=await adminSimulator(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/simulator/pending"){const result=await adminSimulator(req,"pending");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/simulator/resolve"){const result=await adminSimulator(req,"resolve");return send(res,result.success?200:(result.statusCode||400),result);}
-
 if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet/simulator-test-fund"){const result=await adminSimulatorTestFund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/credit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
@@ -3300,9 +3136,9 @@ if(
 req.method==="POST"&&
 path==="/api/admin/logout"
 ){
-
 const result=
 await logoutAdmin(req);
+clearAdminSessionCookie(res);
 
 return send(
 res,
@@ -3570,6 +3406,9 @@ message:
 
 }
 
+await createWallet(user.user_id);
+const wallet=await getWallet(user.user_id);
+
 return send(res,200,{
 success:true,
 user:{
@@ -3578,7 +3417,8 @@ userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
 email:user.email
-}
+},
+wallet
 });
 
 }
@@ -3827,7 +3667,8 @@ res.writeHead(204,{
 "Access-Control-Allow-Methods":
 "GET,POST,OPTIONS",
 "Access-Control-Allow-Headers":
-"Content-Type,Authorization,X-Idempotency-Key"
+"Content-Type,Authorization,X-Idempotency-Key",
+"Access-Control-Allow-Credentials":"true"
 });
 
 return res.end();
@@ -3894,7 +3735,6 @@ database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
 vtu:Boolean(VTU_API_URL&&VTU_API_KEY),
-simulator:VTU_SIMULATOR_ENABLED,
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()

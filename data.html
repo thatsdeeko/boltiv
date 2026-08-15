@@ -35,7 +35,7 @@ function renderPlans(plans){
 
   // Customer-facing catalog: show only the 13 highly reliable plans.
   // VTUGATE can return hundreds of plans; BOLTIV intentionally exposes
-  // only the best 13 plans with delivery reliability of 95%+.
+  // only the best 13 plans; reliability is used internally for selection and is never shown to customers.
   const customerPlans=(Array.isArray(plans)?plans:[])
     .filter(x=>x && x.delivery_rate!==null && x.delivery_rate!==undefined && Number.isFinite(Number(x.delivery_rate)) && Number(x.delivery_rate)>=95)
     .sort((a,b)=>Number(b.delivery_rate)-Number(a.delivery_rate) || Number(a.customer_price)-Number(b.customer_price))
@@ -46,9 +46,7 @@ function renderPlans(plans){
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
     const label=planLabel(plan), validity=Number(plan.validity_days)>0?Number(plan.validity_days)+" Days":"Available";
-    const rate=Number(plan.delivery_rate);
-    const reliability=`Delivery reliability: ${rate.toFixed(1)}%`;
-    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div><div class="plan-reliability">'+esc(reliability)+'</div>';
+        b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div>';
     b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;};
     planGrid.appendChild(b);
   });

@@ -12,9 +12,6 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
 const VTU_API_URL=process.env.VTU_API_URL||"";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
-const VTU_SIMULATOR_ENABLED=String(process.env.VTU_SIMULATOR_ENABLED||"false").toLowerCase()==="true";
-const VTU_SIMULATOR_MODE=String(process.env.VTU_SIMULATOR_MODE||"success").toLowerCase();
-const VTU_SIMULATOR_DELAY_MS=Math.max(0,Number(process.env.VTU_SIMULATOR_DELAY_MS||300)||300);
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -2309,15 +2306,6 @@ const PAYSTACK_API_URL=
 async function callVTUProvider(
 payload
 ){
-
-if(VTU_SIMULATOR_ENABLED){
-  if(VTU_SIMULATOR_DELAY_MS>0) await new Promise(resolve=>setTimeout(resolve,VTU_SIMULATOR_DELAY_MS));
-  const mode=VTU_SIMULATOR_MODE;
-  const providerReference=`SIM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-  if(mode==="failed"||mode==="failure") return {success:false,configured:true,statusCode:400,data:{status:"failed",provider_reference:providerReference,simulator:true,message:"Simulated VTU failure."}};
-  if(mode==="pending"||mode==="processing") return {success:true,configured:true,statusCode:200,data:{status:"pending",provider_reference:providerReference,simulator:true,message:"Simulated VTU transaction is pending."}};
-  return {success:true,configured:true,statusCode:200,data:{status:"successful",provider_reference:providerReference,simulator:true,message:"Simulated VTU transaction successful."}};
-}
 
 if(!VTU_API_URL||
 !VTU_API_KEY){

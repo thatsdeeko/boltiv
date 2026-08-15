@@ -18,3 +18,10 @@ Deployment:
 Important:
 - This build does not invent data plans. If VTUGate has no active service for a network, the page will show that no plans are available.
 - Profit/markup should be configured separately in the BOLTIV service pricing settings; the live provider plan price is used as the customer price in this catalog.
+
+VALID-PLAN DISPLAY UPDATE
+- Data plans are refreshed every 30 seconds instead of being held for 2 minutes.
+- If VTUGATE explicitly rejects a bundle, BOLTIV temporarily quarantines that exact network/service/plan combination for 15 minutes and removes it from the customer catalog.
+- The catalog endpoint filters quarantined plans as a second layer of protection.
+- If an automatic fallback bundle is also rejected, that fallback is quarantined too.
+- This means the app shows plans currently returned by VTUGATE and removes plans that VTUGATE has recently confirmed as unavailable. No VTUGATE data endpoint can guarantee a future purchase without actually purchasing the bundle, so this is the safest non-destructive approach.

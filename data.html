@@ -3,7 +3,7 @@
 </style></head><body>
 <div class="page data-page"><div class="container">
 <div class="data-header"><button class="back-button" onclick="history.back()">‹</button><div><div class="data-title">Buy Data</div><div class="data-subtitle">INSTANT DATA RECHARGE</div></div></div>
-<div class="data-hero"><div class="data-hero-label">BOLTIV DATA</div><div class="data-hero-title">Stay Connected.</div><div class="data-hero-text">Choose a data plan and recharge instantly from your BOLTIV wallet.</div></div>
+<div class="data-hero"><div class="data-hero-label">BOLTIV DATA</div><div class="data-hero-title">Stay Connected.</div><div class="data-hero-text">Choose from data plans currently available through our live VTUGATE catalog.</div></div>
 <div class="data-card">
 <label class="data-label">PHONE NUMBER</label><input class="data-input" id="phoneNumber" type="tel" inputmode="numeric" maxlength="11" placeholder="08012345678">
 <label class="data-label">SELECT NETWORK</label><div class="network-grid"><button type="button" class="network-button" data-network="MTN">MTN</button><button type="button" class="network-button" data-network="AIRTEL">AIRTEL</button><button type="button" class="network-button" data-network="GLO">GLO</button><button type="button" class="network-button" data-network="9MOBILE">9MOBILE</button></div>
@@ -37,7 +37,10 @@ function renderPlans(plans){
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
     const label=planLabel(plan), validity=Number(plan.validity_days)>0?Number(plan.validity_days)+" Days":"Available";
-    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.price)+'</div>';
+    const rate=plan.delivery_rate===null||plan.delivery_rate===undefined||!Number.isFinite(Number(plan.delivery_rate))?null:Number(plan.delivery_rate);
+    const reliability=rate===null?'Provider reliability: new/unknown':`Delivery reliability: ${rate.toFixed(1)}%`;
+    const reliabilityClass=rate===null?'unknown':rate<95?'warn':'';
+    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.price)+'</div><div class="plan-reliability '+reliabilityClass+'">'+esc(reliability)+'</div>';
     b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;};
     planGrid.appendChild(b);
   });
@@ -51,7 +54,7 @@ async function loadPlans(network){
     const d=await r.json();
     if(!r.ok||!d.success)throw new Error(d.message||"Unable to load data plans.");
     renderPlans(d.plans);
-    planHint.textContent=d.plans?.length?d.plans.length+" live plans available":"";
+    const reliable=(d.plans||[]).filter(x=>x.delivery_rate!==null&&x.delivery_rate!==undefined&&Number(x.delivery_rate)>=95).length;planHint.textContent=d.plans?.length?d.plans.length+" currently available plans"+(reliable?" • "+reliable+" highly reliable":""):"No currently available plans for this network.";
   }catch(e){
     planGrid.innerHTML='<div class="plan-loading">'+esc(e.message||"Unable to load data plans.")+'</div>';
   }

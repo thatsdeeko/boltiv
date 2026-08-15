@@ -724,7 +724,7 @@ ENABLED
 <script>
 
 const API="https://boltiv-backend.onrender.com";
-let token=localStorage.getItem("boltiv_admin_token")||"";
+let token=null||"";
 let users=[],transactions=[],payments=[];
 const $=id=>document.getElementById(id);
 function esc(v){return String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -733,14 +733,14 @@ async function api(path,opt={}){
  if(token)headers.Authorization="Bearer "+token;
  const r=await fetch(API+path,{...opt,headers});
  let d={};try{d=await r.json()}catch{}
- if(r.status===401){token="";localStorage.removeItem("boltiv_admin_token");showLogin();}
+ if(r.status===401){token="";showLogin();}
  if(!r.ok)throw Error(d.message||"Request failed");
  return d;
 }
 function showLogin(){$("loginPage").classList.remove("hidden");$("app").classList.add("hidden");}
 function showApp(){$("loginPage").classList.add("hidden");$("app").classList.remove("hidden");loadAll();}
 function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
-async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});token=d.token;localStorage.setItem("boltiv_admin_token",token);showApp();}catch(e){showMsg(e.message)}}
+async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});token=d.token;showApp();}catch(e){showMsg(e.message)}}
 $("loginButton").onclick=login;
 function go(page){if(window.innerWidth<=900&&$("sidebar"))$("sidebar").classList.remove("open");document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="users")loadUsers();if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="services")loadServices();if(page==="security")loadSecurity();if(page==="settings")loadSettings();}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
@@ -780,7 +780,7 @@ async function loadMe(){
 async function logout(){
  try{await api("/api/admin/logout",{method:"POST"});}
  catch(e){console.warn("Logout request failed:",e.message);}
- finally{token="";localStorage.removeItem("boltiv_admin_token");showLogin();showMsg("Logged out successfully.",true);}
+ finally{token="";showLogin();showMsg("Logged out successfully.",true);}
 }
 $("logout").onclick=logout;
 async function loadAdminWallet(){try{const d=await api('/api/admin/wallet');const b=Number(d.wallet?.balance||0);if($('adminWalletBalance'))$('adminWalletBalance').textContent='₦'+b.toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});if($('sAdminWallet'))$('sAdminWallet').textContent='₦'+b.toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});}catch(e){console.error('Admin wallet:',e);}}

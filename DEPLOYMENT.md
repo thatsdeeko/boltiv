@@ -10,7 +10,7 @@ Required environment variables:
 - `PAYSTACK_SECRET_KEY`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
-- `VTU_API_URL`
+- `VTU_API_BASE_URL`
 - `VTU_API_KEY`
 - `FRONTEND_URL`
 - `FRONTEND_ORIGIN`

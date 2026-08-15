@@ -19,8 +19,8 @@ services:
         sync: false
       - key: PAYSTACK_SECRET_KEY
         sync: false
-      - key: VTU_API_URL
-        sync: false
+      - key: VTU_API_BASE_URL
+        value: https://api.vtugate.com
       - key: VTU_API_KEY
         sync: false
       - key: RESEND_API_KEY

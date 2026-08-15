@@ -32,8 +32,17 @@ function planLabel(plan){
 function renderPlans(plans){
   selectedPlan=null;
   planGrid.innerHTML="";
-  if(!Array.isArray(plans)||!plans.length){planGrid.innerHTML='<div class="plan-loading">No data plans are currently available for this network.</div>';return;}
-  plans.forEach(plan=>{
+
+  // Customer-facing catalog: show only the 13 highly reliable plans.
+  // VTUGate may return hundreds of plans, but BOLTIV intentionally curates
+  // the customer catalog to plans with a delivery reliability of 95%+.
+  const customerPlans=(Array.isArray(plans)?plans:[])
+    .filter(x=>x && x.delivery_rate!==null && x.delivery_rate!==undefined && Number.isFinite(Number(x.delivery_rate)) && Number(x.delivery_rate)>=95)
+    .sort((a,b)=>Number(b.delivery_rate)-Number(a.delivery_rate) || Number(a.price)-Number(b.price))
+    .slice(0,13);
+
+  if(!customerPlans.length){planGrid.innerHTML='<div class="plan-loading">No highly reliable data plans are currently available for this network.</div>';return;}
+  customerPlans.forEach(plan=>{
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
     const label=planLabel(plan), validity=Number(plan.validity_days)>0?Number(plan.validity_days)+" Days":"Available";
@@ -54,7 +63,9 @@ async function loadPlans(network){
     const d=await r.json();
     if(!r.ok||!d.success)throw new Error(d.message||"Unable to load data plans.");
     renderPlans(d.plans);
-    const reliable=(d.plans||[]).filter(x=>x.delivery_rate!==null&&x.delivery_rate!==undefined&&Number(x.delivery_rate)>=95).length;planHint.textContent=d.plans?.length?d.plans.length+" currently available plans"+(reliable?" • "+reliable+" highly reliable":""):"No currently available plans for this network.";
+    const reliable=(d.plans||[]).filter(x=>x.delivery_rate!==null&&x.delivery_rate!==undefined&&Number.isFinite(Number(x.delivery_rate))&&Number(x.delivery_rate)>=95);
+    const shown=Math.min(reliable.length,13);
+    planHint.textContent=shown?shown+" curated plans available":"No highly reliable plans are currently available for this network.";
   }catch(e){
     planGrid.innerHTML='<div class="plan-loading">'+esc(e.message||"Unable to load data plans.")+'</div>';
   }

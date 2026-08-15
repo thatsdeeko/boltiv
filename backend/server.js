@@ -2609,47 +2609,45 @@ async function callVTUProvider(payload){
 function pricingConfig(service){
   const cfg=service?.config&&typeof service.config==='object'?service.config:{};
   const pricing=cfg.pricing&&typeof cfg.pricing==='object'?cfg.pricing:{};
-  const mode=String(pricing.mode||'discount').toLowerCase();
+  const legacyMode=String(pricing.mode||'discount').toLowerCase();
+  const markupMode=String(pricing.markup_mode||'fixed').toLowerCase();
+  const markupPct=Number(pricing.markup_pct||0);
+  const markupFixed=Number(pricing.markup_fixed||0);
   const discount=Number(pricing.discount_pct||0);
   const fixedProfit=Number(pricing.fixed_profit||0);
   return {
-    mode:['discount','fixed'].includes(mode)?mode:'discount',
+    markup_mode:['fixed','percentage'].includes(markupMode)?markupMode:'fixed',
+    markup_pct:Number.isFinite(markupPct)&&markupPct>=0?markupPct:0,
+    markup_fixed:Number.isFinite(markupFixed)&&markupFixed>=0?markupFixed:0,
+    // Legacy provider-discount fields retained for compatibility with old installs.
+    mode:['discount','fixed'].includes(legacyMode)?legacyMode:'discount',
     discount_pct:Number.isFinite(discount)&&discount>=0?discount:0,
     fixed_profit:Number.isFinite(fixedProfit)&&fixedProfit>=0?fixedProfit:0
   };
 }
 
+function customerPriceFromCost(providerCost,rule){
+  const cost=Number(providerCost);
+  if(!Number.isFinite(cost)||cost<0) return null;
+  let price=cost;
+  if(rule.markup_mode==='percentage'&&rule.markup_pct>0) price=cost*(1+rule.markup_pct/100);
+  else if(rule.markup_mode==='fixed'&&rule.markup_fixed>0) price=cost+rule.markup_fixed;
+  return Number(price.toFixed(2));
+}
+
+function providerAmountFromCustomer(customerAmount,rule){
+  const amount=Number(customerAmount);
+  if(!Number.isFinite(amount)||amount<=0)return null;
+  if(rule.markup_mode==='percentage'&&rule.markup_pct>0) return Number((amount/(1+rule.markup_pct/100)).toFixed(2));
+  if(rule.markup_mode==='fixed'&&rule.markup_fixed>0) return Number(Math.max(0,amount-rule.markup_fixed).toFixed(2));
+  return Number(amount.toFixed(2));
+}
+
 function estimatedProviderCost(service,customerAmount){
   const rule=pricingConfig(service);
   const amount=Number(customerAmount);
-  let cost=amount;
-  let source='no_pricing_rule';
-  if(rule.mode==='fixed'&&rule.fixed_profit>0){
-    cost=Math.max(0,amount-rule.fixed_profit);
-    source='fixed_profit';
-  }else if(rule.mode==='discount'&&rule.discount_pct>0){
-    cost=Math.max(0,amount*(1-rule.discount_pct/100));
-    source='discount_pct';
-  }
-  return {cost:Number(cost.toFixed(2)),source,rule};
-}
-
-function providerCostFromResponse(providerData,customerAmount){
-  const candidates=[
-    providerData?.provider_cost,
-    providerData?.cost,
-    providerData?.charged_amount,
-    providerData?.amount_charged,
-    providerData?.data?.provider_cost,
-    providerData?.data?.cost,
-    providerData?.data?.charged_amount,
-    providerData?.data?.amount_charged
-  ];
-  for(const value of candidates){
-    const n=Number(value);
-    if(Number.isFinite(n)&&n>=0)return Number(n.toFixed(2));
-  }
-  return null;
+  const cost=providerAmountFromCustomer(amount,rule);
+  return {cost:cost===null?amount:cost,source:(rule.markup_mode==='percentage'&&rule.markup_pct>0)?'markup_pct':(rule.markup_mode==='fixed'&&rule.markup_fixed>0?'markup_fixed':'no_markup'),rule};
 }
 
 async function processVTUTransaction(user,data){
@@ -2661,8 +2659,41 @@ const userId=user.user_id;
 const amount=Number(data.amount);
 if(!userId) return {success:false,statusCode:400,message:"User ID is required."};
 if(!validAmount(amount)) return {success:false,statusCode:400,message:"Invalid amount."};
-const pricing=estimatedProviderCost(service,amount);
-if(pricing.cost>amount){return {success:false,statusCode:400,message:"Service pricing would cost more than the customer price. Update the service pricing before enabling sales."};}
+let pricing=estimatedProviderCost(service,amount);
+let pricingCostOverride=null;
+const providerPayload={...(data.providerPayload||data)};
+// Airtime amount is the face value delivered to the customer; amount is the marked-up price charged to the wallet.
+if(serviceKey(data.service)==='airtime'){
+  const airtimeValue=Number(providerPayload.airtime_amount||data.airtime_amount||0);
+  if(!Number.isFinite(airtimeValue)||airtimeValue<50) return {success:false,statusCode:400,message:'A valid airtime amount is required.'};
+  const expectedCustomer=customerPriceFromCost(airtimeValue,pricingConfig(service));
+  if(expectedCustomer===null||Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'Airtime price has changed. Please refresh and try again.'};
+  pricingCostOverride=Number(airtimeValue.toFixed(2));
+  pricing={...estimatedProviderCost(service,amount),cost:pricingCostOverride,source:'airtime_face_value'};
+}
+// For data, verify the exact live plan so customers cannot alter the wholesale amount in the browser.
+if(serviceKey(data.service)==='data') {
+  const network=clean(providerPayload.network||data.network).toUpperCase();
+  const code=clean(providerPayload.plan_code||providerPayload.planCode||providerPayload.plan);
+  const serviceId=Number(providerPayload.service_id||data.service_id||0);
+  if(!network||!code||!serviceId) return {success:false,statusCode:400,message:'A valid data plan is required.'};
+  try {
+    const livePlans=await fetchVTUGateDataPlans(network);
+    const livePlan=livePlans.find(x=>String(x.code||x.plan_code||'')===code && Number(x.service_id||0)===serviceId);
+    if(!livePlan) return {success:false,statusCode:400,message:'This data plan is no longer available. Please refresh and choose another plan.'};
+    const wholesale=Number(livePlan.price);
+    const expectedCustomer=customerPriceFromCost(wholesale,pricingConfig(service));
+    if(!Number.isFinite(wholesale)||wholesale<=0||expectedCustomer===null) return {success:false,statusCode:400,message:'Unable to price this data plan.'};
+    if(Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'This data plan price has changed. Please refresh the plans and try again.'};
+    pricingCostOverride=wholesale;
+    pricing={...estimatedProviderCost(service,amount),cost:Number(wholesale.toFixed(2)),source:'live_data_plan'};
+  } catch(error) {
+    return {success:false,statusCode:502,message:error?.message||'Unable to verify the selected data plan.'};
+  }
+}
+if(pricing.cost>amount+0.001){return {success:false,statusCode:400,message:"Service pricing would cost more than the customer price. Update the service pricing before enabling sales."};}
+// The customer pays the marked-up price; the provider receives only the wholesale amount.
+providerPayload.amount=pricingCostOverride===null?pricing.cost:pricingCostOverride;
 const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
 if(!pinCheck.success) return {success:false,statusCode:401,message:pinCheck.message,code:"INVALID_TRANSACTION_PIN"};
 const rawIdempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
@@ -2684,7 +2715,7 @@ await client.query("COMMIT");
 }catch(error){try{await client.query("ROLLBACK");}catch{} client.release(); console.error("TRANSACTION RESERVE ERROR:",error); return {success:false,statusCode:500,message:"Unable to start transaction."};}
 client.release();
 let providerResult;
-try{providerResult=await callVTUProvider(data.providerPayload||data);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
+try{providerResult=await callVTUProvider(providerPayload);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
 if(!providerResult.configured){const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_not_configured"); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
 let providerData=providerResult.data||{};
 const actualProviderCost=providerCostFromResponse(providerData,amount);
@@ -2732,7 +2763,7 @@ function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'
 async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
 async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
 
-async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const incomingConfig=b.config===undefined?{}:(b.config||{});const oldConfig=existing.config&&typeof existing.config==='object'?existing.config:{};const config={...oldConfig,...incomingConfig,pricing:{...(oldConfig.pricing||{}),...(incomingConfig.pricing||{})}};if(config.pricing){const mode=String(config.pricing.mode||'discount').toLowerCase();const discount=Number(config.pricing.discount_pct||0);const fixed=Number(config.pricing.fixed_profit||0);if(!['discount','fixed'].includes(mode)||!Number.isFinite(discount)||discount<0||discount>100||!Number.isFinite(fixed)||fixed<0)return{success:false,statusCode:400,message:'Invalid pricing configuration.'};config.pricing={mode,discount_pct:discount,fixed_profit:fixed};}const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
+async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const incomingConfig=b.config===undefined?{}:(b.config||{});const oldConfig=existing.config&&typeof existing.config==='object'?existing.config:{};const config={...oldConfig,...incomingConfig,pricing:{...(oldConfig.pricing||{}),...(incomingConfig.pricing||{})}};if(config.pricing){const mode=String(config.pricing.mode||'discount').toLowerCase();const discount=Number(config.pricing.discount_pct||0);const fixedProfit=Number(config.pricing.fixed_profit||0);const markupMode=String(config.pricing.markup_mode||'fixed').toLowerCase();const markupPct=Number(config.pricing.markup_pct||0);const markupFixed=Number(config.pricing.markup_fixed||0);if(!['discount','fixed'].includes(mode)||!Number.isFinite(discount)||discount<0||discount>100||!Number.isFinite(fixedProfit)||fixedProfit<0||!['fixed','percentage'].includes(markupMode)||!Number.isFinite(markupPct)||markupPct<0||markupPct>100||!Number.isFinite(markupFixed)||markupFixed<0)return{success:false,statusCode:400,message:'Invalid pricing configuration.'};config.pricing={...config.pricing,mode,discount_pct:discount,fixed_profit:fixedProfit,markup_mode:markupMode,markup_pct:markupPct,markup_fixed:markupFixed};}const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
 async function adminSettings(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='get')return{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}};const b=await body(req);if(b.maintenance_mode!==undefined)await setPlatformSetting('maintenance_mode',Boolean(b.maintenance_mode));if(b.registration_enabled!==undefined)await setPlatformSetting('registration_enabled',Boolean(b.registration_enabled));const settings={maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))};await adminAudit(admin,'platform_settings_updated','settings','platform',settings,req);return{success:true,settings};}
 async function adminSecurity(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='events'){const r=await db(`SELECT s.*,a.email FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id ORDER BY s.created_at DESC LIMIT 500`);return{success:true,events:r.rows};}if(action==='sessions'){const r=await db(`SELECT id,created_at,expires_at FROM admin_sessions WHERE admin_id=$1 AND expires_at>NOW() ORDER BY created_at DESC`,[admin.id]);return{success:true,sessions:r.rows};}if(action==='revoke'){const auth=String(req.headers.authorization||'');const current=auth.startsWith('Bearer ')?auth.slice(7).trim():'';const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current]);await recordSecurityEvent('sessions_revoked','warning',{revoked:Number(r.rowCount||0)},req,admin.id);await adminAudit(admin,'sessions_revoked','admin',String(admin.id),{revoked:Number(r.rowCount||0)},req);return{success:true,revoked:Number(r.rowCount||0)};}return{success:false,statusCode:400,message:'Unknown security action.'};}
 
@@ -3862,6 +3893,8 @@ const network=clean(b.network).toUpperCase();
 if(!network)return send(res,400,{success:false,message:"Network is required."});
 try{
   const rawPlans=await fetchVTUGateDataPlans(network);
+  const dataService=await getService('data');
+  const dataPricing=pricingConfig(dataService);
   const byPlan=new Map();
   for(const plan of rawPlans){
     const code=clean(plan.code||plan.plan_code);
@@ -3871,11 +3904,13 @@ try{
     const validity=Number(plan.validity_days||0);
     const price=Number(plan.price||0);
     if(!Number.isFinite(price)||price<=0)continue;
+    const customerPrice=customerPriceFromCost(price,dataPricing);
+    if(customerPrice===null||customerPrice<=0)continue;
     const key=`${code}|${size}|${validity}`;
     const row={
       code,
       name:clean(plan.name||code),
-      price,
+      customer_price:customerPrice,
       network_name:clean(plan.network_name||network).toUpperCase(),
       service_id:Number(plan.service_id),
       size_mb:size,
@@ -3884,7 +3919,7 @@ try{
       delivery_comment:clean(plan.delivery_comment||"")
     };
     const previous=byPlan.get(key);
-    if(!previous||row.price<previous.price)byPlan.set(key,row);
+    if(!previous||row.customer_price<previous.customer_price)byPlan.set(key,row);
   }
   const plans=Array.from(byPlan.values()).sort((a,b)=>a.price-b.price||a.size_mb-b.size_mb);
   return send(res,200,{success:true,network,plans});
@@ -4061,6 +4096,13 @@ return;
 /*
 PUBLIC PLATFORM CONFIGURATION
 */
+if(req.method==='GET'&&path==='/api/pricing'){
+  const keys=['airtime','data','cable','electricity'];
+  const out={};
+  for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={markup_mode:p.markup_mode,markup_pct:p.markup_pct,markup_fixed:p.markup_fixed};}
+  return send(res,200,{success:true,pricing:out});
+}
+
 if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config FROM services ORDER BY key`);return send(res,200,{success:true,services:r.rows});}
 if(req.method==='GET'&&path==='/api/platform/settings'){return send(res,200,{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}});}
 

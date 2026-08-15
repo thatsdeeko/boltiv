@@ -2325,8 +2325,14 @@ function buildVTUGateForm(payload){
   const form=new URLSearchParams();
   const put=(key,value)=>{if(value!==undefined&&value!==null&&String(value)!=="")form.set(key,String(value));};
   if(service==='airtime'){
+    const phone=String(p.phone||p.recipient||'').trim();
     put('network',p.network);
-    put('phone',p.phone||p.recipient);
+    // VTUGATE's public docs call the field `phone`, while the live
+    // validator has been observed returning `Phone number is required`.
+    // Send both aliases so the request works with either validator version.
+    put('phone',phone);
+    put('phone_number',phone);
+    put('network_provider',p.network);
     put('amount',p.amount);
   }else if(service==='data'){
     put('network',p.network);
@@ -2364,37 +2370,23 @@ async function callVTUProvider(payload){
       "Authorization":`Bearer ${VTU_API_KEY}`,
       "Accept":"application/json"
     };
-    // VTUGATE's homepage documents a JSON request body, while its FAQ also says
-    // endpoints accept form-urlencoded. Use JSON first because the live endpoint
-    // has been returning "Phone number is required" when the form body is used.
-    // If that exact validation response occurs, retry once as form-urlencoded.
+    // VTUGATE's API documentation specifies application/x-www-form-urlencoded.
+    // Send the documented form body, including both phone field aliases for
+    // compatibility with the live validator.
     let response;
     if(isVTUGate){
       response=await fetch(url,{
         method:"POST",
-        headers:{...requestHeaders,"Content-Type":"application/json"},
-        body:JSON.stringify({
-          network:payload?.network,
-          phone:payload?.phone||payload?.recipient,
-          amount:Number(payload?.amount)
-        })
+        headers:{...requestHeaders,"Content-Type":"application/x-www-form-urlencoded"},
+        body:form.toString()
       });
       let firstData={};
       try{firstData=await response.json();}catch{firstData={};}
-      const firstMessage=String(firstData?.message||firstData?.error||"").toLowerCase();
-      if(response.status===400 && firstMessage.includes("phone number is required")){
-        response=await fetch(url,{
-          method:"POST",
-          headers:{...requestHeaders,"Content-Type":"application/x-www-form-urlencoded"},
-          body:form.toString()
-        });
-      } else {
-        const providerOk=typeof firstData?.status==='boolean'?firstData.status:response.ok;
-        if(!response.ok || !providerOk){
-          console.error("VTU PROVIDER RESPONSE:", JSON.stringify({provider,service,statusCode:response.status,data:firstData}));
-        }
-        return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data:firstData};
+      const providerOk=typeof firstData?.status==='boolean'?firstData.status:response.ok;
+      if(!response.ok || !providerOk){
+        console.error("VTU PROVIDER RESPONSE:", JSON.stringify({provider,service,statusCode:response.status,data:firstData}));
       }
+      return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data:firstData};
     } else {
       response=await fetch(url,{
         method:"POST",

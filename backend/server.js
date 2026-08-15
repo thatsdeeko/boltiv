@@ -1526,6 +1526,42 @@ email:admin.email
 }
 
 
+
+function getAdminSessionToken(req){
+  const cookieHeader = req.headers.cookie || "";
+  const match = cookieHeader.match(/(?:^|;\s*)boltiv_admin_session=([^;]+)/);
+  if (match) {
+    try { return decodeURIComponent(match[1]); } catch (_) { return match[1]; }
+  }
+  const auth = req.headers.authorization || "";
+  if (auth.startsWith("Bearer ")) return auth.slice(7);
+  return null;
+}
+
+function setAdminSessionCookie(res, token){
+  const parts = [
+    `boltiv_admin_session=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=86400"
+  ];
+  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
+}
+
+function clearAdminSessionCookie(res){
+  const parts = [
+    "boltiv_admin_session=",
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=0"
+  ];
+  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
+}
+
 async function adminFromToken(req){
 
 const authorization=
@@ -3119,7 +3155,8 @@ ADMIN LOGOUT
 if(
 req.method==="POST"&&
 path==="/api/admin/logout"
-){
+){clearAdminSessionCookie(res);
+
 
 const result=
 await logoutAdmin(req);

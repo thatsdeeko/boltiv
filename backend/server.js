@@ -10,7 +10,7 @@ const FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/bolti
 const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
-const VTU_API_URL=process.env.VTU_API_URL||"";
+const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
@@ -2355,7 +2355,7 @@ async function callVTUProvider(payload){
   }
   const provider=vtuProviderName();
   const service=serviceKey(payload?.service||"");
-  const url=provider==='vtugate'?vtugateEndpoint(service):String(VTU_API_URL||"").replace(/\/+$/,'');
+  const url=provider==='vtugate'?vtugateEndpoint(service):String(VTU_API_BASE_URL||"").replace(/\/+$/,'');
   if(!url){return{success:false,configured:false,message:"VTU provider URL is not configured."};}
   try{
     const isVTUGate=provider==='vtugate';
@@ -3728,7 +3728,7 @@ status:ready?"online":"degraded",
 database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
-vtu:Boolean(VTU_API_URL&&VTU_API_KEY),
+vtu:Boolean(VTU_API_KEY&&VTU_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()
@@ -4285,7 +4285,7 @@ PAYSTACK_SECRET_KEY?
 
 console.log(
 `VTU configured: ${
-VTU_API_URL&&VTU_API_KEY?
+VTU_API_KEY&&VTU_API_BASE_URL?
 "YES":
 "NO"
 }`

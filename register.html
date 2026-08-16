@@ -497,6 +497,38 @@ body{
 
 
 /* =========================
+   TRANSACTION PIN SETUP
+========================= */
+.pin-setup-card{
+    max-width:430px;
+}
+
+.pin-setup-fields{
+    margin-top:18px;
+    text-align:left;
+}
+
+.pin-setup-fields .label{
+    display:block;
+    margin:14px 0 7px;
+}
+
+.pin-setup-fields .input{
+    width:100%;
+}
+
+.pin-setup-status{
+    min-height:22px;
+    margin-top:10px;
+    text-align:center;
+    font-size:13px;
+    font-weight:700;
+}
+
+.pin-setup-status.error{color:#b42318}
+.pin-setup-status.success{color:#16794c}
+
+/* =========================
    MOBILE
 ========================= */
 
@@ -624,34 +656,39 @@ Already have an account? Login
 </div>
 
 
-<!-- SUCCESS MODAL -->
+<!-- TRANSACTION PIN SETUP MODAL -->
 
 <div class="boltiv-success-overlay" id="successModal">
 
-<div class="boltiv-success-card">
+<div class="boltiv-success-card pin-setup-card">
 
 <div class="success-ring">✓</div>
 
-<div class="success-label">
-ACCOUNT CREATED
-</div>
+<div class="success-label">ACCOUNT CREATED</div>
 
 <h2>Welcome to BOLTIV</h2>
 
 <p class="success-message">
 Your account has been created successfully.
-Your BOLTIV account is ready to use.
+Before you continue, create your 4-digit Transaction PIN.
+This PIN protects airtime, data, cable TV, electricity and other transactions.
 </p>
 
-<div class="success-user" id="successUser">
-Welcome, User
-</div>
+<div class="success-user" id="successUser">Welcome, User</div>
 
-<button
-class="boltiv-success-btn"
-id="successContinue">
-CONTINUE TO LOGIN
+<div class="pin-setup-fields">
+<label class="label">TRANSACTION PIN</label>
+<input class="input" id="newTransactionPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Enter 4-digit PIN">
+
+<label class="label">CONFIRM TRANSACTION PIN</label>
+<input class="input" id="confirmTransactionPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Confirm 4-digit PIN">
+
+<div class="pin-setup-status" id="pinSetupStatus"></div>
+
+<button class="boltiv-success-btn" id="createTransactionPin">
+CREATE TRANSACTION PIN
 </button>
+</div>
 
 </div>
 </div>
@@ -673,8 +710,17 @@ document.getElementById("successModal");
 const successUser=
 document.getElementById("successUser");
 
-const successContinue=
-document.getElementById("successContinue");
+const newTransactionPin=
+document.getElementById("newTransactionPin");
+
+const confirmTransactionPin=
+document.getElementById("confirmTransactionPin");
+
+const createTransactionPin=
+document.getElementById("createTransactionPin");
+
+const pinSetupStatus=
+document.getElementById("pinSetupStatus");
 
 
 function showStatus(message,type="error"){
@@ -863,31 +909,30 @@ registerButton.onclick=async()=>{
          We do NOT store the password.
          */
 
-        localStorage.removeItem(
-            "boltivLoggedIn"
-        );
+        // Registration now returns a fresh authenticated session so the
+        // user can create their Transaction PIN immediately.
+        if(data.token){
+            localStorage.setItem("boltivAuthToken",data.token);
+        }
 
-        localStorage.removeItem(
-            "boltivUser"
-        );
+        if(data.user){
+            localStorage.setItem("boltivUser",JSON.stringify(data.user));
+            if(data.user.email) localStorage.setItem("boltivUserEmail",data.user.email);
+        }
 
-        localStorage.removeItem(
-            "boltivUserEmail"
-        );
-
-        localStorage.removeItem(
-            "boltivBalance"
-        );
-
-        localStorage.removeItem(
-            "boltivTransactions"
-        );
-
+        localStorage.setItem("boltivLoggedIn","true");
+        localStorage.removeItem("boltivBalance");
+        localStorage.removeItem("boltivTransactions");
 
         successUser.textContent=
             "Welcome, "+name;
 
+        pinSetupStatus.textContent="";
+        pinSetupStatus.className="pin-setup-status";
+        newTransactionPin.value="";
+        confirmTransactionPin.value="";
         successModal.classList.add("show");
+        setTimeout(()=>newTransactionPin.focus(),150);
 
 
     }catch(error){
@@ -914,16 +959,64 @@ registerButton.onclick=async()=>{
 };
 
 
-successContinue.onclick=()=>{
+createTransactionPin.onclick=async()=>{
+    const pin=newTransactionPin.value.trim();
+    const confirm=confirmTransactionPin.value.trim();
 
-    successModal.classList.remove("show");
+    pinSetupStatus.textContent="";
+    pinSetupStatus.className="pin-setup-status";
 
-    setTimeout(()=>{
+    if(!/^\d{4}$/.test(pin)){
+        pinSetupStatus.textContent="Transaction PIN must contain exactly 4 digits.";
+        pinSetupStatus.className="pin-setup-status error";
+        newTransactionPin.focus();
+        return;
+    }
 
-        location.href="login.html";
+    if(pin!==confirm){
+        pinSetupStatus.textContent="The Transaction PINs do not match.";
+        pinSetupStatus.className="pin-setup-status error";
+        confirmTransactionPin.focus();
+        return;
+    }
 
-    },250);
+    const token=localStorage.getItem("boltivAuthToken")||"";
+    if(!token){
+        pinSetupStatus.textContent="Your registration session expired. Please log in and create your PIN from Security.";
+        pinSetupStatus.className="pin-setup-status error";
+        return;
+    }
 
+    createTransactionPin.disabled=true;
+    createTransactionPin.textContent="CREATING PIN...";
+
+    try{
+        const response=await fetch(API_BASE+"/api/security/transaction-pin",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+                "Authorization":"Bearer "+token
+            },
+            body:JSON.stringify({pin})
+        });
+
+        const result=await response.json();
+        if(!response.ok||!result.success) throw new Error(result.message||"Unable to create Transaction PIN.");
+
+        pinSetupStatus.textContent="Transaction PIN created successfully.";
+        pinSetupStatus.className="pin-setup-status success";
+        createTransactionPin.textContent="PIN CREATED — CONTINUE";
+
+        setTimeout(()=>{
+            successModal.classList.remove("show");
+            location.href="index.html";
+        },700);
+    }catch(error){
+        pinSetupStatus.textContent=error.message||"Unable to create Transaction PIN.";
+        pinSetupStatus.className="pin-setup-status error";
+        createTransactionPin.disabled=false;
+        createTransactionPin.textContent="CREATE TRANSACTION PIN";
+    }
 };
 
 </script>

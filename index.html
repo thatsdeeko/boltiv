@@ -4,7 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
+<link rel="canonical" href="https://boltiv.ng/">
 <title>BOLTIV — Dashboard</title>
+<script>
+/* BOLTIV clean root URL: keep index.html for GitHub Pages, but don't show it in the address bar. */
+if (window.location.pathname.endsWith("/index.html")) {
+  window.history.replaceState(
+    null,
+    document.title,
+    "/" + window.location.search + window.location.hash
+  );
+}
+</script>
+
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#ffffff;color:#171717;font-family:Arial,Helvetica,sans-serif}

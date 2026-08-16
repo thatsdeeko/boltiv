@@ -5,6 +5,9 @@ const {Pool}=require("pg");
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
 const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
+const FLW_SECRET_KEY=process.env.FLW_SECRET_KEY||"";
+const FLW_BASE_URL=(process.env.FLW_BASE_URL||"https://api.flutterwave.com/v3").replace(/\/+$/,"");
+const FLW_CALLBACK_URL=process.env.FLW_CALLBACK_URL||"";
 const FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv";
 
 const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
@@ -337,6 +340,28 @@ expires_at TIMESTAMPTZ NOT NULL
 await db(`CREATE TABLE IF NOT EXISTS admin_wallets(admin_id BIGINT PRIMARY KEY,balance NUMERIC(14,2) NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE TABLE IF NOT EXISTS admin_wallet_ledger(id BIGSERIAL PRIMARY KEY,admin_id BIGINT NOT NULL,type TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,balance_after NUMERIC(14,2) NOT NULL,reference TEXT UNIQUE NOT NULL,description TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS admin_wallet_ledger_admin_idx ON admin_wallet_ledger(admin_id,created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS admin_profit_withdrawals(
+id BIGSERIAL PRIMARY KEY,
+admin_id BIGINT NOT NULL,
+amount NUMERIC(14,2) NOT NULL,
+bank_code TEXT NOT NULL,
+account_number TEXT NOT NULL,
+account_name TEXT NOT NULL,
+status TEXT NOT NULL DEFAULT 'pending',
+reference TEXT UNIQUE NOT NULL,
+provider_transfer_id TEXT,
+provider_reference TEXT,
+provider_message TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+completed_at TIMESTAMPTZ
+)`);
+await db(`CREATE INDEX IF NOT EXISTS admin_profit_withdrawals_admin_idx ON admin_profit_withdrawals(admin_id,created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS admin_revenue_wallets(admin_id BIGINT PRIMARY KEY,balance NUMERIC(14,2) NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS admin_revenue_ledger(id BIGSERIAL PRIMARY KEY,admin_id BIGINT NOT NULL,type TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,balance_after NUMERIC(14,2) NOT NULL,reference TEXT UNIQUE NOT NULL,description TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS admin_revenue_ledger_admin_idx ON admin_revenue_ledger(admin_id,created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS admin_revenue_withdrawals(id BIGSERIAL PRIMARY KEY,admin_id BIGINT NOT NULL,amount NUMERIC(14,2) NOT NULL,bank_code TEXT NOT NULL,account_number TEXT NOT NULL,account_name TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',reference TEXT UNIQUE NOT NULL,recipient_code TEXT,provider_transfer_id TEXT,provider_message TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),completed_at TIMESTAMPTZ)`);
+await db(`CREATE INDEX IF NOT EXISTS admin_revenue_withdrawals_admin_idx ON admin_revenue_withdrawals(admin_id,created_at DESC)`);
 await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS recipient_type TEXT NOT NULL DEFAULT 'user'`);
 await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS admin_id BIGINT`);
 await db(`CREATE TABLE IF NOT EXISTS admin_audit_logs(
@@ -2247,7 +2272,12 @@ async function finalizeVTUTransaction(referenceValue, providerData, pending, pri
   const meta={providerResponse:providerData};
   if(pricingMeta)Object.assign(meta,{pricing:pricingMeta});
   const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,providerData?.reference||providerData?.data?.reference||null,JSON.stringify(meta),referenceValue]);
-  return result.rows[0]||null;
+  const tx=result.rows[0]||null;
+  if(tx && status==='successful'){
+    const credited=await creditAdminRevenueFromSale(Number(tx.amount),referenceValue,`Customer payment received for ${tx.service||'VTU service'}`);
+    if(!credited)console.error('REVENUE LEDGER CREDIT FAILED FOR TRANSACTION',referenceValue);
+  }
+  return tx;
 }
 
 
@@ -2643,6 +2673,12 @@ function providerAmountFromCustomer(customerAmount,rule){
   return Number(amount.toFixed(2));
 }
 
+function providerCostFromResponse(providerData,fallbackAmount){
+  const candidates=[providerData?.data?.amount,providerData?.data?.data?.amount,providerData?.amount,providerData?.data?.provider_amount,providerData?.provider_amount,providerData?.data?.amount_charged];
+  for(const value of candidates){const n=Number(value);if(Number.isFinite(n)&&n>0)return Number(n.toFixed(2));}
+  return null;
+}
+
 function estimatedProviderCost(service,customerAmount){
   const rule=pricingConfig(service);
   const amount=Number(customerAmount);
@@ -2731,11 +2767,16 @@ if(!providerResult.success && serviceKey(data.service)==='data' && vtuProviderNa
       providerResult=retryResult;
       providerData=retryResult.data||{};
       data.providerPayload=fallbackPayload;
+      const retryCost=providerCostFromResponse(providerData,Number(fallbackPayload.amount||pricing.cost));
+      if(retryCost!==null){pricingCostOverride=retryCost;pricing={...pricing,cost:retryCost,source:'provider_response'};}
     }else if(isVTUGateBundleUnavailable(retryResult.data||{})){
       markVTUGateDataPlanUnavailable(fallbackPayload.network,fallbackPayload.service_id,fallbackPayload.plan_code);
     }
   }
 }
+const finalProviderCost=providerCostFromResponse(providerData,pricing.cost);
+const finalCost=finalProviderCost===null?pricing.cost:finalProviderCost;
+const finalGrossProfit=Number((amount-finalCost).toFixed(2));
 if(!providerResult.success){
 const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
 const providerMessage=extractVTUProviderMessage(providerData);
@@ -2745,7 +2786,7 @@ return {success:false,statusCode:400,message:providerMessage||"VTU transaction f
 const providerStatus=String(providerData.status||providerData.data?.status||"successful").toLowerCase();
 const pending=["pending","processing","queued","in_progress"].includes(providerStatus);
 const finalStatus=pending?"pending":"successful";
-const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending,{customerAmount:amount,providerCost,grossProfit,pricingSource,pricingRule:pricing.rule}); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
+const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending,{customerAmount:amount,providerCost:finalCost,grossProfit:finalGrossProfit,pricingSource,pricingRule:pricing.rule}); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
 await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
 const finalWallet=await getWallet(userId);
 return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,data:providerData};
@@ -2798,7 +2839,205 @@ return{success:true,message:`User ${status}.`,status};
 async function ensureAdminWallet(client,adminId){await client.query(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);}
 async function getAdminWallet(adminId){const r=await db(`SELECT admin_id,balance,created_at,updated_at FROM admin_wallets WHERE admin_id=$1`,[adminId]);return r.rows.length?{...r.rows[0],balance:Number(r.rows[0].balance||0)}:{admin_id:adminId,balance:0};}
 async function addAdminLedger(client,adminId,type,amount,balanceAfter,description,reference){await client.query(`INSERT INTO admin_wallet_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6)`,[adminId,type,amount,balanceAfter,reference,description]);}
+async function ensureAdminRevenueWallet(client,adminId){await client.query(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);}
+async function addAdminRevenueLedger(client,adminId,type,amount,balanceAfter,description,reference){await client.query(`INSERT INTO admin_revenue_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6)`,[adminId,type,amount,balanceAfter,reference,description]);}
+async function primaryAdminId(){const r=await db(`SELECT id FROM admins ORDER BY id ASC LIMIT 1`);return r.rows[0]?.id||null;}
+async function creditAdminRevenueFromSale(customerAmount,transactionReference,description='Customer service sale'){
+  const amount=Number(customerAmount); if(!Number.isFinite(amount)||amount<=0)return false;
+  const adminId=await primaryAdminId(); if(!adminId){console.error('ADMIN REVENUE CREDIT: no admin exists');return false;}
+  const c=await pool.connect();
+  try{await c.query('BEGIN');await ensureAdminRevenueWallet(c,adminId);
+    const ref=`SALE-${transactionReference}`;
+    const existing=await c.query(`SELECT id FROM admin_revenue_ledger WHERE reference=$1 LIMIT 1`,[ref]);
+    if(existing.rows.length){await c.query('COMMIT');return true;}
+    const r=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,adminId]);
+    if(!r.rows.length)throw new Error('Revenue wallet update failed.');
+    const balanceAfter=Number(r.rows[0].balance);
+    await addAdminRevenueLedger(c,adminId,'sale',amount,balanceAfter,description,ref);
+    await c.query('COMMIT');return true;
+  }catch(e){try{await c.query('ROLLBACK')}catch{};console.error('ADMIN REVENUE CREDIT ERROR:',e);return false;}finally{c.release();}
+}
+
 async function creditAdminFromPayment(client,payment){await ensureAdminWallet(client,payment.admin_id);const wr=await client.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(payment.amount),payment.admin_id]);if(!wr.rows.length)throw new Error('Admin wallet update failed.');const balanceAfter=Number(wr.rows[0].balance);await addAdminLedger(client,payment.admin_id,'funding',Number(payment.amount),balanceAfter,'Paystack admin wallet funding',`AF-${payment.reference}`);await client.query(`UPDATE payments SET status='success',credited=TRUE,credited_at=NOW() WHERE reference=$1`,[payment.reference]);return balanceAfter;}
+
+async function flutterwaveRequest(path, options={}){
+  if(!FLW_SECRET_KEY) return {success:false,statusCode:503,message:"Flutterwave payouts are not configured."};
+  try{
+    const response=await fetch(`${FLW_BASE_URL}${path}`,{
+      ...options,
+      headers:{Authorization:`Bearer ${FLW_SECRET_KEY}`,"Content-Type":"application/json",...(options.headers||{})}
+    });
+    let data={}; try{data=await response.json();}catch{}
+    return {success:Boolean(response.ok && data?.status!=="error"),statusCode:response.status,data};
+  }catch(error){
+    console.error("FLUTTERWAVE REQUEST ERROR:",error.message);
+    return {success:false,statusCode:502,message:"Unable to connect to Flutterwave."};
+  }
+}
+async function adminProfitSummary(adminId){
+  const p=await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`);
+  const w=await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing','successful') THEN amount ELSE 0 END),0) AS reserved FROM admin_profit_withdrawals WHERE admin_id=$1`,[adminId]);
+  const grossProfit=Number(p.rows[0]?.gross_profit||0), reserved=Number(w.rows[0]?.reserved||0);
+  return {grossProfit,reserved,available:Math.max(0,Number((grossProfit-reserved).toFixed(2)))};
+}
+async function flutterwaveBanks(){
+  const r=await flutterwaveRequest("/banks?country=NG");
+  if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||r.message||"Unable to load Nigerian banks."};
+  return{success:true,banks:Array.isArray(r.data?.data)?r.data.data:[]};
+}
+async function resolveFlutterwaveAccount(bankCode,accountNumber){
+  const r=await flutterwaveRequest("/accounts/resolve",{method:"POST",body:JSON.stringify({account_bank:String(bankCode),account_number:String(accountNumber)})});
+  const name=r.data?.data?.account_name;
+  if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.data?.message||"Unable to verify the bank account."};
+  return{success:true,accountName:String(name).trim(),accountNumber:r.data.data.account_number||String(accountNumber)};
+}
+async function paystackRequest(path,options={}){
+  if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};
+  try{
+    const response=await fetch(`${PAYSTACK_API_URL}${path}`,{...options,headers:{'Authorization':`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json',...(options.headers||{})}});
+    let data={};try{data=await response.json()}catch{}
+    return{success:Boolean(response.ok&&data?.status),statusCode:response.status,data};
+  }catch(e){return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}
+}
+async function adminRevenue(req,action){
+  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
+  if(action==='summary'){
+    await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
+    const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
+    const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
+    const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
+    const reserved=(await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing') THEN amount ELSE 0 END),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1`,[admin.id])).rows[0];
+    const balance=Number(w?.balance||0),hold=Number(reserved?.reserved||0);
+    const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
+    return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
+  }
+  if(action==='banks'){const r=await paystackRequest('/bank?country=nigeria&perPage=100');if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||'Unable to load banks.'};return{success:true,banks:Array.isArray(r.data?.data)?r.data.data:[]};}
+  if(action==='verify'){
+    const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
+    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank code and 10-digit account number.'};
+    const r=await paystackRequest(`/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);
+    const name=r.data?.data?.account_name;if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.data?.message||'Unable to verify the bank account.'};
+    return{success:true,accountName:String(name).trim(),accountNumber:r.data.data.account_number||accountNumber};
+  }
+  if(action==='status'){
+    const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:'Withdrawal ID is required.'};
+    const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:'Withdrawal not found.'};
+    if(!row.reference||['successful','failed'].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
+    const r=await paystackRequest(`/transfer/verify/${encodeURIComponent(row.reference)}`);
+    if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||'Unable to check transfer status.'};
+    const ps=String(r.data?.data?.status||'').toLowerCase();let ns=row.status;
+    if(['success','successful','completed'].includes(ps))ns='successful';else if(['failed','reversed'].includes(ps))ns='failed';else ns='processing';
+    if(ns!==row.status){
+      const c=await pool.connect();try{await c.query('BEGIN');
+        await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$4`,[ns,r.data?.data?.id||null,r.data?.message||ps,row.id]);
+        if(ns==='failed'){await ensureAdminRevenueWallet(c,admin.id);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(row.amount),admin.id]);if(w.rows.length)await addAdminRevenueLedger(c,admin.id,'withdrawal_reversal',Number(row.amount),Number(w.rows[0].balance),'Failed withdrawal reversal',`REVERSAL-${row.reference}`);}
+        await c.query('COMMIT');
+      }catch(e){try{await c.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to update withdrawal status.'};}finally{c.release();}
+    }
+    const fresh=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[row.id])).rows[0];return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount)}};
+  }
+  if(action==='withdraw'){
+    const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
+    if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:'Minimum withdrawal is ₦1,000.'};
+    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank account.'};
+    const verifyResult=await paystackRequest(`/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);const verifiedName=verifyResult.data?.data?.account_name;const verified={success:Boolean(verifyResult.success&&verifiedName),accountName:verifiedName?String(verifiedName).trim():'',accountNumber:verifyResult.data?.data?.account_number||accountNumber};if(!verified.success)return{success:false,statusCode:verifyResult.statusCode||400,message:verifyResult.data?.message||'Unable to verify the bank account.'};
+    const client=await pool.connect();let row;
+    try{await client.query('BEGIN');await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);
+      const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);const balance=Number(w.rows[0]?.balance||0);
+      const reserved=(await client.query(`SELECT COALESCE(SUM(amount),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1 AND status IN ('pending','processing')`,[admin.id])).rows[0];const available=Math.max(0,Number((balance-Number(reserved?.reserved||0)).toFixed(2)));
+      if(amount>available){await client.query('ROLLBACK');return{success:false,statusCode:400,message:`Insufficient BOLTIV balance. Available: ₦${available.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};}
+      const ref=reference('BOLTIV-WD').toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,50);
+      const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
+      row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
+      await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin bank withdrawal',`WD-${ref}`);
+      await client.query('COMMIT');
+    }catch(e){try{await client.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to reserve BOLTIV balance for withdrawal.'};}finally{client.release();}
+    const recipient=await paystackRequest('/transferrecipient',{method:'POST',body:JSON.stringify({type:'nuban',name:verified.accountName,account_number:verified.accountNumber,bank_code:bankCode,currency:'NGN'})});
+    if(!recipient.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,'Recipient creation failed');return{success:false,statusCode:400,message:recipient.data?.message||'Unable to create transfer recipient.',withdrawalId:row.id};}
+    const recipientCode=recipient.data?.data?.recipient_code;
+    if(!recipientCode){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,'Paystack did not return a recipient code');return{success:false,statusCode:502,message:'Unable to create a valid transfer recipient.',withdrawalId:row.id};}
+    const tr=await paystackRequest('/transfer',{method:'POST',body:JSON.stringify({source:'balance',amount:Math.round(amount*100),recipient:recipientCode,reference:row.reference,reason:'BOLTIV withdrawal',currency:'NGN'})});
+    if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.data?.message||'Transfer failed');return{success:false,statusCode:400,message:tr.data?.message||'Paystack transfer failed.',withdrawalId:row.id};}
+    const ps=String(tr.data?.data?.status||'pending').toLowerCase();const status=['success','successful','completed'].includes(ps)?'successful':(['failed','reversed'].includes(ps)?'failed':'processing');
+    await db(`UPDATE admin_revenue_withdrawals SET status=$1,recipient_code=$2,provider_transfer_id=$3,provider_message=$4,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$5`,[status,recipientCode,tr.data?.data?.id||null,tr.data?.message||ps,row.id]);
+    await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status},req);
+    return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount};
+  }
+  return{success:false,statusCode:400,message:'Unknown revenue action.'};
+}
+async function reverseRevenueWithdrawal(adminId,id,amount,reason){const c=await pool.connect();try{await c.query('BEGIN');const row=(await c.query(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 FOR UPDATE`,[id,adminId])).rows[0];if(!row){await c.query('ROLLBACK');return;}if(row.status==='failed'){await c.query('COMMIT');return;}await ensureAdminRevenueWallet(c,adminId);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(amount),adminId]);if(w.rows.length)await addAdminRevenueLedger(c,adminId,'withdrawal_reversal',Number(amount),Number(w.rows[0].balance),reason,`REVERSAL-${row.reference}`);await c.query(`UPDATE admin_revenue_withdrawals SET status='failed',provider_message=$1,updated_at=NOW(),completed_at=NOW() WHERE id=$2`,[reason,id]);await c.query('COMMIT');}catch(e){try{await c.query('ROLLBACK')}catch{};console.error('REVENUE WITHDRAWAL REVERSAL ERROR',e)}finally{c.release();}}
+
+async function adminProfitWithdrawals(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==="summary"){
+    const summary=await adminProfitSummary(admin.id);
+    const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_profit_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
+    return{success:true,summary,withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
+  }
+  if(action==="banks")return await flutterwaveBanks();
+  if(action==="verify"){
+    const b=await body(req),bankCode=clean(b.bankCode||b.account_bank),accountNumber=clean(b.accountNumber||b.account_number);
+    if(!bankCode||!/^\d{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank code and 10-digit account number."};
+    return await resolveFlutterwaveAccount(bankCode,accountNumber);
+  }
+  if(action==="status"){
+    const b=await body(req),id=Number(b.id||0);
+    if(!id)return{success:false,statusCode:400,message:"Withdrawal ID is required."};
+    const row=(await db(`SELECT * FROM admin_profit_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];
+    if(!row)return{success:false,statusCode:404,message:"Withdrawal not found."};
+    if(!row.provider_transfer_id||["successful","failed"].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
+    const r=await flutterwaveRequest(`/transfers/${encodeURIComponent(row.provider_transfer_id)}`);
+    if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||r.message||"Unable to check transfer status."};
+    const ps=String(r.data?.data?.status||r.data?.status||"").toUpperCase();
+    let ns=row.status;
+    if(["SUCCESSFUL","COMPLETED"].includes(ps))ns="successful";
+    else if(["FAILED","REVERSED"].includes(ps))ns="failed";
+    else if(["PROCESSING","NEW","PENDING","QUEUED"].includes(ps))ns="processing";
+    if(ns!==row.status)await db(`UPDATE admin_profit_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$3`,[ns,r.data?.message||ps,row.id]);
+    const fresh=(await db(`SELECT * FROM admin_profit_withdrawals WHERE id=$1`,[row.id])).rows[0];
+    return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount)}};
+  }
+  if(action==="create"){
+    return{success:false,statusCode:410,message:"The old profit-only withdrawal route is disabled. Use the BOLTIV Revenue Wallet withdrawal."};
+    const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.account_bank),accountNumber=clean(b.accountNumber||b.account_number);
+    if(!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid withdrawal amount."};
+    if(amount<1000)return{success:false,statusCode:400,message:"Minimum profit withdrawal is ₦1,000."};
+    if(!bankCode||!/^\d{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank account."};
+    if(!FLW_SECRET_KEY)return{success:false,statusCode:503,message:"Flutterwave payout credentials are not configured on the backend."};
+    const verified=await resolveFlutterwaveAccount(bankCode,accountNumber);
+    if(!verified.success)return verified;
+    const client=await pool.connect(); let row;
+    try{
+      await client.query("BEGIN");
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-profit-withdraw:${admin.id}`]);
+      const p=await client.query(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`);
+      const w=await client.query(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing','successful') THEN amount ELSE 0 END),0) AS reserved FROM admin_profit_withdrawals WHERE admin_id=$1`,[admin.id]);
+      const available=Math.max(0,Number((Number(p.rows[0]?.gross_profit||0)-Number(w.rows[0]?.reserved||0)).toFixed(2)));
+      if(amount>available){await client.query("ROLLBACK");return{success:false,statusCode:400,message:`Insufficient available profit. You can withdraw up to ₦${available.toLocaleString("en-NG",{minimumFractionDigits:2})}.`};}
+      const ref=reference("BOLTIV-PROFIT");
+      row=(await client.query(`INSERT INTO admin_profit_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'pending',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
+      await client.query("COMMIT");
+    }catch(error){
+      try{await client.query("ROLLBACK")}catch{}
+      console.error("PROFIT WITHDRAWAL RESERVE ERROR:",error);
+      return{success:false,statusCode:500,message:"Unable to reserve profit for withdrawal."};
+    }finally{client.release();}
+    const payload={account_bank:bankCode,account_number:verified.accountNumber,amount,currency:"NGN",narration:"BOLTIV profit withdrawal",reference:row.reference,debit_currency:"NGN",...(FLW_CALLBACK_URL?{callback_url:FLW_CALLBACK_URL}:{})};
+    const tr=await flutterwaveRequest("/transfers",{method:"POST",body:JSON.stringify(payload)});
+    if(!tr.success){
+      await db(`UPDATE admin_profit_withdrawals SET status='failed',provider_message=$1,updated_at=NOW(),completed_at=NOW() WHERE id=$2`,[tr.data?.message||tr.message||"Flutterwave transfer failed.",row.id]);
+      await adminAudit(admin,'profit_withdrawal_failed','profit_withdrawal',String(row.id),{amount,reference:row.reference},req);
+      return{success:false,statusCode:400,message:tr.data?.message||tr.message||"Flutterwave transfer failed.",withdrawalId:row.id};
+    }
+    const provider=tr.data?.data||{},ps=String(provider.status||"NEW").toUpperCase();
+    const status=["SUCCESSFUL","COMPLETED"].includes(ps)?"successful":(["FAILED","REVERSED"].includes(ps)?"failed":"processing");
+    await db(`UPDATE admin_profit_withdrawals SET status=$1,provider_transfer_id=$2,provider_reference=$3,provider_message=$4,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$5`,[status,provider.id||null,provider.reference||null,tr.data?.message||ps,row.id]);
+    await adminAudit(admin,'profit_withdrawal_created','profit_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status},req);
+    return{success:true,message:status==="successful"?"Profit withdrawal completed.":"Profit withdrawal submitted and is being processed.",withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount};
+  }
+  return{success:false,statusCode:400,message:"Unknown withdrawal action."};
+}
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
 async function initializeAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:'Enter an amount of at least ₦100.'};const ref=reference('ADM-FUND');await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited,recipient_type,admin_id,created_at) VALUES($1,$2,$3,$4,$5,'pending',FALSE,'admin',$6,NOW())`,[ref,`ADMIN:${admin.id}`,admin.email,amount,Math.round(amount*100),admin.id]);try{const response=await fetch(`${PAYSTACK_API_URL}/transaction/initialize`,{method:'POST',headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({email:admin.email,amount:Math.round(amount*100),reference:ref,callback_url:`${FRONTEND_URL}/admin.html?admin_funding=${encodeURIComponent(ref)}`})});const data=await response.json();if(!response.ok||!data.status){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:400,message:data.message||'Unable to initialize payment.'};}return{success:true,reference:ref,authorization_url:data.data?.authorization_url||''};}catch(e){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}}
 async function verifyAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),ref=clean(b.reference);if(!ref)return{success:false,statusCode:400,message:'Payment reference is required.'};const pr=await db(`SELECT * FROM payments WHERE reference=$1 AND recipient_type='admin' AND admin_id=$2 LIMIT 1`,[ref,admin.id]);if(!pr.rows.length)return{success:false,statusCode:404,message:'Admin funding payment not found.'};const payment=pr.rows[0];if(payment.credited)return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};const response=await fetch(`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(ref)}`,{headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'}});const data=await response.json();if(!response.ok||!data.status)return{success:false,statusCode:400,message:data.message||'Unable to verify payment.'};const tx=data.data||{};if(tx.status!=='success'){await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[tx.status,ref]);return{success:false,statusCode:400,message:`Payment status: ${tx.status}`};}if(Number(tx.amount)!==Number(payment.amount_kobo))return{success:false,statusCode:400,message:'Payment amount does not match.'};const client=await pool.connect();try{await client.query('BEGIN');const locked=(await client.query(`SELECT * FROM payments WHERE reference=$1 FOR UPDATE`,[ref])).rows[0];if(!locked||locked.credited){await client.query('COMMIT');return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};}const balance=await creditAdminFromPayment(client,locked);await client.query('COMMIT');await adminAudit(admin,'admin_wallet_funded','admin_wallet',String(admin.id),{amount:Number(payment.amount),reference:ref},req);return{success:true,message:'Admin wallet funded successfully.',reference:ref,balance};}catch(e){try{await client.query('ROLLBACK')}catch{}return{success:false,statusCode:500,message:'Unable to credit admin wallet.'};}finally{client.release();}}
@@ -2826,6 +3065,9 @@ await c.query(`UPDATE transactions SET status='refunded',metadata=COALESCE(metad
 await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata)
 VALUES($1,'credit','Refund',$2,$3,'successful',NOW(),$4)`,
 [t.user_id,amount,refundRef,JSON.stringify({original_reference:ref,admin_id:admin.id})]);
+await ensureAdminRevenueWallet(c,admin.id);
+const rev=await c.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
+if(rev.rows.length){const revRef=`REF-SALE-${ref}`;await addAdminRevenueLedger(c,admin.id,'refund',-amount,Number(rev.rows[0].balance),`Refund for ${ref}`,revRef);}
 await c.query("COMMIT");
 await adminAudit(admin,"transaction_refund","transaction",ref,{amount,refundReference:refundRef},req);
 await addNotification(t.user_id,"Transaction refunded",`₦${amount.toLocaleString()} has been refunded to your wallet. Reference: ${ref}`,"payment");
@@ -2936,6 +3178,7 @@ const profitResult=await db(
 FROM transactions`
 );
 const adminWalletResult=await db(`SELECT COALESCE(SUM(balance),0) AS balance FROM admin_wallets`);
+const adminRevenueResult=await db(`SELECT COALESCE(SUM(balance),0) AS balance FROM admin_revenue_wallets`);
 
 return{
 users:Number(usersResult.rows[0]?.count||0),
@@ -2947,7 +3190,8 @@ pending:Number(transactionStatusResult.rows[0]?.pending||0),
 failed:Number(transactionStatusResult.rows[0]?.failed||0),
 activeUsers:Number(activeUsersResult.rows[0]?.count||0),
 grossProfit:Number(profitResult.rows[0]?.profit||0),
-adminWalletBalance:Number(adminWalletResult.rows[0]?.balance||0)
+adminWalletBalance:Number(adminWalletResult.rows[0]?.balance||0),
+adminRevenueBalance:Number(adminRevenueResult.rows[0]?.balance||0)
 };
 
 }
@@ -3372,7 +3616,16 @@ result
 }
 
 
-if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==='GET'&&path==='/api/admin/revenue/banks'){const result=await adminRevenue(req,'banks');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==='POST'&&path==='/api/admin/revenue/verify-account'){const result=await adminRevenue(req,'verify');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==='POST'&&path==='/api/admin/revenue/withdraw'){const result=await adminRevenue(req,'withdraw');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==='POST'&&path==='/api/admin/revenue/status'){const result=await adminRevenue(req,'status');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/profit"){const result=await adminProfitWithdrawals(req,"summary");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/profit/banks"){const result=await adminProfitWithdrawals(req,"banks");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/profit/verify-account"){const result=await adminProfitWithdrawals(req,"verify");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/profit/withdraw"){const result=await adminProfitWithdrawals(req,"create");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/profit/status"){const result=await adminProfitWithdrawals(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}

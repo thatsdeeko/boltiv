@@ -8,7 +8,7 @@ const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
 const FLW_SECRET_KEY=process.env.FLW_SECRET_KEY||"";
 const FLW_BASE_URL=(process.env.FLW_BASE_URL||"https://api.flutterwave.com/v3").replace(/\/+$/,"");
 const FLW_CALLBACK_URL=process.env.FLW_CALLBACK_URL||"";
-const FRONTEND_URL=process.env.FRONTEND_URL||"https://thatsdeeko.github.io/boltiv";
+const FRONTEND_URL=process.env.FRONTEND_URL||"https://boltiv.ng";
 
 const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
@@ -2818,9 +2818,59 @@ return {success:true,message:pending?`${data.service} is being processed.`:`${da
 }
 
 
-async function reconcilePendingTransactions(admin,req){
+async function requeryVTUGateTransaction(referenceValue){
+  if(vtuProviderName()!=="vtugate") return {success:false,configured:false,message:"Automatic requery is currently configured for VTUGATE only."};
+  if(!VTU_API_KEY) return {success:false,configured:false,message:"VTU provider is not configured."};
+  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
+  const url=base+"/api/v1/transactionstatus";
+  try{
+    const response=await fetch(url,{
+      method:"POST",
+      headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({reference:String(referenceValue),request_id:String(referenceValue)}).toString()
+    });
+    let data={}; try{data=await response.json();}catch{}
+    return {success:response.ok,configured:true,statusCode:response.status,data};
+  }catch(error){
+    return {success:false,configured:true,error:true,message:error?.message||"Unable to requery VTUGATE."};
+  }
+}
+
+function normalizeRequeryStatus(data){
+  const raw=data?.status??data?.data?.status??data?.data?.transaction?.status??data?.transaction?.status??data?.result?.status??"";
+  const status=String(raw||"").trim().toLowerCase();
+  if(["successful","success","completed","complete","delivered","successful_delivery"].includes(status)) return "successful";
+  if(["failed","failure","reversed","refunded","cancelled","canceled"].includes(status)) return "failed";
+  return "pending";
+}
+
+async function reconcilePendingTransactions(admin=null,req=null){
   const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
-  return {success:true,count:r.rows.length,transactions:r.rows.map(t=>({...t,amount:Number(t.amount)}))};
+  const results=[];
+  for(const t of r.rows){
+    const q=await requeryVTUGateTransaction(t.reference);
+    if(!q.configured || !q.success){
+      results.push({...t,amount:Number(t.amount),requery_status:"unavailable",message:q.message||"Provider status could not be checked."});
+      continue;
+    }
+    const status=normalizeRequeryStatus(q.data);
+    if(status==="successful"){
+      const finalized=await finalizeVTUTransaction(t.reference,q.data,false,{reconciled:true,requeryResponse:q.data});
+      if(finalized){
+        await addNotification(t.user_id,"Transaction successful",`${t.service||"Service"} was confirmed successful. Reference: ${t.reference}`,"success");
+        results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:true});
+      }else results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:false});
+    }else if(status==="failed"){
+      const refund=await markTransactionFailedAndRefund(t.reference,"provider_requery_failed",q.data);
+      if(refund.success){
+        await addNotification(t.user_id,"Transaction refunded",`${t.service||"Service"} failed and your wallet was refunded. Reference: ${t.reference}`,"error");
+        results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:true,refundReference:refund.refundReference||null});
+      }else results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:false,message:refund.message});
+    }else{
+      results.push({...t,amount:Number(t.amount),requery_status:"pending",resolved:false});
+    }
+  }
+  return {success:true,count:r.rows.length,resolved:results.filter(x=>x.resolved||x.refunded).length,transactions:results};
 }
 
 async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
@@ -4876,6 +4926,11 @@ console.log(
 console.log(
 `Frontend: ${FRONTEND_URL}`
 );
+
+// Reconcile provider-pending transactions every 5 minutes.
+setInterval(()=>{
+  reconcilePendingTransactions().catch(error=>console.error("AUTOMATIC TRANSACTION RECONCILIATION ERROR:",error));
+},5*60*1000).unref();
 
 console.log(
 `Admin configured: ${

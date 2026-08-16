@@ -13,7 +13,8 @@
     padding:35px 0 40px;
 }
 
-.auth-logo{
+.auth-logo img{width:70px;height:80px;object-fit:contain;display:block}
+.auth-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
     text-align:center;
     color:#b8860b;
     font-size:33px;
@@ -147,7 +148,7 @@ body{
     justify-content:center;
 }
 
-.auth-logo{
+.auth-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
     text-align:center;
     color:#b8860b;
     font-size:39.6px;
@@ -510,7 +511,7 @@ body{
         padding-top:55px;
     }
 
-    .auth-logo{
+    .auth-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
         font-size:35.2px;
     }
 
@@ -531,6 +532,7 @@ body{
 }
 
 </style>
+<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
 </head>
 
 <body>
@@ -540,7 +542,7 @@ body{
 
 <div class="auth-page">
 
-<div class="auth-logo">BOLTIV</div>
+<div class="auth-logo"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
 <div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
 
 <div class="auth-card">

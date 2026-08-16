@@ -1,4 +1,0 @@
-BOLTIV Education + VTUGATE integration.
-
-Adds Education UI for WAEC, NECO, JAMB and NABTEB. Uses VTUGATE /api/v1/geteducationprice for live pricing and /api/v1/buyeducation for purchase.
-Revenue calculation logic was not intentionally modified.

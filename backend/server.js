@@ -1023,7 +1023,7 @@ tokenHash
 );
 
 const resetUrl=
-`${FRONTEND_URL}/reset-password/?token=${encodeURIComponent(rawToken)}`;
+`${FRONTEND_URL}/reset-password.html?token=${encodeURIComponent(rawToken)}`;
 
 const displayName=
 clean(user.name)||
@@ -1698,7 +1698,7 @@ email,
 amount:amountKobo,
 reference:referenceValue,
 callback_url:
-`${FRONTEND_URL}/wallet/`
+`${FRONTEND_URL}/wallet.html`
 })
 }
 );
@@ -2344,7 +2344,8 @@ function vtugateEndpoint(service){
     airtime:"/api/v1/buyairtime",
     data:"/api/v1/buydata",
     cable:"/api/v1/buycabletv",
-    electricity:"/api/v1/buyelectricity"
+    electricity:"/api/v1/buyelectricity",
+    education:"/api/v1/buyeducation"
   };
   return cleanBase+(map[service]||"");
 }
@@ -2501,6 +2502,11 @@ async function buildVTUGateForm(payload){
     put('meter_number',p.meterNumber||p.meter_number);
     put('meter_type',p.meterType||p.meter_type);
     put('amount',p.amount);
+  }else if(service==='education'){
+    const exam=p.exam||p.exam_type||p.examType||p.provider||'';
+    const quantity=Number(p.quantity||1);
+    put('exam',exam); put('exam_type',exam); put('service',exam);
+    put('quantity',quantity); put('amount',p.amount);
   }else{
     for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
   }
@@ -2686,6 +2692,23 @@ function estimatedProviderCost(service,customerAmount){
   return {cost:cost===null?amount:cost,source:(rule.markup_mode==='percentage'&&rule.markup_pct>0)?'markup_pct':(rule.markup_mode==='fixed'&&rule.markup_fixed>0?'markup_fixed':'no_markup'),rule};
 }
 
+async function getVTUGateEducationPrice(exam,quantity=1){
+  if(vtuProviderName()!=="vtugate") throw new Error("Education pricing is currently configured for VTUGATE only.");
+  if(!VTU_API_KEY) throw new Error("VTU provider is not configured.");
+  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
+  const url=base+"/api/v1/geteducationprice";
+  const examName=String(exam||'').trim().toUpperCase();
+  const qty=Math.max(1,Math.min(50,Number(quantity)||1));
+  const form=new URLSearchParams({exam:examName,exam_type:examName,service:examName,quantity:String(qty)});
+  const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
+  let data={}; try{data=await response.json();}catch{}
+  if(!response.ok||data?.status!==true) throw new Error(data?.message||`VTUGATE education pricing failed (${response.status})`);
+  const candidates=[data?.data?.price,data?.data?.amount,data?.price,data?.amount,data?.data?.unit_price,data?.data?.data?.price];
+  const unit=candidates.map(Number).find(n=>Number.isFinite(n)&&n>0);
+  if(!unit) throw new Error('VTUGATE returned no education price.');
+  return {unitPrice:Number(unit.toFixed(2)),total:Number((unit*qty).toFixed(2)),data};
+}
+
 async function processVTUTransaction(user,data){
 if(Boolean(await getPlatformSetting('maintenance_mode',false)))return{success:false,statusCode:503,message:'BOLTIV is currently in maintenance mode. Transactions are temporarily disabled.'};
 const service=await getService(data.service);
@@ -2725,6 +2748,22 @@ if(serviceKey(data.service)==='data') {
     pricing={...estimatedProviderCost(service,amount),cost:Number(wholesale.toFixed(2)),source:'live_data_plan'};
   } catch(error) {
     return {success:false,statusCode:502,message:error?.message||'Unable to verify the selected data plan.'};
+  }
+}
+if(serviceKey(data.service)==='education'){
+  const exam=clean(providerPayload.exam||providerPayload.exam_type||providerPayload.examType||providerPayload.provider||'').toUpperCase();
+  const quantity=Math.max(1,Math.min(50,Number(providerPayload.quantity||data.quantity||1)));
+  if(!['WAEC','NECO','JAMB','NABTEB'].includes(exam)) return {success:false,statusCode:400,message:'Select a valid education examination.'};
+  try{
+    const live=await getVTUGateEducationPrice(exam,quantity);
+    const expectedCustomer=customerPriceFromCost(live.total,pricingConfig(service));
+    if(expectedCustomer===null) return {success:false,statusCode:400,message:'Unable to price this education pin order.'};
+    if(Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'Education pin price has changed. Please refresh and try again.'};
+    pricingCostOverride=live.total;
+    pricing={...estimatedProviderCost(service,amount),cost:live.total,source:'live_education_price'};
+    providerPayload.exam=exam; providerPayload.exam_type=exam; providerPayload.quantity=quantity;
+  }catch(error){
+    return {success:false,statusCode:502,message:error?.message||'Unable to verify the education pin price.'};
   }
 }
 if(pricing.cost>amount+0.001){return {success:false,statusCode:400,message:"Service pricing would cost more than the customer price. Update the service pricing before enabling sales."};}
@@ -3114,7 +3153,7 @@ async function adminProfitWithdrawals(req,action){
   return{success:false,statusCode:400,message:"Unknown withdrawal action."};
 }
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
-async function initializeAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:'Enter an amount of at least ₦100.'};const ref=reference('ADM-FUND');await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited,recipient_type,admin_id,created_at) VALUES($1,$2,$3,$4,$5,'pending',FALSE,'admin',$6,NOW())`,[ref,`ADMIN:${admin.id}`,admin.email,amount,Math.round(amount*100),admin.id]);try{const response=await fetch(`${PAYSTACK_API_URL}/transaction/initialize`,{method:'POST',headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({email:admin.email,amount:Math.round(amount*100),reference:ref,callback_url:`${FRONTEND_URL}/admin/?admin_funding=${encodeURIComponent(ref)}`})});const data=await response.json();if(!response.ok||!data.status){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:400,message:data.message||'Unable to initialize payment.'};}return{success:true,reference:ref,authorization_url:data.data?.authorization_url||''};}catch(e){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}}
+async function initializeAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:'Enter an amount of at least ₦100.'};const ref=reference('ADM-FUND');await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited,recipient_type,admin_id,created_at) VALUES($1,$2,$3,$4,$5,'pending',FALSE,'admin',$6,NOW())`,[ref,`ADMIN:${admin.id}`,admin.email,amount,Math.round(amount*100),admin.id]);try{const response=await fetch(`${PAYSTACK_API_URL}/transaction/initialize`,{method:'POST',headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({email:admin.email,amount:Math.round(amount*100),reference:ref,callback_url:`${FRONTEND_URL}/admin.html?admin_funding=${encodeURIComponent(ref)}`})});const data=await response.json();if(!response.ok||!data.status){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:400,message:data.message||'Unable to initialize payment.'};}return{success:true,reference:ref,authorization_url:data.data?.authorization_url||''};}catch(e){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}}
 async function verifyAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),ref=clean(b.reference);if(!ref)return{success:false,statusCode:400,message:'Payment reference is required.'};const pr=await db(`SELECT * FROM payments WHERE reference=$1 AND recipient_type='admin' AND admin_id=$2 LIMIT 1`,[ref,admin.id]);if(!pr.rows.length)return{success:false,statusCode:404,message:'Admin funding payment not found.'};const payment=pr.rows[0];if(payment.credited)return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};const response=await fetch(`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(ref)}`,{headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'}});const data=await response.json();if(!response.ok||!data.status)return{success:false,statusCode:400,message:data.message||'Unable to verify payment.'};const tx=data.data||{};if(tx.status!=='success'){await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[tx.status,ref]);return{success:false,statusCode:400,message:`Payment status: ${tx.status}`};}if(Number(tx.amount)!==Number(payment.amount_kobo))return{success:false,statusCode:400,message:'Payment amount does not match.'};const client=await pool.connect();try{await client.query('BEGIN');const locked=(await client.query(`SELECT * FROM payments WHERE reference=$1 FOR UPDATE`,[ref])).rows[0];if(!locked||locked.credited){await client.query('COMMIT');return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};}const balance=await creditAdminFromPayment(client,locked);await client.query('COMMIT');await adminAudit(admin,'admin_wallet_funded','admin_wallet',String(admin.id),{amount:Number(payment.amount),reference:ref},req);return{success:true,message:'Admin wallet funded successfully.',reference:ref,balance};}catch(e){try{await client.query('ROLLBACK')}catch{}return{success:false,statusCode:500,message:'Unable to credit admin wallet.'};}finally{client.release();}}
 
 async function adminWalletAdjust(req,mode){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"Admin wallet transfer");if(!target||!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid amount."};const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};const u=r.rows[0],c=await pool.connect();try{await c.query("BEGIN");await ensureAdminWallet(c,admin.id);const ref=`ADM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;if(mode==="credit"){const ar=await c.query(`UPDATE admin_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 AND balance>=$1 RETURNING balance`,[amount,admin.id]);if(!ar.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient admin wallet balance. Fund the admin wallet first."};}const adminBalance=Number(ar.rows[0].balance);await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,u.user_id]);await addAdminLedger(c,admin.id,'transfer_out',amount,adminBalance,`Transfer to ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,source:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_credit_from_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet credited',`Your wallet was credited with ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'Wallet credited from admin wallet.',balance:Number(wr.rows[0].balance),adminBalance,reference:ref};}const wr=await c.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,u.user_id]);if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient user wallet balance."};}const userBalance=Number(wr.rows[0].balance);const ar=await c.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);const adminBalance=Number(ar.rows[0].balance);await addAdminLedger(c,admin.id,'transfer_in',amount,adminBalance,`Transfer from ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'debit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,destination:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_debit_to_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet debited',`Your wallet was debited by ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'User wallet debited to admin wallet.',balance:userBalance,adminBalance,reference:ref};}catch(e){try{await c.query("ROLLBACK")}catch{}console.error('ADMIN WALLET TRANSFER ERROR',e);return{success:false,statusCode:500,message:"Unable to adjust wallet."};}finally{c.release();}}
@@ -4261,6 +4300,36 @@ try{
 }
 
 /*
+VTUGATE ELECTRICITY METER VERIFICATION
+*/
+if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){
+  const rl=rateLimit(req,"electricity-verify",30,60*1000);
+  if(!rl.allowed)return rateLimitedResponse(res,rl);
+  const user=await userFromToken(req);
+  if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+  if(vtuProviderName()!=="vtugate")return send(res,503,{success:false,message:"VTUGATE electricity verification is not configured."});
+  if(!VTU_API_KEY)return send(res,503,{success:false,message:"VTU provider is not configured."});
+  try{
+    const b=await body(req);
+    const provider=String(b.provider||"").trim();
+    const meterNumber=String(b.meterNumber||b.meter_number||"").trim();
+    const meterType=String(b.meterType||b.meter_type||"Prepaid").trim();
+    if(!provider||!meterNumber)return send(res,400,{success:false,message:"Provider and meter number are required."});
+    const base=String(VTU_API_BASE_URL||"https://api.vtugate.com").replace(/\\+$/,'').replace(/\/api\/v1$/i,'');
+    const url=base+"/api/v1/verifyelectricity";
+    const form=new URLSearchParams({provider,meter_number:meterNumber,meter_type:meterType}).toString();
+    const response=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:form});
+    let data={};try{data=await response.json();}catch{}
+    console.log("VTUGATE ELECTRICITY VERIFY:",JSON.stringify({provider,meterNumber,meterType,statusCode:response.status,data}));
+    if(!response.ok||data?.status!==true)return send(res,response.status>=400&&response.status<500?response.status:502,{success:false,message:data?.message||"Unable to verify electricity meter.",provider_data:data});
+    return send(res,200,{success:true,message:data?.message||"Electricity meter verified successfully.",data:data?.data||data,provider_data:data});
+  }catch(error){
+    console.error("VTUGATE ELECTRICITY VERIFY ERROR:",error?.message||error);
+    return send(res,502,{success:false,message:"Unable to verify electricity meter right now."});
+  }
+}
+
+/*
 VTU TRANSACTION
 */
 
@@ -4428,7 +4497,7 @@ return;
 PUBLIC PLATFORM CONFIGURATION
 */
 if(req.method==='GET'&&path==='/api/pricing'){
-  const keys=['airtime','data','cable','electricity'];
+  const keys=['airtime','data','cable','electricity','education'];
   const out={};
   for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={markup_mode:p.markup_mode,markup_pct:p.markup_pct,markup_fixed:p.markup_fixed};}
   return send(res,200,{success:true,pricing:out});

@@ -35,7 +35,7 @@ if(!transactionPin){mb.style.display="block";return;}
 show("processing","Checking Service","Connecting to BOLTIV...");
 mb.style.display="none";
 try{
-const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network,amount,service:"airtime",providerPayload:{service:"airtime",phone:p,network,amount},idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now()),transactionPin:transactionPin})});
+const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network,amount,airtime_amount:amount,service:"airtime",providerPayload:{service:"airtime",phone:p,network,amount,airtime_amount:amount},idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now()),transactionPin:transactionPin})});
 let d={};
 try{d=await r.json()}catch(e){}
 if(d.success){

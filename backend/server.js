@@ -2805,7 +2805,16 @@ const finalStatus=pending?"pending":"successful";
 const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending,{customerAmount:amount,providerCost:finalCost,grossProfit:finalGrossProfit,pricingSource,pricingRule:pricing.rule}); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
 await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
 const finalWallet=await getWallet(userId);
-return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,data:providerData};
+const responseMeta={};
+const responsePhone=clean(providerPayload.phone||providerPayload.phone_number||data.phone||data.recipient||'');
+const responseNetwork=clean(providerPayload.network||providerPayload.network_provider||data.network||'').toUpperCase();
+const responseProvider=clean(providerPayload.provider||data.provider||'');
+const responsePlan=clean(providerPayload.plan_code||providerPayload.planCode||providerPayload.plan||data.plan||'');
+if(responsePhone)responseMeta.phone=responsePhone;
+if(responseNetwork)responseMeta.network=responseNetwork;
+if(responseProvider)responseMeta.provider=responseProvider;
+if(responsePlan)responseMeta.plan=responsePlan;
+return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,phone:responsePhone||null,network:responseNetwork||null,provider:responseProvider||null,plan:responsePlan||null,data:providerData,transaction:{reference:referenceValue,service:data.service,amount,phone:responsePhone||null,network:responseNetwork||null,provider:responseProvider||null,plan:responsePlan||null,metadata:responseMeta}};
 }
 
 

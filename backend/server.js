@@ -4330,6 +4330,35 @@ if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){
 }
 
 /*
+VTUGATE EDUCATION PRICE
+*/
+if(req.method==="POST"&&path==="/api/vtu/education/price"){
+  const rl=rateLimit(req,"education-price",30,60*1000);
+  if(!rl.allowed)return rateLimitedResponse(res,rl);
+  const user=await userFromToken(req);
+  if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+  try{
+    const b=await body(req);
+    const exam=clean(b.exam||b.exam_type||b.examType||b.provider||"").toUpperCase();
+    const quantity=Math.max(1,Math.min(50,Number(b.quantity)||1));
+    if(!["WAEC","NECO","JAMB","NABTEB"].includes(exam)){
+      return send(res,400,{success:false,message:"Select a valid education examination."});
+    }
+    const live=await getVTUGateEducationPrice(exam,quantity);
+    const service=await getService("education");
+    const pricing=pricingConfig(service);
+    const total=customerPriceFromCost(live.total,pricing);
+    if(total===null||!Number.isFinite(total)||total<=0){
+      return send(res,400,{success:false,message:"Unable to calculate the education pin price."});
+    }
+    return send(res,200,{success:true,exam,quantity,unitPrice:Number((total/quantity).toFixed(2)),total:Number(total.toFixed(2)),providerCost:Number(live.total.toFixed(2))});
+  }catch(error){
+    console.error("VTUGATE EDUCATION PRICE ERROR:",error?.message||error);
+    return send(res,502,{success:false,message:error?.message||"Unable to load education price right now."});
+  }
+}
+
+/*
 VTU TRANSACTION
 */
 

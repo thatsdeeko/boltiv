@@ -37,6 +37,7 @@ const BoltivTransaction={
         overlay.className="boltiv-transaction-overlay";
         overlay.innerHTML=`
             <div class="boltiv-transaction-card">
+                <div class="boltiv-receipt-brand"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"></div>
                 <div class="boltiv-transaction-icon" id="boltivTransactionIcon"></div>
                 <div class="boltiv-transaction-status" id="boltivTransactionStatus">Processing</div>
                 <div class="boltiv-transaction-title" id="boltivTransactionTitle">Please wait</div>
@@ -93,7 +94,9 @@ const BoltivTransaction={
     details(data){
         let html="";
         if(data.service)html+=`<div class="transaction-detail"><span>Service</span><strong>${this.escape(data.service)}</strong></div>`;
-        if(data.amount)html+=`<div class="transaction-detail"><span>Amount</span><strong>${this.escape(data.amount)}</strong></div>`;
+        if(data.amount!==undefined&&data.amount!==null&&data.amount!=="")html+=`<div class="transaction-detail"><span>Amount</span><strong>${this.escape(data.amount)}</strong></div>`;
+        if(data.phone)html+=`<div class="transaction-detail"><span>Phone</span><strong>${this.escape(data.phone)}</strong></div>`;
+        if(data.network)html+=`<div class="transaction-detail"><span>Network</span><strong>${this.escape(data.network)}</strong></div>`;
         if(data.recipient)html+=`<div class="transaction-detail"><span>Recipient</span><strong>${this.escape(data.recipient)}</strong></div>`;
         if(data.transactionId)html+=`<div class="transaction-detail"><span>Transaction ID</span><strong>${this.escape(data.transactionId)}</strong></div>`;
         return html;

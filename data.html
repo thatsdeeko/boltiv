@@ -37,7 +37,7 @@ function renderPlans(plans){
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
     const label=planLabel(plan), validity=Number(plan.validity_days)>0?Number(plan.validity_days)+" Days":"Available";
-    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.price)+'</div>';
+    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div>';
     b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;};
     planGrid.appendChild(b);
   });
@@ -56,7 +56,7 @@ async function loadPlans(network){
     planGrid.innerHTML='<div class="plan-loading">'+esc(e.message||"Unable to load data plans.")+'</div>';
   }
 }
-function info(p,id="",bal=""){let h='<div class="modal-detail"><span>Service</span><strong>Data</strong></div><div class="modal-detail"><span>Network</span><strong>'+esc(selectedNetwork)+'</strong></div><div class="modal-detail"><span>Phone</span><strong>'+esc(p)+'</strong></div><div class="modal-detail"><span>Data Plan</span><strong>'+esc(planLabel(selectedPlan))+'</strong></div><div class="modal-detail"><span>Amount</span><strong>'+money(selectedPlan.price)+'</strong></div>';if(id)h+='<div class="modal-detail"><span>Reference</span><strong>'+esc(id)+'</strong></div>';if(bal!=="")h+='<div class="modal-detail"><span>Wallet Balance</span><strong>'+money(bal)+'</strong></div>';return h}
+function info(p,id="",bal=""){let h='<div class="modal-detail"><span>Service</span><strong>Data</strong></div><div class="modal-detail"><span>Network</span><strong>'+esc(selectedNetwork)+'</strong></div><div class="modal-detail"><span>Phone</span><strong>'+esc(p)+'</strong></div><div class="modal-detail"><span>Data Plan</span><strong>'+esc(planLabel(selectedPlan))+'</strong></div><div class="modal-detail"><span>Amount</span><strong>'+money(selectedPlan.customer_price)+'</strong></div>';if(id)h+='<div class="modal-detail"><span>Reference</span><strong>'+esc(id)+'</strong></div>';if(bal!=="")h+='<div class="modal-detail"><span>Wallet Balance</span><strong>'+money(bal)+'</strong></div>';return h}
 document.querySelectorAll(".network-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".network-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedNetwork=b.dataset.network;loadPlans(selectedNetwork)});
 $("purchaseButton").onclick=async()=>{
   const p=phone.value.trim();
@@ -68,7 +68,7 @@ $("purchaseButton").onclick=async()=>{
   if(!transactionPin){modalBtn.style.display="block";return;}
   show("processing","Processing Data","Your request is being sent securely.","PLEASE WAIT",info(p));modalBtn.style.display="none";
   try{
-    const r=await fetch(API+"/api/vtu/data",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network:selectedNetwork,plan_code:selectedPlan.code,service_id:selectedPlan.service_id,amount:Number(selectedPlan.price),service:"data",providerPayload:{service:"data",phone:p,network:selectedNetwork,plan_code:selectedPlan.code,service_id:selectedPlan.service_id,amount:Number(selectedPlan.price)},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin})});
+    const r=await fetch(API+"/api/vtu/data",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network:selectedNetwork,plan_code:selectedPlan.code,service_id:selectedPlan.service_id,amount:Number(selectedPlan.customer_price),service:"data",providerPayload:{service:"data",phone:p,network:selectedNetwork,plan_code:selectedPlan.code,service_id:selectedPlan.service_id,amount:Number(selectedPlan.customer_price)},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin})});
     const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process data purchase.");
     show(d.status==="pending"?"processing":"success",d.status==="pending"?"Processing":"Data Purchased",d.message||"Your data request has been received.","DONE",info(p,d.reference,d.balance));
   }catch(e){show("failed","Data Purchase Failed",e.message||"Unable to process your data purchase.","DONE",info(p));}

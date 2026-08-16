@@ -51,3 +51,9 @@ After deployment verify:
 
 
 VTUGATE airtime service IDs are resolved dynamically from /api/v1/fetchservices for the selected network (MTN, AIRTEL, GLO, 9MOBILE), with a 5-minute server cache. VTU_AIRTIME_SERVICE_ID may be left blank; if set, it overrides dynamic lookup.
+
+## BOLTIV customer-sale revenue wallet
+
+Successful customer service purchases now credit the admin-only BOLTIV Revenue Wallet with the amount the customer paid. Gross profit remains separately calculated as customer price minus provider cost. The revenue withdrawal flow uses Paystack Transfers so it matches the Paystack account receiving customer payments.
+
+See `DEPLOYMENT_REVENUE.md` for the full flow and environment requirements.

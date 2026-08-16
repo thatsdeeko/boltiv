@@ -96,6 +96,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="nav">
 <button data-page="payments">▣ Payments</button>
 <button data-page="transactions">↔ Transactions</button>
+<button data-page="profit">₦ Revenue & Withdraw</button>
 </div>
 
 <div class="side-label">PLATFORM</div>
@@ -132,7 +133,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 
 <div class="stats">
 <div class="stat"><div class="stat-label">TOTAL USERS</div><div id="sUsers" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">CUSTOMER FUNDS</div><div id="sWallet" class="stat-value">₦0.00</div></div><div class="stat"><div class="stat-label">ADMIN WALLET</div><div id="sAdminWallet" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">CUSTOMER FUNDS</div><div id="sWallet" class="stat-value">₦0.00</div></div><div class="stat"><div class="stat-label">ADMIN WALLET</div><div id="sAdminWallet" class="stat-value">₦0.00</div></div><div class="stat"><div class="stat-label">BOLTIV REVENUE</div><div id="sRevenue" class="stat-value">₦0.00</div></div>
 <div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="sTransactions" class="stat-value">0</div></div>
 <div class="stat"><div class="stat-label">PAYMENTS</div><div id="sPayments" class="stat-value">0</div></div>
 <div class="stat"><div class="stat-label">GROSS PROFIT</div><div id="sProfit" class="stat-value">₦0.00</div></div>
@@ -240,6 +241,29 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="section"><div class="section-head"><h2>TRANSACTION HISTORY</h2></div><div id="transactionsArea"><div class="loading">Loading...</div></div></div>
 </section>
 
+<section id="page-profit" class="page">
+<div class="heading"><h1>Revenue & Withdrawals</h1><p>Only the authenticated administrator can withdraw BOLTIV customer-sale funds.</p></div>
+<div class="stats">
+<div class="stat"><div class="stat-label">CUSTOMER SALES</div><div id="revenueSales" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">GROSS PROFIT</div><div id="revenueProfit" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">RESERVED</div><div id="revenueReserved" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">AVAILABLE TO WITHDRAW</div><div id="revenueAvailable" class="stat-value">₦0.00</div></div>
+</div>
+<div class="section"><div class="section-head"><h2>BOLTIV REVENUE WALLET</h2></div><div class="section-body"><div class="notice">When a customer successfully buys a service, the amount they paid is credited to this BOLTIV revenue wallet. VTUGATE remains the fulfilment provider and is paid from its own provider balance. This balance is separate from customer wallet balances.</div><div style="font-size:9px;color:#888;margin-top:12px">CURRENT WITHDRAWABLE BALANCE</div><div id="revenueBalance" class="amount" style="font-size:28px;margin:5px 0 2px">₦0.00</div></div></div>
+<div class="grid2">
+<div class="section"><div class="section-head"><h2>ADMIN-ONLY BANK WITHDRAWAL</h2></div><div class="section-body">
+<div class="notice">Customers have no revenue-withdrawal endpoint. The backend requires an authenticated admin session for every withdrawal operation.</div>
+<label>BANK</label><select id="revenueBank"><option value="">Loading banks...</option></select>
+<label>ACCOUNT NUMBER</label><input id="revenueAccount" inputmode="numeric" maxlength="10" placeholder="10-digit account number">
+<button class="btn" onclick="verifyRevenueAccount()">VERIFY ACCOUNT</button>
+<div id="revenueAccountName" class="notice" style="display:none;margin-top:10px"></div>
+<label>AMOUNT (₦)</label><input id="revenueAmount" type="number" min="1000" step="0.01" placeholder="Minimum ₦1,000">
+<button class="btn primary" onclick="withdrawRevenue()">WITHDRAW BOLTIV BALANCE</button>
+<div id="revenueMessage" class="message" style="margin-top:10px"></div>
+</div></div>
+<div class="section"><div class="section-head"><h2>WITHDRAWAL HISTORY</h2><button class="btn" onclick="loadRevenue()">REFRESH</button></div><div id="revenueHistory" class="section-body"><div class="loading">Loading...</div></div></div>
+</div>
+</section>
 <section id="page-services" class="page">
 <div class="heading"><h1>Services</h1><p>Manage the services offered through BOLTIV.</p></div>
 <div class="toolbar"><button class="btn" onclick="loadServices()">REFRESH</button></div>
@@ -741,7 +765,7 @@ function showApp(){$("loginPage").classList.add("hidden");$("app").classList.rem
 function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
 async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});showApp();}catch(e){showMsg(e.message)}}
 $("loginButton").onclick=login;
-function go(page){if(window.innerWidth<=900&&$("sidebar"))$("sidebar").classList.remove("open");document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="users")loadUsers();if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="services")loadServices();if(page==="security")loadSecurity();if(page==="settings")loadSettings();}
+function go(page){if(window.innerWidth<=900&&$("sidebar"))$("sidebar").classList.remove("open");document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="users")loadUsers();if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="profit")loadRevenue();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="services")loadServices();if(page==="security")loadSecurity();if(page==="settings")loadSettings();}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
 if($("menu"))$("menu").onclick=()=>{$("sidebar").classList.toggle("open")};
 document.addEventListener("click",e=>{if(window.innerWidth<=900&&$("sidebar").classList.contains("open")&&!e.target.closest("#sidebar")&&!e.target.closest("#menu"))$("sidebar").classList.remove("open")});
@@ -749,7 +773,7 @@ if($("supportSearch"))$("supportSearch").oninput=filterSupport;if($("supportFilt
 function closeModal(){$("adminModal").classList.remove("show")}
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("adminModal").classList.add("show")}
 async function loadAll(){
-  await Promise.allSettled([loadStats(),loadMe(),loadAdminWallet(),loadUsers(),loadPayments(),loadTransactions(),loadSupport(),loadAudit(),loadServices(),loadSecurity(),loadSettings()]);
+  await Promise.allSettled([loadStats(),loadMe(),loadAdminWallet(),loadUsers(),loadPayments(),loadTransactions(),loadSupport(),loadAudit(),loadServices(),loadSecurity(),loadSettings(),loadRevenue()]);
 }
 async function loadStats(){
  try{
@@ -770,6 +794,7 @@ async function loadStats(){
   if($("aWallet"))$("aWallet").textContent="₦"+Number(s.walletBalance||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
   if($("aProfit"))$("aProfit").textContent="₦"+Number(s.grossProfit||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
   if($("sAdminWallet"))$("sAdminWallet").textContent="₦"+Number(s.adminWalletBalance||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
+  if($("sRevenue"))$("sRevenue").textContent="₦"+Number(s.adminRevenueBalance||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
  }catch(e){ console.error("Admin stats:",e); }
 }
 async function loadMe(){
@@ -818,6 +843,40 @@ async function loadPending(){
 }
 
 function filterPayments(){const q=$("paymentSearch").value.toLowerCase();renderPayments(payments.filter(p=>[p.reference,p.email,p.user_id].join(" ").toLowerCase().includes(q)))}
+
+let revenueBanks=[];
+async function loadRevenue(){
+ try{
+  const [d,b]=await Promise.all([api("/api/admin/revenue"),api("/api/admin/revenue/banks")]);
+  const s=d.summary||{};
+  $("revenueSales").textContent="₦"+Number(s.sales||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+  $("revenueProfit").textContent="₦"+Number(s.grossProfit||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+  $("revenueReserved").textContent="₦"+Number(s.reserved||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+  $("revenueAvailable").textContent="₦"+Number(s.available||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+  $("revenueBalance").textContent="₦"+Number(s.balance||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+  revenueBanks=b.banks||[];
+  $("revenueBank").innerHTML='<option value="">Select bank</option>'+revenueBanks.map(x=>`<option value="${esc(x.code)}">${esc(x.name)}</option>`).join("");
+  const rows=d.withdrawals||[];
+  $("revenueHistory").innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>AMOUNT</th><th>ACCOUNT</th><th>STATUS</th><th>REFERENCE</th></tr></thead><tbody>'+rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>₦${Number(x.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2})}</td><td>${esc(x.account_name)}<br><small>${esc(x.account_number)} • ${esc(x.bank_code)}</small></td><td><span class="badge ${x.status==='successful'?'successful':x.status==='failed'?'failed':'pending'}">${esc(x.status)}</span></td><td>${esc(x.reference)}</td></tr>`).join("")+'</tbody></table></div>':'<div class="empty">No BOLTIV withdrawals yet.</div>';
+ }catch(e){$("revenueHistory").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
+}
+async function verifyRevenueAccount(){
+ try{
+  const bankCode=$("revenueBank").value,accountNumber=$("revenueAccount").value.trim();
+  const d=await api("/api/admin/revenue/verify-account",{method:"POST",body:JSON.stringify({bankCode,accountNumber})});
+  $("revenueAccountName").style.display="block";$("revenueAccountName").textContent="ACCOUNT NAME: "+d.accountName;$("revenueAccountName").className="notice success";
+  $("revenueAccount").dataset.verifiedName=d.accountName;
+ }catch(e){$("revenueAccountName").style.display="block";$("revenueAccountName").textContent=e.message;$("revenueAccountName").className="notice error";delete $("revenueAccount").dataset.verifiedName;}
+}
+async function withdrawRevenue(){
+ try{
+  const amount=Number($("revenueAmount").value),bankCode=$("revenueBank").value,accountNumber=$("revenueAccount").value.trim();
+  if(!$("revenueAccount").dataset.verifiedName){await verifyRevenueAccount();if(!$("revenueAccount").dataset.verifiedName)return;}
+  if(!confirm(`Withdraw ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} to ${$("revenueAccount").dataset.verifiedName}?`))return;
+  const d=await api("/api/admin/revenue/withdraw",{method:"POST",body:JSON.stringify({amount,bankCode,accountNumber})});
+  alert(d.message||"Withdrawal submitted.");$("revenueAmount").value="";await loadRevenue();await loadStats();
+ }catch(e){alert(e.message);}
+}
 function filterSupport(){const q=($("supportSearch")?.value||"").toLowerCase(),f=$("supportFilter")?.value||"";document.querySelectorAll("#supportTickets .ticket").forEach(t=>{const text=t.textContent.toLowerCase();const status=text.includes(" • "+f.toLowerCase()+" • ");t.style.display=(!q||text.includes(q))&&(!f||status)?"":"none";});}
 function filterAudit(){const q=($("auditSearch")?.value||"").toLowerCase(),f=$("auditType")?.value||"";document.querySelectorAll("#auditArea tbody tr").forEach(r=>{const text=r.textContent.toLowerCase();r.style.display=(!q||text.includes(q))&&(!f||text.includes(f.toLowerCase()))?"":"none";});}
 const notifyRecipient=$("notifyRecipient"),notifyTitle=$("notifyTitle"),notifyMessage=$("notifyMessage"),notifyType=$("notifyType"),notifyPriority=$("notifyPriority");
@@ -829,9 +888,9 @@ async function sendNotification(){try{await api("/api/admin/notifications",{meth
 async function loadSupport(){try{const d=await api("/api/admin/support");const a=d.tickets||[];$("supportTickets").innerHTML=a.length?a.map(t=>`<div class="ticket"><div class="ticket-title">#${t.id} — ${esc(t.subject)}</div><div class="ticket-meta">${esc(t.name||t.email||t.user_id)} • ${esc(t.status)} • ${new Date(t.updated_at).toLocaleString()}</div><p style="font-size:9px;margin:10px 0">${esc(t.message)}</p><button class="btn" onclick="replyTicket(${t.id})">REPLY</button> <button class="btn" onclick="ticketStatus(${t.id},'pending')">PENDING</button> <button class="btn primary" onclick="ticketStatus(${t.id},'resolved')">RESOLVE</button></div>`).join(""):'<div class="empty">No support tickets available.</div>'}catch(e){$("supportTickets").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
 async function replyTicket(id){const m=prompt("Reply to ticket #"+id);if(!m)return;try{await api("/api/admin/support/reply",{method:"POST",body:JSON.stringify({ticketId:id,message:m})});loadSupport();alert("Reply sent.")}catch(e){alert(e.message)}}
 async function ticketStatus(id,status){try{await api("/api/admin/support/status",{method:"POST",body:JSON.stringify({ticketId:id,status})});loadSupport()}catch(e){alert(e.message)}}
-async function loadServices(){try{const d=await api("/api/admin/services");const a=d.services||[];$('servicesArea').innerHTML=a.map(x=>{const p=x.config&&x.config.pricing||{};const mm=String(p.markup_mode||'fixed');const mv=mm==='percentage'?`${Number(p.markup_pct||0)}%`:`₦${Number(p.markup_fixed||0).toLocaleString()}`;return `<div class="service-card"><div class="service-icon">${esc(x.icon||'⚙')}</div><div class="service-name">${esc(x.name)}</div><div class="service-status" style="color:${x.enabled&&!x.maintenance?'var(--green)':'var(--yellow)'}">● ${x.enabled&&!x.maintenance?'ACTIVE':'DISABLED'}</div><div style="font-size:10px;margin-top:8px">Your markup: ${esc(mm)} ${mv}</div><div style="font-size:10px;margin-top:4px">Fee: ₦${Number(x.fee||0).toLocaleString()}</div><button class="btn" style="margin-top:12px" onclick="manageService('${esc(x.key)}')">MANAGE</button></div>`}).join('')}catch(e){$('servicesArea').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
-async function manageService(key){try{const d=await api('/api/admin/services');const x=(d.services||[]).find(v=>v.key===key);if(!x)return;const p=x.config&&x.config.pricing||{};openModal('MANAGE '+String(x.name).toUpperCase(),`<label>STATUS</label><select id="svcEnabled"><option value="true" ${x.enabled?'selected':''}>ENABLED</option><option value="false" ${!x.enabled?'selected':''}>DISABLED</option></select><label>MAINTENANCE</label><select id="svcMaintenance"><option value="false" ${!x.maintenance?'selected':''}>OFF</option><option value="true" ${x.maintenance?'selected':''}>ON</option></select><label>SERVICE FEE</label><input id="svcFee" type="number" min="0" step="0.01" value="${Number(x.fee||0)}"><label>YOUR MARKUP TYPE</label><select id="svcMarkupMode"><option value="fixed" ${String(p.markup_mode||'fixed')==='fixed'?'selected':''}>FIXED ₦ PER SALE</option><option value="percentage" ${String(p.markup_mode||'fixed')==='percentage'?'selected':''}>PERCENTAGE %</option></select><label>FIXED MARKUP ₦</label><input id="svcMarkupFixed" type="number" min="0" step="0.01" value="${Number(p.markup_fixed||0)}"><label>MARKUP %</label><input id="svcMarkupPct" type="number" min="0" max="100" step="0.01" value="${Number(p.markup_pct||0)}"><div style="font-size:9px;color:#666;margin-top:8px">Example: provider cost ₦396 + ₦24 markup = customer pays ₦420. BOLTIV sends only the provider cost to VTUGATE and keeps the markup as gross profit after a successful transaction.</div><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveService('${esc(x.key)}')">SAVE</button></div>`)}catch(e){alert(e.message)}}
-async function saveService(key){try{const markupMode=$('svcMarkupMode').value;const markupPct=Number($('svcMarkupPct').value||0);const markupFixed=Number($('svcMarkupFixed').value||0);await api('/api/admin/services',{method:'PATCH',body:JSON.stringify({key,enabled:$('svcEnabled').value==='true',maintenance:$('svcMaintenance').value==='true',fee:Number($('svcFee').value),config:{pricing:{markup_mode:markupMode,markup_pct:markupPct,markup_fixed:markupFixed}}})});closeModal();loadServices();alert('Service and markup updated.')}catch(e){alert(e.message)}}
+async function loadServices(){try{const d=await api("/api/admin/services");const a=d.services||[];$('servicesArea').innerHTML=a.map(x=>{const p=x.config&&x.config.pricing||{};const mode=p.mode||'discount';const value=mode==='fixed'?`₦${Number(p.fixed_profit||0).toLocaleString()}`:`${Number(p.discount_pct||0)}%`;return `<div class="service-card"><div class="service-icon">${esc(x.icon||'⚙')}</div><div class="service-name">${esc(x.name)}</div><div class="service-status" style="color:${x.enabled&&!x.maintenance?'var(--green)':'var(--yellow)'}">● ${x.enabled&&!x.maintenance?'ACTIVE':'DISABLED'}</div><div style="font-size:10px;margin-top:8px">Pricing: ${esc(mode)} ${value}</div><div style="font-size:10px;margin-top:4px">Fee: ₦${Number(x.fee||0).toLocaleString()}</div><button class="btn" style="margin-top:12px" onclick="manageService('${esc(x.key)}')">MANAGE</button></div>`}).join('')}catch(e){$('servicesArea').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
+async function manageService(key){try{const d=await api('/api/admin/services');const x=(d.services||[]).find(v=>v.key===key);if(!x)return;const p=x.config&&x.config.pricing||{};openModal('MANAGE '+String(x.name).toUpperCase(),`<label>STATUS</label><select id="svcEnabled"><option value="true" ${x.enabled?'selected':''}>ENABLED</option><option value="false" ${!x.enabled?'selected':''}>DISABLED</option></select><label>MAINTENANCE</label><select id="svcMaintenance"><option value="false" ${!x.maintenance?'selected':''}>OFF</option><option value="true" ${x.maintenance?'selected':''}>ON</option></select><label>SERVICE FEE</label><input id="svcFee" type="number" min="0" step="0.01" value="${Number(x.fee||0)}"><label>PRICING MODE</label><select id="svcPricingMode"><option value="discount" ${String(p.mode||'discount')==='discount'?'selected':''}>PROVIDER DISCOUNT %</option><option value="fixed" ${String(p.mode||'discount')==='fixed'?'selected':''}>FIXED PROFIT PER SALE</option></select><label>DISCOUNT %</label><input id="svcDiscount" type="number" min="0" max="100" step="0.01" value="${Number(p.discount_pct||0)}"><label>FIXED PROFIT</label><input id="svcFixedProfit" type="number" min="0" step="0.01" value="${Number(p.fixed_profit||0)}"><div style="font-size:9px;color:#666;margin-top:8px">Use the provider's real wholesale discount/cost. Profit is recorded after successful service transactions.</div><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveService('${esc(x.key)}')">SAVE</button></div>`)}catch(e){alert(e.message)}}
+async function saveService(key){try{const mode=$('svcPricingMode').value;const discount=Number($('svcDiscount').value||0);const fixedProfit=Number($('svcFixedProfit').value||0);await api('/api/admin/services',{method:'PATCH',body:JSON.stringify({key,enabled:$('svcEnabled').value==='true',maintenance:$('svcMaintenance').value==='true',fee:Number($('svcFee').value),config:{pricing:{mode,discount_pct:discount,fixed_profit:fixedProfit}}})});closeModal();loadServices();alert('Service and pricing updated.')}catch(e){alert(e.message)}}
 async function loadSettings(){try{const d=await api('/api/admin/settings');const s=d.settings||{};const m=$('maintenanceBtn'),r=$('registrationBtn');if(m){m.textContent=s.maintenance_mode?'ENABLED':'DISABLED';m.classList.toggle('primary',!s.maintenance_mode)}if(r){r.textContent=s.registration_enabled?'ENABLED':'DISABLED';r.classList.toggle('primary',s.registration_enabled)}}catch(e){console.error(e)}}
 async function updateSettings(patch){try{const d=await api('/api/admin/settings',{method:'PATCH',body:JSON.stringify(patch)});const s=d.settings||{};if($('maintenanceBtn'))$('maintenanceBtn').textContent=s.maintenance_mode?'ENABLED':'DISABLED';if($('registrationBtn'))$('registrationBtn').textContent=s.registration_enabled?'ENABLED':'DISABLED';return s}catch(e){alert(e.message);throw e}}
 async function toggleMaintenance(){const d=await api('/api/admin/settings');await updateSettings({maintenance_mode:!d.settings.maintenance_mode});}

@@ -2506,6 +2506,7 @@ async function buildVTUGateForm(payload){
     const exam=p.exam||p.exam_type||p.examType||p.provider||'';
     const quantity=Number(p.quantity||1);
     put('exam',exam); put('exam_type',exam); put('service',exam);
+    put('service_id',p.service_id||vtugateEducationServiceId(exam));
     put('quantity',quantity); put('amount',p.amount);
   }else{
     for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
@@ -2692,21 +2693,34 @@ function estimatedProviderCost(service,customerAmount){
   return {cost:cost===null?amount:cost,source:(rule.markup_mode==='percentage'&&rule.markup_pct>0)?'markup_pct':(rule.markup_mode==='fixed'&&rule.markup_fixed>0?'markup_fixed':'no_markup'),rule};
 }
 
+function vtugateEducationServiceId(exam){
+  const examName=String(exam||'').trim().toUpperCase();
+  const envKey=`VTU_EDUCATION_${examName}_SERVICE_ID`;
+  const configured=String(process.env[envKey]||'').trim();
+  if(configured) return configured;
+  // VTUGATE documentation example confirms WAEC uses service_id=1.
+  if(examName==='WAEC') return '1';
+  throw new Error(`VTUGATE service_id is not configured for ${examName}. Set ${envKey} in Render.`);
+}
+
 async function getVTUGateEducationPrice(exam,quantity=1){
   if(vtuProviderName()!=="vtugate") throw new Error("Education pricing is currently configured for VTUGATE only.");
   if(!VTU_API_KEY) throw new Error("VTU provider is not configured.");
   const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
-  const url=base+"/api/v1/geteducationprice";
+  // VTUGATE's documented endpoint is geteducationtypeprice (not geteducationprice).
+  const url=base+"/api/v1/geteducationtypeprice";
   const examName=String(exam||'').trim().toUpperCase();
   const qty=Math.max(1,Math.min(50,Number(quantity)||1));
-  const form=new URLSearchParams({exam:examName,exam_type:examName,service:examName,quantity:String(qty)});
+  const serviceId=vtugateEducationServiceId(examName);
+  // The documented endpoint accepts service_id only; quantity is applied by BOLTIV.
+  const form=new URLSearchParams({service_id:String(serviceId)});
   const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
   let data={}; try{data=await response.json();}catch{}
   if(!response.ok||data?.status!==true) throw new Error(data?.message||`VTUGATE education pricing failed (${response.status})`);
   const candidates=[data?.data?.price,data?.data?.amount,data?.price,data?.amount,data?.data?.unit_price,data?.data?.data?.price];
   const unit=candidates.map(Number).find(n=>Number.isFinite(n)&&n>0);
   if(!unit) throw new Error('VTUGATE returned no education price.');
-  return {unitPrice:Number(unit.toFixed(2)),total:Number((unit*qty).toFixed(2)),data};
+  return {unitPrice:Number(unit.toFixed(2)),total:Number((unit*qty).toFixed(2)),serviceId:String(serviceId),data};
 }
 
 async function processVTUTransaction(user,data){

@@ -2805,12 +2805,53 @@ async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fe
 async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
 
 
-async function adminBigisubPriceTest(req){
+function bigisubApiKey(){
+  let key=String(process.env.BIGISUB_API_KEY||'').trim();
+  if(/^Bearer\s+/i.test(key)) key=key.replace(/^Bearer\s+/i,'').trim();
+  return key;
+}
+function bigisubHeaders(){
+  const key=bigisubApiKey();
+  return {
+    Authorization:`Bearer ${key}`,
+    Accept:'application/json',
+    'Content-Type':'application/json'
+  };
+}
+function bigisubBaseUrl(){
+  return String(process.env.BIGISUB_API_BASE_URL||'https://bigisub.ng/api/v2').trim().replace(/\/+$/,'');
+}
+async function bigisubRequest(path,query=''){
+  const url=`${bigisubBaseUrl()}${path}${query?`?${query}`:''}`;
+  const r=await fetch(url,{method:'GET',headers:bigisubHeaders()});
+  const text=await r.text();
+  let data;
+  try{data=JSON.parse(text)}catch{data={raw:text.slice(0,2000)}}
+  return {url,status:r.status,ok:r.ok,data};
+}
+async function adminBigisubAuthTest(req){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
-  const apiKey=process.env.BIGISUB_API_KEY||'';
+  const apiKey=bigisubApiKey();
   if(!apiKey)return{success:false,statusCode:503,message:'BIGISUB_API_KEY is not configured.'};
-  const base=String(process.env.BIGISUB_API_BASE_URL||'https://bigisub.ng/api/v2').replace(/\/$/,'');
+  try{
+    const result=await bigisubRequest('/wallet/balance');
+    return {
+      success:true,
+      authenticated:result.status!==401&&result.status!==403,
+      status:result.status,
+      response:result.data,
+      endpoint:'/wallet/balance'
+    };
+  }catch(e){
+    return{success:false,statusCode:502,message:'Unable to connect to Bigisub.',error:String(e.message||e)};
+  }
+}
+async function adminBigisubPriceTest(req){
+  const auth=await adminFromToken(req);
+  if(!auth)return{success:false,statusCode:401,message:'Unauthorized.'};
+  const apiKey=bigisubApiKey();
+  if(!apiKey)return{success:false,statusCode:503,message:'BIGISUB_API_KEY is not configured.'};
   const network=String(new URL(req.url,`http://${req.headers.host||'localhost'}`).searchParams.get('network')||'MTN').toUpperCase();
   const allowedNetworks=['MTN','AIRTEL','GLO','9MOBILE','9MOBILE/ETISALAT'];
   if(!allowedNetworks.includes(network))return{success:false,statusCode:400,message:'Unsupported network.'};
@@ -2824,12 +2865,9 @@ async function adminBigisubPriceTest(req){
   const results=[];
   for(const path of candidates){
     try{
-      const url=`${base}${path}?network=${encodeURIComponent(network)}`;
-      const r=await fetch(url,{headers:{Authorization:`Bearer ${apiKey}`,Accept:'application/json'}});
-      const text=await r.text();
-      let data=null;try{data=JSON.parse(text)}catch{data={raw:text.slice(0,2000)}}
-      results.push({path,status:r.status,ok:r.ok,data});
-      if(r.ok && data)break;
+      const result=await bigisubRequest(path,`network=${encodeURIComponent(network)}`);
+      results.push({path,status:result.status,ok:result.ok,data:result.data});
+      if(result.ok)break;
     }catch(e){results.push({path,status:0,ok:false,error:String(e.message||e)})}
   }
   return{success:true,network,results};
@@ -3669,6 +3707,7 @@ if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupp
 if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/bigisub/auth-test"){const result=await adminBigisubAuthTest(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/bigisub/price-test"){const result=await adminBigisubPriceTest(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/services"){const result=await adminServices(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/services"){const result=await adminServices(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}

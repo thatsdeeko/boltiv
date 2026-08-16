@@ -10,9 +10,9 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: FRONTEND_URL
-        value: https://thatsdeeko.github.io/boltiv
+        value: https://boltiv.ng
       - key: FRONTEND_ORIGIN
-        value: https://thatsdeeko.github.io
+        value: https://boltiv.ng
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD

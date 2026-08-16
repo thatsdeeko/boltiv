@@ -2821,8 +2821,13 @@ function bigisubApiKey(){
 }
 function bigisubHeaders(){
   const key=bigisubApiKey();
+  // Bigisub's current API-token screen instructs partner integrations
+  // to authenticate with: Authorization: Token <token>.
+  // Keep the scheme configurable so it can be switched without a code change
+  // if Bigisub changes the requirement for a particular API environment.
+  const scheme=String(process.env.BIGISUB_AUTH_SCHEME||'Token').trim()||'Token';
   return {
-    Authorization:`Bearer ${key}`,
+    Authorization:`${scheme} ${key}`,
     Accept:'application/json',
     'Content-Type':'application/json'
   };

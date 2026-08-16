@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
 <title>BOLTIV — Support</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 
 <script>
 if(localStorage.getItem("boltivLoggedIn")!=="true"){
-location.replace("login.html");
+location.replace("/login/");
 }
 </script>
 
@@ -332,7 +332,7 @@ margin-bottom:4px;
 font-size:18.7px;
 }
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
+<link rel="icon" type="image/png" href="/assets/boltiv-icon.png">
 </head>
 
 <body>
@@ -497,22 +497,22 @@ href="mailto:boltivsupport@gmail.com"
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
 
-<button class="nav-item" data-page="index.html">
+<button class="nav-item" data-page="/">
 <span class="nav-icon">⌂</span>
 <span>Home</span>
 </button>
 
-<button class="nav-item" data-page="wallet.html">
+<button class="nav-item" data-page="/wallet/">
 <span class="nav-icon">₦</span>
 <span>Wallet</span>
 </button>
 
-<button class="nav-item" data-page="transactions.html">
+<button class="nav-item" data-page="/transactions/">
 <span class="nav-icon">↯</span>
 <span>Activity</span>
 </button>
 
-<button class="nav-item active" data-page="profile.html">
+<button class="nav-item active" data-page="/profile/">
 <span class="nav-icon">◉</span>
 <span>Profile</span>
 </button>

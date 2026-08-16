@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#f7f7f5">
 <title>BOLTIV — Profile</title>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 
 <script>
 if(localStorage.getItem("boltivLoggedIn")!=="true"){
-location.replace("login.html");
+location.replace("/login/");
 }
 </script>
 
@@ -404,7 +404,7 @@ border-color:#422020;
 color:#e07777;
 }
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
+<link rel="icon" type="image/png" href="/assets/boltiv-icon.png">
 </head>
 
 <body>
@@ -568,7 +568,7 @@ type="button">
 
 <div class="action-icon">
 ⌾
-<button class="action" onclick="location.href='notifications.html'"><div class="action-icon">🔔</div><div class="action-text"><div class="action-title">Notifications</div><div class="action-sub">View account and transaction updates.</div></div><span>›</span></button></div>
+<button class="action" onclick="location.href='/notifications/'"><div class="action-icon">🔔</div><div class="action-text"><div class="action-title">Notifications</div><div class="action-sub">View account and transaction updates.</div></div><span>›</span></button></div>
 
 <div class="action-text">
 
@@ -678,7 +678,7 @@ Sign out of your BOLTIV account
 
 <button
 class="nav-item"
-data-page="index.html"
+data-page="/"
 type="button">
 
 <span class="nav-icon">⌂</span>
@@ -689,7 +689,7 @@ type="button">
 
 <button
 class="nav-item"
-data-page="wallet.html"
+data-page="/wallet/"
 type="button">
 
 <span class="nav-icon">₦</span>
@@ -700,7 +700,7 @@ type="button">
 
 <button
 class="nav-item"
-data-page="transactions.html"
+data-page="/transactions/"
 type="button">
 
 <span class="nav-icon">↯</span>
@@ -711,7 +711,7 @@ type="button">
 
 <button
 class="nav-item active"
-data-page="profile.html"
+data-page="/profile/"
 type="button">
 
 <span class="nav-icon">◉</span>
@@ -1132,7 +1132,7 @@ document
 .getElementById("securityBtn")
 .onclick=()=>{
 
-location.href="security.html";
+location.href="/security/";
 
 };
 
@@ -1145,7 +1145,7 @@ document
 .getElementById("supportBtn")
 .onclick=()=>{
 
-location.href="support.html";
+location.href="/support/";
 
 };
 
@@ -1180,7 +1180,7 @@ localStorage.removeItem("boltivLoggedIn");
 
 logoutModal.classList.remove("show");
 
-location.replace("login.html");
+location.replace("/login/");
 
 };
 

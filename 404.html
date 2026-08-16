@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>BOLTIV</title></head>
+<body><script>
+(async()=>{
+  const path=location.pathname.replace(/^\/+|\/+$/g,'');
+  const routes={
+    '':'index.html',
+    'login':'login.html','register':'register.html','wallet':'wallet.html','transactions':'transactions.html',
+    'airtime':'airtime.html','data':'data.html','cable':'cable.html','electricity':'electricity.html','profile':'profile.html',
+    'history':'history.html','notifications':'notifications.html','receipt':'receipt.html','contact':'contact.html',
+    'privacy':'privacy.html','terms':'terms.html','security':'security.html','support':'support.html',
+    'forgot-password':'forgot-password.html','reset-password':'reset-password.html','admin':'admin.html'
+  };
+  const file=routes[path] || null;
+  if(!file){document.body.textContent='Page not found'; return;}
+  try{
+    const r=await fetch('/'+file,{cache:'no-store'});
+    if(!r.ok) throw new Error('Page unavailable');
+    let html=await r.text();
+    html=html.replace(/<head([^>]*)>/i,'<head$1><base href="/">');
+    document.open(); document.write(html); document.close();
+  }catch(e){document.body.textContent='Unable to load this page. Please try again.';}
+})();
+</script></body></html>

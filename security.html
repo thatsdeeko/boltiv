@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#f7f7f5">
 <title>BOLTIV — Security</title>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 
 <script>
 if(localStorage.getItem("boltivLoggedIn")!=="true"){
-location.replace("login.html");
+location.replace("/login/");
 }
 </script>
 
@@ -388,7 +388,7 @@ background:#b8860b;
 color:#f7f7f5;
 }
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
+<link rel="icon" type="image/png" href="/assets/boltiv-icon.png">
 </head>
 
 <body>
@@ -672,7 +672,7 @@ the PIN is stored locally on this device.
 
 <button
 class="nav-item"
-data-page="index.html"
+data-page="/"
 type="button">
 
 <span class="nav-icon">⌂</span>
@@ -683,7 +683,7 @@ Home
 
 <button
 class="nav-item"
-data-page="wallet.html"
+data-page="/wallet/"
 type="button">
 
 <span class="nav-icon">₦</span>
@@ -694,7 +694,7 @@ Wallet
 
 <button
 class="nav-item"
-data-page="transactions.html"
+data-page="/transactions/"
 type="button">
 
 <span class="nav-icon">↯</span>
@@ -705,7 +705,7 @@ Activity
 
 <button
 class="nav-item active"
-data-page="profile.html"
+data-page="/profile/"
 type="button">
 
 <span class="nav-icon">◉</span>

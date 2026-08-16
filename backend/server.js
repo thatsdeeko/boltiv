@@ -2806,8 +2806,17 @@ async function recordSecurityEvent(eventType,severity,details={},req=null,adminI
 
 
 function bigisubApiKey(){
-  let key=String(process.env.BIGISUB_API_KEY||'').trim();
-  if(/^Bearer\s+/i.test(key)) key=key.replace(/^Bearer\s+/i,'').trim();
+  // Render may use the documented BIGISUB_API_KEY name. The aliases below
+  // make deployment less fragile without ever exposing the secret.
+  let key=String(
+    process.env.BIGISUB_API_KEY ||
+    process.env.BIGISUB_API_TOKEN ||
+    process.env.BIGISUB_KEY ||
+    ''
+  ).trim();
+
+  // Accept either a raw key or a value accidentally saved as "Bearer <key>".
+  key=key.replace(/^Bearer\\s+/i,'').trim();
   return key;
 }
 function bigisubHeaders(){
@@ -2832,19 +2841,47 @@ async function bigisubRequest(path,query=''){
 async function adminBigisubAuthTest(req){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
+
   const apiKey=bigisubApiKey();
-  if(!apiKey)return{success:false,statusCode:503,message:'BIGISUB_API_KEY is not configured.'};
+  const configured=Boolean(apiKey);
+  if(!configured){
+    return{
+      success:false,
+      statusCode:503,
+      message:'Bigisub API key is not configured.',
+      keyConfigured:false
+    };
+  }
+
+  // Safe diagnostics only: never return the key itself.
+  const fingerprint=require('crypto')
+    .createHash('sha256')
+    .update(apiKey)
+    .digest('hex')
+    .slice(0,12);
+
   try{
     const result=await bigisubRequest('/wallet/balance');
-    return {
+    return{
       success:true,
       authenticated:result.status!==401&&result.status!==403,
       status:result.status,
+      keyConfigured:true,
+      keyLength:apiKey.length,
+      keyFingerprint:fingerprint,
       response:result.data,
       endpoint:'/wallet/balance'
     };
   }catch(e){
-    return{success:false,statusCode:502,message:'Unable to connect to Bigisub.',error:String(e.message||e)};
+    return{
+      success:false,
+      statusCode:502,
+      message:'Unable to connect to Bigisub.',
+      keyConfigured:true,
+      keyLength:apiKey.length,
+      keyFingerprint:fingerprint,
+      error:String(e.message||e)
+    };
   }
 }
 async function adminBigisubPriceTest(req){

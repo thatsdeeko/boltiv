@@ -2746,7 +2746,23 @@ try{
 await client.query("BEGIN");
 const debit=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,userId]);
 if(!debit.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Insufficient wallet balance.",balance:(await getWallet(userId))?.balance||0};}
-await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,idempotency_key,recipient,metadata) VALUES($1,'debit',$2,$3,$4,'processing',NOW(),$5,$6,$7)`,[userId,data.service||"VTU Service",amount,referenceValue,idempotencyKey,data.recipient||null,data.metadata?JSON.stringify(data.metadata):null]);
+const safeTxMeta={...(data.metadata&&typeof data.metadata==='object'?data.metadata:{})};
+const payloadPhone=clean(providerPayload.phone||providerPayload.phone_number||data.phone||data.recipient||'');
+const payloadNetwork=clean(providerPayload.network||providerPayload.network_provider||data.network||'').toUpperCase();
+const payloadProvider=clean(providerPayload.provider||data.provider||'');
+const payloadPlan=clean(providerPayload.plan_code||providerPayload.planCode||providerPayload.plan||data.plan||'');
+const payloadSmartcard=clean(providerPayload.smartcard||providerPayload.iuc||providerPayload.iucNumber||data.smartcard||data.iuc||'');
+const payloadMeter=clean(providerPayload.meter_number||providerPayload.meterNumber||data.meter_number||data.meterNumber||'');
+const payloadMeterType=clean(providerPayload.meter_type||providerPayload.meterType||data.meter_type||data.meterType||'');
+if(payloadPhone)safeTxMeta.phone=payloadPhone;
+if(payloadNetwork)safeTxMeta.network=payloadNetwork;
+if(payloadProvider)safeTxMeta.provider=payloadProvider;
+if(payloadPlan)safeTxMeta.plan=payloadPlan;
+if(payloadSmartcard)safeTxMeta.smartcard=payloadSmartcard;
+if(payloadMeter)safeTxMeta.meterNumber=payloadMeter;
+if(payloadMeterType)safeTxMeta.meterType=payloadMeterType;
+const txRecipient=clean(data.recipient||payloadPhone||payloadSmartcard||payloadMeter||'')||null;
+await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,idempotency_key,recipient,metadata) VALUES($1,'debit',$2,$3,$4,'processing',NOW(),$5,$6,$7)`,[userId,data.service||"VTU Service",amount,referenceValue,idempotencyKey,txRecipient,Object.keys(safeTxMeta).length?JSON.stringify(safeTxMeta):null]);
 await client.query("COMMIT");
 }catch(error){try{await client.query("ROLLBACK");}catch{} client.release(); console.error("TRANSACTION RESERVE ERROR:",error); return {success:false,statusCode:500,message:"Unable to start transaction."};}
 client.release();

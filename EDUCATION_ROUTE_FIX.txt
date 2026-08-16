@@ -1,0 +1,5 @@
+BOLTIV Education route fix
+
+Added POST /api/vtu/education/price, which authenticates the user, calls the existing VTUGate education pricing helper, applies the existing education pricing configuration, and returns the customer total used by education.html.
+
+The revenue/pricing calculation functions themselves were not modified.

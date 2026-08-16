@@ -7,7 +7,7 @@
 <link rel="canonical" href="https://boltiv.ng/">
 <title>BOLTIV — Dashboard</title>
 <script>
-/* BOLTIV clean root URL: keep / for GitHub Pages, but don't show it in the address bar. */
+/* BOLTIV clean root URL: keep index.html for GitHub Pages, but don't show it in the address bar. */
 if (window.location.pathname.endsWith("/index.html")) {
   window.history.replaceState(
     null,
@@ -95,13 +95,7 @@ a{text-decoration:none;color:inherit}
   .footer{font-size:11px}
 }
 </style>
-<link rel="icon" type="image/png" href="/assets/boltiv-icon.png">
-<script>
-/* BOLTIV clean URL: redirect the legacy index.html URL to the root URL. */
-if (window.location.pathname.endsWith("/index.html")) {
-  window.history.replaceState(null, document.title, "/" + window.location.search + window.location.hash);
-}
-</script>
+<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
 </head>
 
 <body>
@@ -110,8 +104,8 @@ if (window.location.pathname.endsWith("/index.html")) {
 <div class="container">
 
 <header class="header">
-<div class="brand"><img src="/assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
-<div style="display:flex;gap:8px;align-items:center"><button class="login" onclick="location.href='/notifications/'">🔔</button><button class="login" id="logoutButton">LOGOUT</button></div>
+<div class="brand"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
+<div style="display:flex;gap:8px;align-items:center"><button class="login" onclick="location.href='notifications.html'">🔔</button><button class="login" id="logoutButton">LOGOUT</button></div>
 </header>
 
 <section class="hero">
@@ -142,7 +136,7 @@ WALLET BALANCE
 
 <button
 class="hero-button"
-onclick="location.href='/wallet/'">
+onclick="location.href='wallet.html'">
 FUND WALLET
 </button>
 
@@ -157,7 +151,7 @@ OUR SERVICES
 <div class="grid">
 
 <div class="card"
-onclick="location.href='/airtime/'">
+onclick="location.href='airtime.html'">
 <div class="icon">☎</div>
 <div class="name">Airtime</div>
 <div class="text">
@@ -166,7 +160,7 @@ Recharge your phone quickly and conveniently.
 </div>
 
 <div class="card"
-onclick="location.href='/data/'">
+onclick="location.href='data.html'">
 <div class="icon">◉</div>
 <div class="name">Data</div>
 <div class="text">
@@ -175,7 +169,7 @@ Purchase affordable data bundles for your line.
 </div>
 
 <div class="card"
-onclick="location.href='/electricity/'">
+onclick="location.href='electricity.html'">
 <div class="icon">ϟ</div>
 <div class="name">Electricity</div>
 <div class="text">
@@ -184,13 +178,15 @@ Pay your electricity bills conveniently.
 </div>
 
 <div class="card"
-onclick="location.href='/cable/'">
+onclick="location.href='cable.html'">
 <div class="icon">▣</div>
 <div class="name">Cable TV</div>
 <div class="text">
 Renew your TV subscription with ease.
 </div>
 </div>
+<div class="card" onclick="location.href='education.html'"><div class="icon">🎓</div><div class="name">Education</div><div class="text">Buy WAEC, NECO, JAMB and NABTEB pins.</div></div>
+
 
 </div>
 </section>
@@ -209,7 +205,7 @@ Fast. Simple. Reliable.
 
 <p>
 BOLTIV is a digital services platform designed to make everyday payments more convenient.
-Customers can fund their wallet and use their available balance to purchase airtime, data, electricity and cable TV services.
+Customers can fund their wallet and use their available balance to purchase airtime, data, electricity, cable TV and education services.
 </p>
 
 <p>
@@ -252,7 +248,7 @@ Add funds securely to your BOLTIV wallet.
 <div>
 <h3>Choose a service</h3>
 <p>
-Select airtime, data, electricity or cable TV.
+Select airtime, data, electricity, cable TV or education.
 </p>
 </div>
 </div>
@@ -314,9 +310,9 @@ Transaction details should be reviewed carefully before confirmation.
 </p>
 
 <div class="links">
-<a href="/privacy/">Privacy Policy</a>
-<a href="/terms/">Terms & Conditions</a>
-<a href="/contact/">Contact Us</a>
+<a href="privacy.html">Privacy Policy</a>
+<a href="terms.html">Terms & Conditions</a>
+<a href="contact.html">Contact Us</a>
 </div>
 
 </div>
@@ -344,7 +340,7 @@ const logoutButton=document.getElementById("logoutButton");
 async function loadAccount(){
   const token=localStorage.getItem(TOKEN_KEY);
   if(!token){
-    location.replace("/login/");
+    location.replace("login.html");
     return;
   }
 
@@ -394,7 +390,7 @@ async function loadAccount(){
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(EMAIL_KEY);
       localStorage.removeItem(TOKEN_KEY);
-      location.replace("/login/");
+      location.replace("login.html");
     }
   }
 }
@@ -419,7 +415,7 @@ logoutButton.onclick=async()=>{
   localStorage.removeItem("boltivBalance");
   localStorage.removeItem("boltivTransactions");
   localStorage.removeItem(TOKEN_KEY);
-  location.replace("/login/");
+  location.replace("login.html");
 };
 
 loadAccount();

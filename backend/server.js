@@ -389,7 +389,8 @@ await db(`CREATE TABLE IF NOT EXISTS platform_settings(key TEXT PRIMARY KEY,valu
 await db(`CREATE TABLE IF NOT EXISTS services(key TEXT PRIMARY KEY,name TEXT NOT NULL,icon TEXT,enabled BOOLEAN NOT NULL DEFAULT TRUE,fee NUMERIC(14,2) NOT NULL DEFAULT 0,maintenance BOOLEAN NOT NULL DEFAULT FALSE,config JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
-for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['education','Education','🎫']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+await db(`DELETE FROM services WHERE key='education'`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
 await db(`
@@ -684,10 +685,21 @@ await createWallet(
 user.user_id
 );
 
+// Create an authenticated session immediately after registration so the
+// new user can set the mandatory Transaction PIN before entering BOLTIV.
+const sessionToken=token();
+await db(
+`INSERT INTO user_sessions(token,user_id,expires_at)
+VALUES($1,$2,NOW()+INTERVAL '30 days')`,
+[sessionToken,user.id]
+);
+
 return{
 success:true,
 message:
-"Account created successfully.",
+"Account created successfully. Please create your Transaction PIN.",
+token:sessionToken,
+transactionPinSet:false,
 user:{
 id:user.user_id,
 userId:user.user_id,
@@ -2345,7 +2357,6 @@ function vtugateEndpoint(service){
     data:"/api/v1/buydata",
     cable:"/api/v1/buycabletv",
     electricity:"/api/v1/buyelectricity",
-    education:"/api/v1/buyeducation"
   };
   return cleanBase+(map[service]||"");
 }
@@ -2502,12 +2513,6 @@ async function buildVTUGateForm(payload){
     put('meter_number',p.meterNumber||p.meter_number);
     put('meter_type',p.meterType||p.meter_type);
     put('amount',p.amount);
-  }else if(service==='education'){
-    const exam=p.exam||p.exam_type||p.examType||p.provider||'';
-    const quantity=Number(p.quantity||1);
-    put('exam',exam); put('exam_type',exam); put('service',exam);
-    put('service_id',p.service_id||vtugateEducationServiceId(exam));
-    put('quantity',quantity); put('amount',p.amount);
   }else{
     for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
   }
@@ -2693,36 +2698,6 @@ function estimatedProviderCost(service,customerAmount){
   return {cost:cost===null?amount:cost,source:(rule.markup_mode==='percentage'&&rule.markup_pct>0)?'markup_pct':(rule.markup_mode==='fixed'&&rule.markup_fixed>0?'markup_fixed':'no_markup'),rule};
 }
 
-function vtugateEducationServiceId(exam){
-  const examName=String(exam||'').trim().toUpperCase();
-  const envKey=`VTU_EDUCATION_${examName}_SERVICE_ID`;
-  const configured=String(process.env[envKey]||'').trim();
-  if(configured) return configured;
-  // VTUGATE documentation example confirms WAEC uses service_id=1.
-  if(examName==='WAEC') return '1';
-  throw new Error(`VTUGATE service_id is not configured for ${examName}. Set ${envKey} in Render.`);
-}
-
-async function getVTUGateEducationPrice(exam,quantity=1){
-  if(vtuProviderName()!=="vtugate") throw new Error("Education pricing is currently configured for VTUGATE only.");
-  if(!VTU_API_KEY) throw new Error("VTU provider is not configured.");
-  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
-  // VTUGATE's documented endpoint is geteducationtypeprice (not geteducationprice).
-  const url=base+"/api/v1/geteducationtypeprice";
-  const examName=String(exam||'').trim().toUpperCase();
-  const qty=Math.max(1,Math.min(50,Number(quantity)||1));
-  const serviceId=vtugateEducationServiceId(examName);
-  // The documented endpoint accepts service_id only; quantity is applied by BOLTIV.
-  const form=new URLSearchParams({service_id:String(serviceId)});
-  const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
-  let data={}; try{data=await response.json();}catch{}
-  if(!response.ok||data?.status!==true) throw new Error(data?.message||`VTUGATE education pricing failed (${response.status})`);
-  const candidates=[data?.data?.price,data?.data?.amount,data?.price,data?.amount,data?.data?.unit_price,data?.data?.data?.price];
-  const unit=candidates.map(Number).find(n=>Number.isFinite(n)&&n>0);
-  if(!unit) throw new Error('VTUGATE returned no education price.');
-  return {unitPrice:Number(unit.toFixed(2)),total:Number((unit*qty).toFixed(2)),serviceId:String(serviceId),data};
-}
-
 async function processVTUTransaction(user,data){
 if(Boolean(await getPlatformSetting('maintenance_mode',false)))return{success:false,statusCode:503,message:'BOLTIV is currently in maintenance mode. Transactions are temporarily disabled.'};
 const service=await getService(data.service);
@@ -2762,22 +2737,6 @@ if(serviceKey(data.service)==='data') {
     pricing={...estimatedProviderCost(service,amount),cost:Number(wholesale.toFixed(2)),source:'live_data_plan'};
   } catch(error) {
     return {success:false,statusCode:502,message:error?.message||'Unable to verify the selected data plan.'};
-  }
-}
-if(serviceKey(data.service)==='education'){
-  const exam=clean(providerPayload.exam||providerPayload.exam_type||providerPayload.examType||providerPayload.provider||'').toUpperCase();
-  const quantity=Math.max(1,Math.min(50,Number(providerPayload.quantity||data.quantity||1)));
-  if(!['WAEC','NECO','JAMB','NABTEB'].includes(exam)) return {success:false,statusCode:400,message:'Select a valid education examination.'};
-  try{
-    const live=await getVTUGateEducationPrice(exam,quantity);
-    const expectedCustomer=customerPriceFromCost(live.total,pricingConfig(service));
-    if(expectedCustomer===null) return {success:false,statusCode:400,message:'Unable to price this education pin order.'};
-    if(Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'Education pin price has changed. Please refresh and try again.'};
-    pricingCostOverride=live.total;
-    pricing={...estimatedProviderCost(service,amount),cost:live.total,source:'live_education_price'};
-    providerPayload.exam=exam; providerPayload.exam_type=exam; providerPayload.quantity=quantity;
-  }catch(error){
-    return {success:false,statusCode:502,message:error?.message||'Unable to verify the education pin price.'};
   }
 }
 if(pricing.cost>amount+0.001){return {success:false,statusCode:400,message:"Service pricing would cost more than the customer price. Update the service pricing before enabling sales."};}
@@ -2928,7 +2887,7 @@ async function reconcilePendingTransactions(admin=null,req=null){
 
 async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
 async function setPlatformSetting(key,value){await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[key,JSON.stringify(value)]);}
-function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable',education:'education'})[v]||v;}
+function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable'})[v]||v;}
 async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
 async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
 
@@ -4344,35 +4303,6 @@ if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){
 }
 
 /*
-VTUGATE EDUCATION PRICE
-*/
-if(req.method==="POST"&&path==="/api/vtu/education/price"){
-  const rl=rateLimit(req,"education-price",30,60*1000);
-  if(!rl.allowed)return rateLimitedResponse(res,rl);
-  const user=await userFromToken(req);
-  if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-  try{
-    const b=await body(req);
-    const exam=clean(b.exam||b.exam_type||b.examType||b.provider||"").toUpperCase();
-    const quantity=Math.max(1,Math.min(50,Number(b.quantity)||1));
-    if(!["WAEC","NECO","JAMB","NABTEB"].includes(exam)){
-      return send(res,400,{success:false,message:"Select a valid education examination."});
-    }
-    const live=await getVTUGateEducationPrice(exam,quantity);
-    const service=await getService("education");
-    const pricing=pricingConfig(service);
-    const total=customerPriceFromCost(live.total,pricing);
-    if(total===null||!Number.isFinite(total)||total<=0){
-      return send(res,400,{success:false,message:"Unable to calculate the education pin price."});
-    }
-    return send(res,200,{success:true,exam,quantity,unitPrice:Number((total/quantity).toFixed(2)),total:Number(total.toFixed(2)),providerCost:Number(live.total.toFixed(2))});
-  }catch(error){
-    console.error("VTUGATE EDUCATION PRICE ERROR:",error?.message||error);
-    return send(res,502,{success:false,message:error?.message||"Unable to load education price right now."});
-  }
-}
-
-/*
 VTU TRANSACTION
 */
 
@@ -4540,7 +4470,7 @@ return;
 PUBLIC PLATFORM CONFIGURATION
 */
 if(req.method==='GET'&&path==='/api/pricing'){
-  const keys=['airtime','data','cable','electricity','education'];
+  const keys=['airtime','data','cable','electricity'];
   const out={};
   for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={markup_mode:p.markup_mode,markup_pct:p.markup_pct,markup_fixed:p.markup_fixed};}
   return send(res,200,{success:true,pricing:out});

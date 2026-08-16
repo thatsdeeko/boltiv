@@ -56,7 +56,7 @@ function normalizeTransaction(t){
   let meta=t.metadata;
   if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}}
   meta=meta&&typeof meta==="object"?meta:{};
-  return {...t,type,amount:Number(t.amount||0),createdAt:t.date||t.createdAt||"",phone:t.recipient||meta.phone||t.phone||"",network:meta.network||t.network||"",provider:meta.provider||t.provider||"",plan:meta.plan||meta.plan_name||t.plan||"",smartcard:meta.smartcard||meta.iuc||t.smartcard||"",meterNumber:meta.meterNumber||meta.meter||t.meterNumber||"",meterType:meta.meterType||t.meterType||"",id:t.reference||t.id};
+  return {...t,type,amount:Number(t.amount||0),createdAt:t.date||t.createdAt||"",phone:t.recipient||meta.phone||t.phone||"",network:meta.network||meta.network_provider||t.network||"",provider:meta.provider||t.provider||"",plan:meta.plan||meta.plan_name||t.plan||"",smartcard:meta.smartcard||meta.iuc||t.smartcard||"",meterNumber:meta.meterNumber||meta.meter||t.meterNumber||"",meterType:meta.meterType||t.meterType||"",id:t.reference||t.id};
 }
 async function syncTransactions(){
   const token=localStorage.getItem("boltivAuthToken")||"";

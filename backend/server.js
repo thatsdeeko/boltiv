@@ -3692,7 +3692,9 @@ const csrf=await adminCsrfToken(req);
 return send(res,200,{success:true,csrfToken:csrf});
 }
 
-if(req.method!=="GET"&&req.method!=="HEAD"&&path!=="/api/admin/login"){
+const isAdminRoute = path === "/api/admin" || path.startsWith("/api/admin/");
+
+if(isAdminRoute&&req.method!=="GET"&&req.method!=="HEAD"&&path!=="/api/admin/login"){
 const csrfCheck=await requireAdminCsrf(req);
 if(!csrfCheck.success)return send(res,csrfCheck.statusCode||403,csrfCheck);
 }

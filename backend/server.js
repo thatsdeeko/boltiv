@@ -338,6 +338,8 @@ admin_id BIGINT NOT NULL,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 expires_at TIMESTAMPTZ NOT NULL
 )`);
+// Backward-compatible migration for existing Boltiv databases.
+await db(`ALTER TABLE admin_sessions ADD COLUMN IF NOT EXISTS csrf_token TEXT`);
 await db(`CREATE TABLE IF NOT EXISTS admin_wallets(admin_id BIGINT PRIMARY KEY,balance NUMERIC(14,2) NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE TABLE IF NOT EXISTS admin_wallet_ledger(id BIGSERIAL PRIMARY KEY,admin_id BIGINT NOT NULL,type TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,balance_after NUMERIC(14,2) NOT NULL,reference TEXT UNIQUE NOT NULL,description TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS admin_wallet_ledger_admin_idx ON admin_wallet_ledger(admin_id,created_at DESC)`);
@@ -3630,7 +3632,11 @@ async function adminCsrfToken(req){
 const sessionToken=getAdminSessionToken(req);
 if(!sessionToken)return null;
 const r=await db(`SELECT csrf_token FROM admin_sessions WHERE token=$1 AND expires_at>NOW()`,[sessionToken]);
-return r.rows[0]?.csrf_token||null;
+if(!r.rows[0])return null;
+if(r.rows[0].csrf_token)return r.rows[0].csrf_token;
+const csrfToken=token();
+await db(`UPDATE admin_sessions SET csrf_token=$1 WHERE token=$2`,[csrfToken,sessionToken]);
+return csrfToken;
 }
 
 async function requireAdminCsrf(req){

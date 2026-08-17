@@ -2921,33 +2921,57 @@ function normalizeRequeryStatus(data){
   return "pending";
 }
 
+const PENDING_RECONCILE_INTERVAL_MS=Math.max(60*1000,Number(process.env.PENDING_RECONCILE_INTERVAL_MS||5*60*1000));
+const PENDING_STALE_AFTER_MS=Math.max(60*60*1000,Number(process.env.PENDING_STALE_AFTER_MS||48*60*60*1000));
+
 async function reconcilePendingTransactions(admin=null,req=null){
-  const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
+  const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date,metadata FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
   const results=[];
+  const now=Date.now();
   for(const t of r.rows){
+    const ageMs=Math.max(0,now-new Date(t.date).getTime());
+    const ageHours=Number((ageMs/3600000).toFixed(1));
+    const stale=ageMs>=PENDING_STALE_AFTER_MS;
+    const baseResult={...t,amount:Number(t.amount),age_hours:ageHours,stale};
     const q=await requeryVTUGateTransaction(t.reference);
     if(!q.configured || !q.success){
-      results.push({...t,amount:Number(t.amount),requery_status:"unavailable",message:q.message||"Provider status could not be checked."});
+      if(stale){
+        await db(`UPDATE transactions SET metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2 AND status IN ('processing','pending')`,[JSON.stringify({reconciliation:{state:'stale',checked_at:new Date().toISOString(),message:q.message||'Provider status could not be checked.'}}),t.reference]);
+      }
+      results.push({...baseResult,requery_status:'unavailable',message:q.message||'Provider status could not be checked.',reconciliation:stale?'stale':'waiting'});
       continue;
     }
     const status=normalizeRequeryStatus(q.data);
-    if(status==="successful"){
-      const finalized=await finalizeVTUTransaction(t.reference,q.data,false,{reconciled:true,requeryResponse:q.data});
+    if(status==='successful'){
+      const finalized=await finalizeVTUTransaction(t.reference,q.data,false,{reconciled:true,reconciledAt:new Date().toISOString(),requeryResponse:q.data});
       if(finalized){
-        await addNotification(t.user_id,"Transaction successful",`${t.service||"Service"} was confirmed successful. Reference: ${t.reference}`,"success");
-        results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:true});
-      }else results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:false});
-    }else if(status==="failed"){
-      const refund=await markTransactionFailedAndRefund(t.reference,"provider_requery_failed",q.data);
+        await addNotification(t.user_id,'Transaction successful',`${t.service||'Service'} was confirmed successful. Reference: ${t.reference}`,'success');
+        results.push({...baseResult,requery_status:'successful',resolved:true,reconciliation:'resolved'});
+      }else results.push({...baseResult,requery_status:'successful',resolved:false,reconciliation:'state_changed'});
+    }else if(status==='failed'){
+      const refund=await markTransactionFailedAndRefund(t.reference,'provider_requery_failed',q.data);
       if(refund.success){
-        await addNotification(t.user_id,"Transaction refunded",`${t.service||"Service"} failed and your wallet was refunded. Reference: ${t.reference}`,"error");
-        results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:true,refundReference:refund.refundReference||null});
-      }else results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:false,message:refund.message});
+        await addNotification(t.user_id,'Transaction refunded',`${t.service||'Service'} failed and your wallet was refunded. Reference: ${t.reference}`,'error');
+        results.push({...baseResult,requery_status:'failed',refunded:true,refundReference:refund.refundReference||null,reconciliation:'refunded'});
+      }else results.push({...baseResult,requery_status:'failed',refunded:false,message:refund.message,reconciliation:'refund_failed'});
     }else{
-      results.push({...t,amount:Number(t.amount),requery_status:"pending",resolved:false});
+      if(stale){
+        await db(`UPDATE transactions SET metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2 AND status IN ('processing','pending')`,[JSON.stringify({reconciliation:{state:'stale',checked_at:new Date().toISOString(),provider_status:'pending'}}),t.reference]);
+      }
+      results.push({...baseResult,requery_status:'pending',resolved:false,reconciliation:stale?'stale':'waiting'});
     }
   }
-  return {success:true,count:r.rows.length,resolved:results.filter(x=>x.resolved||x.refunded).length,transactions:results};
+  return {
+    success:true,
+    count:r.rows.length,
+    resolved:results.filter(x=>x.resolved||x.refunded).length,
+    successful:results.filter(x=>x.requery_status==='successful'&&x.resolved).length,
+    refunded:results.filter(x=>x.refunded).length,
+    stillPending:results.filter(x=>x.requery_status==='pending').length,
+    unavailable:results.filter(x=>x.requery_status==='unavailable').length,
+    stale:results.filter(x=>x.stale).length,
+    transactions:results
+  };
 }
 
 async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
@@ -5036,10 +5060,14 @@ console.log(
 `Frontend: ${FRONTEND_URL}`
 );
 
-// Reconcile provider-pending transactions every 5 minutes.
+// Reconcile provider-pending transactions automatically.
+// Run once shortly after startup, then continue on the configured interval.
+setTimeout(()=>{
+  reconcilePendingTransactions().catch(error=>console.error("INITIAL TRANSACTION RECONCILIATION ERROR:",error));
+},15*1000).unref();
 setInterval(()=>{
   reconcilePendingTransactions().catch(error=>console.error("AUTOMATIC TRANSACTION RECONCILIATION ERROR:",error));
-},5*60*1000).unref();
+},PENDING_RECONCILE_INTERVAL_MS).unref();
 
 console.log(
 `Admin configured: ${

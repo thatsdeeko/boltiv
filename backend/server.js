@@ -15,15 +15,6 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
 const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
-const BIGISUB_API_BASE_URL=(process.env.BIGISUB_API_BASE_URL||"https://api.bigisub.ng").replace(/\/+$/,'');
-const BIGISUB_API_TOKEN=String(process.env.BIGISUB_API_TOKEN||"").trim();
-// Bigisub's production API uses `Authorization: Token <token>` for the
-// permanent API token. Keep the env setting for backward compatibility, but
-// Betting is deliberately hard-locked to the documented Token scheme below.
-const BIGISUB_AUTH_SCHEME=String(process.env.BIGISUB_AUTH_SCHEME||"Token").trim()||"Token";
-const BIGISUB_BETTING_ENDPOINT=process.env.BIGISUB_BETTING_ENDPOINT||"/api/v2/betting/fund";
-const BIGISUB_SMS_ENDPOINT=process.env.BIGISUB_SMS_ENDPOINT||"/api/v2/sms/send";
-const BIGISUB_RECHARGE_PIN_ENDPOINT=process.env.BIGISUB_RECHARGE_PIN_ENDPOINT||"/api/v2/recharge-pin/purchase";
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -398,8 +389,8 @@ await db(`CREATE TABLE IF NOT EXISTS platform_settings(key TEXT PRIMARY KEY,valu
 await db(`CREATE TABLE IF NOT EXISTS services(key TEXT PRIMARY KEY,name TEXT NOT NULL,icon TEXT,enabled BOOLEAN NOT NULL DEFAULT TRUE,fee NUMERIC(14,2) NOT NULL DEFAULT 0,maintenance BOOLEAN NOT NULL DEFAULT FALSE,config JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
-for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['betting','Betting','🎰'],['sms','Bulk SMS','💬'],['recharge_pin','Recharge PIN','🔐']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
-await db(`DELETE FROM services WHERE key='education'`);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+await db(`DELETE FROM services WHERE key IN ('education','betting','sms','recharge_pin')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
 await db(`
@@ -2359,7 +2350,6 @@ function vtuProviderName(){
 }
 function providerForService(service){
   const key=serviceKey(service);
-  if(["betting","sms","recharge_pin"].includes(key)) return "bigisub";
   return vtuProviderName();
 }
 
@@ -2615,55 +2605,6 @@ function isVTUGateBundleUnavailable(providerData){
   return /cannot purchase|not available|unavailable|not currently|at the moment|explore other.*plans/.test(text);
 }
 
-function normalizeBigisubToken(rawToken){
-  let token=String(rawToken||"").trim();
-  // Prevent accidental values such as `Token abc` or `Bearer abc` from
-  // becoming `Token Token abc` / `Token Bearer abc`.
-  token=token.replace(/^Bearer\s+/i,"").replace(/^Token\s+/i,"").trim();
-  return token;
-}
-
-function bigisubAuthorization(service){
-  const token=normalizeBigisubToken(BIGISUB_API_TOKEN);
-  // Betting must always use Bigisub's documented permanent-token scheme.
-  const scheme=service==='betting'?'Token':BIGISUB_AUTH_SCHEME;
-  return token?`${scheme} ${token}`:"";
-}
-
-async function parseBigisubResponse(response){
-  const contentType=String(response.headers.get('content-type')||'').toLowerCase();
-  let data={};
-  let rawText='';
-  try{
-    if(contentType.includes('application/json')){
-      data=await response.json();
-    }else{
-      rawText=await response.text();
-      if(rawText.trim()){
-        try{data=JSON.parse(rawText);}catch{data={message:rawText.trim()};}
-      }
-    }
-  }catch(error){
-    try{rawText=await response.text();}catch{}
-    data=rawText.trim()?{message:rawText.trim()}:{};
-  }
-  if(data===null||data===undefined)data={};
-  if(typeof data!=='object')data={message:String(data)};
-  if(rawText && !data.raw_response) data.raw_response=rawText;
-  return data;
-}
-
-function extractBigisubError(providerData,statusCode){
-  const message=extractVTUProviderMessage(providerData);
-  const code=providerData?.code||providerData?.error_code||providerData?.data?.code||providerData?.data?.error_code||null;
-  const status=providerData?.status||providerData?.data?.status||null;
-  return {
-    message:message||`Bigisub returned HTTP ${statusCode}.`,
-    code:code?String(code):null,
-    status:status?String(status):null
-  };
-}
-
 async function findVTUGateDataFallback(originalPayload,providerData){
   try{
     const network=clean(originalPayload?.network).toUpperCase();
@@ -2720,64 +2661,6 @@ async function findVTUGateDataFallback(originalPayload,providerData){
 async function callVTUProvider(payload){
   const service=serviceKey(payload?.service||"");
   const provider=providerForService(service);
-
-  if(provider==='bigisub'){
-    if(!BIGISUB_API_TOKEN){
-      return{success:false,configured:false,message:"Bigisub provider is not configured."};
-    }
-    const endpointMap={betting:BIGISUB_BETTING_ENDPOINT,sms:BIGISUB_SMS_ENDPOINT,recharge_pin:BIGISUB_RECHARGE_PIN_ENDPOINT};
-    let endpoints=[endpointMap[service]].filter(Boolean);
-    if(service==='recharge_pin') endpoints=[...new Set([...endpoints,'/api/v2/rechargepin/purchase','/api/v2/recharge/pin/purchase'])];
-    const base=BIGISUB_API_BASE_URL;
-    const p={...(payload||{})};
-    delete p.service;
-    delete p.providerPayload;
-    let requestBody={};
-    if(service==='betting'){
-      // Bigisub v2 betting/fund expects the betting platform/service_id,
-      // customer_id, amount and the Bigisub 4-digit transaction PIN.
-      const customerId=clean(p.customer_id||p.customerId||p.recipient||'');
-      const serviceId=clean(p.service_id||p.platform||p.provider||'').toLowerCase();
-      const pin=clean(p.pin||p.pin_code||'');
-      requestBody={
-        service_id:serviceId,
-        customer_id:customerId,
-        amount:Number(p.amount||0),
-        pin
-      };
-      // Bigisub's docs show the PIN as a common purchase field; do not send
-      // Boltiv's internal transaction PIN under a different field name.
-    }else if(service==='sms'){
-      const recipients=p.recipients||p.recipient||p.phone_number||p.phone||'';
-      requestBody={...p,recipients,phone_number:typeof recipients==='string'?recipients.split(',')[0].trim():recipients,message:p.message||p.body||'',sender:p.sender||p.sender_id||'BOLTIV'};
-    }else if(service==='recharge_pin'){
-      const network=clean(p.network||p.network_provider||p.service_id||'').toLowerCase();
-      const value=Number(p.value||p.denomination||p.amount_per_pin||p.plan_value||0);
-      const quantity=Math.max(1,Number(p.quantity||1));
-      requestBody={...p,network,service_id:p.service_id||network,value,quantity,amount:Number(p.amount||value*quantity)};
-      if(p.plan===undefined) requestBody.plan=p.plan_id||p.plan_code||'';
-    }else requestBody=p;
-    for(const endpoint of endpoints){
-      try{
-        const authorization=bigisubAuthorization(service);
-        const response=await fetch(base+endpoint,{method:'POST',headers:{Authorization:authorization,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(requestBody)});
-        const data=await parseBigisubResponse(response);
-        const rawStatus=String(data?.status||data?.data?.status||'').toLowerCase();
-        const providerOk=typeof data?.status==='boolean'?data.status:(['success','successful','completed','processing','pending','queued','initiated','completed-api','processing-api','queued-api','pending-api'].includes(rawStatus)||response.ok&&rawStatus==='');
-        if(!response.ok && [404,405].includes(response.status) && service==='recharge_pin' && endpoint!==endpoints[endpoints.length-1]) continue;
-        if(!response.ok || !providerOk){
-          const providerError=extractBigisubError(data,response.status);
-          console.error('BIGISUB PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,error:providerError,data}));
-          return{success:false,configured:true,statusCode:response.status,data,error:true,message:providerError.message,provider_code:providerError.code,provider_status:providerError.status};
-        }
-        return{success:true,configured:true,statusCode:response.status,data};
-      }catch(error){
-        console.error('BIGISUB PROVIDER REQUEST ERROR:',error?.message||error);
-        if(endpoint===endpoints[endpoints.length-1]) return{success:false,configured:true,statusCode:502,data:{},error:true,message:'Bigisub provider request failed.'};
-      }
-    }
-    return{success:false,configured:true,statusCode:502,data:{},message:'Bigisub endpoint is not configured.'};
-  }
 
   if(!VTU_API_KEY){
     return{success:false,configured:false,message:"VTU provider is not configured."};
@@ -2904,7 +2787,6 @@ if(pricing.cost>amount+0.001){return {success:false,statusCode:400,message:"Serv
 providerPayload.amount=pricingCostOverride===null?pricing.cost:pricingCostOverride;
 const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
 if(pinCheck.success){
-  // Bigisub requires its own 4-digit transaction PIN on purchase requests.
   // Boltiv's transaction PIN is the PIN the user enters for this purchase.
   providerPayload.pin=data.transactionPin;
 }
@@ -3070,7 +2952,7 @@ async function reconcilePendingTransactions(admin=null,req=null){
 
 async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
 async function setPlatformSetting(key,value){await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[key,JSON.stringify(value)]);}
-function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable','betting':'betting','betting wallet':'betting','sms':'sms','bulk sms':'sms','recharge pin':'recharge_pin','recharge_pin':'recharge_pin','recharge-card':'recharge_pin'})[v]||v;}
+function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable'})[v]||v;}
 async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
 async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
 
@@ -4609,7 +4491,6 @@ database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
 vtu:Boolean(process.env.VTU_API_KEY&& (process.env.VTU_API_BASE_URL||process.env.VTU_API_URL)),
-bigisub:Boolean(BIGISUB_API_TOKEN&&BIGISUB_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()

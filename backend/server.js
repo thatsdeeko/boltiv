@@ -2283,7 +2283,7 @@ async function finalizeVTUTransaction(referenceValue, providerData, pending, pri
   const status=pending?'pending':'successful';
   const meta={providerResponse:providerData};
   if(pricingMeta)Object.assign(meta,{pricing:pricingMeta});
-  const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,providerData?.reference||providerData?.data?.reference||null,JSON.stringify(meta),referenceValue]);
+  const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,extractVTUProviderReference(providerData),JSON.stringify(meta),referenceValue]);
   const tx=result.rows[0]||null;
   if(tx && status==='successful'){
     const credited=await creditAdminRevenueFromSale(Number(tx.amount),referenceValue,`Customer payment received for ${tx.service||'VTU service'}`);
@@ -2517,6 +2517,36 @@ async function buildVTUGateForm(payload){
     for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
   }
   return form;
+}
+
+function extractVTUProviderReference(providerData){
+  const candidates=[
+    providerData?.reference,
+    providerData?.transaction_id,
+    providerData?.transactionId,
+    providerData?.transactionID,
+    providerData?.id,
+    providerData?.data?.reference,
+    providerData?.data?.transaction_id,
+    providerData?.data?.transactionId,
+    providerData?.data?.transactionID,
+    providerData?.data?.id,
+    providerData?.data?.data?.reference,
+    providerData?.data?.data?.transaction_id,
+    providerData?.data?.data?.transactionId,
+    providerData?.data?.data?.transactionID,
+    providerData?.data?.data?.id,
+    providerData?.result?.reference,
+    providerData?.result?.transaction_id,
+    providerData?.result?.transactionId,
+    providerData?.result?.id,
+    providerData?.transaction?.reference,
+    providerData?.transaction?.transaction_id,
+    providerData?.transaction?.transactionId,
+    providerData?.transaction?.id
+  ];
+  const value=candidates.find(v=>v!==undefined&&v!==null&&String(v).trim()!=="");
+  return value===undefined?null:String(value).trim();
 }
 
 function extractVTUProviderMessage(providerData){
@@ -3339,6 +3369,7 @@ t.reference,
 t.status,
 t.date,
 t.metadata,
+t.provider_reference,
 u.name,
 u.email
 FROM transactions t
@@ -3363,7 +3394,8 @@ status:item.status,
 date:item.date,
 metadata:item.metadata||{},
 grossProfit:Number(item.metadata?.pricing?.grossProfit||0),
-providerCost:Number(item.metadata?.pricing?.providerCost||0)
+providerCost:Number(item.metadata?.pricing?.providerCost||0),
+provider_reference:item.provider_reference||extractVTUProviderReference(item.metadata?.providerResponse||item.metadata?.provider_response||item.metadata)||null
 }));
 
 }

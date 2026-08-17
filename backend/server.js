@@ -64,13 +64,14 @@ res.writeHead(status,{
 "Access-Control-Allow-Origin":res.__corsOrigin||DEFAULT_FRONTEND_ORIGIN,
 "Vary":"Origin",
 "Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
-"Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key",
+"Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key,X-Admin-CSRF",
 "Access-Control-Allow-Credentials":"true",
 "X-Content-Type-Options":"nosniff",
 "X-Frame-Options":"DENY",
 "Referrer-Policy":"strict-origin-when-cross-origin",
 "Cache-Control":"no-store"
 });
+if(FRONTEND_URL.startsWith("https://"))res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
 res.end(JSON.stringify(data));
 return true;
 }
@@ -1529,6 +1530,7 @@ WHERE expires_at<NOW()`
 
 const sessionToken=
 token();
+const csrfToken=token();
 
 await recordSecurityEvent('admin_login_success','info',{email:admin.email},req,admin.id);
 
@@ -1536,16 +1538,19 @@ await db(
 `INSERT INTO admin_sessions(
 token,
 admin_id,
-expires_at
+expires_at,
+csrf_token
 )
 VALUES(
 $1,
 $2,
-NOW()+INTERVAL '24 hours'
+NOW()+INTERVAL '24 hours',
+$3
 )`,
 [
 sessionToken,
-admin.id
+admin.id,
+csrfToken
 ]
 );
 
@@ -2921,57 +2926,33 @@ function normalizeRequeryStatus(data){
   return "pending";
 }
 
-const PENDING_RECONCILE_INTERVAL_MS=Math.max(60*1000,Number(process.env.PENDING_RECONCILE_INTERVAL_MS||5*60*1000));
-const PENDING_STALE_AFTER_MS=Math.max(60*60*1000,Number(process.env.PENDING_STALE_AFTER_MS||48*60*60*1000));
-
 async function reconcilePendingTransactions(admin=null,req=null){
-  const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date,metadata FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
+  const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
   const results=[];
-  const now=Date.now();
   for(const t of r.rows){
-    const ageMs=Math.max(0,now-new Date(t.date).getTime());
-    const ageHours=Number((ageMs/3600000).toFixed(1));
-    const stale=ageMs>=PENDING_STALE_AFTER_MS;
-    const baseResult={...t,amount:Number(t.amount),age_hours:ageHours,stale};
     const q=await requeryVTUGateTransaction(t.reference);
     if(!q.configured || !q.success){
-      if(stale){
-        await db(`UPDATE transactions SET metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2 AND status IN ('processing','pending')`,[JSON.stringify({reconciliation:{state:'stale',checked_at:new Date().toISOString(),message:q.message||'Provider status could not be checked.'}}),t.reference]);
-      }
-      results.push({...baseResult,requery_status:'unavailable',message:q.message||'Provider status could not be checked.',reconciliation:stale?'stale':'waiting'});
+      results.push({...t,amount:Number(t.amount),requery_status:"unavailable",message:q.message||"Provider status could not be checked."});
       continue;
     }
     const status=normalizeRequeryStatus(q.data);
-    if(status==='successful'){
-      const finalized=await finalizeVTUTransaction(t.reference,q.data,false,{reconciled:true,reconciledAt:new Date().toISOString(),requeryResponse:q.data});
+    if(status==="successful"){
+      const finalized=await finalizeVTUTransaction(t.reference,q.data,false,{reconciled:true,requeryResponse:q.data});
       if(finalized){
-        await addNotification(t.user_id,'Transaction successful',`${t.service||'Service'} was confirmed successful. Reference: ${t.reference}`,'success');
-        results.push({...baseResult,requery_status:'successful',resolved:true,reconciliation:'resolved'});
-      }else results.push({...baseResult,requery_status:'successful',resolved:false,reconciliation:'state_changed'});
-    }else if(status==='failed'){
-      const refund=await markTransactionFailedAndRefund(t.reference,'provider_requery_failed',q.data);
+        await addNotification(t.user_id,"Transaction successful",`${t.service||"Service"} was confirmed successful. Reference: ${t.reference}`,"success");
+        results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:true});
+      }else results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:false});
+    }else if(status==="failed"){
+      const refund=await markTransactionFailedAndRefund(t.reference,"provider_requery_failed",q.data);
       if(refund.success){
-        await addNotification(t.user_id,'Transaction refunded',`${t.service||'Service'} failed and your wallet was refunded. Reference: ${t.reference}`,'error');
-        results.push({...baseResult,requery_status:'failed',refunded:true,refundReference:refund.refundReference||null,reconciliation:'refunded'});
-      }else results.push({...baseResult,requery_status:'failed',refunded:false,message:refund.message,reconciliation:'refund_failed'});
+        await addNotification(t.user_id,"Transaction refunded",`${t.service||"Service"} failed and your wallet was refunded. Reference: ${t.reference}`,"error");
+        results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:true,refundReference:refund.refundReference||null});
+      }else results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:false,message:refund.message});
     }else{
-      if(stale){
-        await db(`UPDATE transactions SET metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2 AND status IN ('processing','pending')`,[JSON.stringify({reconciliation:{state:'stale',checked_at:new Date().toISOString(),provider_status:'pending'}}),t.reference]);
-      }
-      results.push({...baseResult,requery_status:'pending',resolved:false,reconciliation:stale?'stale':'waiting'});
+      results.push({...t,amount:Number(t.amount),requery_status:"pending",resolved:false});
     }
   }
-  return {
-    success:true,
-    count:r.rows.length,
-    resolved:results.filter(x=>x.resolved||x.refunded).length,
-    successful:results.filter(x=>x.requery_status==='successful'&&x.resolved).length,
-    refunded:results.filter(x=>x.refunded).length,
-    stillPending:results.filter(x=>x.requery_status==='pending').length,
-    unavailable:results.filter(x=>x.requery_status==='unavailable').length,
-    stale:results.filter(x=>x.stale).length,
-    transactions:results
-  };
+  return {success:true,count:r.rows.length,resolved:results.filter(x=>x.resolved||x.refunded).length,transactions:results};
 }
 
 async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
@@ -3639,6 +3620,26 @@ payments
 }
 
 
+function secureTokenEquals(a,b){
+const aa=Buffer.from(String(a||''));
+const bb=Buffer.from(String(b||''));
+return aa.length>0&&aa.length===bb.length&&crypto.timingSafeEqual(aa,bb);
+}
+
+async function adminCsrfToken(req){
+const sessionToken=getAdminSessionToken(req);
+if(!sessionToken)return null;
+const r=await db(`SELECT csrf_token FROM admin_sessions WHERE token=$1 AND expires_at>NOW()`,[sessionToken]);
+return r.rows[0]?.csrf_token||null;
+}
+
+async function requireAdminCsrf(req){
+const expected=await adminCsrfToken(req);
+const provided=String(req.headers['x-admin-csrf']||'');
+if(!expected||!secureTokenEquals(provided,expected))return {success:false,statusCode:403,message:'CSRF validation failed.'};
+return {success:true};
+}
+
 async function handleAdminRoutes(
 req,
 res,
@@ -3678,6 +3679,17 @@ result
 
 }
 
+if(req.method==="GET"&&path==="/api/admin/csrf"){
+const admin=await adminFromToken(req);
+if(!admin)return send(res,401,{success:false,message:"Unauthorized."});
+const csrf=await adminCsrfToken(req);
+return send(res,200,{success:true,csrfToken:csrf});
+}
+
+if(req.method!=="GET"&&req.method!=="HEAD"&&path!=="/api/admin/login"){
+const csrfCheck=await requireAdminCsrf(req);
+if(!csrfCheck.success)return send(res,csrfCheck.statusCode||403,csrfCheck);
+}
 
 /*
 ADMIN SESSION CHECK
@@ -4015,6 +4027,8 @@ if(req.method==="GET"&&path==="/api/security"){
 const security=await getSecurity(user.user_id); return send(res,200,{success:true,transactionPinSet:Boolean(security?.transaction_pin_hash)});
 }
 if(req.method==="POST"&&path==="/api/security/transaction-pin"){
+const rl=rateLimit(req,`transaction-pin-change:${user.user_id}`,5,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=await body(req); const result=await setTransactionPin(user.user_id,b.pin,b.currentPin||""); return send(res,result.success?200:400,result);
 }
 if(req.method==="GET"&&path==="/api/transactions/detail"){
@@ -4447,7 +4461,7 @@ res.writeHead(204,{
 "Access-Control-Allow-Methods":
 "GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":
-"Content-Type,Authorization,X-Idempotency-Key",
+"Content-Type,Authorization,X-Idempotency-Key,X-Admin-CSRF",
 "Access-Control-Allow-Credentials":"true"
 });
 
@@ -5060,14 +5074,10 @@ console.log(
 `Frontend: ${FRONTEND_URL}`
 );
 
-// Reconcile provider-pending transactions automatically.
-// Run once shortly after startup, then continue on the configured interval.
-setTimeout(()=>{
-  reconcilePendingTransactions().catch(error=>console.error("INITIAL TRANSACTION RECONCILIATION ERROR:",error));
-},15*1000).unref();
+// Reconcile provider-pending transactions every 5 minutes.
 setInterval(()=>{
   reconcilePendingTransactions().catch(error=>console.error("AUTOMATIC TRANSACTION RECONCILIATION ERROR:",error));
-},PENDING_RECONCILE_INTERVAL_MS).unref();
+},5*60*1000).unref();
 
 console.log(
 `Admin configured: ${

@@ -59,6 +59,7 @@ return send(res,429,{success:false,message:"Too many requests. Please try again 
 setInterval(()=>{const now=Date.now();for(const [k,v] of rateBuckets){if(v.resetAt<=now)rateBuckets.delete(k);}},10*60*1000).unref();
 
 function send(res,status,data){
+if(FRONTEND_URL.startsWith("https://"))res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
 res.writeHead(status,{
 "Content-Type":"application/json",
 "Access-Control-Allow-Origin":res.__corsOrigin||DEFAULT_FRONTEND_ORIGIN,
@@ -71,7 +72,6 @@ res.writeHead(status,{
 "Referrer-Policy":"strict-origin-when-cross-origin",
 "Cache-Control":"no-store"
 });
-if(FRONTEND_URL.startsWith("https://"))res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
 res.end(JSON.stringify(data));
 return true;
 }

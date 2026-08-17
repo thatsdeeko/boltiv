@@ -10,6 +10,7 @@ Authentication follows the Bigisub documentation: Authorization: Token <permanen
 Required Render environment variables:
 BIGISUB_API_BASE_URL=https://api.bigisub.ng
 BIGISUB_API_TOKEN=<your permanent Bigisub API token>
+BIGISUB_AUTH_SCHEME=Token
 BIGISUB_BETTING_ENDPOINT=/api/v2/betting/fund
 BIGISUB_SMS_ENDPOINT=/api/v2/sms/send
 BIGISUB_RECHARGE_PIN_ENDPOINT=/api/v2/recharge-pin/purchase
@@ -17,3 +18,7 @@ BIGISUB_RECHARGE_PIN_ENDPOINT=/api/v2/recharge-pin/purchase
 The Recharge PIN endpoint is configurable because the public Bigisub documentation page currently exposes the category and common fields but not the endpoint text in its indexed HTML. The backend also tries two common fallback endpoint names if the configured endpoint returns 404/405.
 
 VTUGATE remains the provider for Airtime, Data, Cable TV and Electricity.
+
+Betting request body sent to Bigisub v2 /betting/fund:
+{ service_id, customer_id, amount, pin }
+Boltiv no longer sends phone_number as a substitute for customer_id. The provider error response is surfaced to the user and stored as provider_message/provider_code/provider_status/provider_reference.

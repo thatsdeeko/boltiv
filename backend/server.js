@@ -17,6 +17,7 @@ const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"h
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
 const BIGISUB_API_BASE_URL=(process.env.BIGISUB_API_BASE_URL||"https://api.bigisub.ng").replace(/\/+$/,'');
 const BIGISUB_API_TOKEN=process.env.BIGISUB_API_TOKEN||"";
+const BIGISUB_AUTH_SCHEME=String(process.env.BIGISUB_AUTH_SCHEME||"Token").trim()||"Token";
 const BIGISUB_BETTING_ENDPOINT=process.env.BIGISUB_BETTING_ENDPOINT||"/api/v2/betting/fund";
 const BIGISUB_SMS_ENDPOINT=process.env.BIGISUB_SMS_ENDPOINT||"/api/v2/sms/send";
 const BIGISUB_RECHARGE_PIN_ENDPOINT=process.env.BIGISUB_RECHARGE_PIN_ENDPOINT||"/api/v2/recharge-pin/purchase";
@@ -2568,15 +2569,40 @@ function extractVTUProviderReference(providerData){
 function extractVTUProviderMessage(providerData){
   const candidates=[
     providerData?.message,
+    providerData?.error,
+    providerData?.error_message,
     providerData?.provider_message,
+    providerData?.detail,
+    providerData?.description,
+    providerData?.errors?.message,
+    providerData?.errors?.error,
     providerData?.data?.message,
+    providerData?.data?.error,
+    providerData?.data?.error_message,
     providerData?.data?.provider_message,
+    providerData?.data?.detail,
+    providerData?.data?.description,
+    providerData?.data?.errors?.message,
+    providerData?.data?.errors?.error,
     providerData?.data?.data?.message,
-    providerData?.data?.data?.provider_message
+    providerData?.data?.data?.error,
+    providerData?.data?.data?.error_message,
+    providerData?.data?.data?.provider_message,
+    providerData?.data?.data?.detail,
+    providerData?.result?.message,
+    providerData?.result?.error,
+    providerData?.result?.error_message
   ];
   for(const value of candidates){
-    const text=clean(value);
-    if(text) return text;
+    if(Array.isArray(value)){
+      const text=value.map(v=>typeof v==='string'?v:(v?.message||v?.error||v?.detail||'')).filter(Boolean).join('; ');
+      if(text)return text;
+    }else if(value&&typeof value==='object'){
+      const text=value.message||value.error||value.detail;
+      if(text)return String(text);
+    }else if(value!==undefined&&value!==null&&String(value).trim()!==''){
+      return String(value).trim();
+    }
   }
   return '';
 }
@@ -2656,8 +2682,19 @@ async function callVTUProvider(payload){
     delete p.providerPayload;
     let requestBody={};
     if(service==='betting'){
-      const customerId=clean(p.customer_id||p.customerId||p.phone_number||p.phone||p.recipient||'');
-      requestBody={...p,customer_id:customerId,phone_number:customerId,amount:Number(p.amount||0)};
+      // Bigisub v2 betting/fund expects the betting platform/service_id,
+      // customer_id, amount and the Bigisub 4-digit transaction PIN.
+      const customerId=clean(p.customer_id||p.customerId||p.recipient||'');
+      const serviceId=clean(p.service_id||p.platform||p.provider||'').toLowerCase();
+      const pin=clean(p.pin||p.pin_code||'');
+      requestBody={
+        service_id:serviceId,
+        customer_id:customerId,
+        amount:Number(p.amount||0),
+        pin
+      };
+      // Bigisub's docs show the PIN as a common purchase field; do not send
+      // Boltiv's internal transaction PIN under a different field name.
     }else if(service==='sms'){
       const recipients=p.recipients||p.recipient||p.phone_number||p.phone||'';
       requestBody={...p,recipients,phone_number:typeof recipients==='string'?recipients.split(',')[0].trim():recipients,message:p.message||p.body||'',sender:p.sender||p.sender_id||'BOLTIV'};
@@ -2670,7 +2707,7 @@ async function callVTUProvider(payload){
     }else requestBody=p;
     for(const endpoint of endpoints){
       try{
-        const response=await fetch(base+endpoint,{method:'POST',headers:{Authorization:`Token ${BIGISUB_API_TOKEN}`,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(requestBody)});
+        const response=await fetch(base+endpoint,{method:'POST',headers:{Authorization:`${BIGISUB_AUTH_SCHEME} ${BIGISUB_API_TOKEN}`,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(requestBody)});
         let data={};try{data=await response.json();}catch{data={};}
         const rawStatus=String(data?.status||data?.data?.status||'').toLowerCase();
         const providerOk=typeof data?.status==='boolean'?data.status:(['success','successful','completed','processing','pending','queued','initiated','completed-api','processing-api','queued-api','pending-api'].includes(rawStatus)||response.ok&&rawStatus==='');
@@ -2809,6 +2846,11 @@ if(pricing.cost>amount+0.001){return {success:false,statusCode:400,message:"Serv
 // The customer pays the marked-up price; the provider receives only the wholesale amount.
 providerPayload.amount=pricingCostOverride===null?pricing.cost:pricingCostOverride;
 const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
+if(pinCheck.success){
+  // Bigisub requires its own 4-digit transaction PIN on purchase requests.
+  // Boltiv's transaction PIN is the PIN the user enters for this purchase.
+  providerPayload.pin=data.transactionPin;
+}
 if(!pinCheck.success) return {success:false,statusCode:401,message:pinCheck.message,code:"INVALID_TRANSACTION_PIN"};
 const rawIdempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
 const idempotencyKey=crypto.createHash("sha256").update(`${userId}:${rawIdempotencyKey}`).digest("hex");
@@ -2875,7 +2917,18 @@ if(!providerResult.success){
 const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
 const providerMessage=extractVTUProviderMessage(providerData);
 await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
-return {success:false,statusCode:400,message:providerMessage||"VTU transaction failed. Your wallet has been refunded.",provider_message:providerMessage||null,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};
+return {
+  success:false,
+  statusCode:400,
+  message:providerMessage||"Betting transaction failed. Your wallet has been refunded.",
+  provider_message:providerMessage||null,
+  provider_code:providerData?.code||providerData?.error_code||providerData?.data?.code||providerData?.data?.error_code||null,
+  provider_status:providerData?.status||providerData?.data?.status||null,
+  provider_reference:extractVTUProviderReference(providerData),
+  reference:referenceValue,
+  status:"failed",
+  balance:(await getWallet(userId))?.balance||0
+};
 }
 const providerStatusRaw=String(providerData.status||providerData.data?.status||providerData.data?.order_status||providerData.data?.data?.status||"").toLowerCase();
 const providerMessage=String(providerData.message||providerData.data?.message||providerData.data?.provider_message||"").toLowerCase();

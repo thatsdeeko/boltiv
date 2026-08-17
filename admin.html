@@ -750,11 +750,22 @@ ENABLED
 
 const API="https://boltiv-backend.onrender.com";
 let sessionReady = false;
+let adminCsrfToken = "";
 let users=[],transactions=[],payments=[];
 const $=id=>document.getElementById(id);
 function esc(v){return String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+async function ensureAdminCsrf(){
+ if(adminCsrfToken)return adminCsrfToken;
+ const r=await fetch(API+"/api/admin/csrf",{credentials:"include"});
+ let d={};try{d=await r.json()}catch{}
+ if(!r.ok||!d.csrfToken)throw Error(d.message||"Unable to initialize admin security token.");
+ adminCsrfToken=d.csrfToken;
+ return adminCsrfToken;
+}
 async function api(path,opt={}){
  const headers={"Content-Type":"application/json",...(opt.headers||{})};
+ const method=String(opt.method||"GET").toUpperCase();
+ if(method!=="GET"&&method!=="HEAD"&&path!=="/api/admin/login")headers["X-Admin-CSRF"]=await ensureAdminCsrf();
  const r=await fetch(API+path, {credentials:"include",...opt,headers});
  let d={};try{d=await r.json()}catch{}
  if(r.status===401){showLogin();}
@@ -834,10 +845,9 @@ async function loadPending(){
   const d=await api("/api/admin/transactions/pending");
   const a=d.transactions||[];
   $("pendingBox").style.display="block";
-  $("pendingCount").textContent=Number(d.stillPending??a.filter(x=>x.requery_status==='pending').length);
-  const summary=`<div style="margin:0 0 10px;font-size:10px;color:#666">Checked: <b>${Number(d.count||0)}</b> • Resolved: <b>${Number(d.resolved||0)}</b> • Refunded: <b>${Number(d.refunded||0)}</b> • Still pending: <b>${Number(d.stillPending||0)}</b> • Stale: <b>${Number(d.stale||0)}</b></div>`;
-  if(!a.length){$("pendingArea").innerHTML=summary+'<div class="empty">No pending transactions.</div>';return;}
-  $("pendingArea").innerHTML=summary+'<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>SERVICE</th><th>AMOUNT</th><th>RESULT</th><th>PROVIDER REF</th><th>AGE</th></tr></thead><tbody>'+a.map(t=>{const result=t.resolved?'RESOLVED':t.refunded?'REFUNDED':t.requery_status==='failed'?'REFUND FAILED':t.requery_status==='successful'?'SUCCESSFUL':t.stale?'STALE / CHECK PROVIDER':t.requery_status==='unavailable'?'UNAVAILABLE':'STILL PENDING';const cls=t.resolved||t.refunded?'successful':t.requery_status==='failed'?'failed':'pending';return '<tr><td>'+esc(t.reference)+'</td><td>'+esc(t.service)+'</td><td class="amount">₦'+Number(t.amount||0).toLocaleString()+'</td><td><span class="badge '+cls+'">'+esc(result)+'</span></td><td>'+esc(t.provider_reference||"—")+'</td><td>'+esc(String(t.age_hours??0))+'h</td></tr>'}).join('')+'</tbody></table></div>';
+  $("pendingCount").textContent=a.length;
+  if(!a.length){$("pendingArea").innerHTML='<div class="empty">No pending transactions.</div>';return;}
+  $("pendingArea").innerHTML='<div class="table-wrap"><table><thead><tr><th>REFERENCE</th><th>SERVICE</th><th>AMOUNT</th><th>STATUS</th><th>PROVIDER REF</th><th>DATE</th></tr></thead><tbody>'+a.map(t=>'<tr><td>'+esc(t.reference)+'</td><td>'+esc(t.service)+'</td><td class="amount">₦'+Number(t.amount||0).toLocaleString()+'</td><td><span class="badge pending">'+esc(t.status)+'</span></td><td>'+esc(t.provider_reference||"—")+'</td><td>'+new Date(t.date).toLocaleString()+'</td></tr>').join('')+'</tbody></table></div>';
  }catch(e){
   $("pendingBox").style.display="block";
   $("pendingArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';

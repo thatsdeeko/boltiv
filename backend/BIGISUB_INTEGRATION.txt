@@ -1,0 +1,19 @@
+BOLTIV BIGISUB INTEGRATION
+
+Bigisub is used as the provider for:
+- Betting
+- Bulk SMS
+- Recharge PIN
+
+Authentication follows the Bigisub documentation: Authorization: Token <permanent API token>.
+
+Required Render environment variables:
+BIGISUB_API_BASE_URL=https://api.bigisub.ng
+BIGISUB_API_TOKEN=<your permanent Bigisub API token>
+BIGISUB_BETTING_ENDPOINT=/api/v2/betting/fund
+BIGISUB_SMS_ENDPOINT=/api/v2/sms/send
+BIGISUB_RECHARGE_PIN_ENDPOINT=/api/v2/recharge-pin/purchase
+
+The Recharge PIN endpoint is configurable because the public Bigisub documentation page currently exposes the category and common fields but not the endpoint text in its indexed HTML. The backend also tries two common fallback endpoint names if the configured endpoint returns 404/405.
+
+VTUGATE remains the provider for Airtime, Data, Cable TV and Electricity.

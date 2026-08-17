@@ -15,6 +15,11 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
 const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
+const BIGISUB_API_BASE_URL=(process.env.BIGISUB_API_BASE_URL||"https://api.bigisub.ng").replace(/\/+$/,'');
+const BIGISUB_API_TOKEN=process.env.BIGISUB_API_TOKEN||"";
+const BIGISUB_BETTING_ENDPOINT=process.env.BIGISUB_BETTING_ENDPOINT||"/api/v2/betting/fund";
+const BIGISUB_SMS_ENDPOINT=process.env.BIGISUB_SMS_ENDPOINT||"/api/v2/sms/send";
+const BIGISUB_RECHARGE_PIN_ENDPOINT=process.env.BIGISUB_RECHARGE_PIN_ENDPOINT||"/api/v2/recharge-pin/purchase";
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -389,7 +394,7 @@ await db(`CREATE TABLE IF NOT EXISTS platform_settings(key TEXT PRIMARY KEY,valu
 await db(`CREATE TABLE IF NOT EXISTS services(key TEXT PRIMARY KEY,name TEXT NOT NULL,icon TEXT,enabled BOOLEAN NOT NULL DEFAULT TRUE,fee NUMERIC(14,2) NOT NULL DEFAULT 0,maintenance BOOLEAN NOT NULL DEFAULT FALSE,config JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
-for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['betting','Betting','🎰'],['sms','Bulk SMS','💬'],['recharge_pin','Recharge PIN','🔐']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
 await db(`DELETE FROM services WHERE key='education'`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
@@ -2348,6 +2353,11 @@ const PAYSTACK_API_URL=
 function vtuProviderName(){
   return String(process.env.VTU_PROVIDER||"vtugate").trim().toLowerCase();
 }
+function providerForService(service){
+  const key=serviceKey(service);
+  if(["betting","sms","recharge_pin"].includes(key)) return "bigisub";
+  return vtuProviderName();
+}
 
 function vtugateEndpoint(service){
   const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'');
@@ -2526,6 +2536,12 @@ function extractVTUProviderReference(providerData){
     providerData?.transactionId,
     providerData?.transactionID,
     providerData?.id,
+    providerData?.order_id,
+    providerData?.job_id,
+    providerData?.request_id,
+    providerData?.data?.order_id,
+    providerData?.data?.job_id,
+    providerData?.data?.request_id,
     providerData?.data?.reference,
     providerData?.data?.transaction_id,
     providerData?.data?.transactionId,
@@ -2624,58 +2640,78 @@ async function findVTUGateDataFallback(originalPayload,providerData){
 }
 
 async function callVTUProvider(payload){
+  const service=serviceKey(payload?.service||"");
+  const provider=providerForService(service);
+
+  if(provider==='bigisub'){
+    if(!BIGISUB_API_TOKEN){
+      return{success:false,configured:false,message:"Bigisub provider is not configured."};
+    }
+    const endpointMap={betting:BIGISUB_BETTING_ENDPOINT,sms:BIGISUB_SMS_ENDPOINT,recharge_pin:BIGISUB_RECHARGE_PIN_ENDPOINT};
+    let endpoints=[endpointMap[service]].filter(Boolean);
+    if(service==='recharge_pin') endpoints=[...new Set([...endpoints,'/api/v2/rechargepin/purchase','/api/v2/recharge/pin/purchase'])];
+    const base=BIGISUB_API_BASE_URL;
+    const p={...(payload||{})};
+    delete p.service;
+    delete p.providerPayload;
+    let requestBody={};
+    if(service==='betting'){
+      const customerId=clean(p.customer_id||p.customerId||p.phone_number||p.phone||p.recipient||'');
+      requestBody={...p,customer_id:customerId,phone_number:customerId,amount:Number(p.amount||0)};
+    }else if(service==='sms'){
+      const recipients=p.recipients||p.recipient||p.phone_number||p.phone||'';
+      requestBody={...p,recipients,phone_number:typeof recipients==='string'?recipients.split(',')[0].trim():recipients,message:p.message||p.body||'',sender:p.sender||p.sender_id||'BOLTIV'};
+    }else if(service==='recharge_pin'){
+      const network=clean(p.network||p.network_provider||p.service_id||'').toLowerCase();
+      const value=Number(p.value||p.denomination||p.amount_per_pin||p.plan_value||0);
+      const quantity=Math.max(1,Number(p.quantity||1));
+      requestBody={...p,network,service_id:p.service_id||network,value,quantity,amount:Number(p.amount||value*quantity)};
+      if(p.plan===undefined) requestBody.plan=p.plan_id||p.plan_code||'';
+    }else requestBody=p;
+    for(const endpoint of endpoints){
+      try{
+        const response=await fetch(base+endpoint,{method:'POST',headers:{Authorization:`Token ${BIGISUB_API_TOKEN}`,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(requestBody)});
+        let data={};try{data=await response.json();}catch{data={};}
+        const rawStatus=String(data?.status||data?.data?.status||'').toLowerCase();
+        const providerOk=typeof data?.status==='boolean'?data.status:(['success','successful','completed','processing','pending','queued','initiated','completed-api','processing-api','queued-api','pending-api'].includes(rawStatus)||response.ok&&rawStatus==='');
+        if(!response.ok && [404,405].includes(response.status) && service==='recharge_pin' && endpoint!==endpoints[endpoints.length-1]) continue;
+        if(!response.ok || !providerOk) console.error('BIGISUB PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,data}));
+        return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
+      }catch(error){
+        console.error('BIGISUB PROVIDER REQUEST ERROR:',error?.message||error);
+        if(endpoint===endpoints[endpoints.length-1]) return{success:false,configured:true,statusCode:502,data:{},error:true,message:'Bigisub provider request failed.'};
+      }
+    }
+    return{success:false,configured:true,statusCode:502,data:{},message:'Bigisub endpoint is not configured.'};
+  }
+
   if(!VTU_API_KEY){
     return{success:false,configured:false,message:"VTU provider is not configured."};
   }
-  const provider=vtuProviderName();
-  const service=serviceKey(payload?.service||"");
   const url=provider==='vtugate'?vtugateEndpoint(service):String(VTU_API_BASE_URL||"").replace(/\/+$/,'');
   if(!url){return{success:false,configured:false,message:"VTU provider URL is not configured."};}
   try{
     const isVTUGate=provider==='vtugate';
     const form=isVTUGate?await buildVTUGateForm(payload):null;
-    const requestHeaders={
-      "Authorization":`Bearer ${VTU_API_KEY}`,
-      "Accept":"application/json"
-    };
-    // VTUGATE's API documentation specifies application/x-www-form-urlencoded.
-    // Send the documented form body, including both phone field aliases for
-    // compatibility with the live validator.
+    const requestHeaders={"Authorization":`Bearer ${VTU_API_KEY}`,"Accept":"application/json"};
     let response;
     if(isVTUGate){
-      response=await fetch(url,{
-        method:"POST",
-        headers:{...requestHeaders,"Content-Type":"application/x-www-form-urlencoded"},
-        body:form.toString()
-      });
-      let firstData={};
-      try{firstData=await response.json();}catch{firstData={};}
+      response=await fetch(url,{method:"POST",headers:{...requestHeaders,"Content-Type":"application/x-www-form-urlencoded"},body:form.toString()});
+      let firstData={};try{firstData=await response.json();}catch{firstData={};}
       const providerOk=typeof firstData?.status==='boolean'?firstData.status:response.ok;
-      if(!response.ok || !providerOk){
-        console.error("VTU PROVIDER RESPONSE:", JSON.stringify({provider,service,statusCode:response.status,data:firstData}));
-      }
+      if(!response.ok||!providerOk) console.error("VTU PROVIDER RESPONSE:",JSON.stringify({provider,service,statusCode:response.status,data:firstData}));
       return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data:firstData};
-    } else {
-      response=await fetch(url,{
-        method:"POST",
-        headers:{...requestHeaders,"Content-Type":"application/json"},
-        body:JSON.stringify(payload||{})
-      });
     }
-    let data={};
-    try{data=await response.json();}catch{data={};}
+    response=await fetch(url,{method:"POST",headers:{...requestHeaders,"Content-Type":"application/json"},body:JSON.stringify(payload||{})});
+    let data={};try{data=await response.json();}catch{data={};}
     const providerOk=typeof data?.status==='boolean'?data.status:response.ok;
-    // Safe diagnostic: log only status/response metadata, never the API key or request headers.
-    if(!response.ok || !providerOk){
-      console.error("VTU PROVIDER RESPONSE:", JSON.stringify({provider,service,statusCode:response.status,data}));
-    }
+    if(!response.ok||!providerOk) console.error("VTU PROVIDER RESPONSE:",JSON.stringify({provider,service,statusCode:response.status,data}));
     return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
   }catch(error){
     console.error("VTU PROVIDER REQUEST ERROR:",error);
     return{success:false,configured:true,statusCode:502,data:{},error:true,message:"VTU provider request failed."};
   }
 }
-
 
 
 function pricingConfig(service){
@@ -2716,7 +2752,7 @@ function providerAmountFromCustomer(customerAmount,rule){
 }
 
 function providerCostFromResponse(providerData,fallbackAmount){
-  const candidates=[providerData?.data?.amount,providerData?.data?.data?.amount,providerData?.amount,providerData?.data?.provider_amount,providerData?.provider_amount,providerData?.data?.amount_charged];
+  const candidates=[providerData?.data?.amount_charged,providerData?.data?.data?.amount_charged,providerData?.amount_charged,providerData?.data?.amount,providerData?.data?.data?.amount,providerData?.amount,providerData?.data?.provider_amount,providerData?.provider_amount,providerData?.data?.cost,providerData?.cost];
   for(const value of candidates){const n=Number(value);if(Number.isFinite(n)&&n>0)return Number(n.toFixed(2));}
   return null;
 }
@@ -2841,8 +2877,10 @@ const providerMessage=extractVTUProviderMessage(providerData);
 await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
 return {success:false,statusCode:400,message:providerMessage||"VTU transaction failed. Your wallet has been refunded.",provider_message:providerMessage||null,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};
 }
-const providerStatus=String(providerData.status||providerData.data?.status||"successful").toLowerCase();
-const pending=["pending","processing","queued","in_progress"].includes(providerStatus);
+const providerStatusRaw=String(providerData.status||providerData.data?.status||providerData.data?.order_status||providerData.data?.data?.status||"").toLowerCase();
+const providerMessage=String(providerData.message||providerData.data?.message||providerData.data?.provider_message||"").toLowerCase();
+const providerStatus=providerStatusRaw||(/processing|queued|initiated|pending|on-hold/.test(providerMessage)?"processing":/failed|cancelled|refunded/.test(providerMessage)?"failed":"successful");
+const pending=["pending","processing","queued","in_progress","initiated","processing-api","queued-api","pending-api","on-hold"].includes(providerStatus);
 const finalStatus=pending?"pending":"successful";
 const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending,{customerAmount:amount,providerCost:finalCost,grossProfit:finalGrossProfit,pricingSource,pricingRule:pricing.rule}); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
 await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
@@ -2917,7 +2955,7 @@ async function reconcilePendingTransactions(admin=null,req=null){
 
 async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
 async function setPlatformSetting(key,value){await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[key,JSON.stringify(value)]);}
-function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable'})[v]||v;}
+function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable','betting':'betting','betting wallet':'betting','sms':'sms','bulk sms':'sms','recharge pin':'recharge_pin','recharge_pin':'recharge_pin','recharge-card':'recharge_pin'})[v]||v;}
 async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
 async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
 
@@ -4456,6 +4494,7 @@ database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
 vtu:Boolean(process.env.VTU_API_KEY&& (process.env.VTU_API_BASE_URL||process.env.VTU_API_URL)),
+bigisub:Boolean(BIGISUB_API_TOKEN&&BIGISUB_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()

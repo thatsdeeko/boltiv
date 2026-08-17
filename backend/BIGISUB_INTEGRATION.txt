@@ -5,7 +5,7 @@ Bigisub is used as the provider for:
 - Bulk SMS
 - Recharge PIN
 
-Authentication follows the Bigisub documentation: Authorization: Token <permanent API token>.
+Authentication follows the Bigisub documentation: Authorization: Token <permanent API token>. Betting is hard-locked to this Token scheme regardless of BIGISUB_AUTH_SCHEME.
 
 Required Render environment variables:
 BIGISUB_API_BASE_URL=https://api.bigisub.ng
@@ -22,3 +22,11 @@ VTUGATE remains the provider for Airtime, Data, Cable TV and Electricity.
 Betting request body sent to Bigisub v2 /betting/fund:
 { service_id, customer_id, amount, pin }
 Boltiv no longer sends phone_number as a substitute for customer_id. The provider error response is surfaced to the user and stored as provider_message/provider_code/provider_status/provider_reference.
+
+
+Betting authentication/error handling patch
+- Betting always sends `Authorization: Token <token>`.
+- If BIGISUB_API_TOKEN is accidentally entered as `Token <token>` or `Bearer <token>`, the prefix is stripped before the header is built.
+- Bigisub JSON and plain-text error responses are preserved.
+- HTTP status, provider message, provider code, provider status and provider reference are returned to the Boltiv frontend when available.
+- Failed provider purchases are still refunded through the existing Boltiv transaction flow.

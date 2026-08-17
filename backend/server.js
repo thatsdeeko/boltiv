@@ -16,7 +16,10 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
 const BIGISUB_API_BASE_URL=(process.env.BIGISUB_API_BASE_URL||"https://api.bigisub.ng").replace(/\/+$/,'');
-const BIGISUB_API_TOKEN=process.env.BIGISUB_API_TOKEN||"";
+const BIGISUB_API_TOKEN=String(process.env.BIGISUB_API_TOKEN||"").trim();
+// Bigisub's production API uses `Authorization: Token <token>` for the
+// permanent API token. Keep the env setting for backward compatibility, but
+// Betting is deliberately hard-locked to the documented Token scheme below.
 const BIGISUB_AUTH_SCHEME=String(process.env.BIGISUB_AUTH_SCHEME||"Token").trim()||"Token";
 const BIGISUB_BETTING_ENDPOINT=process.env.BIGISUB_BETTING_ENDPOINT||"/api/v2/betting/fund";
 const BIGISUB_SMS_ENDPOINT=process.env.BIGISUB_SMS_ENDPOINT||"/api/v2/sms/send";
@@ -2612,6 +2615,55 @@ function isVTUGateBundleUnavailable(providerData){
   return /cannot purchase|not available|unavailable|not currently|at the moment|explore other.*plans/.test(text);
 }
 
+function normalizeBigisubToken(rawToken){
+  let token=String(rawToken||"").trim();
+  // Prevent accidental values such as `Token abc` or `Bearer abc` from
+  // becoming `Token Token abc` / `Token Bearer abc`.
+  token=token.replace(/^Bearer\s+/i,"").replace(/^Token\s+/i,"").trim();
+  return token;
+}
+
+function bigisubAuthorization(service){
+  const token=normalizeBigisubToken(BIGISUB_API_TOKEN);
+  // Betting must always use Bigisub's documented permanent-token scheme.
+  const scheme=service==='betting'?'Token':BIGISUB_AUTH_SCHEME;
+  return token?`${scheme} ${token}`:"";
+}
+
+async function parseBigisubResponse(response){
+  const contentType=String(response.headers.get('content-type')||'').toLowerCase();
+  let data={};
+  let rawText='';
+  try{
+    if(contentType.includes('application/json')){
+      data=await response.json();
+    }else{
+      rawText=await response.text();
+      if(rawText.trim()){
+        try{data=JSON.parse(rawText);}catch{data={message:rawText.trim()};}
+      }
+    }
+  }catch(error){
+    try{rawText=await response.text();}catch{}
+    data=rawText.trim()?{message:rawText.trim()}:{};
+  }
+  if(data===null||data===undefined)data={};
+  if(typeof data!=='object')data={message:String(data)};
+  if(rawText && !data.raw_response) data.raw_response=rawText;
+  return data;
+}
+
+function extractBigisubError(providerData,statusCode){
+  const message=extractVTUProviderMessage(providerData);
+  const code=providerData?.code||providerData?.error_code||providerData?.data?.code||providerData?.data?.error_code||null;
+  const status=providerData?.status||providerData?.data?.status||null;
+  return {
+    message:message||`Bigisub returned HTTP ${statusCode}.`,
+    code:code?String(code):null,
+    status:status?String(status):null
+  };
+}
+
 async function findVTUGateDataFallback(originalPayload,providerData){
   try{
     const network=clean(originalPayload?.network).toUpperCase();
@@ -2707,13 +2759,18 @@ async function callVTUProvider(payload){
     }else requestBody=p;
     for(const endpoint of endpoints){
       try{
-        const response=await fetch(base+endpoint,{method:'POST',headers:{Authorization:`${BIGISUB_AUTH_SCHEME} ${BIGISUB_API_TOKEN}`,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(requestBody)});
-        let data={};try{data=await response.json();}catch{data={};}
+        const authorization=bigisubAuthorization(service);
+        const response=await fetch(base+endpoint,{method:'POST',headers:{Authorization:authorization,'Accept':'application/json','Content-Type':'application/json'},body:JSON.stringify(requestBody)});
+        const data=await parseBigisubResponse(response);
         const rawStatus=String(data?.status||data?.data?.status||'').toLowerCase();
         const providerOk=typeof data?.status==='boolean'?data.status:(['success','successful','completed','processing','pending','queued','initiated','completed-api','processing-api','queued-api','pending-api'].includes(rawStatus)||response.ok&&rawStatus==='');
         if(!response.ok && [404,405].includes(response.status) && service==='recharge_pin' && endpoint!==endpoints[endpoints.length-1]) continue;
-        if(!response.ok || !providerOk) console.error('BIGISUB PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,data}));
-        return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
+        if(!response.ok || !providerOk){
+          const providerError=extractBigisubError(data,response.status);
+          console.error('BIGISUB PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,error:providerError,data}));
+          return{success:false,configured:true,statusCode:response.status,data,error:true,message:providerError.message,provider_code:providerError.code,provider_status:providerError.status};
+        }
+        return{success:true,configured:true,statusCode:response.status,data};
       }catch(error){
         console.error('BIGISUB PROVIDER REQUEST ERROR:',error?.message||error);
         if(endpoint===endpoints[endpoints.length-1]) return{success:false,configured:true,statusCode:502,data:{},error:true,message:'Bigisub provider request failed.'};
@@ -2916,14 +2973,19 @@ const finalGrossProfit=Number((amount-finalCost).toFixed(2));
 if(!providerResult.success){
 const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
 const providerMessage=extractVTUProviderMessage(providerData);
-await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}`,"error");
+const providerCode=providerResult.provider_code||providerData?.code||providerData?.error_code||providerData?.data?.code||providerData?.data?.error_code||null;
+const providerStatus=providerResult.provider_status||providerData?.status||providerData?.data?.status||null;
+const providerHttpStatus=providerResult.statusCode||null;
+const fallbackMessage=`${data.service||"Service"} transaction failed. Your wallet has been refunded.`;
+await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}${providerMessage?` Provider: ${providerMessage}`:''}`,"error");
 return {
   success:false,
-  statusCode:400,
-  message:providerMessage||"Betting transaction failed. Your wallet has been refunded.",
-  provider_message:providerMessage||null,
-  provider_code:providerData?.code||providerData?.error_code||providerData?.data?.code||providerData?.data?.error_code||null,
-  provider_status:providerData?.status||providerData?.data?.status||null,
+  statusCode:providerHttpStatus && providerHttpStatus>=400 && providerHttpStatus<600 ? providerHttpStatus : 400,
+  message:providerMessage||providerResult.message||fallbackMessage,
+  provider_message:providerMessage||providerResult.message||null,
+  provider_code:providerCode,
+  provider_status:providerStatus,
+  provider_http_status:providerHttpStatus,
   provider_reference:extractVTUProviderReference(providerData),
   reference:referenceValue,
   status:"failed",

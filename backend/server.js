@@ -5,6 +5,12 @@ const {Pool}=require("pg");
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
 const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
+const PAYSCRIBE_API_KEY=process.env.PAYSCRIBE_API_KEY||"";
+const PAYSCRIBE_API_BASE_URL=(process.env.PAYSCRIBE_API_BASE_URL||"https://api.payscribe.ng/api/v1").replace(/\/+$/,"");
+const PAYSCRIBE_VA_CREATE_PATH=process.env.PAYSCRIBE_VA_CREATE_PATH||"/collections/create";
+const PAYSCRIBE_WEBHOOK_SECRET=process.env.PAYSCRIBE_WEBHOOK_SECRET||PAYSCRIBE_API_KEY;
+const PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS=Number(process.env.PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS||300);
+
 const FLW_SECRET_KEY=process.env.FLW_SECRET_KEY||"";
 const FLW_BASE_URL=(process.env.FLW_BASE_URL||"https://api.flutterwave.com/v3").replace(/\/+$/,"");
 const FLW_CALLBACK_URL=process.env.FLW_CALLBACK_URL||"";
@@ -322,6 +328,48 @@ credited BOOLEAN NOT NULL DEFAULT FALSE,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 credited_at TIMESTAMPTZ
 )`);
+await db(`
+CREATE TABLE IF NOT EXISTS payscribe_customers(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT UNIQUE NOT NULL,
+payscribe_customer_id TEXT UNIQUE NOT NULL,
+tier INTEGER NOT NULL DEFAULT 0,
+status TEXT NOT NULL DEFAULT 'active',
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS payscribe_virtual_accounts(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT UNIQUE NOT NULL,
+payscribe_customer_id TEXT NOT NULL,
+account_number TEXT UNIQUE NOT NULL,
+account_name TEXT,
+bank_name TEXT,
+bank_code TEXT,
+currency TEXT NOT NULL DEFAULT 'NGN',
+status TEXT NOT NULL DEFAULT 'active',
+provider_account_id TEXT,
+metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS payscribe_va_customer_idx ON payscribe_virtual_accounts(payscribe_customer_id)`);
+await db(`CREATE INDEX IF NOT EXISTS payscribe_va_account_idx ON payscribe_virtual_accounts(account_number)`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS payscribe_webhook_events(
+id BIGSERIAL PRIMARY KEY,
+event_id TEXT UNIQUE NOT NULL,
+event_type TEXT,
+payload JSONB NOT NULL,
+signature TEXT,
+processed BOOLEAN NOT NULL DEFAULT FALSE,
+processed_at TIMESTAMPTZ,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+
 
 await db(`
 CREATE TABLE IF NOT EXISTS admins(
@@ -687,6 +735,14 @@ result.rows[0];
 await createWallet(
 user.user_id
 );
+
+if(payscribeConfigured()){
+try{
+  await ensurePayscribeCustomer(user);
+}catch(error){
+  console.error("PAYSCRIBE CUSTOMER CREATION ON REGISTER FAILED:",error?.data||error);
+}
+}
 
 // Create an authenticated session immediately after registration so the
 // new user can set the mandatory Transaction PIN before entering BOLTIV.
@@ -1636,6 +1692,202 @@ success:true,
 message:"Admin logged out successfully."
 };
 
+}
+
+
+function payscribeConfigured(){
+return Boolean(PAYSCRIBE_API_KEY);
+}
+
+function normalizePayscribePhone(phone){
+const p=String(phone||"").replace(/\D/g,"");
+if(p.startsWith("234")) return p;
+if(p.startsWith("0")) return "234"+p.slice(1);
+return p;
+}
+
+function splitFullName(name){
+const parts=clean(name).split(/\s+/).filter(Boolean);
+return {
+firstName:parts.shift()||"Customer",
+lastName:parts.join(" ")||"Customer"
+};
+}
+
+async function payscribeRequest(pathname, options={}){
+if(!payscribeConfigured()) throw new Error("Payscribe is not configured.");
+const url=`${PAYSCRIBE_API_BASE_URL}${pathname.startsWith("/")?pathname:"/"+pathname}`;
+const response=await fetch(url,{
+...options,
+headers:{
+"Authorization":`Bearer ${PAYSCRIBE_API_KEY}`,
+"Accept":"application/json",
+"Content-Type":"application/json",
+...(options.headers||{})
+}
+});
+let data={};
+try{data=await response.json();}catch{}
+if(!response.ok || data?.status===false){
+const msg=data?.message?.details?.message||data?.message?.description||data?.message||`Payscribe request failed (${response.status}).`;
+const error=new Error(typeof msg==="string"?msg:"Payscribe request failed.");
+error.status=response.status;
+error.data=data;
+throw error;
+}
+return data;
+}
+
+function payscribeDetails(data){
+return data?.message?.details ?? data?.data?.details ?? data?.data ?? data?.message ?? {};
+}
+
+function extractPayscribeCustomerId(data){
+const d=payscribeDetails(data);
+return d?.customer_id||d?.customerId||data?.customer_id||data?.customerId||null;
+}
+
+function extractPayscribeAccount(data){
+const d=payscribeDetails(data);
+const nested=d?.account||d?.virtual_account||d?.virtualAccount||d?.details||{};
+return {
+accountNumber:d?.account_number||d?.accountNumber||d?.account||nested?.account_number||nested?.accountNumber||nested?.account||null,
+accountName:d?.account_name||d?.accountName||nested?.account_name||nested?.accountName||null,
+bankName:d?.bank_name||d?.bankName||nested?.bank_name||nested?.bankName||null,
+bankCode:d?.bank_code||d?.bankCode||nested?.bank_code||nested?.bankCode||d?.bank||nested?.bank||null,
+currency:d?.currency||nested?.currency||"NGN",
+providerAccountId:d?.id||d?.account_id||d?.accountId||nested?.id||null,
+raw:d
+};
+}
+
+async function ensurePayscribeCustomer(user){
+let existing=await db(`SELECT * FROM payscribe_customers WHERE user_id=$1 LIMIT 1`,[user.user_id]);
+if(existing.rows.length) return existing.rows[0];
+const {firstName,lastName}=splitFullName(user.name||"Customer");
+const data=await payscribeRequest("/customers/create",{
+method:"POST",
+body:JSON.stringify({
+first_name:firstName,
+last_name:lastName,
+phone:normalizePayscribePhone(user.phone),
+email:user.email,
+country:"NG"
+})
+});
+const customerId=extractPayscribeCustomerId(data);
+if(!customerId) throw new Error("Payscribe did not return a customer_id.");
+const result=await db(`INSERT INTO payscribe_customers(user_id,payscribe_customer_id,tier,status) VALUES($1,$2,$3,'active') ON CONFLICT(user_id) DO UPDATE SET payscribe_customer_id=EXCLUDED.payscribe_customer_id,updated_at=NOW() RETURNING *`,[user.user_id,customerId,Number(payscribeDetails(data)?.tier||0)]);
+return result.rows[0];
+}
+
+async function upgradePayscribeTier1(user, customerId, kyc){
+const dob=clean(kyc?.dob);
+const street=clean(kyc?.street);
+const city=clean(kyc?.city);
+const state=clean(kyc?.state);
+const postalCode=clean(kyc?.postal_code||kyc?.postalCode);
+const identificationNumber=clean(kyc?.identification_number||kyc?.bvn);
+if(!/^\d{4}-\d{2}-\d{2}$/.test(dob)||!street||!city||!state||!postalCode||!identificationNumber){
+return {success:false,message:"Date of birth, address, city, state, postal code and BVN are required to activate your personal funding account."};
+}
+const data=await payscribeRequest("/customers/create/tier1",{
+method:"PATCH",
+body:JSON.stringify({
+customer_id:customerId,
+dob,
+address:{street,city,state,country:"NG",postal_code:postalCode},
+identification_type:clean(kyc?.identification_type||"BVN"),
+identification_number:identificationNumber,
+...(kyc?.photo?{photo:clean(kyc.photo)}:{})
+})
+});
+await db(`UPDATE payscribe_customers SET tier=1,updated_at=NOW() WHERE user_id=$1`,[user.user_id]);
+return {success:true,data};
+}
+
+async function createPayscribeVirtualAccount(user, customerId){
+const existing=await db(`SELECT * FROM payscribe_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
+if(existing.rows.length) return {success:true,account:existing.rows[0],existing:true};
+const ref=`BOLTIV-VA-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+const data=await payscribeRequest(PAYSCRIBE_VA_CREATE_PATH,{
+method:"POST",
+body:JSON.stringify({customer_id:customerId,currency:"NGN",ref})
+});
+const account=extractPayscribeAccount(data);
+if(!account.accountNumber){
+const e=new Error("Payscribe did not return a virtual account number. Check PAYSCRIBE_VA_CREATE_PATH against your current Payscribe Collections documentation.");
+e.data=data;
+throw e;
+}
+const result=await db(`INSERT INTO payscribe_virtual_accounts(user_id,payscribe_customer_id,account_number,account_name,bank_name,bank_code,currency,status,provider_account_id,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9) ON CONFLICT(user_id) DO UPDATE SET account_number=EXCLUDED.account_number,account_name=EXCLUDED.account_name,bank_name=EXCLUDED.bank_name,bank_code=EXCLUDED.bank_code,currency=EXCLUDED.currency,status='active',provider_account_id=EXCLUDED.provider_account_id,metadata=EXCLUDED.metadata,updated_at=NOW() RETURNING *`,[
+user.user_id,customerId,account.accountNumber,account.accountName,account.bankName,account.bankCode,account.currency,account.providerAccountId,JSON.stringify(account.raw||{})
+]);
+return {success:true,account:result.rows[0],existing:false};
+}
+
+async function getPayscribeFundingAccount(user){
+const r=await db(`SELECT * FROM payscribe_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
+if(r.rows.length) return {success:true,account:r.rows[0]};
+const c=await db(`SELECT * FROM payscribe_customers WHERE user_id=$1 LIMIT 1`,[user.user_id]);
+return {success:true,account:null,customer:c.rows[0]||null};
+}
+
+function payscribeWebhookSignatureValid(req, rawBody){
+const eventId=String(req.headers["x-payscribe-event-id"]||"");
+const timestamp=String(req.headers["x-payscribe-timestamp"]||"");
+const sigHeader=String(req.headers["x-payscribe-signature"]||"");
+if(!eventId||!timestamp||!/^v1=[0-9a-f]{64}$/i.test(sigHeader)||!PAYSCRIBE_WEBHOOK_SECRET)return false;
+const ts=Number(timestamp);
+if(!Number.isFinite(ts)||Math.abs(Date.now()/1000-ts)>PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS)return false;
+const expected=crypto.createHmac("sha256",PAYSCRIBE_WEBHOOK_SECRET).update(`${timestamp}.${eventId}.${rawBody}`).digest("hex");
+const given=sigHeader.slice(3);
+return given.length===expected.length && crypto.timingSafeEqual(Buffer.from(expected,"hex"),Buffer.from(given,"hex"));
+}
+
+function payscribeWebhookEvent(event){
+return clean(event?.event_type||event?.event||"").toLowerCase();
+}
+
+function payscribeFundingPayload(event){
+const d=event?.data||event?.message?.details||event?.details||event?.payload||event||{};
+const va=d?.virtual_account||d?.virtualAccount||d?.account_details||d?.accountDetails||d?.account||{};
+return {
+customerId:d?.customer_id||d?.customerId||va?.customer_id||va?.customerId||null,
+accountNumber:d?.account_number||d?.accountNumber||va?.account_number||va?.accountNumber||va?.account||null,
+amount:Number(d?.amount||d?.credited_amount||d?.creditedAmount||d?.credit?.amount||0),
+currency:String(d?.currency||"NGN").toUpperCase(),
+reference:d?.ref||d?.reference||d?.trans_id||d?.transaction_id||d?.transactionId||null,
+status:String(d?.status||"success").toLowerCase(),
+raw:d
+};
+}
+
+async function creditPayscribeFunding(event, eventId){
+const p=payscribeFundingPayload(event);
+if(!p.accountNumber && !p.customerId) throw new Error("Payscribe funding event has no customer/account identifier.");
+if(!Number.isFinite(p.amount)||p.amount<=0) throw new Error("Payscribe funding event has an invalid amount.");
+if(p.currency!=="NGN") throw new Error("Unsupported Payscribe funding currency.");
+if(["failed","fail","cancelled","canceled"].includes(p.status)) return {ignored:true};
+const lookup=await db(`SELECT user_id,account_number,payscribe_customer_id FROM payscribe_virtual_accounts WHERE ($1<>'' AND account_number=$1) OR ($2<>'' AND payscribe_customer_id=$2) LIMIT 1`,[String(p.accountNumber||""),String(p.customerId||"")]);
+if(!lookup.rows.length) throw new Error("No BOLTIV user is linked to the Payscribe funding account.");
+const userId=lookup.rows[0].user_id;
+const referenceValue=`PS-${p.reference||eventId}`;
+const client=await pool.connect();
+try{
+await client.query("BEGIN");
+const duplicate=await client.query(`SELECT processed FROM payscribe_webhook_events WHERE event_id=$1 FOR UPDATE`,[eventId]);
+if(duplicate.rows.length && duplicate.rows[0].processed){await client.query("COMMIT");return {duplicate:true,userId};}
+await client.query(`INSERT INTO payscribe_webhook_events(event_id,event_type,payload,signature,processed) VALUES($1,$2,$3,$4,FALSE) ON CONFLICT(event_id) DO NOTHING`,[eventId,payscribeWebhookEvent(event),JSON.stringify(event),String("v1="+(event.__signature||""))]);
+await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
+const w=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[p.amount,userId]);
+if(!w.rows.length) throw new Error("Wallet update failed.");
+await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING`,[userId,p.amount,referenceValue,p.reference||eventId,JSON.stringify({provider:"payscribe",event_id:eventId,event_type:payscribeWebhookEvent(event),payload:event})]);
+await client.query(`UPDATE payscribe_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);
+await client.query("COMMIT");
+await addNotification(userId,"Wallet Funded",`₦${p.amount.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})} was received into your BOLTIV wallet.`, "success");
+return {credited:true,userId,amount:p.amount,balance:Number(w.rows[0].balance),reference:referenceValue};
+}catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
 
 async function createPayment(
@@ -3058,6 +3310,110 @@ async function paystackRequest(path,options={}){
     return{success:Boolean(response.ok&&data?.status),statusCode:response.status,data};
   }catch(e){return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}
 }
+
+async function payscribePayoutRequest(path,options={}){
+  if(!payscribeConfigured())return{success:false,statusCode:503,message:'Payscribe is not configured.'};
+  try{
+    const data=await payscribeRequest(path,options);
+    return{success:true,statusCode:200,data};
+  }catch(e){
+    return{success:false,statusCode:e.status||502,message:e.message||'Unable to connect to Payscribe.',data:e.data||{}};
+  }
+}
+
+function payscribePayoutDetails(data){
+  const d=payscribeDetails(data);
+  return d?.details||d;
+}
+
+async function payscribePayoutBanks(){
+  const r=await payscribePayoutRequest('/payouts/bank/list?country=NGN');
+  if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.message||'Unable to load Payscribe banks.'};
+  const d=payscribeDetails(r.data);
+  const banks=Array.isArray(d)?d:(Array.isArray(d?.details)?d.details:[]);
+  return{success:true,banks:banks.map(x=>({code:x.code||x.bank_code||x.bankCode,name:x.name||x.bank_name||x.bankName})).filter(x=>x.code&&x.name)};
+}
+
+async function resolvePayscribePayoutAccount(bankCode,accountNumber){
+  const r=await payscribePayoutRequest('/payouts/account/lookup',{method:'POST',body:JSON.stringify({account:String(accountNumber),bank:String(bankCode)})});
+  const d=payscribeDetails(r.data);
+  const name=d?.account_name||d?.accountName||d?.details?.account_name;
+  if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.message||'Unable to verify the bank account.'};
+  return{success:true,accountName:String(name).trim(),accountNumber:d?.account_number||d?.accountNumber||String(accountNumber)};
+}
+
+async function verifyPayscribePayoutTransfer(identifier){
+  const r=await payscribePayoutRequest(`/payouts/verify/${encodeURIComponent(identifier)}`);
+  if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.message||'Unable to check Payscribe transfer status.'};
+  const d=payscribePayoutDetails(r.data);
+  return{success:true,data:d};
+}
+
+async function adminRevenue(req,action){
+  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
+  if(action==='summary'){
+    await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
+    const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
+    const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
+    const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
+    const reserved=(await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing') THEN amount ELSE 0 END),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1`,[admin.id])).rows[0];
+    const balance=Number(w?.balance||0),hold=Number(reserved?.reserved||0);
+    const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
+    return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
+  }
+  if(action==='banks')return payscribePayoutBanks();
+  if(action==='verify'){
+    const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
+    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank code and 10-digit account number.'};
+    return resolvePayscribePayoutAccount(bankCode,accountNumber);
+  }
+  if(action==='status'){
+    const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:'Withdrawal ID is required.'};
+    const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:'Withdrawal not found.'};
+    if(!row.reference||['successful','failed'].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
+    const r=await verifyPayscribePayoutTransfer(row.provider_transfer_id||row.reference);
+    if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.message||'Unable to check transfer status.'};
+    const d=r.data||{},ps=String(d.status||d.transaction_status||'').toLowerCase();let ns=row.status;
+    if(['success','successful','completed'].includes(ps))ns='successful';
+    else if(['failed','fail','reversed','cancelled','canceled'].includes(ps))ns='failed';
+    else ns='processing';
+    if(ns!==row.status){
+      const c=await pool.connect();try{await c.query('BEGIN');
+        await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=COALESCE($2,provider_transfer_id),provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$4`,[ns,d.trans_id||d.transaction_id||null,d.message||ps,row.id]);
+        if(ns==='failed'){await ensureAdminRevenueWallet(c,admin.id);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(row.amount),admin.id]);if(w.rows.length)await addAdminRevenueLedger(c,admin.id,'withdrawal_reversal',Number(row.amount),Number(w.rows[0].balance),'Failed Payscribe withdrawal reversal',`REVERSAL-${row.reference}`);}
+        await c.query('COMMIT');
+      }catch(e){try{await c.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to update withdrawal status.'};}finally{c.release();}
+    }
+    const fresh=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[row.id])).rows[0];return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount)}};
+  }
+  if(action==='withdraw'){
+    const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
+    if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:'Minimum withdrawal is ₦1,000.'};
+    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank account.'};
+    const verified=await resolvePayscribePayoutAccount(bankCode,accountNumber);
+    if(!verified.success)return{success:false,statusCode:verified.statusCode||400,message:verified.message||'Unable to verify the bank account.'};
+    const client=await pool.connect();let row;
+    try{await client.query('BEGIN');await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);
+      const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);const balance=Number(w.rows[0]?.balance||0);
+      const reserved=(await client.query(`SELECT COALESCE(SUM(amount),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1 AND status IN ('pending','processing')`,[admin.id])).rows[0];const available=Math.max(0,Number((balance-Number(reserved?.reserved||0)).toFixed(2)));
+      if(amount>available){await client.query('ROLLBACK');return{success:false,statusCode:400,message:`Insufficient BOLTIV balance. Available: ₦${available.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};}
+      const ref=reference('BOLTIV-WD').toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,50);
+      const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
+      row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
+      await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin Payscribe bank withdrawal',`WD-${ref}`);
+      await client.query('COMMIT');
+    }catch(e){try{await client.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to reserve BOLTIV balance for withdrawal.'};}finally{client.release();}
+    const tr=await payscribePayoutRequest('/payouts/transfer',{method:'POST',body:JSON.stringify({amount:String(amount),bank:String(bankCode),account:String(verified.accountNumber),currency:'NGN',narration:'BOLTIV admin withdrawal',ref:row.reference})});
+    if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||'Payscribe transfer failed');return{success:false,statusCode:tr.statusCode||400,message:tr.message||'Payscribe transfer failed.',withdrawalId:row.id};}
+    const d=payscribePayoutDetails(tr.data),transId=d?.trans_id||d?.transaction_id||d?.id||null;
+    const ps=String(d?.status||d?.transaction_status||'processing').toLowerCase();const status=['success','successful','completed'].includes(ps)?'successful':(['failed','fail','reversed','cancelled','canceled'].includes(ps)?'failed':'processing');
+    if(status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,d?.message||'Payscribe transfer failed');
+    else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,transId,d?.message||ps,row.id]);
+    await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'payscribe',providerTransferId:transId},req);
+    return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:'payscribe'};
+  }
+  return{success:false,statusCode:400,message:'Unknown revenue action.'};
+}
 async function adminRevenue(req,action){
   const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
   if(action==='summary'){
@@ -4228,6 +4584,104 @@ transactions
 PAYMENT INITIALIZATION
 */
 
+
+/*
+PAYSCRIBE PERSONAL FUNDING ACCOUNT
+*/
+
+if(req.method==="GET"&&path==="/api/payscribe/funding-account"){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+if(!payscribeConfigured())return send(res,503,{success:false,message:"Payscribe is not configured."});
+try{
+const result=await getPayscribeFundingAccount(user);
+return send(res,200,result);
+}catch(error){
+console.error("PAYSCRIBE ACCOUNT LOOKUP ERROR:",error);
+return send(res,502,{success:false,message:error.message||"Unable to load funding account."});
+}
+}
+
+if(req.method==="POST"&&path==="/api/payscribe/funding-account/activate"){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+if(!payscribeConfigured())return send(res,503,{success:false,message:"Payscribe is not configured."});
+const b=await body(req);
+try{
+const customer=await ensurePayscribeCustomer(user);
+if(Number(customer.tier)<1){
+const tier=await upgradePayscribeTier1(user,customer.payscribe_customer_id,b);
+if(!tier.success)return send(res,400,tier);
+}
+const result=await createPayscribeVirtualAccount(user,customer.payscribe_customer_id);
+return send(res,200,{success:true,message:"Personal funding account is ready.",account:result.account});
+}catch(error){
+console.error("PAYSCRIBE FUNDING ACCOUNT ACTIVATION ERROR:",error?.data||error);
+return send(res,502,{success:false,message:error.message||"Unable to activate your personal funding account."});
+}
+}
+
+/*
+PAYSCRIBE WEBHOOK
+*/
+
+if(req.method==="POST"&&path==="/api/payscribe/webhook"){
+if(!PAYSCRIBE_WEBHOOK_SECRET)return send(res,503,{success:false,message:"Payscribe webhook secret is not configured."});
+let rawBody="";
+req.on("data",chunk=>{rawBody+=chunk;});
+req.on("end",async()=>{
+try{
+const eventId=String(req.headers["x-payscribe-event-id"]||"");
+const eventType=String(req.headers["x-payscribe-event"]||"");
+const signature=String(req.headers["x-payscribe-signature"]||"");
+if(!eventId)return send(res,400,{success:false,message:"Missing Payscribe event id."});
+if(!payscribeWebhookSignatureValid(req,rawBody))return send(res,401,{success:false,message:"Invalid Payscribe webhook signature."});
+let event;try{event=JSON.parse(rawBody);}catch{return send(res,400,{success:false,message:"Invalid webhook payload."});}
+event.__signature=signature;
+const existing=await db(`SELECT processed FROM payscribe_webhook_events WHERE event_id=$1 LIMIT 1`,[eventId]);
+if(existing.rows.length&&existing.rows[0].processed)return send(res,200,{success:true,message:"Webhook already processed."});
+const normalized=payscribeWebhookEvent(event);
+if(/payouts\.created|payout\.created|payout\.transfer\.failed|payout.*failed/.test(normalized)||/payouts\.created|payout\.created|payout\.transfer\.failed|payout.*failed/.test(eventType.toLowerCase())){
+  const d=event?.data||event?.message?.details||event?.details||event?.payload||event||{};
+  const ref=clean(d?.ref||d?.reference||"");
+  const transId=clean(d?.trans_id||d?.transaction_id||d?.id||"");
+  const status=String(d?.status||"").toLowerCase();
+  const payoutStatus=['success','successful','completed'].includes(status)?'successful':(['failed','fail','reversed','cancelled','canceled'].includes(status)?'failed':'processing');
+  if(ref||transId){
+    const wr=await db(`SELECT * FROM admin_revenue_withdrawals WHERE (reference=$1 AND $1<>'') OR (provider_transfer_id=$2 AND $2<>'') ORDER BY id DESC LIMIT 1`,[ref,transId]);
+    if(wr.rows.length){
+      const row=wr.rows[0];
+      if(row.status!==payoutStatus){
+        const c=await pool.connect();try{await c.query('BEGIN');
+          await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=COALESCE($2,provider_transfer_id),provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$4`,[payoutStatus,transId||null,d?.message||status,row.id]);
+          if(payoutStatus==='failed' && !['failed'].includes(String(row.status))){
+            await ensureAdminRevenueWallet(c,row.admin_id);
+            const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(row.amount),row.admin_id]);
+            if(w.rows.length)await addAdminRevenueLedger(c,row.admin_id,'withdrawal_reversal',Number(row.amount),Number(w.rows[0].balance),'Failed Payscribe payout reversal',`REVERSAL-${row.reference}`);
+          }
+          await c.query('COMMIT');
+        }catch(e){try{await c.query('ROLLBACK')}catch{};throw e;}finally{c.release();}
+      }
+    }
+  }
+  await db(`INSERT INTO payscribe_webhook_events(event_id,event_type,payload,signature,processed,processed_at) VALUES($1,$2,$3,$4,TRUE,NOW()) ON CONFLICT(event_id) DO UPDATE SET processed=TRUE,processed_at=NOW()`,[eventId,normalized,JSON.stringify(event),signature]);
+  return send(res,200,{success:true,message:"Payscribe payout webhook processed."});
+}
+const fundingLike=/invoice\.paid|payment_link\.paid|collection|virtual.*account|account.*credit|payment.*received|funding/.test(normalized)||/invoice\.paid|payment_link\.paid|collection|virtual.*account|account.*credit|payment.*received|funding/.test(eventType.toLowerCase());
+if(!fundingLike){
+await db(`INSERT INTO payscribe_webhook_events(event_id,event_type,payload,signature,processed,processed_at) VALUES($1,$2,$3,$4,TRUE,NOW()) ON CONFLICT(event_id) DO UPDATE SET processed=TRUE,processed_at=NOW()`,[eventId,normalized,JSON.stringify(event),signature]);
+return send(res,200,{success:true,message:"Webhook received."});
+}
+const result=await creditPayscribeFunding(event,eventId);
+return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Funding webhook processed.",...result});
+}catch(error){
+console.error("PAYSCRIBE WEBHOOK ERROR:",error);
+return send(res,500,{success:false,message:"Webhook processing failed."});
+}
+});
+return;
+}
+
 if(
 req.method==="POST"&&
 path==="/api/payments/initialize"
@@ -4265,20 +4719,10 @@ message:
 
 }
 
-const result=
-await initializePayment(
-user.user_id,
-user.email,
-amount
-);
-
-return send(
-res,
-result.success?
-200:
-400,
-result
-);
+return send(res,410,{
+success:false,
+message:"Paystack wallet funding has been replaced by Payscribe personal virtual accounts."
+});
 
 }
 

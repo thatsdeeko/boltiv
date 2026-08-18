@@ -7,7 +7,33 @@ function user(){try{return JSON.parse(localStorage.getItem("boltivUser")||"null"
 function uid(){const u=user();return String(u.id||u.userId||u.email||u.phone||"boltiv-user")}
 function email(){const u=user();return String(u.email||localStorage.getItem("boltivUserEmail")||"")}
 function money(v){return"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})}
-async function verifyCallback(){const q=new URLSearchParams(location.search);const ref=q.get("reference")||q.get("trxref");if(!ref)return;toast("pending","Verifying Payment","Confirming your Paystack payment...");const r=await API.request("/api/payments/verify?reference="+encodeURIComponent(ref));if(r.success){toast("success","Wallet Funded",`₦${Number(r.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2})} has been added to your wallet.`);history.replaceState({},document.title,location.pathname)}else toast("error","Payment Verification",r.message||"We could not verify the payment yet.")}
+let fundingAccount=null;
+async function loadFundingAccount(){
+const r=await API.request("/api/payscribe/funding-account");
+if(r.success&&r.account){
+fundingAccount=r.account;
+let box=document.getElementById("payscribeFundingBox");
+if(!box){box=document.createElement("div");box.id="payscribeFundingBox";box.style="margin:14px 0;padding:16px;border:1px solid #ddd;border-radius:12px;background:#fff";document.querySelector(".section")?.appendChild(box)}
+box.innerHTML=`<strong>YOUR BOLTIV FUNDING ACCOUNT</strong><div style="margin-top:10px;font-size:22px;font-weight:700;letter-spacing:1px">${r.account.account_number||""}</div><div style="margin-top:5px">${r.account.bank_name||"Bank"}${r.account.bank_code?` (${r.account.bank_code})`:""}</div><div style="margin-top:5px;color:#666">${r.account.account_name||""}</div><div style="margin-top:10px;font-size:13px;color:#555">Transfer money directly to this account. Payscribe will notify BOLTIV and your wallet will be credited automatically.</div>`;
+return r;
+}
+return r;
+}
+async function activateFundingAccount(){
+const dob=prompt("Date of birth (YYYY-MM-DD):"); if(!dob)return;
+const street=prompt("Residential street address:"); if(!street)return;
+const city=prompt("City:"); if(!city)return;
+const state=prompt("State:"); if(!state)return;
+const postal_code=prompt("Postal code:"); if(!postal_code)return;
+const bvn=prompt("BVN:"); if(!bvn)return;
+toast("pending","Activating","Creating your secure Payscribe funding account...");
+const r=await API.request("/api/payscribe/funding-account/activate",{method:"POST",body:JSON.stringify({dob,street,city,state,postal_code,bvn,identification_type:"BVN"})});
+if(!r.success){toast("error","Activation Failed",r.message||"Unable to activate funding account.");return null}
+fundingAccount=r.account;
+toast("success","Account Ready","Your personal funding account is ready.");
+await loadFundingAccount();
+return r;
+}
 async function createWallet(){return API.request("/api/wallet/create",{method:"POST",body:JSON.stringify({userId:uid()})})}
 async function loadWallet(){let r=await API.request("/api/wallet");if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);localStorage.setItem("boltivBalance",String(b));localStorage.setItem("boltivWalletBalance",String(b));return r}if(r.message==="Wallet not found"){r=await createWallet();if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);localStorage.setItem("boltivBalance",String(b));localStorage.setItem("boltivWalletBalance",String(b));return r}}toast("error","Wallet Error",r.message||"Unable to load wallet")}
 function updateSummary(){const v=Number(amount.value);fundSummary.style.display=v>=100?"block":"none";if(v>=100)summaryAmount.textContent=money(v)}
@@ -17,7 +43,7 @@ document.querySelectorAll(".amount-btn").forEach(b=>b.onclick=()=>{document.quer
 amount.oninput=()=>{document.querySelectorAll(".amount-btn").forEach(x=>x.classList.remove("active"));updateSummary()};
 fundBtn.onclick=()=>{const v=Number(amount.value);if(!v||v<100)return toast("error","Invalid Amount","The minimum wallet funding amount is ₦100.");openModal(v)};
 cancelFunding.onclick=closeModal;
-confirmFunding.onclick=async()=>{if(!pendingAmount)return;const v=pendingAmount,e=email();if(!e){toast("error","Email Required","Please add your email address to your profile first.");return closeModal()}toast("pending","Connecting","Connecting to BOLTIV payment gateway...");const r=await API.request("/api/payments/initialize",{method:"POST",body:JSON.stringify({email:e,amount:v})});if(r.success){toast("success","Payment Ready","Redirecting to secure Paystack checkout...");if(r.authorization_url)location.href=r.authorization_url}else toast("error","Payment Gateway",r.message||"Unable to initialize payment.");closeModal()};
-modal.onclick=e=>{if(e.target===modal)closeModal()};document.onkeydown=e=>{if(e.key==="Escape")closeModal()};profileButton.onclick=()=>location.href="profile.html";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);verifyCallback().finally(()=>loadWallet());window.addEventListener("pageshow",()=>{verifyCallback().finally(loadWallet)});
+confirmFunding.onclick=async()=>{if(!pendingAmount)return;let r=await loadFundingAccount();if(!r.success){toast("error","Funding Account",r.message||"Unable to load your funding account.");return closeModal()}if(!r.account){r=await activateFundingAccount();if(!r||!r.success)return}closeModal();toast("success","Transfer to Fund",`Send ₦${Number(pendingAmount).toLocaleString("en-NG",{minimumFractionDigits:2})} or any amount to your BOLTIV funding account. Your wallet will be credited automatically when Payscribe confirms the transfer.`);};
+modal.onclick=e=>{if(e.target===modal)closeModal()};document.onkeydown=e=>{if(e.key==="Escape")closeModal()};profileButton.onclick=()=>location.href="profile.html";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);loadFundingAccount().finally(()=>loadWallet());
 /* END OF BOLTIV WALLET */
 </script></body></html>

@@ -5,13 +5,8 @@ const {Pool}=require("pg");
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
 const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
-const PAYSCRIBE_API_KEY=process.env.PAYSCRIBE_API_KEY||"";
-const PAYSCRIBE_API_BASE_URL=(process.env.PAYSCRIBE_API_BASE_URL||"https://api.payscribe.ng/api/v1").replace(/\/+$/,"");
-const PAYSCRIBE_VA_CREATE_PATH=process.env.PAYSCRIBE_VA_CREATE_PATH||"/collections/create";
-const PAYSCRIBE_WEBHOOK_SECRET=process.env.PAYSCRIBE_WEBHOOK_SECRET||PAYSCRIBE_API_KEY;
-const PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS=Number(process.env.PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS||300);
 
-// Strowallet — customer wallet funding (replaces Payscribe virtual accounts)
+// Strowallet — customer wallet funding
 const STROWALLET_PUBLIC_KEY=process.env.STROWALLET_PUBLIC_KEY||process.env.STROWALLET_API_KEY||"";
 const STROWALLET_BASE_URL=(process.env.STROWALLET_BASE_URL||"https://strowallet.com/api").replace(/\/+$/,"");
 const STROWALLET_MODE=(process.env.STROWALLET_MODE||"live").toLowerCase();
@@ -339,48 +334,6 @@ credited BOOLEAN NOT NULL DEFAULT FALSE,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 credited_at TIMESTAMPTZ
 )`);
-await db(`
-CREATE TABLE IF NOT EXISTS payscribe_customers(
-id BIGSERIAL PRIMARY KEY,
-user_id TEXT UNIQUE NOT NULL,
-payscribe_customer_id TEXT UNIQUE NOT NULL,
-tier INTEGER NOT NULL DEFAULT 0,
-status TEXT NOT NULL DEFAULT 'active',
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-
-await db(`
-CREATE TABLE IF NOT EXISTS payscribe_virtual_accounts(
-id BIGSERIAL PRIMARY KEY,
-user_id TEXT UNIQUE NOT NULL,
-payscribe_customer_id TEXT NOT NULL,
-account_number TEXT UNIQUE NOT NULL,
-account_name TEXT,
-bank_name TEXT,
-bank_code TEXT,
-currency TEXT NOT NULL DEFAULT 'NGN',
-status TEXT NOT NULL DEFAULT 'active',
-provider_account_id TEXT,
-metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-await db(`CREATE INDEX IF NOT EXISTS payscribe_va_customer_idx ON payscribe_virtual_accounts(payscribe_customer_id)`);
-await db(`CREATE INDEX IF NOT EXISTS payscribe_va_account_idx ON payscribe_virtual_accounts(account_number)`);
-
-await db(`
-CREATE TABLE IF NOT EXISTS payscribe_webhook_events(
-id BIGSERIAL PRIMARY KEY,
-event_id TEXT UNIQUE NOT NULL,
-event_type TEXT,
-payload JSONB NOT NULL,
-signature TEXT,
-processed BOOLEAN NOT NULL DEFAULT FALSE,
-processed_at TIMESTAMPTZ,
-created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)`);
-
 await db(`
 CREATE TABLE IF NOT EXISTS strowallet_virtual_accounts(
 id BIGSERIAL PRIMARY KEY,
@@ -774,14 +727,6 @@ result.rows[0];
 await createWallet(
 user.user_id
 );
-
-if(payscribeConfigured()){
-try{
-  await ensurePayscribeCustomer(user);
-}catch(error){
-  console.error("PAYSCRIBE CUSTOMER CREATION ON REGISTER FAILED:",error?.data||error);
-}
-}
 
 // Create an authenticated session immediately after registration so the
 // new user can set the mandatory Transaction PIN before entering BOLTIV.
@@ -1734,163 +1679,6 @@ message:"Admin logged out successfully."
 }
 
 
-function payscribeConfigured(){
-return Boolean(PAYSCRIBE_API_KEY);
-}
-
-function normalizePayscribePhone(phone){
-const p=String(phone||"").replace(/\D/g,"");
-if(p.startsWith("234")) return p;
-if(p.startsWith("0")) return "234"+p.slice(1);
-return p;
-}
-
-function splitFullName(name){
-const parts=clean(name).split(/\s+/).filter(Boolean);
-return {
-firstName:parts.shift()||"Customer",
-lastName:parts.join(" ")||"Customer"
-};
-}
-
-async function payscribeRequest(pathname, options={}){
-if(!payscribeConfigured()) throw new Error("Payscribe is not configured.");
-const url=`${PAYSCRIBE_API_BASE_URL}${pathname.startsWith("/")?pathname:"/"+pathname}`;
-const response=await fetch(url,{
-...options,
-headers:{
-"Authorization":`Bearer ${PAYSCRIBE_API_KEY}`,
-"Accept":"application/json",
-"Content-Type":"application/json",
-...(options.headers||{})
-}
-});
-let data={};
-try{data=await response.json();}catch{}
-if(!response.ok || data?.status===false){
-const msg=data?.message?.details?.message||data?.message?.description||data?.message||`Payscribe request failed (${response.status}).`;
-const error=new Error(typeof msg==="string"?msg:"Payscribe request failed.");
-error.status=response.status;
-error.data=data;
-throw error;
-}
-return data;
-}
-
-function payscribeDetails(data){
-return data?.message?.details ?? data?.data?.details ?? data?.data ?? data?.message ?? {};
-}
-
-function extractPayscribeCustomerId(data){
-const d=payscribeDetails(data);
-return d?.customer_id||d?.customerId||data?.customer_id||data?.customerId||null;
-}
-
-function extractPayscribeAccount(data){
-const d=payscribeDetails(data);
-const nested=d?.account||d?.virtual_account||d?.virtualAccount||d?.details||{};
-return {
-accountNumber:d?.account_number||d?.accountNumber||d?.account||nested?.account_number||nested?.accountNumber||nested?.account||null,
-accountName:d?.account_name||d?.accountName||nested?.account_name||nested?.accountName||null,
-bankName:d?.bank_name||d?.bankName||nested?.bank_name||nested?.bankName||null,
-bankCode:d?.bank_code||d?.bankCode||nested?.bank_code||nested?.bankCode||d?.bank||nested?.bank||null,
-currency:d?.currency||nested?.currency||"NGN",
-providerAccountId:d?.id||d?.account_id||d?.accountId||nested?.id||null,
-raw:d
-};
-}
-
-async function ensurePayscribeCustomer(user){
-let existing=await db(`SELECT * FROM payscribe_customers WHERE user_id=$1 LIMIT 1`,[user.user_id]);
-if(existing.rows.length) return existing.rows[0];
-const {firstName,lastName}=splitFullName(user.name||"Customer");
-const data=await payscribeRequest("/customers/create",{
-method:"POST",
-body:JSON.stringify({
-first_name:firstName,
-last_name:lastName,
-phone:normalizePayscribePhone(user.phone),
-email:user.email,
-country:"NG"
-})
-});
-const customerId=extractPayscribeCustomerId(data);
-if(!customerId) throw new Error("Payscribe did not return a customer_id.");
-const tier=Number(payscribeDetails(data)?.tier||0);
-try{
-const result=await db(`INSERT INTO payscribe_customers(user_id,payscribe_customer_id,tier,status) VALUES($1,$2,$3,'active') ON CONFLICT(user_id) DO UPDATE SET payscribe_customer_id=EXCLUDED.payscribe_customer_id,tier=GREATEST(payscribe_customers.tier,EXCLUDED.tier),status='active',updated_at=NOW() RETURNING *`,[user.user_id,customerId,tier]);
-return result.rows[0];
-}catch(error){
-// A second activation request can race the first one. Both requests may
-// receive the same Payscribe customer ID, so the unique provider-ID
-// constraint can fire even though the user_id lookup above was empty.
-if(error?.code!=='23505')throw error;
-const byCustomer=await db(`SELECT * FROM payscribe_customers WHERE payscribe_customer_id=$1 LIMIT 1`,[customerId]);
-if(byCustomer.rows.length&&String(byCustomer.rows[0].user_id)===String(user.user_id)){
-return byCustomer.rows[0];
-}
-if(byCustomer.rows.length){
-const e=new Error('This Payscribe customer is already linked to another BOLTIV account. Please contact BOLTIV support.');
-e.code='PAYSCRIBE_CUSTOMER_ALREADY_LINKED';
-e.data={constraint:error?.constraint||null};
-throw e;
-}
-throw error;
-}
-}
-
-async function upgradePayscribeTier1(user, customerId, kyc){
-const dob=clean(kyc?.dob);
-const street=clean(kyc?.street);
-const city=clean(kyc?.city);
-const state=clean(kyc?.state);
-const postalCode=clean(kyc?.postal_code||kyc?.postalCode);
-const identificationNumber=clean(kyc?.identification_number||kyc?.bvn);
-if(!/^\d{4}-\d{2}-\d{2}$/.test(dob)||!street||!city||!state||!postalCode||!identificationNumber){
-return {success:false,message:"Date of birth, address, city, state, postal code and BVN are required to activate your personal funding account."};
-}
-const data=await payscribeRequest("/customers/create/tier1",{
-method:"PATCH",
-body:JSON.stringify({
-customer_id:customerId,
-dob,
-address:{street,city,state,country:"NG",postal_code:postalCode},
-identification_type:clean(kyc?.identification_type||"BVN"),
-identification_number:identificationNumber,
-...(kyc?.photo?{photo:clean(kyc.photo)}:{})
-})
-});
-await db(`UPDATE payscribe_customers SET tier=1,updated_at=NOW() WHERE user_id=$1`,[user.user_id]);
-return {success:true,data};
-}
-
-async function createPayscribeVirtualAccount(user, customerId){
-const existing=await db(`SELECT * FROM payscribe_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
-if(existing.rows.length) return {success:true,account:existing.rows[0],existing:true};
-const ref=`BOLTIV-VA-${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-const data=await payscribeRequest(PAYSCRIBE_VA_CREATE_PATH,{
-method:"POST",
-body:JSON.stringify({customer_id:customerId,currency:"NGN",ref})
-});
-const account=extractPayscribeAccount(data);
-if(!account.accountNumber){
-const e=new Error("Payscribe did not return a virtual account number. Check PAYSCRIBE_VA_CREATE_PATH against your current Payscribe Collections documentation.");
-e.data=data;
-throw e;
-}
-const result=await db(`INSERT INTO payscribe_virtual_accounts(user_id,payscribe_customer_id,account_number,account_name,bank_name,bank_code,currency,status,provider_account_id,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9) ON CONFLICT(user_id) DO UPDATE SET account_number=EXCLUDED.account_number,account_name=EXCLUDED.account_name,bank_name=EXCLUDED.bank_name,bank_code=EXCLUDED.bank_code,currency=EXCLUDED.currency,status='active',provider_account_id=EXCLUDED.provider_account_id,metadata=EXCLUDED.metadata,updated_at=NOW() RETURNING *`,[
-user.user_id,customerId,account.accountNumber,account.accountName,account.bankName,account.bankCode,account.currency,account.providerAccountId,JSON.stringify(account.raw||{})
-]);
-return {success:true,account:result.rows[0],existing:false};
-}
-
-async function getPayscribeFundingAccount(user){
-const r=await db(`SELECT * FROM payscribe_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
-if(r.rows.length) return {success:true,account:r.rows[0]};
-const c=await db(`SELECT * FROM payscribe_customers WHERE user_id=$1 LIMIT 1`,[user.user_id]);
-return {success:true,account:null,customer:c.rows[0]||null};
-}
-
 /* ===================== STROWALLET FUNDING ===================== */
 
 function strowalletConfigured(){
@@ -2061,63 +1849,6 @@ throw e;
 }finally{
 client.release();
 }
-}
-
-function payscribeWebhookSignatureValid(req, rawBody){
-const eventId=String(req.headers["x-payscribe-event-id"]||"");
-const timestamp=String(req.headers["x-payscribe-timestamp"]||"");
-const sigHeader=String(req.headers["x-payscribe-signature"]||"");
-if(!eventId||!timestamp||!/^v1=[0-9a-f]{64}$/i.test(sigHeader)||!PAYSCRIBE_WEBHOOK_SECRET)return false;
-const ts=Number(timestamp);
-if(!Number.isFinite(ts)||Math.abs(Date.now()/1000-ts)>PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS)return false;
-const expected=crypto.createHmac("sha256",PAYSCRIBE_WEBHOOK_SECRET).update(`${timestamp}.${eventId}.${rawBody}`).digest("hex");
-const given=sigHeader.slice(3);
-return given.length===expected.length && crypto.timingSafeEqual(Buffer.from(expected,"hex"),Buffer.from(given,"hex"));
-}
-
-function payscribeWebhookEvent(event){
-return clean(event?.event_type||event?.event||"").toLowerCase();
-}
-
-function payscribeFundingPayload(event){
-const d=event?.data||event?.message?.details||event?.details||event?.payload||event||{};
-const va=d?.virtual_account||d?.virtualAccount||d?.account_details||d?.accountDetails||d?.account||{};
-return {
-customerId:d?.customer_id||d?.customerId||va?.customer_id||va?.customerId||null,
-accountNumber:d?.account_number||d?.accountNumber||va?.account_number||va?.accountNumber||va?.account||null,
-amount:Number(d?.amount||d?.credited_amount||d?.creditedAmount||d?.credit?.amount||0),
-currency:String(d?.currency||"NGN").toUpperCase(),
-reference:d?.ref||d?.reference||d?.trans_id||d?.transaction_id||d?.transactionId||null,
-status:String(d?.status||"success").toLowerCase(),
-raw:d
-};
-}
-
-async function creditPayscribeFunding(event, eventId){
-const p=payscribeFundingPayload(event);
-if(!p.accountNumber && !p.customerId) throw new Error("Payscribe funding event has no customer/account identifier.");
-if(!Number.isFinite(p.amount)||p.amount<=0) throw new Error("Payscribe funding event has an invalid amount.");
-if(p.currency!=="NGN") throw new Error("Unsupported Payscribe funding currency.");
-if(["failed","fail","cancelled","canceled"].includes(p.status)) return {ignored:true};
-const lookup=await db(`SELECT user_id,account_number,payscribe_customer_id FROM payscribe_virtual_accounts WHERE ($1<>'' AND account_number=$1) OR ($2<>'' AND payscribe_customer_id=$2) LIMIT 1`,[String(p.accountNumber||""),String(p.customerId||"")]);
-if(!lookup.rows.length) throw new Error("No BOLTIV user is linked to the Payscribe funding account.");
-const userId=lookup.rows[0].user_id;
-const referenceValue=`PS-${p.reference||eventId}`;
-const client=await pool.connect();
-try{
-await client.query("BEGIN");
-const duplicate=await client.query(`SELECT processed FROM payscribe_webhook_events WHERE event_id=$1 FOR UPDATE`,[eventId]);
-if(duplicate.rows.length && duplicate.rows[0].processed){await client.query("COMMIT");return {duplicate:true,userId};}
-await client.query(`INSERT INTO payscribe_webhook_events(event_id,event_type,payload,signature,processed) VALUES($1,$2,$3,$4,FALSE) ON CONFLICT(event_id) DO NOTHING`,[eventId,payscribeWebhookEvent(event),JSON.stringify(event),String("v1="+(event.__signature||""))]);
-await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
-const w=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[p.amount,userId]);
-if(!w.rows.length) throw new Error("Wallet update failed.");
-await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING`,[userId,p.amount,referenceValue,p.reference||eventId,JSON.stringify({provider:"payscribe",event_id:eventId,event_type:payscribeWebhookEvent(event),payload:event})]);
-await client.query(`UPDATE payscribe_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);
-await client.query("COMMIT");
-await addNotification(userId,"Wallet Funded",`₦${p.amount.toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})} was received into your BOLTIV wallet.`, "success");
-return {credited:true,userId,amount:p.amount,balance:Number(w.rows[0].balance),reference:referenceValue};
-}catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
 
 async function createPayment(
@@ -3600,45 +3331,6 @@ async function paystackRequest(path,options={}){
   }catch(e){return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}
 }
 
-async function payscribePayoutRequest(path,options={}){
-  if(!payscribeConfigured())return{success:false,statusCode:503,message:'Payscribe is not configured.'};
-  try{
-    const data=await payscribeRequest(path,options);
-    return{success:true,statusCode:200,data};
-  }catch(e){
-    return{success:false,statusCode:e.status||502,message:e.message||'Unable to connect to Payscribe.',data:e.data||{}};
-  }
-}
-
-function payscribePayoutDetails(data){
-  const d=payscribeDetails(data);
-  return d?.details||d;
-}
-
-async function payscribePayoutBanks(){
-  const r=await payscribePayoutRequest('/payouts/bank/list?country=NGN');
-  if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.message||'Unable to load Payscribe banks.'};
-  const d=payscribeDetails(r.data);
-  const banks=Array.isArray(d)?d:(Array.isArray(d?.details)?d.details:[]);
-  return{success:true,banks:banks.map(x=>({code:x.code||x.bank_code||x.bankCode,name:x.name||x.bank_name||x.bankName})).filter(x=>x.code&&x.name)};
-}
-
-async function resolvePayscribePayoutAccount(bankCode,accountNumber){
-  const r=await payscribePayoutRequest('/payouts/account/lookup',{method:'POST',body:JSON.stringify({account:String(accountNumber),bank:String(bankCode)})});
-  const d=payscribeDetails(r.data);
-  const name=d?.account_name||d?.accountName||d?.details?.account_name;
-  if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.message||'Unable to verify the bank account.'};
-  return{success:true,accountName:String(name).trim(),accountNumber:d?.account_number||d?.accountNumber||String(accountNumber)};
-}
-
-async function verifyPayscribePayoutTransfer(identifier){
-  const r=await payscribePayoutRequest(`/payouts/verify/${encodeURIComponent(identifier)}`);
-  if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.message||'Unable to check Payscribe transfer status.'};
-  const d=payscribePayoutDetails(r.data);
-  return{success:true,data:d};
-}
-
-
 /* ===================== STROWALLET REVENUE PAYOUTS ===================== */
 
 function strowalletDetails(data){
@@ -4876,10 +4568,10 @@ PAYMENT INITIALIZATION
 
 /*
 STROWALLET PERSONAL FUNDING ACCOUNT
-(Also accepts legacy /api/payscribe/funding-account paths for older clients)
+
 */
 
-if(req.method==="GET"&&(path==="/api/funding-account"||path==="/api/payscribe/funding-account"||path==="/api/strowallet/funding-account")){
+if(req.method==="GET"&&(path==="/api/funding-account"||path==="/api/strowallet/funding-account")){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 if(!strowalletConfigured())return send(res,503,{success:false,message:"Strowallet is not configured. Set STROWALLET_PUBLIC_KEY on the server."});
@@ -4892,7 +4584,7 @@ return send(res,502,{success:false,message:error.message||"Unable to load fundin
 }
 }
 
-if(req.method==="POST"&&(path==="/api/funding-account/activate"||path==="/api/payscribe/funding-account/activate"||path==="/api/strowallet/funding-account/activate")){
+if(req.method==="POST"&&(path==="/api/funding-account/activate"||path==="/api/strowallet/funding-account/activate")){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 if(!strowalletConfigured())return send(res,503,{success:false,message:"Strowallet is not configured. Set STROWALLET_PUBLIC_KEY on the server."});
@@ -4919,67 +4611,6 @@ return send(res,200,{success:true,message:result.duplicate?"Webhook already proc
 }catch(error){
 console.error("STROWALLET WEBHOOK ERROR:",error);
 return send(res,500,{success:false,message:error.message||"Webhook processing failed."});
-}
-});
-return;
-}
-
-/*
-PAYSCRIBE WEBHOOK (legacy — kept for safety if any old events still arrive)
-*/
-
-if(req.method==="POST"&&path==="/api/payscribe/webhook"){
-if(!PAYSCRIBE_WEBHOOK_SECRET)return send(res,503,{success:false,message:"Payscribe webhook secret is not configured."});
-let rawBody="";
-req.on("data",chunk=>{rawBody+=chunk;});
-req.on("end",async()=>{
-try{
-const eventId=String(req.headers["x-payscribe-event-id"]||"");
-const eventType=String(req.headers["x-payscribe-event"]||"");
-const signature=String(req.headers["x-payscribe-signature"]||"");
-if(!eventId)return send(res,400,{success:false,message:"Missing Payscribe event id."});
-if(!payscribeWebhookSignatureValid(req,rawBody))return send(res,401,{success:false,message:"Invalid Payscribe webhook signature."});
-let event;try{event=JSON.parse(rawBody);}catch{return send(res,400,{success:false,message:"Invalid webhook payload."});}
-event.__signature=signature;
-const existing=await db(`SELECT processed FROM payscribe_webhook_events WHERE event_id=$1 LIMIT 1`,[eventId]);
-if(existing.rows.length&&existing.rows[0].processed)return send(res,200,{success:true,message:"Webhook already processed."});
-const normalized=payscribeWebhookEvent(event);
-if(/payouts\.created|payout\.created|payout\.transfer\.failed|payout.*failed/.test(normalized)||/payouts\.created|payout\.created|payout\.transfer\.failed|payout.*failed/.test(eventType.toLowerCase())){
-  const d=event?.data||event?.message?.details||event?.details||event?.payload||event||{};
-  const ref=clean(d?.ref||d?.reference||"");
-  const transId=clean(d?.trans_id||d?.transaction_id||d?.id||"");
-  const status=String(d?.status||"").toLowerCase();
-  const payoutStatus=['success','successful','completed'].includes(status)?'successful':(['failed','fail','reversed','cancelled','canceled'].includes(status)?'failed':'processing');
-  if(ref||transId){
-    const wr=await db(`SELECT * FROM admin_revenue_withdrawals WHERE (reference=$1 AND $1<>'') OR (provider_transfer_id=$2 AND $2<>'') ORDER BY id DESC LIMIT 1`,[ref,transId]);
-    if(wr.rows.length){
-      const row=wr.rows[0];
-      if(row.status!==payoutStatus){
-        const c=await pool.connect();try{await c.query('BEGIN');
-          await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=COALESCE($2,provider_transfer_id),provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$4`,[payoutStatus,transId||null,d?.message||status,row.id]);
-          if(payoutStatus==='failed' && !['failed'].includes(String(row.status))){
-            await ensureAdminRevenueWallet(c,row.admin_id);
-            const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(row.amount),row.admin_id]);
-            if(w.rows.length)await addAdminRevenueLedger(c,row.admin_id,'withdrawal_reversal',Number(row.amount),Number(w.rows[0].balance),'Failed Payscribe payout reversal',`REVERSAL-${row.reference}`);
-          }
-          await c.query('COMMIT');
-        }catch(e){try{await c.query('ROLLBACK')}catch{};throw e;}finally{c.release();}
-      }
-    }
-  }
-  await db(`INSERT INTO payscribe_webhook_events(event_id,event_type,payload,signature,processed,processed_at) VALUES($1,$2,$3,$4,TRUE,NOW()) ON CONFLICT(event_id) DO UPDATE SET processed=TRUE,processed_at=NOW()`,[eventId,normalized,JSON.stringify(event),signature]);
-  return send(res,200,{success:true,message:"Payscribe payout webhook processed."});
-}
-const fundingLike=/invoice\.paid|payment_link\.paid|collection|virtual.*account|account.*credit|payment.*received|funding/.test(normalized)||/invoice\.paid|payment_link\.paid|collection|virtual.*account|account.*credit|payment.*received|funding/.test(eventType.toLowerCase());
-if(!fundingLike){
-await db(`INSERT INTO payscribe_webhook_events(event_id,event_type,payload,signature,processed,processed_at) VALUES($1,$2,$3,$4,TRUE,NOW()) ON CONFLICT(event_id) DO UPDATE SET processed=TRUE,processed_at=NOW()`,[eventId,normalized,JSON.stringify(event),signature]);
-return send(res,200,{success:true,message:"Webhook received."});
-}
-const result=await creditPayscribeFunding(event,eventId);
-return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Funding webhook processed.",...result});
-}catch(error){
-console.error("PAYSCRIBE WEBHOOK ERROR:",error);
-return send(res,500,{success:false,message:"Webhook processing failed."});
 }
 });
 return;
@@ -5024,7 +4655,7 @@ message:
 
 return send(res,410,{
 success:false,
-message:"Paystack wallet funding has been replaced by Payscribe personal virtual accounts."
+message:"Wallet funding is handled through Strowallet personal virtual accounts."
 });
 
 }

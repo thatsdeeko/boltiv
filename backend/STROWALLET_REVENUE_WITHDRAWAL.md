@@ -1,6 +1,6 @@
 # BOLTIV Revenue Wallet — Strowallet Withdrawals
 
-Revenue-wallet withdrawals now use Strowallet's documented Nigerian bank-transfer API instead of Payscribe.
+Revenue-wallet withdrawals now use Strowallet's documented Nigerian bank-transfer API as the only revenue-withdrawal provider.
 
 ## Render environment
 

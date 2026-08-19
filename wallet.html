@@ -21,7 +21,20 @@
 .wallet-modal-btn:active{transform:scale(.98)}
 .wallet-modal-cancel{background:#fff;border:1px solid #dfe2e7;color:#344054}
 .wallet-modal-confirm{background:#111827;color:#fff;border:1px solid #111827;box-shadow:0 8px 20px rgba(17,24,39,.18)}
-@media(max-width:420px){.wallet-modal-card{padding:22px;border-radius:22px}.wallet-modal-title{font-size:20px}.wallet-modal-amount{font-size:28px}}
+.wallet-modal-confirm:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+.kyc-modal .wallet-modal-card{max-width:440px;max-height:92vh;overflow-y:auto;padding:24px 22px 22px}
+.kyc-form{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.kyc-form .form-group{margin-bottom:0}
+.kyc-form .label{font-size:9px;letter-spacing:.9px;color:#6b7280;margin-bottom:5px}
+.kyc-form .input{padding:11px 12px;font-size:14px;border-radius:11px;border:1px solid #e5e7eb;background:#fafafa}
+.kyc-form .input:focus{background:#fff;border-color:#c9a227;box-shadow:0 0 0 3px rgba(201,162,39,.12)}
+.kyc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kyc-hint{font-size:10.5px;color:#98a0ad;margin-top:2px;line-height:1.4}
+.kyc-error{display:none;margin-top:10px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;color:#b91c1c;font-size:12px;line-height:1.4}
+.kyc-error.show{display:block}
+.kyc-secure{display:flex;align-items:center;gap:7px;margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px solid #e8ecf1;border-radius:10px;font-size:11px;color:#64748b}
+.kyc-secure span{font-size:13px}
+@media(max-width:420px){.wallet-modal-card{padding:22px;border-radius:22px}.wallet-modal-title{font-size:20px}.wallet-modal-amount{font-size:28px}.kyc-row{grid-template-columns:1fr}}
 </style><link rel="icon" type="image/png" href="assets/boltiv-icon.png">
 </head><body><div class="page"><div class="container"><header class="header"><div class="brand"><div class="brand-name">BOLTIV</div><div class="brand-tagline">DIGITAL PAYMENT HUB</div></div><button class="profile-mini" id="profileButton">U</button></header><section class="welcome"><div class="welcome-title">MY <span>WALLET</span></div><div class="welcome-text">Manage your balance and make payments securely with BOLTIV.</div></section><section class="balance-card"><div class="balance-label">AVAILABLE BALANCE</div><div class="balance-value" id="balance">₦0.00</div><div class="balance-actions"><button class="btn btn-primary" onclick="document.getElementById('amount').focus()">ADD MONEY</button><button class="btn btn-secondary" onclick="location.href='transactions.html'">ACTIVITY</button></div></section><section class="section"><div class="section-head"><h2 class="section-title">ADD MONEY</h2></div><div class="card"><div style="margin-bottom:16px"><div style="font-size:16.5px;font-weight:1000;color:#fff">Add money to your wallet</div><div style="font-size:11px;color:#777;line-height:1.5;margin-top:5px">Choose an amount to add to your BOLTIV wallet and use it across our payment services.</div></div><div class="form-group"><label class="label">CHOOSE AMOUNT</label><div class="provider-grid"><button class="provider-card amount-btn" data-amount="500"><div class="provider-name">₦500</div></button><button class="provider-card amount-btn" data-amount="1000"><div class="provider-name">₦1,000</div></button><button class="provider-card amount-btn" data-amount="2000"><div class="provider-name">₦2,000</div></button><button class="provider-card amount-btn" data-amount="5000"><div class="provider-name">₦5,000</div></button><button class="provider-card amount-btn" data-amount="10000"><div class="provider-name">₦10,000</div></button><button class="provider-card amount-btn" data-amount="20000"><div class="provider-name">₦20,000</div></button></div></div><div class="form-group"><label class="label">CUSTOM AMOUNT</label><div style="position:relative"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#b8860b;font-weight:900;font-size:13.2px;z-index:1">₦</span><input class="input" id="amount" type="number" inputmode="numeric" min="100" placeholder="Enter amount" style="padding-left:30px"></div></div><div id="fundSummary" style="display:none;margin:12px 0;padding:12px;background:#fffdf4;border:1px solid #ead99b;border-radius:10px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:10px;color:#777">AMOUNT TO ADD</span><strong id="summaryAmount" style="font-size:15.4px;color:#b8860b">₦0.00</strong></div></div><button class="btn btn-primary" id="fundBtn" style="width:100%">CONTINUE TO FUND</button></div></section><section class="section"><div class="notice"><strong>ONE WALLET. MULTIPLE SERVICES.</strong><br>Use your wallet balance for airtime, data, TV subscriptions and electricity payments.</div></section><section class="section"><div class="wallet-actions"><div class="wallet-action" onclick="location.href='airtime.html'"><div class="wallet-action-icon">☎</div><div class="wallet-action-title">AIRTIME</div></div><div class="wallet-action" onclick="location.href='data.html'"><div class="wallet-action-icon">⌁</div><div class="wallet-action-title">DATA</div></div><div class="wallet-action" onclick="location.href='cable.html'"><div class="wallet-action-icon">▣</div><div class="wallet-action-title">TV SUBSCRIPTION</div></div><div class="wallet-action" onclick="location.href='electricity.html'"><div class="wallet-action-icon">⚡</div><div class="wallet-action-title">ELECTRICITY</div></div></div></section><footer class="footer"><div class="footer-logo">BOLTIV</div><div class="footer-text">DIGITAL PAYMENT HUB</div></footer></div></div><nav class="bottom-nav"><button class="nav-item" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item active" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button><button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button><button class="nav-item" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button></nav><div class="wallet-modal" id="walletModal" role="dialog" aria-modal="true" aria-labelledby="fundingModalTitle">
 <div class="wallet-modal-card">
@@ -35,8 +48,56 @@
 <div class="wallet-modal-amount-box"><div class="wallet-modal-amount-label">Amount to add</div><div class="wallet-modal-amount" id="modalAmount">₦0.00</div></div>
 <div class="wallet-modal-note"><span class="wallet-modal-note-icon">✓</span><span>Your wallet is credited automatically after Payscribe confirms the transfer. No manual confirmation is required.</span></div>
 <div class="wallet-modal-actions"><button class="wallet-modal-btn wallet-modal-cancel" id="cancelFunding">Cancel</button><button class="wallet-modal-btn wallet-modal-confirm" id="confirmFunding">Continue to funding</button></div>
-</div></div><script>
-const API_URL="https://boltiv-backend.onrender.com",modal=document.getElementById("walletModal"),modalAmount=document.getElementById("modalAmount");let pendingAmount=0;
+</div></div>
+<div class="wallet-modal kyc-modal" id="kycModal" role="dialog" aria-modal="true" aria-labelledby="kycModalTitle">
+<div class="wallet-modal-card">
+<div class="wallet-modal-top">
+<div class="wallet-modal-brand"><img class="wallet-modal-brand-mark" src="assets/boltiv-icon.png" alt="BOLTIV"><span class="wallet-modal-label">BOLTIV WALLET</span></div>
+<button class="wallet-modal-close" id="closeKyc" aria-label="Close">×</button>
+</div>
+<div class="wallet-modal-icon" style="font-size:22px">🔐</div>
+<div class="wallet-modal-title" id="kycModalTitle">Activate funding account</div>
+<div class="wallet-modal-text">To create your personal virtual account, we need a few details required by regulation. This is a one-time setup.</div>
+<form class="kyc-form" id="kycForm" autocomplete="on" novalidate>
+<div class="form-group">
+<label class="label" for="kycDob">DATE OF BIRTH</label>
+<input class="input" id="kycDob" name="dob" type="date" required max="2010-12-31" min="1940-01-01">
+</div>
+<div class="form-group">
+<label class="label" for="kycStreet">RESIDENTIAL STREET ADDRESS</label>
+<input class="input" id="kycStreet" name="street" type="text" placeholder="e.g. 12 Admiralty Way, Lekki" required maxlength="120" autocomplete="street-address">
+</div>
+<div class="kyc-row">
+<div class="form-group">
+<label class="label" for="kycCity">CITY</label>
+<input class="input" id="kycCity" name="city" type="text" placeholder="e.g. Lagos" required maxlength="60" autocomplete="address-level2">
+</div>
+<div class="form-group">
+<label class="label" for="kycState">STATE</label>
+<input class="input" id="kycState" name="state" type="text" placeholder="e.g. Lagos" required maxlength="40" autocomplete="address-level1">
+</div>
+</div>
+<div class="kyc-row">
+<div class="form-group">
+<label class="label" for="kycPostal">POSTAL CODE</label>
+<input class="input" id="kycPostal" name="postal_code" type="text" placeholder="e.g. 100001" required maxlength="10" inputmode="numeric" autocomplete="postal-code">
+</div>
+<div class="form-group">
+<label class="label" for="kycBvn">BVN</label>
+<input class="input" id="kycBvn" name="bvn" type="password" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" placeholder="11-digit BVN" required autocomplete="off">
+</div>
+</div>
+<p class="kyc-hint">Your BVN is encrypted in transit and used only for identity verification with Payscribe. It is never stored in plain text on BOLTIV.</p>
+<div class="kyc-error" id="kycError" role="alert"></div>
+<div class="kyc-secure"><span>🛡</span><span>Bank-grade security · Data used solely for account activation</span></div>
+<div class="wallet-modal-actions" style="margin-top:18px">
+<button type="button" class="wallet-modal-btn wallet-modal-cancel" id="cancelKyc">Cancel</button>
+<button type="submit" class="wallet-modal-btn wallet-modal-confirm" id="submitKyc">Activate account</button>
+</div>
+</form>
+</div></div>
+<script>
+const API_URL="https://boltiv-backend.onrender.com",modal=document.getElementById("walletModal"),modalAmount=document.getElementById("modalAmount"),kycModal=document.getElementById("kycModal"),kycForm=document.getElementById("kycForm"),kycError=document.getElementById("kycError"),submitKyc=document.getElementById("submitKyc");let pendingAmount=0,kycResolve=null;
 const API={async request(endpoint,options={}){try{const r=await fetch(API_URL+endpoint,{...options,headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||""),...(options.headers||{})}});return await r.json()}catch(e){console.error(e);return{success:false,message:"Unable to connect to BOLTIV server"}}}};
 function toast(type,title,msg){document.querySelector(".boltiv-toast")?.remove();const icons={success:"✓",error:"!",pending:"⌛"},t=document.createElement("div");t.className="boltiv-toast "+type;t.innerHTML=`<div class="boltiv-toast-icon">${icons[type]||"✓"}</div><div class="boltiv-toast-content"><div class="boltiv-toast-title">${title}</div><div class="boltiv-toast-message">${msg}</div></div><button class="boltiv-toast-close">×</button>`;document.body.appendChild(t);requestAnimationFrame(()=>t.classList.add("show"));const c=()=>{t.classList.remove("show");setTimeout(()=>t.remove(),350)};t.querySelector(".boltiv-toast-close").onclick=c;setTimeout(c,4000)}
 function user(){try{return JSON.parse(localStorage.getItem("boltivUser")||"null")||{}}catch(e){return{}}}
@@ -55,21 +116,53 @@ return r;
 }
 return r;
 }
+function openKycModal(){
+kycError.classList.remove("show");kycError.textContent="";
+kycForm.reset();
+submitKyc.disabled=false;submitKyc.textContent="Activate account";
+kycModal.classList.add("show");
+setTimeout(()=>document.getElementById("kycDob")?.focus(),280);
+return new Promise(resolve=>{kycResolve=resolve});
+}
+function closeKycModal(result=null){
+kycModal.classList.remove("show");
+if(kycResolve){kycResolve(result);kycResolve=null}
+}
+function showKycError(msg){kycError.textContent=msg;kycError.classList.add("show")}
 async function activateFundingAccount(){
-const dob=prompt("Date of birth (YYYY-MM-DD):"); if(!dob)return;
-const street=prompt("Residential street address:"); if(!street)return;
-const city=prompt("City:"); if(!city)return;
-const state=prompt("State:"); if(!state)return;
-const postal_code=prompt("Postal code:"); if(!postal_code)return;
-const bvn=prompt("BVN:"); if(!bvn)return;
+const result=await openKycModal();
+return result;
+}
+kycForm.onsubmit=async e=>{
+e.preventDefault();
+const dob=document.getElementById("kycDob").value.trim();
+const street=document.getElementById("kycStreet").value.trim();
+const city=document.getElementById("kycCity").value.trim();
+const state=document.getElementById("kycState").value.trim();
+const postal_code=document.getElementById("kycPostal").value.trim();
+const bvn=document.getElementById("kycBvn").value.trim();
+if(!dob)return showKycError("Please enter your date of birth.");
+if(!/^\d{4}-\d{2}-\d{2}$/.test(dob))return showKycError("Date of birth must be in YYYY-MM-DD format.");
+if(!street)return showKycError("Please enter your residential street address.");
+if(!city)return showKycError("Please enter your city.");
+if(!state)return showKycError("Please enter your state.");
+if(!postal_code)return showKycError("Please enter your postal code.");
+if(!/^\d{11}$/.test(bvn))return showKycError("BVN must be exactly 11 digits.");
+kycError.classList.remove("show");
+submitKyc.disabled=true;submitKyc.textContent="Activating…";
 toast("pending","Activating","Creating your secure Payscribe funding account...");
 const r=await API.request("/api/payscribe/funding-account/activate",{method:"POST",body:JSON.stringify({dob,street,city,state,postal_code,bvn,identification_type:"BVN"})});
-if(!r.success){toast("error","Activation Failed",r.message||"Unable to activate funding account.");return null}
+if(!r.success){
+submitKyc.disabled=false;submitKyc.textContent="Activate account";
+showKycError(r.message||"Unable to activate funding account. Please check your details and try again.");
+toast("error","Activation Failed",r.message||"Unable to activate funding account.");
+return;
+}
 fundingAccount=r.account;
 toast("success","Account Ready","Your personal funding account is ready.");
 await loadFundingAccount();
-return r;
-}
+closeKycModal(r);
+};
 async function createWallet(){return API.request("/api/wallet/create",{method:"POST",body:JSON.stringify({userId:uid()})})}
 async function loadWallet(){let r=await API.request("/api/wallet");if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);localStorage.setItem("boltivBalance",String(b));localStorage.setItem("boltivWalletBalance",String(b));return r}if(r.message==="Wallet not found"){r=await createWallet();if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);localStorage.setItem("boltivBalance",String(b));localStorage.setItem("boltivWalletBalance",String(b));return r}}toast("error","Wallet Error",r.message||"Unable to load wallet")}
 function updateSummary(){const v=Number(amount.value);fundSummary.style.display=v>=100?"block":"none";if(v>=100)summaryAmount.textContent=money(v)}
@@ -79,7 +172,11 @@ document.querySelectorAll(".amount-btn").forEach(b=>b.onclick=()=>{document.quer
 amount.oninput=()=>{document.querySelectorAll(".amount-btn").forEach(x=>x.classList.remove("active"));updateSummary()};
 fundBtn.onclick=()=>{const v=Number(amount.value);if(!v||v<100)return toast("error","Invalid Amount","The minimum wallet funding amount is ₦100.");openModal(v)};
 cancelFunding.onclick=closeModal;closeFunding.onclick=closeModal;
+cancelKyc.onclick=()=>closeKycModal(null);closeKyc.onclick=()=>closeKycModal(null);
 confirmFunding.onclick=async()=>{if(!pendingAmount)return;let r=await loadFundingAccount();if(!r.success){toast("error","Funding Account",r.message||"Unable to load your funding account.");return closeModal()}if(!r.account){r=await activateFundingAccount();if(!r||!r.success)return}closeModal();toast("success","Transfer to Fund",`Send ₦${Number(pendingAmount).toLocaleString("en-NG",{minimumFractionDigits:2})} or any amount to your BOLTIV funding account. Your wallet will be credited automatically when Payscribe confirms the transfer.`);};
-modal.onclick=e=>{if(e.target===modal)closeModal()};document.onkeydown=e=>{if(e.key==="Escape")closeModal()};profileButton.onclick=()=>location.href="profile.html";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);loadFundingAccount().finally(()=>loadWallet());
+modal.onclick=e=>{if(e.target===modal)closeModal()};
+kycModal.onclick=e=>{if(e.target===kycModal)closeKycModal(null)};
+document.onkeydown=e=>{if(e.key==="Escape"){if(kycModal.classList.contains("show"))closeKycModal(null);else closeModal()}};
+profileButton.onclick=()=>location.href="profile.html";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);loadFundingAccount().finally(()=>loadWallet());
 /* END OF BOLTIV WALLET */
 </script></body></html>

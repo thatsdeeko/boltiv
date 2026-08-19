@@ -1431,6 +1431,32 @@ error.message
 }
 
 
+
+async function recordSecurityEvent(eventType,severity="info",details={},req=null,adminId=null){
+try{
+const safeDetails = details && typeof details === "object" ? details : {value:String(details??"")};
+await db(
+`INSERT INTO security_events(
+admin_id,
+event_type,
+severity,
+details,
+ip
+)
+VALUES($1,$2,$3,$4::jsonb,$5)`,
+[
+adminId||null,
+String(eventType||"security_event"),
+String(severity||"info"),
+JSON.stringify(safeDetails),
+req ? requestIp(req) : null
+]
+);
+}catch(err){
+console.error("Failed to record security event:",err?.message||err);
+}
+}
+
 async function adminLogin(
 email,
 password,

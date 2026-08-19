@@ -72,7 +72,7 @@ return r;
 async function activateFundingAccount(){
 toast("pending","Activating","Creating your personal funding account...");
 const r=await API.request("/api/funding-account/activate",{method:"POST",body:JSON.stringify({})});
-if(!r.success){toast("error","Activation Failed",r.message||"Unable to activate funding account.");return null}
+if(!r.success){const msg=typeof r.message==="string"?r.message:(r.message?.message||r.message?.error||r.message?.msg||"Unable to activate funding account.");toast("error","Activation Failed",msg);return null}
 fundingAccount=r.account;
 toast("success","Account Ready","Your personal funding account is ready.");
 await loadFundingAccount();

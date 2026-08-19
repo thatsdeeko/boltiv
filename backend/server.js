@@ -1927,8 +1927,16 @@ const response=await fetch(url,{method,headers,body:fetchBody});
 let data={};
 try{data=await response.json();}catch{}
 if(!response.ok){
-const msg=data?.message||data?.error||data?.msg||`Strowallet request failed (${response.status}).`;
-const error=new Error(typeof msg==="string"?msg:"Strowallet request failed.");
+const rawMsg=data?.message??data?.error??data?.msg;
+let msg;
+if(typeof rawMsg==="string"){
+msg=rawMsg;
+}else if(rawMsg&&typeof rawMsg==="object"){
+msg=rawMsg.message||rawMsg.error||rawMsg.msg||JSON.stringify(rawMsg);
+}else{
+msg=`Strowallet request failed (${response.status}).`;
+}
+const error=new Error(msg);
 error.status=response.status;
 error.data=data;
 throw error;
@@ -1976,9 +1984,9 @@ method:"POST",
 body:{
 public_key:STROWALLET_PUBLIC_KEY,
 email,
-accountName,
+account_name:accountName,
 phone,
-webhookUrl:webhook,
+webhook_url:webhook,
 mode:STROWALLET_MODE
 }
 });

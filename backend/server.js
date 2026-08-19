@@ -4,19 +4,11 @@ const {Pool}=require("pg");
 
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
-const PAYSTACK_SECRET_KEY=process.env.PAYSTACK_SECRET_KEY||"";
-
-// Strowallet — customer wallet funding
-const STROWALLET_PUBLIC_KEY=process.env.STROWALLET_PUBLIC_KEY||process.env.STROWALLET_API_KEY||"";
-const STROWALLET_BASE_URL=(process.env.STROWALLET_BASE_URL||"https://strowallet.com/api").replace(/\/+$/,"");
-const STROWALLET_MODE=(process.env.STROWALLET_MODE||"live").toLowerCase();
-const STROWALLET_SENDER_NAME=process.env.STROWALLET_SENDER_NAME||"BOLTIV TECHNOLOGIES LIMITED";
-const STROWALLET_VA_PATH=process.env.STROWALLET_VA_PATH||"/virtual-bank/new-customer";
-const STROWALLET_WEBHOOK_URL=process.env.STROWALLET_WEBHOOK_URL||"";
 const BACKEND_PUBLIC_URL=(process.env.BACKEND_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||"").replace(/\/+$/,"");
 
 const FLW_SECRET_KEY=process.env.FLW_SECRET_KEY||"";
 const FLW_BASE_URL=(process.env.FLW_BASE_URL||"https://api.flutterwave.com/v3").replace(/\/+$/,"");
+const FLW_SECRET_HASH=process.env.FLW_SECRET_HASH||"";
 const FLW_CALLBACK_URL=process.env.FLW_CALLBACK_URL||"";
 const FRONTEND_URL=process.env.FRONTEND_URL||"https://boltiv.ng";
 
@@ -335,25 +327,33 @@ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 credited_at TIMESTAMPTZ
 )`);
 await db(`
-CREATE TABLE IF NOT EXISTS strowallet_virtual_accounts(
+CREATE TABLE IF NOT EXISTS flutterwave_virtual_accounts(
 id BIGSERIAL PRIMARY KEY,
-user_id TEXT UNIQUE NOT NULL,
+owner_type TEXT NOT NULL DEFAULT 'user',
+owner_id TEXT NOT NULL,
+account_type TEXT NOT NULL DEFAULT 'static',
 account_number TEXT UNIQUE NOT NULL,
 account_name TEXT,
 bank_name TEXT,
 bank_code TEXT,
 currency TEXT NOT NULL DEFAULT 'NGN',
+amount NUMERIC(14,2) NOT NULL DEFAULT 0,
 status TEXT NOT NULL DEFAULT 'active',
+provider_account_id TEXT,
 provider_customer_id TEXT,
-session_id TEXT,
+tx_ref TEXT UNIQUE,
+identity_type TEXT,
+expiry_date TIMESTAMPTZ,
 metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
-await db(`CREATE INDEX IF NOT EXISTS strowallet_va_account_idx ON strowallet_virtual_accounts(account_number)`);
+await db(`CREATE INDEX IF NOT EXISTS flutterwave_va_account_idx ON flutterwave_virtual_accounts(account_number)`);
+await db(`CREATE INDEX IF NOT EXISTS flutterwave_va_owner_idx ON flutterwave_virtual_accounts(owner_type,owner_id,created_at DESC)`);
+await db(`CREATE UNIQUE INDEX IF NOT EXISTS flutterwave_static_owner_idx ON flutterwave_virtual_accounts(owner_type,owner_id) WHERE account_type='static'`);
 
 await db(`
-CREATE TABLE IF NOT EXISTS strowallet_webhook_events(
+CREATE TABLE IF NOT EXISTS flutterwave_webhook_events(
 id BIGSERIAL PRIMARY KEY,
 event_id TEXT UNIQUE NOT NULL,
 event_type TEXT,
@@ -1679,2308 +1679,168 @@ message:"Admin logged out successfully."
 }
 
 
-/* ===================== STROWALLET FUNDING ===================== */
+/* ===================== FLUTTERWAVE VIRTUAL ACCOUNT FUNDING ===================== */
 
-function strowalletConfigured(){
-return Boolean(STROWALLET_PUBLIC_KEY);
+function flutterwaveConfigured(){
+return Boolean(FLW_SECRET_KEY);
 }
 
-function strowalletWebhookTarget(){
-if(STROWALLET_WEBHOOK_URL) return STROWALLET_WEBHOOK_URL;
-if(BACKEND_PUBLIC_URL) return `${BACKEND_PUBLIC_URL}/api/strowallet/webhook`;
-return "";
+function normalizeNgPhone(phone){
+let p=String(phone||"").replace(/\D/g,"");
+if(p.startsWith("234")&&p.length===13)p="0"+p.slice(3);
+if(p.length===10&&/^[789]/.test(p))p="0"+p;
+return p;
+}
+function splitName(name,email){const value=clean(name)||clean(email).split("@")[0]||"BOLTIV User";const parts=value.split(/\s+/).filter(Boolean);return{first:parts.shift()||"BOLTIV",last:parts.join(" ")||"User"};}
+function flutterwaveError(r,fallback="Flutterwave request failed."){const message=r?.data?.message||r?.data?.error||r?.message;return typeof message==="string"&&message.trim()?message.trim():fallback;}
+async function flutterwaveRequest(path,options={}){
+if(!flutterwaveConfigured())return{success:false,statusCode:503,message:"Flutterwave is not configured."};
+try{const response=await fetch(`${FLW_BASE_URL}${path}`,{...options,headers:{Authorization:`Bearer ${FLW_SECRET_KEY}`,"Content-Type":"application/json",Accept:"application/json",...(options.headers||{})}});let data={};try{data=await response.json();}catch{}return{success:Boolean(response.ok&&data?.status!=="error"),statusCode:response.status,data};}catch(error){console.error("FLUTTERWAVE REQUEST ERROR:",error.message);return{success:false,statusCode:502,message:"Unable to connect to Flutterwave."};}
+}
+function parseDateOrNull(value){if(!value||String(value).toUpperCase()==="N/A")return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d;}
+function extractFlutterwaveVA(data){const d=data?.data||data?.result||data||{};return{accountNumber:clean(d.account_number||d.accountNumber||d.transfer_account||d.account?.account_number),accountName:clean(d.account_name||d.accountName||d.full_name||d.name),bankName:clean(d.bank_name||d.bankName||d.transfer_bank||d.bank?.name),bankCode:clean(d.bank_code||d.bankCode||d.transfer_bank_code||d.bank?.code),providerAccountId:clean(d.id||d.account_id||d.virtual_account_id),providerCustomerId:clean(d.customer_id||d.customerId),txRef:clean(d.tx_ref||d.txRef),expiryDate:parseDateOrNull(d.expiry_date||d.expiryDate),raw:d};}
+async function getFlutterwaveStaticFundingAccount(user){const r=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type='user' AND owner_id=$1 AND account_type='static' AND status='active' LIMIT 1`,[user.user_id]);return{success:true,account:r.rows[0]||null};}
+async function createFlutterwaveVirtualAccount({ownerType="user",ownerId,user,accountType="static",amount=0,identityType="",identityNumber=""}){
+if(!flutterwaveConfigured())throw new Error("Flutterwave is not configured. Set FLW_SECRET_KEY on the server.");
+if(!ownerId)throw new Error("Account owner is required.");
+if(!["static","dynamic"].includes(accountType))throw new Error("Invalid virtual account type.");
+if(accountType==="dynamic"&&(!Number.isFinite(Number(amount))||Number(amount)<=0))throw new Error("A valid deposit amount is required for a dynamic account.");
+if(accountType==="static"){
+const existing=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type=$1 AND owner_id=$2 AND account_type='static' AND status='active' LIMIT 1`,[ownerType,ownerId]);if(existing.rows.length)return{success:true,account:existing.rows[0],existing:true};
+if(!["nin","bvn"].includes(String(identityType).toLowerCase()))throw new Error("Choose NIN or BVN for a permanent account.");
+if(!/^\d{11}$/.test(String(identityNumber||"")))throw new Error("Enter a valid 11-digit NIN or BVN.");
+}
+const name=splitName(user?.name,user?.email),email=clean(user?.email),phone=normalizeNgPhone(user?.phone);if(!email)throw new Error("A valid email address is required.");if(!phone||phone.length<11)throw new Error("A valid Nigerian phone number is required on your profile.");
+const ref=reference(`BOLTIV-${accountType.toUpperCase()}`).replace(/[^a-zA-Z0-9-]/g,"-").slice(0,42);
+const payload={email,amount:accountType==="static"?0:Number(amount),currency:"NGN",firstname:name.first,lastname:name.last,tx_ref:ref,is_permanent:accountType==="static",narration:`BOLTIV ${accountType} funding`,phonenumber:phone};
+if(accountType==="static")payload[String(identityType).toLowerCase()]=String(identityNumber);
+const r=await flutterwaveRequest("/virtual-account-numbers",{method:"POST",body:JSON.stringify(payload)});if(!r.success)throw new Error(flutterwaveError(r,"Unable to create Flutterwave virtual account."));
+const account=extractFlutterwaveVA(r.data);if(!account.accountNumber)throw new Error("Flutterwave did not return a virtual account number.");
+const result=await db(`INSERT INTO flutterwave_virtual_accounts(owner_type,owner_id,account_type,account_number,account_name,bank_name,bank_code,currency,amount,status,provider_account_id,provider_customer_id,tx_ref,identity_type,expiry_date,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,'NGN',$8,'active',$9,$10,$11,$12,$13,$14) ON CONFLICT(account_number) DO UPDATE SET account_name=EXCLUDED.account_name,bank_name=EXCLUDED.bank_name,bank_code=EXCLUDED.bank_code,amount=EXCLUDED.amount,status='active',provider_account_id=EXCLUDED.provider_account_id,provider_customer_id=EXCLUDED.provider_customer_id,expiry_date=EXCLUDED.expiry_date,metadata=EXCLUDED.metadata,updated_at=NOW() RETURNING *`,[ownerType,ownerId,accountType,account.accountNumber,account.accountName||`${name.first} ${name.last}`,account.bankName,account.bankCode||null,Number(accountType==="static"?0:amount),account.providerAccountId||null,account.providerCustomerId||null,ref,accountType==="static"?String(identityType).toLowerCase():null,account.expiryDate,JSON.stringify(account.raw||{})]);
+return{success:true,account:result.rows[0],existing:false};
+}
+async function createCustomerFlutterwaveStaticAccount(user,identityType,identityNumber){return createFlutterwaveVirtualAccount({ownerType:"user",ownerId:user.user_id,user,accountType:"static",identityType,identityNumber});}
+async function createCustomerFlutterwaveDynamicAccount(user,amount){return createFlutterwaveVirtualAccount({ownerType:"user",ownerId:user.user_id,user,accountType:"dynamic",amount});}
+async function creditFlutterwaveVirtualAccount(payload){
+const data=payload?.data||payload||{};const accountNumber=clean(data?.account?.account_number||data?.account_number||data?.transfer_account||payload?.meta_data?.account_number||payload?.meta?.account_number);const amount=Number(data?.amount||data?.amount_settled||data?.charged_amount||0);const txId=clean(data?.id||data?.flw_ref||data?.tx_ref||payload?.id);const txRef=clean(data?.tx_ref||data?.reference||"");if(!Number.isFinite(amount)||amount<=0)throw new Error("Flutterwave webhook has an invalid amount.");if(!txId&&!txRef&&!accountNumber)throw new Error("Flutterwave webhook is missing a transaction identifier.");let va=null;if(txRef)va=(await db(`SELECT * FROM flutterwave_virtual_accounts WHERE tx_ref=$1 LIMIT 1`,[txRef])).rows[0]||null;if(!va&&accountNumber)va=(await db(`SELECT * FROM flutterwave_virtual_accounts WHERE account_number=$1 LIMIT 1`,[accountNumber])).rows[0]||null;if(!va)throw new Error("No BOLTIV owner is mapped to this Flutterwave virtual-account payment.");
+if(txId || txRef){
+const verified=/^\d+$/.test(txId)?await flutterwaveRequest(`/transactions/${encodeURIComponent(txId)}/verify`):await flutterwaveRequest(`/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`);
+const vd=verified.data?.data||{};
+if(!verified.success||String(vd.status||"").toLowerCase()!=="successful")throw new Error(flutterwaveError(verified,"Flutterwave transaction verification failed."));
+if(String(vd.currency||"").toUpperCase()!=="NGN")throw new Error("Flutterwave transaction currency is not NGN.");
+if(Number(vd.amount||0)<=0)throw new Error("Flutterwave transaction amount is invalid.");
+}
+const client=await pool.connect();try{await client.query("BEGIN");const eventId=txId||txRef||accountNumber;const existing=await client.query(`SELECT processed FROM flutterwave_webhook_events WHERE event_id=$1 FOR UPDATE`,[eventId]);if(existing.rows.length&&existing.rows[0].processed){await client.query("COMMIT");return{success:true,duplicate:true};}await client.query(`INSERT INTO flutterwave_webhook_events(event_id,event_type,payload,processed) VALUES($1,$2,$3,FALSE) ON CONFLICT(event_id) DO NOTHING`,[eventId,String(payload?.event||payload?.type||"charge.completed"),JSON.stringify(payload)]);
+if(va.owner_type==="admin"){const adminId=Number(va.owner_id);await ensureAdminWallet(client,adminId);const wr=await client.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,adminId]);if(!wr.rows.length)throw new Error("Admin wallet could not be credited.");await addAdminLedger(client,adminId,"funding",amount,Number(wr.rows[0].balance),"Flutterwave virtual-account funding",`FLW-ADMIN-${eventId}`);await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");return{success:true,duplicate:false,amount,ownerType:"admin",adminId};}
+const userId=String(va.owner_id);await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET balance=wallets.balance+$2,updated_at=NOW()`,[userId,amount]);const referenceValue=`FUND-${eventId}`;await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING`,[userId,amount,referenceValue,txRef||txId,JSON.stringify({provider:"flutterwave",account_number:accountNumber||va.account_number,account_type:va.account_type,payload})]);await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} via Flutterwave bank transfer.` ,"payment");}catch{}return{success:true,duplicate:false,amount,userId};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
+}
+async function getAdminFlutterwaveFundingAccount(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const r=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type='admin' AND owner_id=$1 AND account_type='dynamic' AND status='active' AND (expiry_date IS NULL OR expiry_date>NOW()) ORDER BY created_at DESC LIMIT 1`,[String(admin.id)]);return{success:true,account:r.rows[0]||null};}
+async function createAdminFlutterwaveFundingAccount(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:"Enter an amount of at least ₦100."};try{return await createFlutterwaveVirtualAccount({ownerType:"admin",ownerId:String(admin.id),user:{name:"BOLTIV TECHNOLOGIES LIMITED",email:admin.email,phone:process.env.ADMIN_PHONE||"08000000000"},accountType:"dynamic",amount});}catch(e){return{success:false,statusCode:400,message:e.message||"Unable to create Flutterwave admin funding account."};}
 }
 
 function normalizeNgPhone(phone){
 let p=String(phone||"").replace(/\D/g,"");
 if(p.startsWith("234")&&p.length===13) p="0"+p.slice(3);
-if(p.length===10&&p.startsWith("7")||p.startsWith("8")||p.startsWith("9")) p="0"+p;
+if(p.length===10&&/^[789]/.test(p)) p="0"+p;
 return p;
 }
 
-async function strowalletRequest(pathname, {method="POST", body=null, query=null}={}){
-if(!strowalletConfigured()) throw new Error("Strowallet is not configured.");
-let url=`${STROWALLET_BASE_URL}${pathname.startsWith("/")?pathname:"/"+pathname}`;
-const params=new URLSearchParams();
-if(query) Object.entries(query).forEach(([k,v])=>{ if(v!=null&&v!=="") params.set(k,String(v)); });
-if([...params].length) url+=`?${params.toString()}`;
-const headers={"Accept":"application/json"};
-let fetchBody;
-if(method!=="GET" && body){
-headers["Content-Type"]="application/x-www-form-urlencoded";
-const form=new URLSearchParams();
-Object.entries(body).forEach(([k,v])=>{ if(v!=null&&v!=="") form.set(k,String(v)); });
-fetchBody=form.toString();
+function splitName(name,email){
+const value=clean(name)||clean(email).split("@")[0]||"BOLTIV User";
+const parts=value.split(/\s+/).filter(Boolean);
+return {first:parts.shift()||"BOLTIV",last:parts.join(" ")||"User"};
 }
-const response=await fetch(url,{method,headers,body:fetchBody});
-let data={};
-try{data=await response.json();}catch{}
-if(!response.ok){
-const rawMsg=data?.message??data?.error??data?.msg;
-let msg;
-if(typeof rawMsg==="string"){
-msg=rawMsg;
-}else if(rawMsg&&typeof rawMsg==="object"){
-msg=rawMsg.message||rawMsg.error||rawMsg.msg||JSON.stringify(rawMsg);
-}else{
-msg=`Strowallet request failed (${response.status}).`;
-}
-const error=new Error(msg);
-error.status=response.status;
-error.data=data;
-throw error;
-}
-return data;
-}
-
-function extractStrowalletAccount(data){
-const d=data?.data||data?.account||data?.message||data||{};
-const nested=d?.account||d?.virtual_account||d?.virtualAccount||d||{};
-return {
-accountNumber:clean(d?.accountNumber||d?.account_number||d?.account||nested?.accountNumber||nested?.account_number||nested?.account||""),
-accountName:clean(d?.accountName||d?.account_name||d?.name||nested?.accountName||nested?.account_name||""),
-bankName:clean(d?.bankName||d?.bank_name||d?.bank||nested?.bankName||nested?.bank_name||"Nombank MFB"),
-bankCode:clean(d?.bankCode||d?.bank_code||nested?.bankCode||nested?.bank_code||""),
-customerId:clean(d?.customerId||d?.customer_id||d?.id||nested?.customerId||""),
-sessionId:clean(d?.sessionId||d?.session_id||""),
-currency:"NGN",
-raw:d
-};
-}
-
-async function getStrowalletFundingAccount(user){
-const r=await db(`SELECT * FROM strowallet_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
-if(r.rows.length) return {success:true,account:r.rows[0]};
-return {success:true,account:null};
-}
-
-async function createStrowalletVirtualAccount(user){
-const existing=await db(`SELECT * FROM strowallet_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
-if(existing.rows.length) return {success:true,account:existing.rows[0],existing:true};
-
-const webhook=strowalletWebhookTarget();
-if(!webhook) throw new Error("Strowallet webhook URL is not configured. Set STROWALLET_WEBHOOK_URL or BACKEND_PUBLIC_URL.");
-
-const accountName=clean(user.name||user.email||"BOLTIV User");
-const phone=normalizeNgPhone(user.phone);
-const email=clean(user.email);
-if(!phone||phone.length<11) throw new Error("A valid Nigerian phone number is required on your profile to create a funding account.");
-if(!email) throw new Error("An email address is required on your profile to create a funding account.");
-
-const path=STROWALLET_VA_PATH.startsWith("/")?STROWALLET_VA_PATH:`/${STROWALLET_VA_PATH}`;
-const data=await strowalletRequest(path,{
-method:"POST",
-body:{
-public_key:STROWALLET_PUBLIC_KEY,
-email,
-account_name:accountName,
-phone,
-webhook_url:webhook,
-mode:STROWALLET_MODE
-}
-});
-
-const account=extractStrowalletAccount(data);
-if(!account.accountNumber){
-const e=new Error(data?.message||data?.error||"Strowallet did not return a virtual account number. Check STROWALLET_VA_PATH and your API key.");
-e.data=data;
-throw e;
-}
-
-const result=await db(`INSERT INTO strowallet_virtual_accounts(user_id,account_number,account_name,bank_name,bank_code,currency,status,provider_customer_id,session_id,metadata)
-VALUES($1,$2,$3,$4,$5,'NGN','active',$6,$7,$8)
-ON CONFLICT(user_id) DO UPDATE SET
-account_number=EXCLUDED.account_number,
-account_name=EXCLUDED.account_name,
-bank_name=EXCLUDED.bank_name,
-bank_code=EXCLUDED.bank_code,
-status='active',
-provider_customer_id=EXCLUDED.provider_customer_id,
-session_id=EXCLUDED.session_id,
-metadata=EXCLUDED.metadata,
-updated_at=NOW()
-RETURNING *`,[
-user.user_id,
-account.accountNumber,
-account.accountName||accountName,
-account.bankName,
-account.bankCode||null,
-account.customerId||null,
-account.sessionId||null,
-JSON.stringify(account.raw||{})
-]);
-return {success:true,account:result.rows[0],existing:false};
-}
-
-async function creditStrowalletFunding(payload){
-const accountNumber=clean(payload?.accountNumber||payload?.account_number||"");
-const amount=Number(payload?.settledAmount||payload?.settled_amount||payload?.transactionAmount||payload?.transaction_amount||payload?.amount||0);
-const sessionId=clean(payload?.sessionId||payload?.session_id||payload?.settlementId||payload?.settlement_id||payload?.initiationTranRef||"");
-const reference=sessionId||`STW-${accountNumber}-${Date.now()}`;
-
-if(!accountNumber) throw new Error("Strowallet webhook missing accountNumber.");
-if(!Number.isFinite(amount)||amount<=0) throw new Error("Strowallet webhook has an invalid amount.");
-
-const lookup=await db(`SELECT user_id,account_number FROM strowallet_virtual_accounts WHERE account_number=$1 LIMIT 1`,[accountNumber]);
-if(!lookup.rows.length) throw new Error(`No BOLTIV user mapped to Strowallet account ${accountNumber}.`);
-const userId=lookup.rows[0].user_id;
-
-const client=await pool.connect();
-try{
-await client.query("BEGIN");
-const duplicate=await client.query(`SELECT processed FROM strowallet_webhook_events WHERE event_id=$1 FOR UPDATE`,[reference]);
-if(duplicate.rows.length&&duplicate.rows[0].processed){
-await client.query("COMMIT");
-return {success:true,duplicate:true};
-}
-await client.query(`INSERT INTO strowallet_webhook_events(event_id,event_type,payload,processed) VALUES($1,$2,$3,FALSE) ON CONFLICT(event_id) DO NOTHING`,[reference,"virtual_account.credit",JSON.stringify(payload)]);
-const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,userId]);
-if(!wr.rows.length){
-await client.query(`INSERT INTO wallets(user_id,balance,created_at,updated_at) VALUES($1,$2,NOW(),NOW()) ON CONFLICT(user_id) DO UPDATE SET balance=wallets.balance+$2,updated_at=NOW() RETURNING balance`,[userId,amount]);
-}
-await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING`,[userId,amount,`FUND-${reference}`,reference,JSON.stringify({provider:"strowallet",payload})]);
-await client.query(`UPDATE strowallet_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[reference]);
-await client.query("COMMIT");
-try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${Number(amount).toLocaleString("en-NG",{minimumFractionDigits:2})} via bank transfer.`,"payment");}catch{}
-return {success:true,duplicate:false,amount,userId};
-}catch(e){
-try{await client.query("ROLLBACK");}catch{}
-throw e;
-}finally{
-client.release();
-}
-}
-
-async function createPayment(
-userId,
-email,
-amount
-){
-
-if(!PAYSTACK_SECRET_KEY){
-
-return{
-success:false,
-message:
-"Paystack is not configured."
-};
-
-}
-
-const amountKobo=
-Math.round(
-Number(amount)*100
-);
-
-if(!Number.isFinite(amountKobo)||
-amountKobo<=0){
-
-return{
-success:false,
-message:
-"Invalid payment amount."
-};
-
-}
-
-const referenceValue=
-reference("BOLTIV-PAY");
-
-await db(
-`INSERT INTO payments(
-reference,
-user_id,
-email,
-amount,
-amount_kobo,
-status,
-credited,
-created_at
-)
-VALUES(
-$1,$2,$3,$4,$5,
-'pending',
-FALSE,
-NOW()
-)`,
-[
-referenceValue,
-userId,
-email,
-Number(amount),
-amountKobo
-]
-);
-
-try{
-
-const response=
-await fetch(
-`${PAYSTACK_API_URL}/transaction/initialize`,
-{
-method:"POST",
-headers:{
-"Authorization":
-`Bearer ${PAYSTACK_SECRET_KEY}`,
-"Content-Type":
-"application/json"
-},
-body:JSON.stringify({
-email,
-amount:amountKobo,
-reference:referenceValue,
-callback_url:
-`${FRONTEND_URL}/wallet.html`
-})
-}
-);
-
-const data=
-await response.json();
-
-if(!response.ok||
-!data.status){
-
-await db(
-`UPDATE payments
-SET status='failed'
-WHERE reference=$1`,
-[
-referenceValue
-]
-);
-
-return{
-success:false,
-message:
-data.message||
-"Unable to initialize payment."
-};
-
-}
-
-return{
-success:true,
-message:
-"Payment initialized successfully.",
-reference:
-referenceValue,
-authorization_url:
-data.data?.authorization_url||"",
-access_code:
-data.data?.access_code||""
-};
-
-}catch(error){
-
-console.error(
-"PAYSTACK INITIALIZE ERROR:",
-error
-);
-
-await db(
-`UPDATE payments
-SET status='failed'
-WHERE reference=$1`,
-[
-referenceValue
-]
-);
-
-return{
-success:false,
-message:
-"Unable to connect to Paystack."
-};
-
-}
-
-}
-
-
-async function initializePayment(
-userId,
-email,
-amount
-){
-
-return createPayment(
-userId,
-email,
-amount
-);
-
-}
-
-
-async function verifyPayment(
-referenceValue,
-expectedUserId=null
-){
-
-referenceValue=
-clean(referenceValue);
-
-if(!referenceValue){
-
-return{
-success:false,
-message:
-"Payment reference is required."
-};
-
-}
-
-const paymentResult=
-await db(
-`SELECT *
-FROM payments
-WHERE reference=$1
-LIMIT 1`,
-[
-referenceValue
-]
-);
-
-if(!paymentResult.rows.length){
-
-return{
-success:false,
-message:
-"Payment record not found."
-};
-
-}
-
-const payment=
-paymentResult.rows[0];
-
-if(expectedUserId && String(payment.user_id)!==String(expectedUserId)){
-return{success:false,statusCode:403,message:"You cannot verify another user's payment."};
-}
-
-if(payment.credited){
-
-return{
-success:true,
-message:
-"Payment has already been credited.",
-reference:
-referenceValue,
-status:
-"success",
-credited:true
-};
-
-}
-
-if(!PAYSTACK_SECRET_KEY){
-
-return{
-success:false,
-message:
-"Paystack is not configured."
-};
-
-}
-
-try{
-
-const response=
-await fetch(
-`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(referenceValue)}`,
-{
-method:"GET",
-headers:{
-"Authorization":
-`Bearer ${PAYSTACK_SECRET_KEY}`,
-"Content-Type":
-"application/json"
-}
-}
-);
-
-const data=
-await response.json();
-
-if(!response.ok||
-!data.status){
-
-return{
-success:false,
-message:
-data.message||
-"Unable to verify payment."
-};
-
-}
-
-const transaction=
-data.data;
-
-if(
-transaction.status!=="success"
-){
-
-await db(
-`UPDATE payments
-SET status=$1
-WHERE reference=$2`,
-[
-transaction.status,
-referenceValue
-]
-);
-
-return{
-success:false,
-message:
-`Payment status: ${transaction.status}`,
-status:
-transaction.status
-};
-
-}
-
-if(
-Number(transaction.amount)!==
-Number(payment.amount_kobo)
-){
-
-await db(
-`UPDATE payments
-SET status='failed'
-WHERE reference=$1`,
-[
-referenceValue
-]
-);
-
-return{
-success:false,
-message:
-"Payment amount does not match."
-};
-
-}
-
-const client=
-await pool.connect();
-
-try{
-
-await client.query(
-"BEGIN"
-);
-
-await client.query(
-`SELECT id
-FROM payments
-WHERE reference=$1
-FOR UPDATE`,
-[
-referenceValue
-]
-);
-
-const latestPayment=
-await client.query(
-`SELECT *
-FROM payments
-WHERE reference=$1
-FOR UPDATE`,
-[
-referenceValue
-]
-);
-
-if(
-!latestPayment.rows.length
-){
-
-await client.query(
-"ROLLBACK"
-);
-
-return{
-success:false,
-message:
-"Payment record not found."
-};
-
-}
-
-const lockedPayment=
-latestPayment.rows[0];
-
-if(lockedPayment.credited){
-
-await client.query(
-"COMMIT"
-);
-
-return{
-success:true,
-message:
-"Payment has already been credited.",
-reference:
-referenceValue,
-status:
-"success",
-credited:true
-};
-
-}
-
-await client.query(
-`INSERT INTO wallets(
-user_id,
-balance
-)
-VALUES($1,0)
-ON CONFLICT(user_id)
-DO NOTHING`,
-[
-lockedPayment.user_id
-]
-);
-
-const walletResult=
-await client.query(
-`UPDATE wallets
-SET
-balance=balance+$1,
-updated_at=NOW()
-WHERE user_id=$2
-RETURNING balance`,
-[
-Number(lockedPayment.amount),
-lockedPayment.user_id
-]
-);
-
-if(!walletResult.rows.length){
-
-throw new Error(
-"Wallet could not be updated."
-);
-
-}
-
-await client.query(
-`UPDATE payments
-SET
-status='success',
-credited=TRUE,
-credited_at=NOW()
-WHERE reference=$1`,
-[
-referenceValue
-]
-);
-
-await client.query(
-`INSERT INTO transactions(
-user_id,
-type,
-service,
-amount,
-reference,
-status,
-date
-)
-VALUES(
-$1,
-'credit',
-'Wallet Funding',
-$2,
-$3,
-'successful',
-NOW()
-)
-ON CONFLICT(reference)
-DO NOTHING`,
-[
-lockedPayment.user_id,
-Number(lockedPayment.amount),
-referenceValue
-]
-);
-
-await client.query(
-"COMMIT"
-);
-
-return{
-success:true,
-message:
-"Payment verified and wallet credited.",
-reference:
-referenceValue,
-amount:
-Number(lockedPayment.amount),
-status:
-"success",
-credited:true,
-balance:
-Number(
-walletResult.rows[0].balance
-)
-};
-
-}catch(error){
-
-await client.query(
-"ROLLBACK"
-);
-
-console.error(
-"PAYMENT CREDIT ERROR:",
-error
-);
-
-return{
-success:false,
-message:
-"Payment verification succeeded but wallet credit failed."
-};
-
-}finally{
-
-client.release();
 
+function flutterwaveError(r,fallback="Flutterwave request failed."){
+const message=r?.data?.message||r?.data?.error||r?.message;
+return typeof message==="string"&&message.trim()?message.trim():fallback;
 }
 
-}catch(error){
-
-console.error(
-"PAYSTACK VERIFY ERROR:",
-error
-);
-
-return{
-success:false,
-message:
-"Unable to connect to Paystack."
-};
-
-}
-
-}
-
-
-async function debitWallet(
-userId,
-amount
-){
-
-if(!validAmount(amount)){
-
-return{
-success:false,
-message:
-"Invalid amount."
-};
-
-}
-
-const client=
-await pool.connect();
-
-try{
-
-await client.query(
-"BEGIN"
-);
-
-const result=
-await client.query(
-`UPDATE wallets
-SET
-balance=balance-$1,
-updated_at=NOW()
-WHERE user_id=$2
-AND balance>=$1
-RETURNING balance`,
-[
-Number(amount),
-userId
-]
-);
-
-if(!result.rows.length){
-
-await client.query(
-"ROLLBACK"
-);
-
-return{
-success:false,
-message:
-"Insufficient wallet balance."
-};
-
-}
-
-await client.query(
-"COMMIT"
-);
-
-return{
-success:true,
-balance:
-Number(
-result.rows[0].balance
-)
-};
-
-}catch(error){
-
-await client.query(
-"ROLLBACK"
-);
-
-console.error(
-"DEBIT WALLET ERROR:",
-error
-);
-
-return{
-success:false,
-message:
-"Unable to debit wallet."
-};
-
-}finally{
-
-client.release();
-
-}
-
-}
-
-
-async function refundWallet(userId, amount){
-  if(!validAmount(amount)) return {success:false,message:"Invalid refund amount."};
-  const client=await pool.connect();
-  try{
-    await client.query("BEGIN");
-    await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
-    const result=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(amount),userId]);
-    if(!result.rows.length){ await client.query("ROLLBACK"); return {success:false,message:"Unable to refund wallet."}; }
-    await client.query("COMMIT");
-    return {success:true,balance:Number(result.rows[0].balance)};
-  }catch(error){
-    try{await client.query("ROLLBACK");}catch{}
-    console.error("REFUND WALLET ERROR:",error);
-    return {success:false,message:"Unable to refund wallet."};
-  }finally{client.release();}
-}
-
-async function markTransactionFailedAndRefund(referenceValue, reason, providerResponse=null){
-  const client=await pool.connect();
-  try{
-    await client.query("BEGIN");
-    const r=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[referenceValue]);
-    if(!r.rows.length){await client.query("ROLLBACK");return {success:false,message:"Transaction not found."};}
-    const t=r.rows[0];
-    if(t.status==='refunded' || t.refunded_at){await client.query("COMMIT");return {success:true,alreadyRefunded:true,balance:(await getWallet(t.user_id))?.balance||0};}
-    if(t.type!=='debit' || !['processing','pending','failed'].includes(String(t.status))){await client.query("ROLLBACK");return {success:false,message:"Transaction is not eligible for refund."};}
-    await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[t.user_id]);
-    const w=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(t.amount),t.user_id]);
-    if(!w.rows.length){await client.query("ROLLBACK");return {success:false,message:"Unable to refund wallet."};}
-    const refundRef=`REF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-    const meta={original_reference:referenceValue,reason,providerResponse};
-    await client.query(`UPDATE transactions SET status='refunded',refunded_at=NOW(),completed_at=NOW(),metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,[JSON.stringify({refund:meta}),referenceValue]);
-    await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','Wallet refund',$2,$3,'successful',NOW(),$4)`,[t.user_id,Number(t.amount),refundRef,JSON.stringify(meta)]);
-    await client.query("COMMIT");
-    return {success:true,alreadyRefunded:false,balance:Number(w.rows[0].balance),refundReference:refundRef,userId:t.user_id,amount:Number(t.amount)};
-  }catch(error){try{await client.query("ROLLBACK");}catch{};console.error("ATOMIC REFUND ERROR:",error);return {success:false,message:"Unable to complete refund."};}
-  finally{client.release();}
-}
-
-async function finalizeVTUTransaction(referenceValue, providerData, pending, pricingMeta=null){
-  const status=pending?'pending':'successful';
-  const meta={providerResponse:providerData};
-  if(pricingMeta)Object.assign(meta,{pricing:pricingMeta});
-  const result=await db(`UPDATE transactions SET status=$1,provider_reference=$2,completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE reference=$4 AND status IN ('processing','pending') RETURNING *`,[status,extractVTUProviderReference(providerData),JSON.stringify(meta),referenceValue]);
-  const tx=result.rows[0]||null;
-  if(tx && status==='successful'){
-    const credited=await creditAdminRevenueFromSale(Number(tx.amount),referenceValue,`Customer payment received for ${tx.service||'VTU service'}`);
-    if(!credited)console.error('REVENUE LEDGER CREDIT FAILED FOR TRANSACTION',referenceValue);
-  }
-  return tx;
-}
-
-
-async function insertTransaction({
-userId,service,amount,reference,status,type="debit",idempotencyKey=null,
-providerReference=null,recipient=null,metadata=null
-}){
-const result=await db(`
-INSERT INTO transactions(
-user_id,type,service,amount,reference,status,date,idempotency_key,
-provider_reference,recipient,metadata
-)
-VALUES($1,$2,$3,$4,$5,$6,NOW(),$7,$8,$9,$10)
-ON CONFLICT(idempotency_key) DO UPDATE SET reference=transactions.reference
-RETURNING *`,[
-userId,type,service,Number(amount),reference,status,idempotencyKey,
-providerReference,recipient,metadata?JSON.stringify(metadata):null
-]);
-return result.rows[0];
-}
-
-async function addNotification(userId,title,message,type="info"){
-try{await db(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[userId,title,message,type]);}
-catch(error){console.error("NOTIFICATION ERROR:",error.message);}
-}
-
-function hashTransactionPin(pin){return hashPassword(String(pin));}
-function verifyTransactionPin(pin,stored){return verifyPassword(String(pin),stored);}
-
-async function getSecurity(userId){
-const r=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1`,[userId]);
-return r.rows[0]||null;
-}
-
-async function setTransactionPin(userId,pin,currentPin=""){
-if(!/^\d{4}$/.test(String(pin||""))) return {success:false,message:"Transaction PIN must contain exactly 4 digits."};
-const existing=await getSecurity(userId);
-if(existing?.transaction_pin_hash){
-if(!currentPin || !verifyTransactionPin(currentPin,existing.transaction_pin_hash)) return {success:false,message:"Current transaction PIN is incorrect."};
-}
-await db(`INSERT INTO user_security(user_id,transaction_pin_hash,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET transaction_pin_hash=EXCLUDED.transaction_pin_hash,updated_at=NOW()`,[userId,hashTransactionPin(pin)]);
-return {success:true,message:existing?.transaction_pin_hash?"Transaction PIN changed successfully.":"Transaction PIN created successfully."};
-}
-
-async function requireTransactionPin(userId,pin){
-const security=await getSecurity(userId);
-if(!security?.transaction_pin_hash) return {success:false,required:true,code:"TRANSACTION_PIN_NOT_SET",message:"Set your 4-digit transaction PIN before making a transaction."};
-if(!pin || !verifyTransactionPin(pin,security.transaction_pin_hash)) return {success:false,required:true,code:"INVALID_TRANSACTION_PIN",message:"Incorrect transaction PIN."};
-return {success:true,required:true};
-}
-
-
-const PAYSTACK_API_URL=
-"https://api.paystack.co";
-
-function vtuProviderName(){
-  return String(process.env.VTU_PROVIDER||"vtugate").trim().toLowerCase();
-}
-function providerForService(service){
-  const key=serviceKey(service);
-  // During migration CheapDataHub handles airtime + data; VTUGATE remains for cable/electricity.
-  if(["airtime","data"].includes(key) && CHEAPDATAHUB_API_KEY) return "cheapdatahub";
-  return vtuProviderName();
-}
-
-function cheapDataHubEndpoint(service){
-  const map={airtime:"/airtime/purchase/",data:"/data/purchase/"};
-  return CHEAPDATAHUB_API_BASE_URL+(map[service]||"");
-}
-
-const CHEAPDATAHUB_PROVIDER_IDS={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};
-const CHEAPDATAHUB_PLAN_CACHE=new Map();
-const CHEAPDATAHUB_PLAN_CACHE_TTL_MS=5*60*1000;
-
-const CHEAPDATAHUB_FALLBACK_PLAN_LIST=[
-  {id:70,provider:"AIRTEL",size:"1GB (Social Bundle)",duration:"3 Days",price:295},{id:13,provider:"AIRTEL",size:"500MB",duration:"7 Days",price:490},{id:69,provider:"AIRTEL",size:"1.5GB",duration:"1 Day",price:500},{id:66,provider:"AIRTEL",size:"1.5GB",duration:"2 Days",price:599},{id:15,provider:"AIRTEL",size:"1GB",duration:"7 Days",price:800},{id:17,provider:"AIRTEL",size:"2GB",duration:"30 Days",price:1490},{id:52,provider:"AIRTEL",size:"5GB",duration:"7 Days",price:1570},{id:18,provider:"AIRTEL",size:"3GB",duration:"30 Days",price:1960},{id:22,provider:"AIRTEL",size:"6GB",duration:"7 Days",price:2455},{id:19,provider:"AIRTEL",size:"4GB",duration:"30 Days",price:2570},{id:20,provider:"AIRTEL",size:"8GB",duration:"30 Days",price:2999},{id:21,provider:"AIRTEL",size:"10GB",duration:"30 Days",price:4070},
-  {id:42,provider:"GLO",size:"200 MB",duration:"1 Day",price:92},{id:35,provider:"GLO",size:"500MB",duration:"30 Days",price:225},{id:68,provider:"GLO",size:"1GB",duration:"3 Days",price:300},{id:36,provider:"GLO",size:"1GB",duration:"30 Days",price:425},{id:41,provider:"GLO",size:"1GB",duration:"14 Days",price:485},{id:40,provider:"GLO",size:"2GB",duration:"30 Days",price:850},{id:37,provider:"GLO",size:"3GB",duration:"30 Days",price:1300},{id:54,provider:"GLO",size:"5GB",duration:"7 Days",price:1699},{id:38,provider:"GLO",size:"5GB",duration:"30 Days",price:2250},{id:39,provider:"GLO",size:"10GB",duration:"30 Days",price:4390},{id:59,provider:"GLO",size:"20.5GB",duration:"30 Days",price:5300},{id:58,provider:"GLO",size:"107GB",duration:"30 Days",price:19300},
-  {id:43,provider:"MTN",size:"110MB",duration:"1 Day",price:99},{id:74,provider:"MTN",size:"230MB",duration:"1 Day",price:200},{id:76,provider:"MTN",size:"500MB",duration:"2 Days",price:250},{id:78,provider:"MTN",size:"1GB",duration:"1 Day",price:270},{id:81,provider:"MTN",size:"1GB",duration:"30 Days",price:280},{id:44,provider:"MTN",size:"500MB",duration:"30 Days",price:300},{id:77,provider:"MTN",size:"1GB",duration:"2 Days",price:399},{id:45,provider:"MTN",size:"1GB",duration:"7 Days",price:450},{id:46,provider:"MTN",size:"1GB",duration:"30 Days",price:570},{id:79,provider:"MTN",size:"2.5GB",duration:"1 Day",price:600},{id:27,provider:"MTN",size:"2.5GB",duration:"2 Days",price:900},{id:71,provider:"MTN",size:"2GB",duration:"7 Days",price:900},{id:47,provider:"MTN",size:"2GB",duration:"7 Days",price:930},{id:60,provider:"MTN",size:"4.5GB",duration:"1 Day",price:1050},{id:48,provider:"MTN",size:"2GB",duration:"30 Days",price:1150},{id:61,provider:"MTN",size:"4GB",duration:"2 Days",price:1175},{id:80,provider:"MTN",size:"5GB",duration:"14 Days",price:1299},{id:82,provider:"MTN",size:"5GB",duration:"30 Days",price:1299},{id:49,provider:"MTN",size:"3GB",duration:"30 Days",price:1370},{id:50,provider:"MTN",size:"5GB",duration:"30 Days",price:2050},{id:53,provider:"MTN",size:"6GB",duration:"7 Days",price:2495},{id:33,provider:"MTN",size:"7GB",duration:"30 Days",price:3499},{id:55,provider:"MTN",size:"11GB",duration:"7 Days",price:3550},{id:67,provider:"MTN",size:"10GB",duration:"30 Days",price:4800},{id:57,provider:"MTN",size:"36GB",duration:"30 Days",price:10800},{id:51,provider:"MTN",size:"75GB",duration:"30 Days",price:17990}
-].map(x=>({...x,bundle_id:x.id,code:String(x.id),name:x.size,network_name:x.provider,size_label:x.size}));
-
-function decodeCheapDataHubHtml(s){return String(s||"").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&#x27;/gi,"'").replace(/&#39;/gi,"'").replace(/&quot;/gi,'"').replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();}
-function parseCheapDataHubPlanPage(html){
-  const plans=[]; const rowRe=/<tr[^>]*>([\s\S]*?)<\/tr>/gi; let m;
-  while((m=rowRe.exec(String(html||"")))){
-    const cells=[]; const cellRe=/<td[^>]*>([\s\S]*?)<\/td>/gi; let c;
-    while((c=cellRe.exec(m[1])))cells.push(decodeCheapDataHubHtml(c[1]));
-    // Public table: Network | Service | Plan Name | Plan ID | Price
-    if(cells.length<5)continue;
-    const provider=cells[0].toUpperCase(), service=cells[1].toUpperCase(), id=Number(cells[3]);
-    const price=Number(String(cells[4]).replace(/[^0-9.]/g,""));
-    if(!provider||!service.includes("DATA")||!Number.isFinite(id)||id<=0||!Number.isFinite(price)||price<=0)continue;
-    const name=cells[2];
-    const dur=(name.match(/\(([^)]*(?:day|days|month|months))\)/i)||[])[1]||"";
-    const size=(name.match(/(\d+(?:\.\d+)?\s*(?:GB|MB))/i)||[])[1]||name;
-    const n=Number((size.match(/\d+(?:\.\d+)?/)||[])[0]||0);
-    const unit=(size.match(/GB|MB/i)||[])[0]||"MB";
-    plans.push({bundle_id:id,code:String(id),name,network_name:provider,size_label:size,duration:dur,price:Number(price.toFixed(2)),size_mb:unit.toUpperCase()==="GB"?n*1024:n,validity_days:/day/i.test(dur)?Number((dur.match(/\d+/)||[])[0]||0):/month/i.test(dur)?Number((dur.match(/\d+/)||[])[0]||0)*30:0});
-  }
-  return plans;
-}
-async function fetchCheapDataHubDataPlans(network){
-  const wanted=String(network||"").trim().toUpperCase(); if(!wanted)throw new Error("Network is required.");
-  const cached=CHEAPDATAHUB_PLAN_CACHE.get(wanted); if(cached&&Date.now()-cached.time<CHEAPDATAHUB_PLAN_CACHE_TTL_MS)return cached.data;
-  let plans=[];
-  try{const response=await fetch("https://www.cheapdatahub.ng/api/plan-ids/",{headers:{Accept:"text/html,application/xhtml+xml"}});const html=await response.text();if(response.ok)plans=parseCheapDataHubPlanPage(html);}catch(error){console.error("CHEAPDATAHUB PLAN PAGE ERROR:",error?.message||error);}
-  if(!plans.length)plans=CHEAPDATAHUB_FALLBACK_PLAN_LIST;
-  const filtered=plans.filter(p=>String(p.network_name||p.provider||"").toUpperCase()===wanted);
-  CHEAPDATAHUB_PLAN_CACHE.set(wanted,{time:Date.now(),data:filtered}); return filtered;
-}
-function cheapDataHubStatusOk(data,response){const raw=data?.status;if(typeof raw==="boolean")return raw;if(typeof raw==="string")return ["true","success","successful","completed","ok"].includes(raw.trim().toLowerCase());return response.ok;}
-
-function vtugateEndpoint(service){
-  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'');
-  const cleanBase=base.replace(/\/api\/v1$/i,'');
-  const map={
-    airtime:"/api/v1/buyairtime",
-    data:"/api/v1/buydata",
-    cable:"/api/v1/buycabletv",
-    electricity:"/api/v1/buyelectricity",
-  };
-  return cleanBase+(map[service]||"");
-}
-
-const VTUGATE_SERVICE_CACHE=new Map();
-const VTUGATE_SERVICE_CACHE_TTL_MS=5*60*1000;
-
-async function fetchVTUGateServices(serviceType){
-  const now=Date.now();
-  const cached=VTUGATE_SERVICE_CACHE.get(serviceType);
-  if(cached && now-cached.time < VTUGATE_SERVICE_CACHE_TTL_MS) return cached.data;
-  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
-  const url=base+'/api/v1/fetchservices';
-  const response=await fetch(url,{
-    method:'POST',
-    headers:{
-      'Authorization':`Bearer ${VTU_API_KEY}`,
-      'Accept':'application/json',
-      'Content-Type':'application/x-www-form-urlencoded'
-    },
-    body:new URLSearchParams({service_type:serviceType}).toString()
-  });
-  let data={};
-  try{data=await response.json();}catch{data={};}
-  if(!response.ok || data?.status!==true){
-    console.error('VTUGATE SERVICE LOOKUP RESPONSE:',JSON.stringify({serviceType,statusCode:response.status,data}));
-    throw new Error(data?.message||`VTUGATE service lookup failed (${response.status})`);
-  }
-  const services=Array.isArray(data.data)?data.data:[];
-  VTUGATE_SERVICE_CACHE.set(serviceType,{time:now,data:services});
-  return services;
-}
-
-async function resolveVTUGateServiceId(serviceType,network){
-  const explicit=String(process.env[`VTU_${String(serviceType).toUpperCase()}_SERVICE_ID`]||'').trim();
-  if(explicit) return explicit;
-  const services=await fetchVTUGateServices(serviceType);
-  const wanted=String(network||'').trim().toLowerCase();
-  const match=services.find(item=>String(item?.network_name||item?.network||'').trim().toLowerCase()===wanted);
-  if(!match?.service_id){
-    throw new Error(`No VTUGATE ${serviceType} service is available for ${network||'the selected network'}.`);
-  }
-  return String(match.service_id);
-}
-
-const VTUGATE_DATA_PLAN_CACHE=new Map();
-const VTUGATE_DATA_PLAN_CACHE_TTL_MS=30*1000;
-// Plans that VTUGATE has explicitly rejected are temporarily hidden from customers.
-// This prevents a stale/unavailable bundle from repeatedly appearing in the catalog.
-const VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE=new Map();
-const VTUGATE_UNAVAILABLE_DATA_PLAN_TTL_MS=15*60*1000;
-function dataPlanKey(network,serviceId,code){return `${String(network||'').trim().toLowerCase()}:${String(serviceId||'').trim()}:${String(code||'').trim()}`;}
-function markVTUGateDataPlanUnavailable(network,serviceId,code){
-  const key=dataPlanKey(network,serviceId,code);
-  if(!key.endsWith(':'))VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE.set(key,Date.now());
-  VTUGATE_DATA_PLAN_CACHE.delete(String(network||'').trim().toLowerCase());
-}
-function isVTUGateDataPlanUnavailable(network,serviceId,code){
-  const key=dataPlanKey(network,serviceId,code);
-  const at=VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE.get(key);
-  if(!at)return false;
-  if(Date.now()-at>=VTUGATE_UNAVAILABLE_DATA_PLAN_TTL_MS){VTUGATE_UNAVAILABLE_DATA_PLAN_CACHE.delete(key);return false;}
-  return true;
-}
-
-async function fetchVTUGateDataPlans(network){
-  const wanted=String(network||'').trim().toLowerCase();
-  if(!wanted) throw new Error('Network is required.');
-  const now=Date.now();
-  const cached=VTUGATE_DATA_PLAN_CACHE.get(wanted);
-  if(cached && now-cached.time < VTUGATE_DATA_PLAN_CACHE_TTL_MS) return cached.data;
-
-  const services=await fetchVTUGateServices('data');
-  const matching=services.filter(item=>
-    String(item?.network_name||item?.network||'').trim().toLowerCase()===wanted && item?.service_id!==undefined
-  );
-  if(!matching.length) throw new Error(`No VTUGATE data service is available for ${network}.`);
-
-  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||'https://api.vtugate.com').replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
-  const url=base+'/api/v1/fetchdataplans';
-  const merged=new Map();
-
-  for(const service of matching){
-    const serviceId=String(service.service_id);
-    try{
-      const response=await fetch(url,{
-        method:'POST',
-        headers:{
-          'Authorization':`Bearer ${VTU_API_KEY}`,
-          'Accept':'application/json',
-          'Content-Type':'application/x-www-form-urlencoded'
-        },
-        body:new URLSearchParams({service_id:serviceId}).toString()
-      });
-      let data={};
-      try{data=await response.json();}catch{data={};}
-      if(!response.ok || data?.status!==true){
-        console.error('VTUGATE DATA PLANS RESPONSE:',JSON.stringify({serviceId,statusCode:response.status,data}));
-        continue;
-      }
-      const plans=Array.isArray(data?.data?.data_plans)?data.data.data_plans:[];
-      for(const plan of plans){
-        const code=String(plan?.code||plan?.plan_code||'').trim();
-        if(!code) continue;
-        const row={...plan,code,plan_code:code,service_id:Number(plan?.service_id||serviceId)};
-        if(isVTUGateDataPlanUnavailable(wanted,row.service_id,code)) continue;
-        const key=`${row.service_id}:${code}`;
-        if(!merged.has(key)) merged.set(key,row);
-      }
-    }catch(error){
-      console.error('VTUGATE DATA PLANS REQUEST ERROR:',JSON.stringify({serviceId,message:error?.message||'request failed'}));
-    }
-  }
-
-  const plans=Array.from(merged.values()).sort((a,b)=>Number(a.price||0)-Number(b.price||0));
-  VTUGATE_DATA_PLAN_CACHE.set(wanted,{time:now,data:plans});
-  return plans;
-}
-
-async function buildVTUGateForm(payload){
-  const p=payload&&typeof payload==='object'?payload:{};
-  const service=serviceKey(p.service||"");
-  const form=new URLSearchParams();
-  const put=(key,value)=>{if(value!==undefined&&value!==null&&String(value)!=="")form.set(key,String(value));};
-  if(service==='airtime'){
-    const phone=String(p.phone||p.recipient||'').trim();
-    const serviceId=String(p.service_id||await resolveVTUGateServiceId('airtime',p.network)).trim();
-    put('service_id',serviceId);
-    put('network',p.network);
-    put('phone',phone);
-    put('phone_number',phone);
-    put('network_provider',p.network);
-    put('amount',p.amount);
-  }else if(service==='data'){
-    const phone=String(p.phone||p.recipient||'').trim();
-    const planCode=String(p.plan_code||p.planCode||p.plan||'').trim();
-    const serviceId=String(p.service_id||'').trim();
-    if(!serviceId || !planCode){
-      throw new Error('Data service_id and plan_code are required.');
-    }
-    put('service_id',serviceId);
-    put('plan_code',planCode);
-    put('phone',phone);
-    put('phone_number',phone);
-    put('network',p.network);
-    put('amount',p.amount);
-  }else if(service==='cable'){
-    put('provider',p.provider);
-    put('smartcard',p.smartcard||p.iuc||p.iucNumber);
-    put('plan',p.plan);
-    put('amount',p.amount);
-  }else if(service==='electricity'){
-    put('provider',p.provider);
-    put('meter_number',p.meterNumber||p.meter_number);
-    put('meter_type',p.meterType||p.meter_type);
-    put('amount',p.amount);
-  }else{
-    for(const [k,v] of Object.entries(p)){if(!['service','providerPayload'].includes(k)&&typeof v!=='object')put(k,v);}
-  }
-  return form;
-}
-
-function extractVTUProviderReference(providerData){
-  const candidates=[
-    providerData?.reference,
-    providerData?.transaction_id,
-    providerData?.transactionId,
-    providerData?.transactionID,
-    providerData?.id,
-    providerData?.order_id,
-    providerData?.job_id,
-    providerData?.request_id,
-    providerData?.data?.order_id,
-    providerData?.data?.job_id,
-    providerData?.data?.request_id,
-    providerData?.data?.reference,
-    providerData?.data?.transaction_id,
-    providerData?.data?.transactionId,
-    providerData?.data?.transactionID,
-    providerData?.data?.id,
-    providerData?.data?.data?.reference,
-    providerData?.data?.data?.transaction_id,
-    providerData?.data?.data?.transactionId,
-    providerData?.data?.data?.transactionID,
-    providerData?.data?.data?.id,
-    providerData?.result?.reference,
-    providerData?.result?.transaction_id,
-    providerData?.result?.transactionId,
-    providerData?.result?.id,
-    providerData?.transaction?.reference,
-    providerData?.transaction?.transaction_id,
-    providerData?.transaction?.transactionId,
-    providerData?.transaction?.id
-  ];
-  const value=candidates.find(v=>v!==undefined&&v!==null&&String(v).trim()!=="");
-  return value===undefined?null:String(value).trim();
-}
-
-function extractVTUProviderMessage(providerData){
-  const candidates=[
-    providerData?.message,
-    providerData?.error,
-    providerData?.error_message,
-    providerData?.provider_message,
-    providerData?.detail,
-    providerData?.description,
-    providerData?.errors?.message,
-    providerData?.errors?.error,
-    providerData?.data?.message,
-    providerData?.data?.error,
-    providerData?.data?.error_message,
-    providerData?.data?.provider_message,
-    providerData?.data?.detail,
-    providerData?.data?.description,
-    providerData?.data?.errors?.message,
-    providerData?.data?.errors?.error,
-    providerData?.data?.data?.message,
-    providerData?.data?.data?.error,
-    providerData?.data?.data?.error_message,
-    providerData?.data?.data?.provider_message,
-    providerData?.data?.data?.detail,
-    providerData?.result?.message,
-    providerData?.result?.error,
-    providerData?.result?.error_message
-  ];
-  for(const value of candidates){
-    if(Array.isArray(value)){
-      const text=value.map(v=>typeof v==='string'?v:(v?.message||v?.error||v?.detail||'')).filter(Boolean).join('; ');
-      if(text)return text;
-    }else if(value&&typeof value==='object'){
-      const text=value.message||value.error||value.detail;
-      if(text)return String(text);
-    }else if(value!==undefined&&value!==null&&String(value).trim()!==''){
-      return String(value).trim();
-    }
-  }
-  return '';
-}
-
-function isVTUGateBundleUnavailable(providerData){
-  const text=extractVTUProviderMessage(providerData).toLowerCase();
-  return /cannot purchase|not available|unavailable|not currently|at the moment|explore other.*plans/.test(text);
-}
-
-async function findVTUGateDataFallback(originalPayload,providerData){
-  try{
-    const network=clean(originalPayload?.network).toUpperCase();
-    const currentCode=clean(originalPayload?.plan_code||originalPayload?.planCode||originalPayload?.plan);
-    const currentServiceId=Number(originalPayload?.service_id||0);
-    const amount=Number(originalPayload?.amount||0);
-    if(!network||!currentCode||!amount)return null;
-
-    // Force a fresh catalog after a provider-side bundle rejection.
-    VTUGATE_DATA_PLAN_CACHE.delete(network.toLowerCase());
-    const plans=await fetchVTUGateDataPlans(network);
-    if(!Array.isArray(plans)||!plans.length)return null;
-
-    // The original plan has just been rejected by VTUGATE, so immediately remove it from the customer catalog.
-    markVTUGateDataPlanUnavailable(network,currentServiceId,currentCode);
-    const currentPlan=plans.find(plan=>String(plan.code||plan.plan_code||'')===currentCode && Number(plan.service_id||0)===currentServiceId);
-    const targetSize=Number(currentPlan?.size_mb||providerData?.data?.size_mb||0);
-    const targetValidity=Number(currentPlan?.validity_days||providerData?.data?.validity_days||0);
-    const targetName=clean(currentPlan?.name||'').toLowerCase();
-
-    const candidates=plans.filter(plan=>{
-      const code=clean(plan.code||plan.plan_code);
-      const serviceId=Number(plan.service_id||0);
-      const price=Number(plan.price||0);
-      if(!code||!serviceId||code===currentCode&&serviceId===currentServiceId)return false;
-      if(!Number.isFinite(price)||price<=0||price>amount)return false;
-      const size=Number(plan.size_mb||0), validity=Number(plan.validity_days||0);
-      if(targetSize>0 && size!==targetSize)return false;
-      if(targetValidity>0 && validity!==targetValidity)return false;
-      const name=clean(plan.name||'').toLowerCase();
-      // Prefer the same named bundle when the catalog provides multiple providers.
-      if(targetName && name && name!==targetName && targetSize===0)return false;
-      return true;
-    });
-    candidates.sort((a,b)=>{
-      const ar=a.delivery_rate===null||a.delivery_rate===undefined?-1:Number(a.delivery_rate);
-      const br=b.delivery_rate===null||b.delivery_rate===undefined?-1:Number(b.delivery_rate);
-      return br-ar || Number(a.price||0)-Number(b.price||0);
-    });
-    const fallback=candidates[0];
-    if(!fallback)return null;
-    return {
-      ...originalPayload,
-      plan_code:clean(fallback.code||fallback.plan_code),
-      service_id:Number(fallback.service_id),
-      amount:Number(fallback.price||amount)
-    };
-  }catch(error){
-    console.error('VTUGATE DATA FALLBACK LOOKUP ERROR:',error?.message||error);
-    return null;
-  }
-}
-
-async function callVTUProvider(payload){
-  const service=serviceKey(payload?.service||"");
-  const provider=providerForService(service);
-  const isCheapDataHub=provider==='cheapdatahub';
-  const apiKey=isCheapDataHub?CHEAPDATAHUB_API_KEY:VTU_API_KEY;
-  if(!apiKey)return{success:false,configured:false,message:`${isCheapDataHub?'CheapDataHub':'VTU'} provider is not configured.`};
-  const url=isCheapDataHub?cheapDataHubEndpoint(service):vtugateEndpoint(service);
-  if(!url)return{success:false,configured:false,message:`${provider} does not support ${service}.`};
-  try{
-    const requestHeaders={"Authorization":`Bearer ${apiKey}`,"Accept":"application/json","Content-Type":"application/json"};
-    if(isCheapDataHub){
-      let bodyPayload={};
-      if(service==='airtime'){
-        const network=String(payload?.network||'').trim().toUpperCase();
-        const providerId=CHEAPDATAHUB_PROVIDER_IDS[network];
-        const phone=String(payload?.phone||payload?.recipient||'').trim();
-        if(!providerId||!/^\d{11}$/.test(phone)||!Number.isFinite(Number(payload?.amount))||Number(payload.amount)<=0)return{success:false,configured:true,statusCode:422,data:{status:false,message:'Invalid CheapDataHub airtime payload.'}};
-        bodyPayload={provider_id:providerId,phone_number:phone,amount:Number(payload.amount)};
-      }else if(service==='data'){
-        const bundleId=Number(payload?.bundle_id||payload?.plan_id||0);
-        const phone=String(payload?.phone||payload?.recipient||'').trim();
-        if(!Number.isFinite(bundleId)||bundleId<=0||!/^\d{11}$/.test(phone))return{success:false,configured:true,statusCode:422,data:{status:false,message:'Invalid CheapDataHub data payload.'}};
-        bodyPayload={bundle_id:bundleId,phone_number:phone};
-      }else return{success:false,configured:false,message:`CheapDataHub does not support ${service} in this migration.`};
-      const response=await fetch(url,{method:'POST',headers:requestHeaders,body:JSON.stringify(bodyPayload)});
-      let data={};try{data=await response.json();}catch{data={};}
-      const providerOk=cheapDataHubStatusOk(data,response);
-      if(!response.ok||!providerOk)console.error('CHEAPDATAHUB PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,data}));
-      return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
-    }
-    const form=await buildVTUGateForm(payload);
-    const response=await fetch(url,{method:'POST',headers:{...requestHeaders,'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
-    let data={};try{data=await response.json();}catch{data={};}
-    const providerOk=typeof data?.status==='boolean'?data.status:response.ok;
-    if(!response.ok||!providerOk)console.error('VTUGATE PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,data}));
-    return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
-  }catch(error){
-    console.error(`${provider.toUpperCase()} PROVIDER REQUEST ERROR:`,error);
-    return{success:false,configured:true,statusCode:502,data:{},error:true,message:`${provider} provider request failed.`};
-  }
-}
-
-
-function pricingConfig(service){
-  const cfg=service?.config&&typeof service.config==='object'?service.config:{};
-  const pricing=cfg.pricing&&typeof cfg.pricing==='object'?cfg.pricing:{};
-  const legacyMode=String(pricing.mode||'discount').toLowerCase();
-  const markupMode=String(pricing.markup_mode||'fixed').toLowerCase();
-  const markupPct=Number(pricing.markup_pct||0);
-  const markupFixed=Number(pricing.markup_fixed||0);
-  const discount=Number(pricing.discount_pct||0);
-  const fixedProfit=Number(pricing.fixed_profit||0);
-  return {
-    markup_mode:['fixed','percentage'].includes(markupMode)?markupMode:'fixed',
-    markup_pct:Number.isFinite(markupPct)&&markupPct>=0?markupPct:0,
-    markup_fixed:Number.isFinite(markupFixed)&&markupFixed>=0?markupFixed:0,
-    // Legacy provider-discount fields retained for compatibility with old installs.
-    mode:['discount','fixed'].includes(legacyMode)?legacyMode:'discount',
-    discount_pct:Number.isFinite(discount)&&discount>=0?discount:0,
-    fixed_profit:Number.isFinite(fixedProfit)&&fixedProfit>=0?fixedProfit:0
-  };
-}
-
-function customerPriceFromCost(providerCost,rule){
-  const cost=Number(providerCost);
-  if(!Number.isFinite(cost)||cost<0) return null;
-  let price=cost;
-  if(rule.markup_mode==='percentage'&&rule.markup_pct>0) price=cost*(1+rule.markup_pct/100);
-  else if(rule.markup_mode==='fixed'&&rule.markup_fixed>0) price=cost+rule.markup_fixed;
-  return Number(price.toFixed(2));
-}
-
-function providerAmountFromCustomer(customerAmount,rule){
-  const amount=Number(customerAmount);
-  if(!Number.isFinite(amount)||amount<=0)return null;
-  if(rule.markup_mode==='percentage'&&rule.markup_pct>0) return Number((amount/(1+rule.markup_pct/100)).toFixed(2));
-  if(rule.markup_mode==='fixed'&&rule.markup_fixed>0) return Number(Math.max(0,amount-rule.markup_fixed).toFixed(2));
-  return Number(amount.toFixed(2));
-}
-
-function providerCostFromResponse(providerData,fallbackAmount){
-  const candidates=[providerData?.data?.amount_charged,providerData?.data?.data?.amount_charged,providerData?.amount_charged,providerData?.data?.amount,providerData?.data?.data?.amount,providerData?.amount,providerData?.data?.provider_amount,providerData?.provider_amount,providerData?.data?.cost,providerData?.cost];
-  for(const value of candidates){const n=Number(value);if(Number.isFinite(n)&&n>0)return Number(n.toFixed(2));}
-  return null;
-}
-
-function estimatedProviderCost(service,customerAmount){
-  const rule=pricingConfig(service);
-  const amount=Number(customerAmount);
-  const cost=providerAmountFromCustomer(amount,rule);
-  return {cost:cost===null?amount:cost,source:(rule.markup_mode==='percentage'&&rule.markup_pct>0)?'markup_pct':(rule.markup_mode==='fixed'&&rule.markup_fixed>0?'markup_fixed':'no_markup'),rule};
-}
-
-async function processVTUTransaction(user,data){
-if(Boolean(await getPlatformSetting('maintenance_mode',false)))return{success:false,statusCode:503,message:'BOLTIV is currently in maintenance mode. Transactions are temporarily disabled.'};
-const service=await getService(data.service);
-if(service&&(!service.enabled||service.maintenance))return{success:false,statusCode:503,message:`${service.name} is currently unavailable.`};
-if(user.status==="suspended") return {success:false,statusCode:403,message:"Your account is suspended. Transactions are disabled."};
-const userId=user.user_id;
-const amount=Number(data.amount);
-if(!userId) return {success:false,statusCode:400,message:"User ID is required."};
-if(!validAmount(amount)) return {success:false,statusCode:400,message:"Invalid amount."};
-let pricing=estimatedProviderCost(service,amount);
-let pricingCostOverride=null;
-const providerPayload={...(data.providerPayload||data)};
-// Airtime amount is the face value delivered to the customer; amount is the marked-up price charged to the wallet.
-if(serviceKey(data.service)==='airtime'){
-  const airtimeValue=Number(providerPayload.airtime_amount||data.airtime_amount||0);
-  if(!Number.isFinite(airtimeValue)||airtimeValue<50) return {success:false,statusCode:400,message:'A valid airtime amount is required.'};
-  const expectedCustomer=customerPriceFromCost(airtimeValue,pricingConfig(service));
-  if(expectedCustomer===null||Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'Airtime price has changed. Please refresh and try again.'};
-  pricingCostOverride=Number(airtimeValue.toFixed(2));
-  pricing={...estimatedProviderCost(service,amount),cost:pricingCostOverride,source:'airtime_face_value'};
-}
-// For data, verify the exact live plan so customers cannot alter the wholesale amount in the browser.
-if(serviceKey(data.service)==='data') {
-  const network=clean(providerPayload.network||data.network).toUpperCase();
-  const code=clean(providerPayload.bundle_id||providerPayload.plan_code||providerPayload.planCode||providerPayload.plan);
-  if(!network||!code) return {success:false,statusCode:400,message:'A valid data plan is required.'};
-  try {
-    const livePlans=await fetchCheapDataHubDataPlans(network);
-    const livePlan=livePlans.find(x=>String(x.bundle_id||x.code||'')===code);
-    if(!livePlan) return {success:false,statusCode:400,message:'This data plan is no longer available. Please refresh and choose another plan.'};
-    const wholesale=Number(livePlan.price);
-    const expectedCustomer=customerPriceFromCost(wholesale,pricingConfig(service));
-    if(!Number.isFinite(wholesale)||wholesale<=0||expectedCustomer===null) return {success:false,statusCode:400,message:'Unable to price this data plan.'};
-    if(Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'This data plan price has changed. Please refresh the plans and try again.'};
-    pricingCostOverride=wholesale;
-    pricing={...estimatedProviderCost(service,amount),cost:Number(wholesale.toFixed(2)),source:'cheapdatahub_data_plan'};
-    providerPayload.bundle_id=Number(livePlan.bundle_id);
-  } catch(error) {
-    return {success:false,statusCode:502,message:error?.message||'Unable to verify the selected data plan.'};
-  }
-}
-if(pricing.cost>amount+0.001){return {success:false,statusCode:400,message:"Service pricing would cost more than the customer price. Update the service pricing before enabling sales."};}
-// The customer pays the marked-up price; the provider receives only the wholesale amount.
-providerPayload.amount=pricingCostOverride===null?pricing.cost:pricingCostOverride;
-const pinCheck=await requireTransactionPin(userId,data.transactionPin||"");
-if(pinCheck.success){
-  // Boltiv's transaction PIN is the PIN the user enters for this purchase.
-  providerPayload.pin=data.transactionPin;
-}
-if(!pinCheck.success) return {success:false,statusCode:401,message:pinCheck.message,code:"INVALID_TRANSACTION_PIN"};
-const rawIdempotencyKey=clean(data.idempotencyKey)||crypto.randomUUID();
-const idempotencyKey=crypto.createHash("sha256").update(`${userId}:${rawIdempotencyKey}`).digest("hex");
-const existing=await db(`SELECT * FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1`,[userId,idempotencyKey]);
-if(existing.rows.length){
-const t=existing.rows[0];
-return {success:t.status==="successful",statusCode:t.status==="successful"?200:409,message:t.status==="successful"?"Transaction already completed.":"This transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),balance:(await getWallet(userId))?.balance||0};
-}
-await createWallet(userId);
-const client=await pool.connect();
-let referenceValue=reference("BOLTIV-TX");
-try{
-await client.query("BEGIN");
-const debit=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,userId]);
-if(!debit.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Insufficient wallet balance.",balance:(await getWallet(userId))?.balance||0};}
-const safeTxMeta={...(data.metadata&&typeof data.metadata==='object'?data.metadata:{})};
-const payloadPhone=clean(providerPayload.phone||providerPayload.phone_number||data.phone||data.recipient||'');
-const payloadNetwork=clean(providerPayload.network||providerPayload.network_provider||data.network||'').toUpperCase();
-const payloadProvider=clean(providerPayload.provider||data.provider||'');
-const payloadPlan=clean(providerPayload.plan_code||providerPayload.planCode||providerPayload.plan||data.plan||'');
-const payloadSmartcard=clean(providerPayload.smartcard||providerPayload.iuc||providerPayload.iucNumber||data.smartcard||data.iuc||'');
-const payloadMeter=clean(providerPayload.meter_number||providerPayload.meterNumber||data.meter_number||data.meterNumber||'');
-const payloadMeterType=clean(providerPayload.meter_type||providerPayload.meterType||data.meter_type||data.meterType||'');
-if(payloadPhone)safeTxMeta.phone=payloadPhone;
-if(payloadNetwork)safeTxMeta.network=payloadNetwork;
-if(payloadProvider)safeTxMeta.provider=payloadProvider;
-if(payloadPlan)safeTxMeta.plan=payloadPlan;
-if(payloadSmartcard)safeTxMeta.smartcard=payloadSmartcard;
-if(payloadMeter)safeTxMeta.meterNumber=payloadMeter;
-if(payloadMeterType)safeTxMeta.meterType=payloadMeterType;
-const txRecipient=clean(data.recipient||payloadPhone||payloadSmartcard||payloadMeter||'')||null;
-await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,idempotency_key,recipient,metadata) VALUES($1,'debit',$2,$3,$4,'processing',NOW(),$5,$6,$7)`,[userId,data.service||"VTU Service",amount,referenceValue,idempotencyKey,txRecipient,Object.keys(safeTxMeta).length?JSON.stringify(safeTxMeta):null]);
-await client.query("COMMIT");
-}catch(error){try{await client.query("ROLLBACK");}catch{} client.release(); console.error("TRANSACTION RESERVE ERROR:",error); return {success:false,statusCode:500,message:"Unable to start transaction."};}
-client.release();
-let providerResult;
-try{providerResult=await callVTUProvider(providerPayload);}catch(error){providerResult={success:false,configured:true,data:{},error:true};}
-if(!providerResult.configured){const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_not_configured"); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};await addNotification(userId,"Transaction failed","Your BOLTIV transaction was refunded because the service provider is not configured yet.","error");return {success:false,statusCode:503,message:providerResult.message,reference:referenceValue,status:"failed",balance:(await getWallet(userId))?.balance||0};}
-let providerData=providerResult.data||{};
-const actualProviderCost=providerCostFromResponse(providerData,amount);
-const providerCost=actualProviderCost===null?pricing.cost:actualProviderCost;
-const pricingSource=actualProviderCost===null?pricing.source:'provider_response';
-const grossProfit=Number((amount-providerCost).toFixed(2));
-if(false && !providerResult.success && serviceKey(data.service)==='data' && vtuProviderName()==='vtugate' && isVTUGateBundleUnavailable(providerData)){
-  const fallbackPayload=await findVTUGateDataFallback(data.providerPayload||data,providerData);
-  if(fallbackPayload){
-    console.warn('VTUGATE DATA BUNDLE REJECTED; RETRYING ALTERNATE LIVE PLAN:',JSON.stringify({network:fallbackPayload.network,service_id:fallbackPayload.service_id,plan_code:fallbackPayload.plan_code,amount:fallbackPayload.amount}));
-    const retryResult=await callVTUProvider(fallbackPayload);
-    if(retryResult.success){
-      providerResult=retryResult;
-      providerData=retryResult.data||{};
-      data.providerPayload=fallbackPayload;
-      const retryCost=providerCostFromResponse(providerData,Number(fallbackPayload.amount||pricing.cost));
-      if(retryCost!==null){pricingCostOverride=retryCost;pricing={...pricing,cost:retryCost,source:'provider_response'};}
-    }else if(isVTUGateBundleUnavailable(retryResult.data||{})){
-      markVTUGateDataPlanUnavailable(fallbackPayload.network,fallbackPayload.service_id,fallbackPayload.plan_code);
-    }
-  }
-}
-const finalProviderCost=providerCostFromResponse(providerData,pricing.cost);
-const finalCost=finalProviderCost===null?pricing.cost:finalProviderCost;
-const finalGrossProfit=Number((amount-finalCost).toFixed(2));
-if(!providerResult.success){
-const refundResult=await markTransactionFailedAndRefund(referenceValue,"provider_failed",providerData); if(!refundResult.success) return {success:false,statusCode:500,message:refundResult.message,reference:referenceValue,status:"processing"};
-const providerMessage=extractVTUProviderMessage(providerData);
-const providerCode=providerResult.provider_code||providerData?.code||providerData?.error_code||providerData?.data?.code||providerData?.data?.error_code||null;
-const providerStatus=providerResult.provider_status||providerData?.status||providerData?.data?.status||null;
-const providerHttpStatus=providerResult.statusCode||null;
-const fallbackMessage=`${data.service||"Service"} transaction failed. Your wallet has been refunded.`;
-await addNotification(userId,"Transaction failed",`${data.service||"Service"} failed and your wallet was refunded. Reference: ${referenceValue}${providerMessage?` Provider: ${providerMessage}`:''}`,"error");
-return {
-  success:false,
-  statusCode:providerHttpStatus && providerHttpStatus>=400 && providerHttpStatus<600 ? providerHttpStatus : 400,
-  message:providerMessage||providerResult.message||fallbackMessage,
-  provider_message:providerMessage||providerResult.message||null,
-  provider_code:providerCode,
-  provider_status:providerStatus,
-  provider_http_status:providerHttpStatus,
-  provider_reference:extractVTUProviderReference(providerData),
-  reference:referenceValue,
-  status:"failed",
-  balance:(await getWallet(userId))?.balance||0
-};
-}
-const rawStatus=String(providerData.status||providerData.data?.status||providerData.data?.order_status||providerData.data?.data?.status||"").toLowerCase();
-const providerStatusRaw=["true","false","1","0","success","successful","ok"].includes(rawStatus)?"":rawStatus;
-const providerMessage=String(providerData.message||providerData.data?.message||providerData.data?.provider_message||"").toLowerCase();
-const providerStatus=providerStatusRaw||(/processing|queued|initiated|pending|on-hold/.test(providerMessage)?"processing":/failed|cancelled|refunded/.test(providerMessage)?"failed":"successful");
-const pending=["pending","processing","queued","in_progress","initiated","processing-api","queued-api","pending-api","on-hold"].includes(providerStatus);
-const finalStatus=pending?"pending":"successful";
-const finalized=await finalizeVTUTransaction(referenceValue,providerData,pending,{customerAmount:amount,providerCost:finalCost,grossProfit:finalGrossProfit,pricingSource,pricingRule:pricing.rule}); if(!finalized) return {success:false,statusCode:409,message:"Transaction state changed while processing. Check transaction history.",reference:referenceValue,status:"processing"};
-await addNotification(userId,pending?"Transaction processing":"Transaction successful",pending?`${data.service||"Service"} is still processing. Reference: ${referenceValue}`:`${data.service||"Service"} was completed successfully. Reference: ${referenceValue}`,pending?"pending":"success");
-const finalWallet=await getWallet(userId);
-const responseMeta={};
-const responsePhone=clean(providerPayload.phone||providerPayload.phone_number||data.phone||data.recipient||'');
-const responseNetwork=clean(providerPayload.network||providerPayload.network_provider||data.network||'').toUpperCase();
-const responseProvider=clean(providerPayload.provider||data.provider||'');
-const responsePlan=clean(providerPayload.plan_code||providerPayload.planCode||providerPayload.plan||data.plan||'');
-if(responsePhone)responseMeta.phone=responsePhone;
-if(responseNetwork)responseMeta.network=responseNetwork;
-if(responseProvider)responseMeta.provider=responseProvider;
-if(responsePlan)responseMeta.plan=responsePlan;
-return {success:true,message:pending?`${data.service} is being processed.`:`${data.service} purchase successful.`,reference:referenceValue,amount,status:finalStatus,balance:finalWallet?.balance||0,phone:responsePhone||null,network:responseNetwork||null,provider:responseProvider||null,plan:responsePlan||null,data:providerData,transaction:{reference:referenceValue,service:data.service,amount,phone:responsePhone||null,network:responseNetwork||null,provider:responseProvider||null,plan:responsePlan||null,metadata:responseMeta}};
-}
-
-
-async function requeryVTUGateTransaction(referenceValue){
-  if(vtuProviderName()!=="vtugate") return {success:false,configured:false,message:"Automatic requery is currently configured for VTUGATE only."};
-  if(!VTU_API_KEY) return {success:false,configured:false,message:"VTU provider is not configured."};
-  const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'').replace(/\/api\/v1$/i,'');
-  const url=base+"/api/v1/transactionstatus";
-  try{
-    const response=await fetch(url,{
-      method:"POST",
-      headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},
-      body:new URLSearchParams({reference:String(referenceValue),request_id:String(referenceValue)}).toString()
-    });
-    let data={}; try{data=await response.json();}catch{}
-    return {success:response.ok,configured:true,statusCode:response.status,data};
-  }catch(error){
-    return {success:false,configured:true,error:true,message:error?.message||"Unable to requery VTUGATE."};
-  }
-}
-
-function normalizeRequeryStatus(data){
-  const raw=data?.status??data?.data?.status??data?.data?.transaction?.status??data?.transaction?.status??data?.result?.status??"";
-  const status=String(raw||"").trim().toLowerCase();
-  if(["successful","success","completed","complete","delivered","successful_delivery"].includes(status)) return "successful";
-  if(["failed","failure","reversed","refunded","cancelled","canceled"].includes(status)) return "failed";
-  return "pending";
-}
-
-async function reconcilePendingTransactions(admin=null,req=null){
-  const r=await db(`SELECT id,user_id,service,amount,reference,status,provider_reference,date FROM transactions WHERE type='debit' AND status IN ('processing','pending') ORDER BY date ASC LIMIT 100`);
-  const results=[];
-  for(const t of r.rows){
-    const q=await requeryVTUGateTransaction(t.reference);
-    if(!q.configured || !q.success){
-      results.push({...t,amount:Number(t.amount),requery_status:"unavailable",message:q.message||"Provider status could not be checked."});
-      continue;
-    }
-    const status=normalizeRequeryStatus(q.data);
-    if(status==="successful"){
-      const finalized=await finalizeVTUTransaction(t.reference,q.data,false,{reconciled:true,requeryResponse:q.data});
-      if(finalized){
-        await addNotification(t.user_id,"Transaction successful",`${t.service||"Service"} was confirmed successful. Reference: ${t.reference}`,"success");
-        results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:true});
-      }else results.push({...t,amount:Number(t.amount),requery_status:"successful",resolved:false});
-    }else if(status==="failed"){
-      const refund=await markTransactionFailedAndRefund(t.reference,"provider_requery_failed",q.data);
-      if(refund.success){
-        await addNotification(t.user_id,"Transaction refunded",`${t.service||"Service"} failed and your wallet was refunded. Reference: ${t.reference}`,"error");
-        results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:true,refundReference:refund.refundReference||null});
-      }else results.push({...t,amount:Number(t.amount),requery_status:"failed",refunded:false,message:refund.message});
-    }else{
-      results.push({...t,amount:Number(t.amount),requery_status:"pending",resolved:false});
-    }
-  }
-  return {success:true,count:r.rows.length,resolved:results.filter(x=>x.resolved||x.refunded).length,transactions:results};
-}
-
-async function getPlatformSetting(key,fallback=null){const r=await db(`SELECT value FROM platform_settings WHERE key=$1`,[key]);return r.rows.length?r.rows[0].value:fallback;}
-async function setPlatformSetting(key,value){await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[key,JSON.stringify(value)]);}
-function serviceKey(value){const v=clean(value).toLowerCase();return ({airtime:'airtime',data:'data',electricity:'electricity',cable:'cable','cable tv':'cable'})[v]||v;}
-async function getService(key){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1`,[serviceKey(key)]);return r.rows[0]||null;}
-async function recordSecurityEvent(eventType,severity,details={},req=null,adminId=null){await db(`INSERT INTO security_events(admin_id,event_type,severity,details,ip) VALUES($1,$2,$3,$4::jsonb,$5)`,[adminId,eventType,severity,JSON.stringify(details),req?requestIp(req):null]);}
-
-async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const incomingConfig=b.config===undefined?{}:(b.config||{});const oldConfig=existing.config&&typeof existing.config==='object'?existing.config:{};const config={...oldConfig,...incomingConfig,pricing:{...(oldConfig.pricing||{}),...(incomingConfig.pricing||{})}};if(config.pricing){const mode=String(config.pricing.mode||'discount').toLowerCase();const discount=Number(config.pricing.discount_pct||0);const fixedProfit=Number(config.pricing.fixed_profit||0);const markupMode=String(config.pricing.markup_mode||'fixed').toLowerCase();const markupPct=Number(config.pricing.markup_pct||0);const markupFixed=Number(config.pricing.markup_fixed||0);if(!['discount','fixed'].includes(mode)||!Number.isFinite(discount)||discount<0||discount>100||!Number.isFinite(fixedProfit)||fixedProfit<0||!['fixed','percentage'].includes(markupMode)||!Number.isFinite(markupPct)||markupPct<0||markupPct>100||!Number.isFinite(markupFixed)||markupFixed<0)return{success:false,statusCode:400,message:'Invalid pricing configuration.'};config.pricing={...config.pricing,mode,discount_pct:discount,fixed_profit:fixedProfit,markup_mode:markupMode,markup_pct:markupPct,markup_fixed:markupFixed};}const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
-async function adminSettings(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='get')return{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}};const b=await body(req);if(b.maintenance_mode!==undefined)await setPlatformSetting('maintenance_mode',Boolean(b.maintenance_mode));if(b.registration_enabled!==undefined)await setPlatformSetting('registration_enabled',Boolean(b.registration_enabled));const settings={maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))};await adminAudit(admin,'platform_settings_updated','settings','platform',settings,req);return{success:true,settings};}
-async function adminSecurity(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='events'){const r=await db(`SELECT s.*,a.email FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id ORDER BY s.created_at DESC LIMIT 500`);return{success:true,events:r.rows};}if(action==='sessions'){const r=await db(`SELECT id,created_at,expires_at FROM admin_sessions WHERE admin_id=$1 AND expires_at>NOW() ORDER BY created_at DESC`,[admin.id]);return{success:true,sessions:r.rows};}if(action==='revoke'){const auth=String(req.headers.authorization||'');const current=auth.startsWith('Bearer ')?auth.slice(7).trim():'';const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current]);await recordSecurityEvent('sessions_revoked','warning',{revoked:Number(r.rowCount||0)},req,admin.id);await adminAudit(admin,'sessions_revoked','admin',String(admin.id),{revoked:Number(r.rowCount||0)},req);return{success:true,revoked:Number(r.rowCount||0)};}return{success:false,statusCode:400,message:'Unknown security action.'};}
-
-async function adminAudit(admin,action,targetType,targetId,details,req){
-try{
-await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip)
-VALUES($1,$2,$3,$4,$5,$6)`,[
-admin?.id||null,action,targetType||null,targetId||null,
-JSON.stringify(details||{}),
-req?.headers?.["x-forwarded-for"]||req?.socket?.remoteAddress||null
-]);
-}catch(e){console.error("ADMIN AUDIT ERROR:",e.message);}
-}
-
-async function adminUserAction(req){
-const admin=await adminFromToken(req);
-if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-const b=await body(req), target=clean(b.userId||b.id), action=clean(b.action);
-if(!target||!["suspend","activate"].includes(action))
-return{success:false,statusCode:400,message:"Invalid user action."};
-const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);
-if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};
-const u=r.rows[0],status=action==="suspend"?"suspended":"active";
-await db(`UPDATE users SET status=$1,updated_at=NOW() WHERE user_id=$2`,[status,u.user_id]);
-if(action==="suspend") await db(`DELETE FROM user_sessions WHERE user_id=(SELECT id FROM users WHERE user_id=$1)`,[u.user_id]);
-await addNotification(u.user_id,action==="suspend"?"Account suspended":"Account activated",
-action==="suspend"?"Your BOLTIV account has been suspended. Please contact support.":"Your BOLTIV account has been activated.","security");
-await adminAudit(admin,`user_${action}`,"user",u.user_id,{email:u.email},req);
-return{success:true,message:`User ${status}.`,status};
-}
-
-async function ensureAdminWallet(client,adminId){await client.query(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);}
-async function getAdminWallet(adminId){const r=await db(`SELECT admin_id,balance,created_at,updated_at FROM admin_wallets WHERE admin_id=$1`,[adminId]);return r.rows.length?{...r.rows[0],balance:Number(r.rows[0].balance||0)}:{admin_id:adminId,balance:0};}
-async function addAdminLedger(client,adminId,type,amount,balanceAfter,description,reference){await client.query(`INSERT INTO admin_wallet_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6)`,[adminId,type,amount,balanceAfter,reference,description]);}
-async function ensureAdminRevenueWallet(client,adminId){await client.query(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);}
-async function addAdminRevenueLedger(client,adminId,type,amount,balanceAfter,description,reference){await client.query(`INSERT INTO admin_revenue_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6)`,[adminId,type,amount,balanceAfter,reference,description]);}
-async function primaryAdminId(){const r=await db(`SELECT id FROM admins ORDER BY id ASC LIMIT 1`);return r.rows[0]?.id||null;}
-async function creditAdminRevenueFromSale(customerAmount,transactionReference,description='Customer service sale'){
-  const amount=Number(customerAmount); if(!Number.isFinite(amount)||amount<=0)return false;
-  const adminId=await primaryAdminId(); if(!adminId){console.error('ADMIN REVENUE CREDIT: no admin exists');return false;}
-  const c=await pool.connect();
-  try{await c.query('BEGIN');await ensureAdminRevenueWallet(c,adminId);
-    const ref=`SALE-${transactionReference}`;
-    const existing=await c.query(`SELECT id FROM admin_revenue_ledger WHERE reference=$1 LIMIT 1`,[ref]);
-    if(existing.rows.length){await c.query('COMMIT');return true;}
-    const r=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,adminId]);
-    if(!r.rows.length)throw new Error('Revenue wallet update failed.');
-    const balanceAfter=Number(r.rows[0].balance);
-    await addAdminRevenueLedger(c,adminId,'sale',amount,balanceAfter,description,ref);
-    await c.query('COMMIT');return true;
-  }catch(e){try{await c.query('ROLLBACK')}catch{};console.error('ADMIN REVENUE CREDIT ERROR:',e);return false;}finally{c.release();}
-}
-
-async function creditAdminFromPayment(client,payment){await ensureAdminWallet(client,payment.admin_id);const wr=await client.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(payment.amount),payment.admin_id]);if(!wr.rows.length)throw new Error('Admin wallet update failed.');const balanceAfter=Number(wr.rows[0].balance);await addAdminLedger(client,payment.admin_id,'funding',Number(payment.amount),balanceAfter,'Paystack admin wallet funding',`AF-${payment.reference}`);await client.query(`UPDATE payments SET status='success',credited=TRUE,credited_at=NOW() WHERE reference=$1`,[payment.reference]);return balanceAfter;}
-
-async function flutterwaveRequest(path, options={}){
-  if(!FLW_SECRET_KEY) return {success:false,statusCode:503,message:"Flutterwave payouts are not configured."};
-  try{
-    const response=await fetch(`${FLW_BASE_URL}${path}`,{
-      ...options,
-      headers:{Authorization:`Bearer ${FLW_SECRET_KEY}`,"Content-Type":"application/json",...(options.headers||{})}
-    });
-    let data={}; try{data=await response.json();}catch{}
-    return {success:Boolean(response.ok && data?.status!=="error"),statusCode:response.status,data};
-  }catch(error){
-    console.error("FLUTTERWAVE REQUEST ERROR:",error.message);
-    return {success:false,statusCode:502,message:"Unable to connect to Flutterwave."};
-  }
-}
-async function adminProfitSummary(adminId){
-  const p=await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`);
-  const w=await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing','successful') THEN amount ELSE 0 END),0) AS reserved FROM admin_profit_withdrawals WHERE admin_id=$1`,[adminId]);
-  const grossProfit=Number(p.rows[0]?.gross_profit||0), reserved=Number(w.rows[0]?.reserved||0);
-  return {grossProfit,reserved,available:Math.max(0,Number((grossProfit-reserved).toFixed(2)))};
-}
 async function flutterwaveBanks(){
-  const r=await flutterwaveRequest("/banks?country=NG");
-  if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||r.message||"Unable to load Nigerian banks."};
-  return{success:true,banks:Array.isArray(r.data?.data)?r.data.data:[]};
+const r=await flutterwaveRequest("/banks/NG?include_provider_type=1");
+if(!r.success)return{success:false,statusCode:r.statusCode||502,message:flutterwaveError(r,"Unable to load Nigerian banks.")};
+return{success:true,banks:Array.isArray(r.data?.data)?r.data.data.map(x=>({code:String(x.code||x.bank_code||""),name:String(x.name||x.bank_name||"")})).filter(x=>x.code&&x.name):[]};
 }
 async function resolveFlutterwaveAccount(bankCode,accountNumber){
-  const r=await flutterwaveRequest("/accounts/resolve",{method:"POST",body:JSON.stringify({account_bank:String(bankCode),account_number:String(accountNumber)})});
-  const name=r.data?.data?.account_name;
-  if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.data?.message||"Unable to verify the bank account."};
-  return{success:true,accountName:String(name).trim(),accountNumber:r.data.data.account_number||String(accountNumber)};
+const r=await flutterwaveRequest("/accounts/resolve",{method:"POST",body:JSON.stringify({account_bank:String(bankCode),account_number:String(accountNumber)})});
+const d=r.data?.data||{};const name=d.account_name||d.accountName;
+if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:flutterwaveError(r,"Unable to verify the bank account.")};
+return{success:true,accountName:String(name).trim(),accountNumber:String(d.account_number||accountNumber).trim()};
 }
-async function paystackRequest(path,options={}){
-  if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};
-  try{
-    const response=await fetch(`${PAYSTACK_API_URL}${path}`,{...options,headers:{'Authorization':`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json',...(options.headers||{})}});
-    let data={};try{data=await response.json()}catch{}
-    return{success:Boolean(response.ok&&data?.status),statusCode:response.status,data};
-  }catch(e){return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}
+async function flutterwaveBankTransfer({amount,bankCode,accountNumber,narration,referenceValue}){
+const payload={account_bank:String(bankCode),account_number:String(accountNumber),amount:Number(amount),currency:"NGN",debit_currency:"NGN",beneficiary_name:"BOLTIV Technologies Limited",reference:String(referenceValue),narration:String(narration||"BOLTIV revenue withdrawal")};
+if(FLW_CALLBACK_URL)payload.callback_url=FLW_CALLBACK_URL;
+const r=await flutterwaveRequest("/transfers",{method:"POST",body:JSON.stringify(payload),headers:{"X-Idempotency-Key":String(referenceValue)}});
+if(!r.success)return{success:false,statusCode:r.statusCode||400,message:flutterwaveError(r,"Flutterwave transfer failed.")};
+const d=r.data?.data||{};const raw=String(d.status||r.data?.status||"NEW").toUpperCase();
+const status=["SUCCESSFUL","COMPLETED"].includes(raw)?"successful":(["FAILED","REVERSED","CANCELLED","CANCELED"].includes(raw)?"failed":"processing");
+return{success:true,status,transferId:d.id||null,providerReference:d.reference||null,message:r.data?.message||raw,data:r.data};
 }
-
-/* ===================== STROWALLET REVENUE PAYOUTS ===================== */
-
-function strowalletDetails(data){
-  const d=data?.data ?? data?.details ?? data?.result ?? data;
-  return d && typeof d === 'object' ? d : {};
-}
-
-function strowalletMessage(data,fallback='Strowallet request failed.'){
-  const raw=data?.message ?? data?.error ?? data?.msg ?? data?.statusMessage;
-  if(typeof raw==='string' && raw.trim()) return raw.trim();
-  if(raw && typeof raw==='object') return String(raw.message||raw.error||raw.msg||JSON.stringify(raw));
-  return fallback;
-}
-
-async function strowalletPayoutBanks(){
-  try{
-    const data=await strowalletRequest('/banks/lists/',{method:'GET',query:{public_key:STROWALLET_PUBLIC_KEY}});
-    const d=strowalletDetails(data);
-    const raw=Array.isArray(d)?d:(Array.isArray(d.banks)?d.banks:(Array.isArray(d.data)?d.data:[]));
-    const banks=raw.map(x=>({
-      code:String(x.code||x.bank_code||x.bankCode||x.bankCodeId||'').trim(),
-      name:String(x.name||x.bank_name||x.bankName||x.bank||'').trim()
-    })).filter(x=>x.code&&x.name);
-    if(!banks.length) throw new Error(strowalletMessage(data,'Strowallet returned no Nigerian banks.'));
-    return {success:true,banks};
-  }catch(e){
-    return {success:false,statusCode:e.status||502,message:e.message||'Unable to load Strowallet banks.'};
-  }
-}
-
-async function resolveStrowalletPayoutAccount(bankCode,accountNumber){
-  try{
-    const data=await strowalletRequest('/banks/get-customer-name/',{
-      method:'GET',
-      query:{public_key:STROWALLET_PUBLIC_KEY,bank_code:String(bankCode),account_number:String(accountNumber)}
-    });
-    const d=strowalletDetails(data);
-    const name=d?.account_name||d?.accountName||d?.name||d?.customer_name||d?.customerName||d?.account?.name||d?.account?.account_name||d?.account?.accountName;
-    const number=d?.account_number||d?.accountNumber||d?.account?.account_number||d?.account?.accountNumber||String(accountNumber);
-    const nameEnquiryReference=d?.name_enquiry_reference||d?.nameEnquiryReference||d?.enquiry_reference||d?.enquiryReference||d?.sessionId||d?.session_id||d?.reference||d?.account?.name_enquiry_reference||d?.account?.nameEnquiryReference||'';
-    if(!name) return {success:false,statusCode:400,message:strowalletMessage(data,'Unable to verify the Strowallet bank account.')};
-    if(!nameEnquiryReference) return {success:false,statusCode:502,message:'Strowallet verified the account name but did not return a name-enquiry reference required to send the transfer.'};
-    return {success:true,accountName:String(name).trim(),accountNumber:String(number).trim(),nameEnquiryReference:String(nameEnquiryReference).trim()};
-  }catch(e){
-    return {success:false,statusCode:e.status||502,message:e.message||'Unable to verify the Strowallet bank account.'};
-  }
-}
-
-async function strowalletBankTransfer({amount,bankCode,accountNumber,nameEnquiryReference,narration,reference}){
-  try{
-    const data=await strowalletRequest('/banks/request/',{
-      method:'POST',
-      query:{
-        public_key:STROWALLET_PUBLIC_KEY,
-        amount:String(amount),
-        bank_code:String(bankCode),
-        account_number:String(accountNumber),
-        narration:String(narration||'BOLTIV revenue withdrawal'),
-        name_enquiry_reference:String(nameEnquiryReference||''),
-        SenderName:String(STROWALLET_SENDER_NAME),
-        mode:STROWALLET_MODE
-      }
-    });
-    const d=strowalletDetails(data);
-    const rawStatus=String(d?.status||d?.transaction_status||d?.transfer_status||data?.status||'').toLowerCase();
-    const transferId=d?.transaction_id||d?.transactionId||d?.trans_id||d?.transfer_id||d?.transferId||d?.reference||d?.id||data?.reference||data?.id||null;
-    const status=['success','successful','completed','complete'].includes(rawStatus)?'successful':(['failed','fail','reversed','cancelled','canceled'].includes(rawStatus)?'failed':'processing');
-    return {success:true,status,transferId,message:strowalletMessage(data,status==='processing'?'Strowallet transfer submitted and is processing.':'Strowallet transfer completed.'),data};
-  }catch(e){
-    return {success:false,statusCode:e.status||502,message:e.message||'Unable to initiate Strowallet bank transfer.',data:e.data||{}};
-  }
+async function getFlutterwaveTransferStatus(id){
+const r=await flutterwaveRequest(`/transfers/${encodeURIComponent(id)}`);
+if(!r.success)return{success:false,statusCode:r.statusCode||502,message:flutterwaveError(r,"Unable to check transfer status.")};
+const d=r.data?.data||{};const raw=String(d.status||"").toUpperCase();
+const status=["SUCCESSFUL","COMPLETED"].includes(raw)?"successful":(["FAILED","REVERSED","CANCELLED","CANCELED"].includes(raw)?"failed":"processing");
+return{success:true,status,providerMessage:d.complete_message||r.data?.message||raw,data:d};
 }
 
 async function adminRevenue(req,action){
-  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
-  if(action==='summary'){
-    await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
-    const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
-    const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
-    const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
-    const reserved=(await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing') THEN amount ELSE 0 END),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1`,[admin.id])).rows[0];
-    const balance=Number(w?.balance||0),hold=Number(reserved?.reserved||0);
-    const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
-    return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
-  }
-  if(action==='banks'){
-    if(!strowalletConfigured())return{success:false,statusCode:503,message:'Strowallet is not configured.'};
-    return strowalletPayoutBanks();
-  }
-  if(action==='verify'){
-    const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
-    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank code and 10-digit account number.'};
-    if(!strowalletConfigured())return{success:false,statusCode:503,message:'Strowallet is not configured.'};
-    return resolveStrowalletPayoutAccount(bankCode,accountNumber);
-  }
-  if(action==='status'){
-    const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:'Withdrawal ID is required.'};
-    const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:'Withdrawal not found.'};
-    if(!row.reference||['successful','failed'].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
-    return{success:true,withdrawal:{...row,amount:Number(row.amount)},provider:'strowallet',message:'Strowallet does not currently document a separate outgoing-transfer status endpoint in its public API reference. The withdrawal remains in its provider-reported state.'};
-
-  }
-  if(action==='withdraw'){
-    const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
-    if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:'Minimum withdrawal is ₦1,000.'};
-    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank account.'};
-    if(!strowalletConfigured())return{success:false,statusCode:503,message:'Strowallet is not configured.'};
-    const verified=await resolveStrowalletPayoutAccount(bankCode,accountNumber);
-    if(!verified.success)return{success:false,statusCode:verified.statusCode||400,message:verified.message||'Unable to verify the bank account.'};
-    const client=await pool.connect();let row;
-    try{await client.query('BEGIN');await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);
-      const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);const balance=Number(w.rows[0]?.balance||0);
-      const reserved=(await client.query(`SELECT COALESCE(SUM(amount),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1 AND status IN ('pending','processing')`,[admin.id])).rows[0];const available=Math.max(0,Number((balance-Number(reserved?.reserved||0)).toFixed(2)));
-      if(amount>available){await client.query('ROLLBACK');return{success:false,statusCode:400,message:`Insufficient BOLTIV balance. Available: ₦${available.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};}
-      const ref=reference('BOLTIV-WD').toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,50);
-      const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
-      row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
-      await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin Strowallet bank withdrawal',`WD-${ref}`);
-      await client.query('COMMIT');
-    }catch(e){try{await client.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to reserve BOLTIV balance for withdrawal.'};}finally{client.release();}
-    const tr=await strowalletBankTransfer({amount,bankCode,accountNumber:verified.accountNumber,nameEnquiryReference:verified.nameEnquiryReference,narration:'BOLTIV revenue withdrawal',reference:row.reference});
-    if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||'Strowallet transfer failed');return{success:false,statusCode:tr.statusCode||400,message:tr.message||'Strowallet transfer failed.',withdrawalId:row.id};}
-    const status=tr.status||'processing',transId=tr.transferId||row.reference;
-    if(status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||'Strowallet transfer failed');
-    else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,transId,tr.message||status,row.id]);
-    await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'strowallet',providerTransferId:transId},req);
-    return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted to Strowallet and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:'strowallet'};
-  }
-  return{success:false,statusCode:400,message:'Unknown revenue action.'};
+const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+if(action==='summary'){
+await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
+const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
+const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
+const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
+const reserved=(await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing') THEN amount ELSE 0 END),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1`,[admin.id])).rows[0];
+const balance=Number(w?.balance||0),hold=Number(reserved?.reserved||0);const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
+return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0),provider:"flutterwave"}))};
 }
-async function reverseRevenueWithdrawal(adminId,id,amount,reason){const c=await pool.connect();try{await c.query('BEGIN');const row=(await c.query(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 FOR UPDATE`,[id,adminId])).rows[0];if(!row){await c.query('ROLLBACK');return;}if(row.status==='failed'){await c.query('COMMIT');return;}await ensureAdminRevenueWallet(c,adminId);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(amount),adminId]);if(w.rows.length)await addAdminRevenueLedger(c,adminId,'withdrawal_reversal',Number(amount),Number(w.rows[0].balance),reason,`REVERSAL-${row.reference}`);await c.query(`UPDATE admin_revenue_withdrawals SET status='failed',provider_message=$1,updated_at=NOW(),completed_at=NOW() WHERE id=$2`,[reason,id]);await c.query('COMMIT');}catch(e){try{await c.query('ROLLBACK')}catch{};console.error('REVENUE WITHDRAWAL REVERSAL ERROR',e)}finally{c.release();}}
-
-async function adminProfitWithdrawals(req,action){
-  const admin=await adminFromToken(req);
-  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  if(action==="summary"){
-    const summary=await adminProfitSummary(admin.id);
-    const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_profit_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
-    return{success:true,summary,withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
-  }
-  if(action==="banks")return await flutterwaveBanks();
-  if(action==="verify"){
-    const b=await body(req),bankCode=clean(b.bankCode||b.account_bank),accountNumber=clean(b.accountNumber||b.account_number);
-    if(!bankCode||!/^\d{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank code and 10-digit account number."};
-    return await resolveFlutterwaveAccount(bankCode,accountNumber);
-  }
-  if(action==="status"){
-    const b=await body(req),id=Number(b.id||0);
-    if(!id)return{success:false,statusCode:400,message:"Withdrawal ID is required."};
-    const row=(await db(`SELECT * FROM admin_profit_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];
-    if(!row)return{success:false,statusCode:404,message:"Withdrawal not found."};
-    if(!row.provider_transfer_id||["successful","failed"].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
-    const r=await flutterwaveRequest(`/transfers/${encodeURIComponent(row.provider_transfer_id)}`);
-    if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||r.message||"Unable to check transfer status."};
-    const ps=String(r.data?.data?.status||r.data?.status||"").toUpperCase();
-    let ns=row.status;
-    if(["SUCCESSFUL","COMPLETED"].includes(ps))ns="successful";
-    else if(["FAILED","REVERSED"].includes(ps))ns="failed";
-    else if(["PROCESSING","NEW","PENDING","QUEUED"].includes(ps))ns="processing";
-    if(ns!==row.status)await db(`UPDATE admin_profit_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$3`,[ns,r.data?.message||ps,row.id]);
-    const fresh=(await db(`SELECT * FROM admin_profit_withdrawals WHERE id=$1`,[row.id])).rows[0];
-    return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount)}};
-  }
-  if(action==="create"){
-    return{success:false,statusCode:410,message:"The old profit-only withdrawal route is disabled. Use the BOLTIV Revenue Wallet withdrawal."};
-    const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.account_bank),accountNumber=clean(b.accountNumber||b.account_number);
-    if(!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid withdrawal amount."};
-    if(amount<1000)return{success:false,statusCode:400,message:"Minimum profit withdrawal is ₦1,000."};
-    if(!bankCode||!/^\d{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank account."};
-    if(!FLW_SECRET_KEY)return{success:false,statusCode:503,message:"Flutterwave payout credentials are not configured on the backend."};
-    const verified=await resolveFlutterwaveAccount(bankCode,accountNumber);
-    if(!verified.success)return verified;
-    const client=await pool.connect(); let row;
-    try{
-      await client.query("BEGIN");
-      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-profit-withdraw:${admin.id}`]);
-      const p=await client.query(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`);
-      const w=await client.query(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing','successful') THEN amount ELSE 0 END),0) AS reserved FROM admin_profit_withdrawals WHERE admin_id=$1`,[admin.id]);
-      const available=Math.max(0,Number((Number(p.rows[0]?.gross_profit||0)-Number(w.rows[0]?.reserved||0)).toFixed(2)));
-      if(amount>available){await client.query("ROLLBACK");return{success:false,statusCode:400,message:`Insufficient available profit. You can withdraw up to ₦${available.toLocaleString("en-NG",{minimumFractionDigits:2})}.`};}
-      const ref=reference("BOLTIV-PROFIT");
-      row=(await client.query(`INSERT INTO admin_profit_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'pending',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
-      await client.query("COMMIT");
-    }catch(error){
-      try{await client.query("ROLLBACK")}catch{}
-      console.error("PROFIT WITHDRAWAL RESERVE ERROR:",error);
-      return{success:false,statusCode:500,message:"Unable to reserve profit for withdrawal."};
-    }finally{client.release();}
-    const payload={account_bank:bankCode,account_number:verified.accountNumber,amount,currency:"NGN",narration:"BOLTIV profit withdrawal",reference:row.reference,debit_currency:"NGN",...(FLW_CALLBACK_URL?{callback_url:FLW_CALLBACK_URL}:{})};
-    const tr=await flutterwaveRequest("/transfers",{method:"POST",body:JSON.stringify(payload)});
-    if(!tr.success){
-      await db(`UPDATE admin_profit_withdrawals SET status='failed',provider_message=$1,updated_at=NOW(),completed_at=NOW() WHERE id=$2`,[tr.data?.message||tr.message||"Flutterwave transfer failed.",row.id]);
-      await adminAudit(admin,'profit_withdrawal_failed','profit_withdrawal',String(row.id),{amount,reference:row.reference},req);
-      return{success:false,statusCode:400,message:tr.data?.message||tr.message||"Flutterwave transfer failed.",withdrawalId:row.id};
-    }
-    const provider=tr.data?.data||{},ps=String(provider.status||"NEW").toUpperCase();
-    const status=["SUCCESSFUL","COMPLETED"].includes(ps)?"successful":(["FAILED","REVERSED"].includes(ps)?"failed":"processing");
-    await db(`UPDATE admin_profit_withdrawals SET status=$1,provider_transfer_id=$2,provider_reference=$3,provider_message=$4,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$5`,[status,provider.id||null,provider.reference||null,tr.data?.message||ps,row.id]);
-    await adminAudit(admin,'profit_withdrawal_created','profit_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status},req);
-    return{success:true,message:status==="successful"?"Profit withdrawal completed.":"Profit withdrawal submitted and is being processed.",withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount};
-  }
-  return{success:false,statusCode:400,message:"Unknown withdrawal action."};
+if(action==='banks')return flutterwaveBanks();
+if(action==='verify'){
+const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
+if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank code and 10-digit account number."};
+return resolveFlutterwaveAccount(bankCode,accountNumber);
 }
+if(action==='status'){
+const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:"Withdrawal ID is required."};
+const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:"Withdrawal not found."};
+if(!row.provider_transfer_id||["successful","failed"].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount),provider:"flutterwave"}};
+const tr=await getFlutterwaveTransferStatus(row.provider_transfer_id);if(!tr.success)return tr;
+if(tr.status!==row.status){await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$3`,[tr.status,tr.providerMessage||tr.status,row.id]);if(tr.status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.providerMessage||'Flutterwave transfer failed.');}
+const fresh=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[row.id])).rows[0];return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount),provider:"flutterwave"}};
+}
+if(action==='withdraw'){
+const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
+if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:"Minimum withdrawal is ₦1,000."};
+if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank account."};
+if(!flutterwaveConfigured())return{success:false,statusCode:503,message:"Flutterwave is not configured."};
+const verified=await resolveFlutterwaveAccount(bankCode,accountNumber);if(!verified.success)return verified;
+const client=await pool.connect();let row;
+try{await client.query("BEGIN");await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);const balance=Number(w.rows[0]?.balance||0);const reserved=(await client.query(`SELECT COALESCE(SUM(amount),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1 AND status IN ('pending','processing')`,[admin.id])).rows[0];const available=Math.max(0,Number((balance-Number(reserved?.reserved||0)).toFixed(2)));if(amount>available){await client.query("ROLLBACK");return{success:false,statusCode:400,message:`Insufficient BOLTIV balance. Available: ₦${available.toLocaleString("en-NG",{minimumFractionDigits:2})}.`};}const ref=reference("BOLTIV-WD").toLowerCase().replace(/[^a-z0-9_-]/g,"-").slice(0,50);const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin Flutterwave bank withdrawal',`WD-${ref}`);await client.query("COMMIT");}catch(e){try{await client.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to reserve BOLTIV balance for withdrawal."};}finally{client.release();}
+const tr=await flutterwaveBankTransfer({amount,bankCode,accountNumber:verified.accountNumber,narration:"BOLTIV revenue withdrawal",referenceValue:row.reference});
+if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||"Flutterwave transfer failed");return{success:false,statusCode:tr.statusCode||400,message:tr.message||"Flutterwave transfer failed.",withdrawalId:row.id};}
+const status=tr.status||"processing";
+if(status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||"Flutterwave transfer failed");
+else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,tr.transferId||null,tr.message||status,row.id]);
+await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'flutterwave',providerTransferId:tr.transferId},req);
+return{success:true,message:status==='successful'?"BOLTIV withdrawal completed.":"BOLTIV withdrawal submitted to Flutterwave and is being processed.",withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:"flutterwave"};
+}
+return{success:false,statusCode:400,message:"Unknown revenue action."};
+}
+async function reverseRevenueWithdrawal(adminId,id,amount,reason){const c=await pool.connect();try{await c.query("BEGIN");const row=(await c.query(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 FOR UPDATE`,[id,adminId])).rows[0];if(!row){await c.query("ROLLBACK");return;}if(row.status==='failed'){await c.query("COMMIT");return;}await ensureAdminRevenueWallet(c,adminId);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(amount),adminId]);if(w.rows.length)await addAdminRevenueLedger(c,adminId,'withdrawal_reversal',Number(amount),Number(w.rows[0].balance),reason,`REVERSAL-${row.reference}`);await c.query(`UPDATE admin_revenue_withdrawals SET status='failed',provider_message=$1,updated_at=NOW(),completed_at=NOW() WHERE id=$2`,[reason,id]);await c.query("COMMIT");}catch(e){try{await c.query("ROLLBACK")}catch{}console.error("REVENUE WITHDRAWAL REVERSAL ERROR",e)}finally{c.release();}}
+
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
-async function initializeAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:'Enter an amount of at least ₦100.'};const ref=reference('ADM-FUND');await db(`INSERT INTO payments(reference,user_id,email,amount,amount_kobo,status,credited,recipient_type,admin_id,created_at) VALUES($1,$2,$3,$4,$5,'pending',FALSE,'admin',$6,NOW())`,[ref,`ADMIN:${admin.id}`,admin.email,amount,Math.round(amount*100),admin.id]);try{const response=await fetch(`${PAYSTACK_API_URL}/transaction/initialize`,{method:'POST',headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({email:admin.email,amount:Math.round(amount*100),reference:ref,callback_url:`${FRONTEND_URL}/admin.html?admin_funding=${encodeURIComponent(ref)}`})});const data=await response.json();if(!response.ok||!data.status){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:400,message:data.message||'Unable to initialize payment.'};}return{success:true,reference:ref,authorization_url:data.data?.authorization_url||''};}catch(e){await db(`UPDATE payments SET status='failed' WHERE reference=$1`,[ref]);return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}}
-async function verifyAdminWalletFunding(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};const b=await body(req),ref=clean(b.reference);if(!ref)return{success:false,statusCode:400,message:'Payment reference is required.'};const pr=await db(`SELECT * FROM payments WHERE reference=$1 AND recipient_type='admin' AND admin_id=$2 LIMIT 1`,[ref,admin.id]);if(!pr.rows.length)return{success:false,statusCode:404,message:'Admin funding payment not found.'};const payment=pr.rows[0];if(payment.credited)return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};const response=await fetch(`${PAYSTACK_API_URL}/transaction/verify/${encodeURIComponent(ref)}`,{headers:{Authorization:`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json'}});const data=await response.json();if(!response.ok||!data.status)return{success:false,statusCode:400,message:data.message||'Unable to verify payment.'};const tx=data.data||{};if(tx.status!=='success'){await db(`UPDATE payments SET status=$1 WHERE reference=$2`,[tx.status,ref]);return{success:false,statusCode:400,message:`Payment status: ${tx.status}`};}if(Number(tx.amount)!==Number(payment.amount_kobo))return{success:false,statusCode:400,message:'Payment amount does not match.'};const client=await pool.connect();try{await client.query('BEGIN');const locked=(await client.query(`SELECT * FROM payments WHERE reference=$1 FOR UPDATE`,[ref])).rows[0];if(!locked||locked.credited){await client.query('COMMIT');return{success:true,message:'Admin wallet has already been funded.',reference:ref,balance:(await getAdminWallet(admin.id)).balance};}const balance=await creditAdminFromPayment(client,locked);await client.query('COMMIT');await adminAudit(admin,'admin_wallet_funded','admin_wallet',String(admin.id),{amount:Number(payment.amount),reference:ref},req);return{success:true,message:'Admin wallet funded successfully.',reference:ref,balance};}catch(e){try{await client.query('ROLLBACK')}catch{}return{success:false,statusCode:500,message:'Unable to credit admin wallet.'};}finally{client.release();}}
-
-async function adminWalletAdjust(req,mode){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),target=clean(b.userId||b.id),amount=Number(b.amount),reason=clean(b.reason||"Admin wallet transfer");if(!target||!Number.isFinite(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid amount."};const r=await db(`SELECT user_id,email FROM users WHERE user_id=$1 OR id::text=$1 LIMIT 1`,[target]);if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};const u=r.rows[0],c=await pool.connect();try{await c.query("BEGIN");await ensureAdminWallet(c,admin.id);const ref=`ADM-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;if(mode==="credit"){const ar=await c.query(`UPDATE admin_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 AND balance>=$1 RETURNING balance`,[amount,admin.id]);if(!ar.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient admin wallet balance. Fund the admin wallet first."};}const adminBalance=Number(ar.rows[0].balance);await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[u.user_id]);const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,u.user_id]);await addAdminLedger(c,admin.id,'transfer_out',amount,adminBalance,`Transfer to ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'credit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,source:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_credit_from_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet credited',`Your wallet was credited with ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'Wallet credited from admin wallet.',balance:Number(wr.rows[0].balance),adminBalance,reference:ref};}const wr=await c.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,u.user_id]);if(!wr.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient user wallet balance."};}const userBalance=Number(wr.rows[0].balance);const ar=await c.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);const adminBalance=Number(ar.rows[0].balance);await addAdminLedger(c,admin.id,'transfer_in',amount,adminBalance,`Transfer from ${u.email}: ${reason}`,ref);await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata) VALUES($1,'debit','Admin wallet transfer',$2,$3,'successful',NOW(),$4)`,[u.user_id,amount,ref,JSON.stringify({admin_id:admin.id,reason,destination:'admin_wallet'})]);await c.query("COMMIT");await adminAudit(admin,'wallet_debit_to_admin_wallet','user',u.user_id,{amount,reason,reference:ref,adminBalance},req);await addNotification(u.user_id,'Wallet debited',`Your wallet was debited by ₦${amount.toLocaleString()}. Reason: ${reason}`,'payment');return{success:true,message:'User wallet debited to admin wallet.',balance:userBalance,adminBalance,reference:ref};}catch(e){try{await c.query("ROLLBACK")}catch{}console.error('ADMIN WALLET TRANSFER ERROR',e);return{success:false,statusCode:500,message:"Unable to adjust wallet."};}finally{c.release();}}
-
-async function adminRefund(req){
-const admin=await adminFromToken(req);
-if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-const b=await body(req),ref=clean(b.reference);
-if(!ref)return{success:false,statusCode:400,message:"Transaction reference is required."};
-const c=await pool.connect();
-try{
-await c.query("BEGIN");
-const r=await c.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);
-if(!r.rows.length){await c.query("ROLLBACK");return{success:false,statusCode:404,message:"Transaction not found."};}
-const t=r.rows[0];
-if(t.type!=="debit"||t.status==="refunded"||t.refunded_at){await c.query("ROLLBACK");return{success:false,statusCode:400,message:"Transaction cannot be refunded."};}
-const amount=Number(t.amount);
-await c.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[t.user_id]);
-const wr=await c.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,t.user_id]);
-const refundRef=`REF-${Date.now()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
-await c.query(`UPDATE transactions SET status='refunded',metadata=COALESCE(metadata,'{}'::jsonb)||$1::jsonb WHERE reference=$2`,
-[JSON.stringify({refunded_by:admin.id,reason:clean(b.reason||"Admin refund")}),ref]);
-await c.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,metadata)
-VALUES($1,'credit','Refund',$2,$3,'successful',NOW(),$4)`,
-[t.user_id,amount,refundRef,JSON.stringify({original_reference:ref,admin_id:admin.id})]);
-await ensureAdminRevenueWallet(c,admin.id);
-const rev=await c.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
-if(rev.rows.length){const revRef=`REF-SALE-${ref}`;await addAdminRevenueLedger(c,admin.id,'refund',-amount,Number(rev.rows[0].balance),`Refund for ${ref}`,revRef);}
-await c.query("COMMIT");
-await adminAudit(admin,"transaction_refund","transaction",ref,{amount,refundReference:refundRef},req);
-await addNotification(t.user_id,"Transaction refunded",`₦${amount.toLocaleString()} has been refunded to your wallet. Reference: ${ref}`,"payment");
-return{success:true,message:"Transaction refunded successfully.",balance:Number(wr.rows[0].balance),refundReference:refundRef};
-}catch(e){try{await c.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to refund transaction."};}
-finally{c.release();}
+async function initializeAdminWalletFunding(req){
+const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:"Enter an amount of at least ₦100."};
+try{return await createFlutterwaveVirtualAccount({ownerType:"admin",ownerId:String(admin.id),user:{name:"BOLTIV TECHNOLOGIES LIMITED",email:admin.email,phone:process.env.ADMIN_PHONE||"08000000000"},accountType:"dynamic",amount});}
+catch(e){return{success:false,statusCode:400,message:e.message||"Unable to create Flutterwave admin funding account."};}
 }
-
-async function adminNotifications(req){
-const admin=await adminFromToken(req);
-if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-const b=await body(req),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general"),recipient=clean(b.recipient||"all");
-if(title.length<2||message.length<2)return{success:false,statusCode:400,message:"Title and message are required."};
-let r;
-if(recipient==="selected"){
-const key=clean(b.userId||"");
-r=await db(`SELECT user_id FROM users WHERE user_id=$1 OR id::text=$1 OR lower(email)=lower($1) LIMIT 1`,[key]);
-}else if(recipient==="active")r=await db(`SELECT user_id FROM users WHERE status='active'`);
-else r=await db(`SELECT user_id FROM users`);
-if(!r.rows.length)return{success:false,statusCode:404,message:"No matching users."};
-const c=await pool.connect();
-try{
-await c.query("BEGIN");
-for(const u of r.rows)await c.query(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[u.user_id,title,message,type]);
-await c.query("COMMIT");
-await adminAudit(admin,"notification_send","notification",null,{recipient,count:r.rows.length,type,title},req);
-return{success:true,message:`Notification sent to ${r.rows.length} user${r.rows.length===1?"":"s"}.`,count:r.rows.length};
-}catch(e){try{await c.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to send notification."};}
-finally{c.release();}
-}
-
-async function adminSupport(req,action){
-const admin=await adminFromToken(req);
-if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-if(req.method==="GET")return{success:true,tickets:(await db(`SELECT t.*,u.name,u.email FROM support_tickets t LEFT JOIN users u ON u.user_id=t.user_id ORDER BY t.updated_at DESC LIMIT 500`)).rows};
-const b=await body(req),id=Number(b.ticketId);
-const tr=await db(`SELECT * FROM support_tickets WHERE id=$1`,[id]);
-if(!tr.rows.length)return{success:false,statusCode:404,message:"Ticket not found."};
-const t=tr.rows[0];
-if(action==="reply"){
-const m=clean(b.message);
-if(m.length<2)return{success:false,statusCode:400,message:"Reply required."};
-await db(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'admin',$2,$3)`,[id,String(admin.id),m]);
-await db(`UPDATE support_tickets SET status='pending',updated_at=NOW() WHERE id=$1`,[id]);
-await addNotification(t.user_id,"Support ticket update",`Admin replied to support ticket #${id}.`,"general");
-await adminAudit(admin,"support_reply","ticket",String(id),{},req);
-return{success:true,message:"Reply sent."};
-}
-const status=["open","pending","resolved","closed"].includes(b.status)?b.status:null;
-if(!status)return{success:false,statusCode:400,message:"Invalid status."};
-await db(`UPDATE support_tickets SET status=$1,updated_at=NOW() WHERE id=$2`,[status,id]);
-await adminAudit(admin,"support_status","ticket",String(id),{status},req);
-return{success:true,message:"Ticket status updated.",status};
-}
-
-async function adminAuditResponse(req){
-const admin=await adminFromToken(req);
-if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-return{success:true,logs:(await db(`SELECT a.*,ad.email FROM admin_audit_logs a LEFT JOIN admins ad ON ad.id=a.admin_id ORDER BY a.created_at DESC LIMIT 500`)).rows};
-}
-
-async function adminStats(){
-
-const usersResult=
-await db(
-`SELECT COUNT(*)::int AS count
-FROM users`
-);
-
-const walletResult=
-await db(
-`SELECT COALESCE(
-SUM(balance),0
-) AS balance
-FROM wallets`
-);
-
-const transactionsResult=
-await db(
-`SELECT COUNT(*)::int AS count
-FROM transactions`
-);
-
-const paymentsResult=
-await db(
-`SELECT COUNT(*)::int AS count
-FROM payments`
-);
-
-const transactionStatusResult=
-await db(
-`SELECT
-COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) IN ('successful','success','completed'))::int AS successful,
-COUNT(*) FILTER (WHERE LOWER(COALESCE(status,''))='pending')::int AS pending,
-COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) IN ('failed','failure'))::int AS failed
-FROM transactions`
-);
-
-const activeUsersResult=
-await db(
-`SELECT COUNT(*)::int AS count
-FROM users
-WHERE LOWER(COALESCE(status,'active'))='active'`
-);
-
-const profitResult=await db(
-`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS profit
-FROM transactions`
-);
-const adminWalletResult=await db(`SELECT COALESCE(SUM(balance),0) AS balance FROM admin_wallets`);
-const adminRevenueResult=await db(`SELECT COALESCE(SUM(balance),0) AS balance FROM admin_revenue_wallets`);
-
-return{
-users:Number(usersResult.rows[0]?.count||0),
-walletBalance:Number(walletResult.rows[0]?.balance||0),
-transactions:Number(transactionsResult.rows[0]?.count||0),
-payments:Number(paymentsResult.rows[0]?.count||0),
-successful:Number(transactionStatusResult.rows[0]?.successful||0),
-pending:Number(transactionStatusResult.rows[0]?.pending||0),
-failed:Number(transactionStatusResult.rows[0]?.failed||0),
-activeUsers:Number(activeUsersResult.rows[0]?.count||0),
-grossProfit:Number(profitResult.rows[0]?.profit||0),
-adminWalletBalance:Number(adminWalletResult.rows[0]?.balance||0),
-adminRevenueBalance:Number(adminRevenueResult.rows[0]?.balance||0)
-};
-
-}
-
-
-async function adminUsers(){
-
-const result=
-await db(
-`SELECT
-u.id,
-u.user_id,
-u.name,
-u.phone,
-u.email,
-u.created_at,
-u.updated_at,
-u.status,
-COALESCE(
-w.balance,
-0
-) AS balance
-FROM users u
-LEFT JOIN wallets w
-ON w.user_id=u.user_id
-ORDER BY u.created_at DESC
-LIMIT 500`
-);
-
-return result.rows.map(user=>({
-id:user.id,
-user_id:user.user_id,
-name:user.name,
-phone:user.phone,
-email:user.email,
-balance:Number(
-user.balance||0
-),
-created_at:user.created_at,
-updated_at:user.updated_at,
-status:user.status||"active"
-}));
-
-}
-
-
-async function adminTransactions(){
-
-const result=
-await db(
-`SELECT
-t.id,
-t.user_id,
-t.type,
-t.service,
-t.amount,
-t.reference,
-t.status,
-t.date,
-t.metadata,
-t.provider_reference,
-u.name,
-u.email
-FROM transactions t
-LEFT JOIN users u
-ON u.user_id=t.user_id
-ORDER BY t.date DESC
-LIMIT 500`
-);
-
-return result.rows.map(item=>({
-id:item.id,
-user_id:item.user_id,
-name:item.name||"",
-email:item.email||"",
-type:item.type,
-service:item.service,
-amount:Number(
-item.amount||0
-),
-reference:item.reference,
-status:item.status,
-date:item.date,
-metadata:item.metadata||{},
-grossProfit:Number(item.metadata?.pricing?.grossProfit||0),
-providerCost:Number(item.metadata?.pricing?.providerCost||0),
-provider_reference:item.provider_reference||extractVTUProviderReference(item.metadata?.providerResponse||item.metadata?.provider_response||item.metadata)||null
-}));
-
-}
-
-
-async function adminPayments(){
-
-const result=
-await db(
-`SELECT
-p.reference,
-p.user_id,
-p.email,
-p.amount,
-p.amount_kobo,
-p.status,
-p.credited,
-p.created_at,
-p.credited_at,
-u.name
-FROM payments p
-LEFT JOIN users u
-ON u.user_id=p.user_id
-ORDER BY p.created_at DESC
-LIMIT 500`
-);
-
-return result.rows.map(item=>({
-reference:item.reference,
-user_id:item.user_id,
-name:item.name||"",
-email:item.email,
-amount:Number(
-item.amount||0
-),
-amount_kobo:Number(
-item.amount_kobo||0
-),
-status:item.status,
-credited:Boolean(
-item.credited
-),
-created_at:item.created_at,
-credited_at:item.credited_at
-}));
-
-}
-
-
-async function adminMe(req){
-
-const admin=
-await adminFromToken(req);
-
-if(!admin){
-
-return{
-success:false,
-statusCode:401,
-message:
-"Unauthorized."
-};
-
-}
-
-return{
-success:true,
-admin:{
-id:admin.id,
-email:admin.email
-}
-};
-
-}
-
-
-async function adminStatsResponse(req){
-
-const admin=
-await adminFromToken(req);
-
-if(!admin){
-
-return{
-success:false,
-statusCode:401,
-message:
-"Unauthorized."
-};
-
-}
-
-const stats=
-await adminStats();
-
-return{
-success:true,
-stats
-};
-
-}
-
-
-async function adminUsersResponse(req){
-
-const admin=
-await adminFromToken(req);
-
-if(!admin){
-
-return{
-success:false,
-statusCode:401,
-message:
-"Unauthorized."
-};
-
-}
-
-const users=
-await adminUsers();
-
-return{
-success:true,
-users
-};
-
-}
-
-
-async function adminTransactionsResponse(req){
-
-const admin=
-await adminFromToken(req);
-
-if(!admin){
-
-return{
-success:false,
-statusCode:401,
-message:
-"Unauthorized."
-};
-
-}
-
-const transactions=
-await adminTransactions();
-
-return{
-success:true,
-transactions
-};
-
-}
-
-
-async function adminPaymentsResponse(req){
-
-const admin=
-await adminFromToken(req);
-
-if(!admin){
-
-return{
-success:false,
-statusCode:401,
-message:
-"Unauthorized."
-};
-
-}
-
-const payments=
-await adminPayments();
-
-return{
-success:true,
-payments
-};
-
-}
-
-
-function secureTokenEquals(a,b){
-const aa=Buffer.from(String(a||''));
-const bb=Buffer.from(String(b||''));
-return aa.length>0&&aa.length===bb.length&&crypto.timingSafeEqual(aa,bb);
-}
-
-async function adminCsrfToken(req){
-const sessionToken=getAdminSessionToken(req);
-if(!sessionToken)return null;
-const r=await db(`SELECT csrf_token FROM admin_sessions WHERE token=$1 AND expires_at>NOW()`,[sessionToken]);
-if(!r.rows[0])return null;
-if(r.rows[0].csrf_token)return r.rows[0].csrf_token;
-const csrfToken=token();
-await db(`UPDATE admin_sessions SET csrf_token=$1 WHERE token=$2`,[csrfToken,sessionToken]);
-return csrfToken;
-}
-
-async function requireAdminCsrf(req){
-const expected=await adminCsrfToken(req);
-const provided=String(req.headers['x-admin-csrf']||'');
-if(!expected||!secureTokenEquals(provided,expected))return {success:false,statusCode:403,message:'CSRF validation failed.'};
-return {success:true};
+async function verifyAdminWalletFunding(req){
+const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const b=await body(req),accountNumber=clean(b.accountNumber||b.account_number);if(!accountNumber)return{success:false,statusCode:400,message:"Funding account number is required."};
+const r=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type='admin' AND owner_id=$1 AND account_number=$2 LIMIT 1`,[String(admin.id),accountNumber]);if(!r.rows.length)return{success:false,statusCode:404,message:"Flutterwave admin funding account not found."};
+return{success:true,account:r.rows[0],message:"Transfer to this Flutterwave account. The operating wallet will be credited automatically after Flutterwave confirms the transfer."};
 }
 
 async function handleAdminRoutes(
@@ -4151,7 +2011,7 @@ result
 }
 
 
-if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==='GET'&&path==='/api/admin/revenue/banks'){const result=await adminRevenue(req,'banks');return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==='POST'&&path==='/api/admin/revenue/verify-account'){const result=await adminRevenue(req,'verify');return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==='POST'&&path==='/api/admin/revenue/withdraw'){const result=await adminRevenue(req,'withdraw');return send(res,result.success?200:(result.statusCode||400),result);}
@@ -4567,53 +2427,48 @@ PAYMENT INITIALIZATION
 
 
 /*
-STROWALLET PERSONAL FUNDING ACCOUNT
-
+FLUTTERWAVE VIRTUAL ACCOUNT FUNDING
 */
 
-if(req.method==="GET"&&(path==="/api/funding-account"||path==="/api/strowallet/funding-account")){
+if(req.method==="GET"&&path==="/api/funding-account"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-if(!strowalletConfigured())return send(res,503,{success:false,message:"Strowallet is not configured. Set STROWALLET_PUBLIC_KEY on the server."});
-try{
-const result=await getStrowalletFundingAccount(user);
-return send(res,200,result);
-}catch(error){
-console.error("STROWALLET ACCOUNT LOOKUP ERROR:",error);
-return send(res,502,{success:false,message:error.message||"Unable to load funding account."});
-}
+try{const result=await getFlutterwaveStaticFundingAccount(user);return send(res,200,result);}catch(error){console.error("FLUTTERWAVE ACCOUNT LOOKUP ERROR:",error);return send(res,502,{success:false,message:error.message||"Unable to load funding account."});}
 }
 
-if(req.method==="POST"&&(path==="/api/funding-account/activate"||path==="/api/strowallet/funding-account/activate")){
+if(req.method==="POST"&&path==="/api/funding-account/activate"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-if(!strowalletConfigured())return send(res,503,{success:false,message:"Strowallet is not configured. Set STROWALLET_PUBLIC_KEY on the server."});
-try{
-const result=await createStrowalletVirtualAccount(user);
-return send(res,200,{success:true,message:"Personal funding account is ready.",account:result.account});
-}catch(error){
-console.error("STROWALLET FUNDING ACCOUNT ACTIVATION ERROR:",error?.data||error);
-return send(res,502,{success:false,message:error.message||"Unable to activate your personal funding account."});
-}
+try{const b=await body(req),accountType=String(b.accountType||"static").toLowerCase();let result;if(accountType==="dynamic")result=await createCustomerFlutterwaveDynamicAccount(user,Number(b.amount));else result=await createCustomerFlutterwaveStaticAccount(user,String(b.identityType||"").toLowerCase(),String(b.identityNumber||""));return send(res,200,result);}catch(error){console.error("FLUTTERWAVE FUNDING ACCOUNT ACTIVATION ERROR:",error);return send(res,400,{success:false,message:error.message||"Unable to create funding account."});}
 }
 
-if(req.method==="POST"&&path==="/api/strowallet/webhook"){
-let rawBody="";
-req.on("data",chunk=>{rawBody+=chunk;});
-req.on("end",async()=>{
+if(req.method==="POST"&&path==="/api/flutterwave/webhook"){
+let rawBody="";req.on("data",chunk=>{rawBody+=chunk;});req.on("end",async()=>{
 try{
-let payload;try{payload=JSON.parse(rawBody||"{}");}catch{payload={};}
-if(!payload||(!payload.accountNumber&&!payload.account_number&&!payload.sessionId)){
-return send(res,400,{success:false,message:"Invalid Strowallet webhook payload."});
+const directSignature=String(req.headers["verif-hash"]||"");
+const hmacSignature=String(req.headers["flutterwave-signature"]||"");
+let valid=false;
+if(FLW_SECRET_HASH){
+if(directSignature&&directSignature===FLW_SECRET_HASH)valid=true;
+if(hmacSignature){const expected=crypto.createHmac("sha256",FLW_SECRET_HASH).update(rawBody).digest("base64");if(hmacSignature===expected)valid=true;}
 }
-const result=await creditStrowalletFunding(payload);
-return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Funding webhook processed.",...result});
-}catch(error){
-console.error("STROWALLET WEBHOOK ERROR:",error);
-return send(res,500,{success:false,message:error.message||"Webhook processing failed."});
+if(!valid)return send(res,401,{success:false,message:"Invalid Flutterwave webhook signature."});
+let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{success:false,message:"Invalid JSON payload."});}
+const event=String(payload?.event||payload?.type||payload?.event_type||"").toLowerCase();
+if(event==="charge.completed"||event==="account_transaction"||event==="bank_transfer_transaction"||payload?.["event.type"]==="BANK_TRANSFER_TRANSACTION"){
+const result=await creditFlutterwaveVirtualAccount(payload);return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Flutterwave funding webhook processed.",...result});
 }
-});
-return;
+if(event==="transfer.completed"||event==="transfer_completed"||payload?.["event.type"]==="Transfer"){
+const d=payload?.data||payload?.transfer||{};const providerId=String(d.id||"");const referenceValue=clean(d.reference||d.tx_ref||"");const rawStatus=String(d.status||"").toUpperCase();const status=["SUCCESSFUL","COMPLETED"].includes(rawStatus)?"successful":(["FAILED","REVERSED","CANCELLED","CANCELED"].includes(rawStatus)?"failed":"processing");
+let q;
+if(providerId)q=await db(`SELECT * FROM admin_revenue_withdrawals WHERE provider_transfer_id=$1 LIMIT 1`,[providerId]);
+if(!q||!q.rows.length)q=await db(`SELECT * FROM admin_revenue_withdrawals WHERE reference=$1 LIMIT 1`,[referenceValue]);
+if(q.rows.length){const row=q.rows[0];if(status!==row.status){if(status==='failed')await reverseRevenueWithdrawal(row.admin_id,row.id,row.amount,d.complete_message||"Flutterwave transfer failed.");else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END WHERE id=$3`,[status,d.complete_message||status,row.id]);}return send(res,200,{success:true,withdrawalId:row.id,status});}
+return send(res,200,{success:true,message:"Flutterwave transfer webhook received; no matching BOLTIV withdrawal was found."});
+}
+return send(res,200,{success:true,message:"Flutterwave webhook received."});
+}catch(error){console.error("FLUTTERWAVE WEBHOOK ERROR:",error);return send(res,500,{success:false,message:error.message||"Webhook processing failed."});}
+});return;
 }
 
 if(
@@ -4655,7 +2510,7 @@ message:
 
 return send(res,410,{
 success:false,
-message:"Wallet funding is handled through Strowallet personal virtual accounts."
+message:"Wallet funding is handled through Flutterwave virtual accounts."
 });
 
 }
@@ -4862,7 +2717,7 @@ message:ready?"BOLTIV API is healthy.":"BOLTIV API is not ready.",
 status:ready?"online":"degraded",
 database,
 configuration:{
-paystack:Boolean(PAYSTACK_SECRET_KEY),
+flutterwave:Boolean(FLW_SECRET_KEY),
 vtu:Boolean((VTU_API_KEY&&VTU_API_BASE_URL)||(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL)),
 cheapdatahub:Boolean(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
@@ -4960,399 +2815,6 @@ return;
 
 
 /*
-PAYSTACK WEBHOOK
-*/
-
-if(
-req.method==="POST"&&
-path==="/api/paystack/webhook"
-){
-
-if(!PAYSTACK_SECRET_KEY){
-
-return send(res,503,{
-success:false,
-message:
-"Paystack is not configured."
-});
-
-}
-
-/*
-Read the raw body because Paystack
-signatures must be calculated from
-the exact request body.
-*/
-
-let rawBody="";
-
-req.on(
-"data",
-chunk=>{
-rawBody+=chunk;
-}
-);
-
-req.on(
-"end",
-async()=>{
-
-try{
-
-const signature=
-req.headers["x-paystack-signature"];
-
-if(!signature){
-
-return send(res,401,{
-success:false,
-message:
-"Missing Paystack signature."
-});
-
-}
-
-const expectedSignature=
-crypto
-.createHmac(
-"sha512",
-PAYSTACK_SECRET_KEY
-)
-.update(rawBody)
-.digest("hex");
-
-const received=
-String(signature);
-
-if(
-received.length!==
-expectedSignature.length
-){
-
-return send(res,401,{
-success:false,
-message:
-"Invalid Paystack signature."
-});
-
-}
-
-const validSignature=
-crypto.timingSafeEqual(
-Buffer.from(received),
-Buffer.from(expectedSignature)
-);
-
-if(!validSignature){
-
-return send(res,401,{
-success:false,
-message:
-"Invalid Paystack signature."
-});
-
-}
-
-let event;
-
-try{
-
-event=
-JSON.parse(rawBody);
-
-}catch(error){
-
-return send(res,400,{
-success:false,
-message:
-"Invalid webhook payload."
-});
-
-}
-
-if(
-event.event!==
-"charge.success"
-){
-
-return send(res,200,{
-success:true,
-message:
-"Webhook received."
-});
-
-}
-
-const transaction=
-event.data||{};
-
-const referenceValue=
-clean(
-transaction.reference
-);
-
-if(!referenceValue){
-
-return send(res,400,{
-success:false,
-message:
-"Payment reference is missing."
-});
-
-}
-
-const paymentResult=
-await db(
-`SELECT *
-FROM payments
-WHERE reference=$1
-LIMIT 1`,
-[
-referenceValue
-]
-);
-
-if(!paymentResult.rows.length){
-
-return send(res,404,{
-success:false,
-message:
-"Payment record not found."
-});
-
-}
-
-const payment=
-paymentResult.rows[0];
-
-if(payment.credited){
-
-return send(res,200,{
-success:true,
-message:
-"Payment already credited."
-});
-
-}
-
-if(
-Number(transaction.amount)!==
-Number(payment.amount_kobo)
-){
-
-await db(
-`UPDATE payments
-SET status='failed'
-WHERE reference=$1`,
-[
-referenceValue
-]
-);
-
-return send(res,400,{
-success:false,
-message:
-"Payment amount does not match."
-});
-
-}
-
-const client=
-await pool.connect();
-
-try{
-
-await client.query(
-"BEGIN"
-);
-
-const lockedResult=
-await client.query(
-`SELECT *
-FROM payments
-WHERE reference=$1
-FOR UPDATE`,
-[
-referenceValue
-]
-);
-
-if(!lockedResult.rows.length){
-
-await client.query(
-"ROLLBACK"
-);
-
-return send(res,404,{
-success:false,
-message:
-"Payment record not found."
-});
-
-}
-
-const lockedPayment=
-lockedResult.rows[0];
-
-if(lockedPayment.credited){
-
-await client.query(
-"COMMIT"
-);
-
-return send(res,200,{
-success:true,
-message:
-"Payment already credited."
-});
-
-}
-
-if(String(lockedPayment.recipient_type||'user')==='admin'){
-const balance=await creditAdminFromPayment(client,lockedPayment);
-await client.query("COMMIT");
-return send(res,200,{success:true,message:"Admin wallet funded.",reference:referenceValue,balance});
-}
-
-await client.query(
-`INSERT INTO wallets(
-user_id,
-balance
-)
-VALUES($1,0)
-ON CONFLICT(user_id)
-DO NOTHING`,
-[
-lockedPayment.user_id
-]
-);
-
-const walletResult=
-await client.query(
-`UPDATE wallets
-SET
-balance=balance+$1,
-updated_at=NOW()
-WHERE user_id=$2
-RETURNING balance`,
-[
-Number(lockedPayment.amount),
-lockedPayment.user_id
-]
-);
-
-if(!walletResult.rows.length){
-
-throw new Error(
-"Wallet update failed."
-);
-
-}
-
-await client.query(
-`UPDATE payments
-SET
-status='success',
-credited=TRUE,
-credited_at=NOW()
-WHERE reference=$1`,
-[
-referenceValue
-]
-);
-
-await client.query(
-`INSERT INTO transactions(
-user_id,
-type,
-service,
-amount,
-reference,
-status,
-date
-)
-VALUES(
-$1,
-'credit',
-'Wallet Funding',
-$2,
-$3,
-'successful',
-NOW()
-)
-ON CONFLICT(reference)
-DO NOTHING`,
-[
-lockedPayment.user_id,
-Number(lockedPayment.amount),
-referenceValue
-]
-);
-
-await client.query(
-"COMMIT"
-);
-
-return send(res,200,{
-success:true,
-message:
-"Payment received and wallet credited.",
-reference:
-referenceValue,
-amount:
-Number(lockedPayment.amount),
-balance:
-Number(
-walletResult.rows[0].balance
-)
-});
-
-}catch(error){
-
-await client.query(
-"ROLLBACK"
-);
-
-console.error(
-"PAYSTACK WEBHOOK CREDIT ERROR:",
-error
-);
-
-return send(res,500,{
-success:false,
-message:
-"Unable to credit payment."
-});
-
-}finally{
-
-client.release();
-
-}
-
-}catch(error){
-
-console.error(
-"PAYSTACK WEBHOOK ERROR:",
-error
-);
-
-return send(res,500,{
-success:false,
-message:
-"Webhook processing failed."
-});
-
-}
-
-});
-
-return;
-
-}
-
-
-/*
 UNKNOWN ROUTE
 */
 
@@ -5424,8 +2886,8 @@ ADMIN_EMAIL?
 );
 
 console.log(
-`Paystack configured: ${
-PAYSTACK_SECRET_KEY?
+`Flutterwave configured: ${
+FLW_SECRET_KEY?
 "YES":
 "NO"
 }`

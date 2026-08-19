@@ -21,6 +21,8 @@ const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
 const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com";
 const VTU_API_KEY=process.env.VTU_API_KEY||"";
+const CHEAPDATAHUB_API_BASE_URL=(process.env.CHEAPDATAHUB_API_BASE_URL||"https://www.cheapdatahub.ng/api/v1/resellers").replace(/\/+$/,"");
+const CHEAPDATAHUB_API_KEY=process.env.CHEAPDATAHUB_API_KEY||"";
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -2609,8 +2611,56 @@ function vtuProviderName(){
 }
 function providerForService(service){
   const key=serviceKey(service);
+  // During migration CheapDataHub handles airtime + data; VTUGATE remains for cable/electricity.
+  if(["airtime","data"].includes(key) && CHEAPDATAHUB_API_KEY) return "cheapdatahub";
   return vtuProviderName();
 }
+
+function cheapDataHubEndpoint(service){
+  const map={airtime:"/airtime/purchase/",data:"/data/purchase/"};
+  return CHEAPDATAHUB_API_BASE_URL+(map[service]||"");
+}
+
+const CHEAPDATAHUB_PROVIDER_IDS={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};
+const CHEAPDATAHUB_PLAN_CACHE=new Map();
+const CHEAPDATAHUB_PLAN_CACHE_TTL_MS=5*60*1000;
+
+const CHEAPDATAHUB_FALLBACK_PLAN_LIST=[
+  {id:70,provider:"AIRTEL",size:"1GB (Social Bundle)",duration:"3 Days",price:295},{id:13,provider:"AIRTEL",size:"500MB",duration:"7 Days",price:490},{id:69,provider:"AIRTEL",size:"1.5GB",duration:"1 Day",price:500},{id:66,provider:"AIRTEL",size:"1.5GB",duration:"2 Days",price:599},{id:15,provider:"AIRTEL",size:"1GB",duration:"7 Days",price:800},{id:17,provider:"AIRTEL",size:"2GB",duration:"30 Days",price:1490},{id:52,provider:"AIRTEL",size:"5GB",duration:"7 Days",price:1570},{id:18,provider:"AIRTEL",size:"3GB",duration:"30 Days",price:1960},{id:22,provider:"AIRTEL",size:"6GB",duration:"7 Days",price:2455},{id:19,provider:"AIRTEL",size:"4GB",duration:"30 Days",price:2570},{id:20,provider:"AIRTEL",size:"8GB",duration:"30 Days",price:2999},{id:21,provider:"AIRTEL",size:"10GB",duration:"30 Days",price:4070},
+  {id:42,provider:"GLO",size:"200 MB",duration:"1 Day",price:92},{id:35,provider:"GLO",size:"500MB",duration:"30 Days",price:225},{id:68,provider:"GLO",size:"1GB",duration:"3 Days",price:300},{id:36,provider:"GLO",size:"1GB",duration:"30 Days",price:425},{id:41,provider:"GLO",size:"1GB",duration:"14 Days",price:485},{id:40,provider:"GLO",size:"2GB",duration:"30 Days",price:850},{id:37,provider:"GLO",size:"3GB",duration:"30 Days",price:1300},{id:54,provider:"GLO",size:"5GB",duration:"7 Days",price:1699},{id:38,provider:"GLO",size:"5GB",duration:"30 Days",price:2250},{id:39,provider:"GLO",size:"10GB",duration:"30 Days",price:4390},{id:59,provider:"GLO",size:"20.5GB",duration:"30 Days",price:5300},{id:58,provider:"GLO",size:"107GB",duration:"30 Days",price:19300},
+  {id:43,provider:"MTN",size:"110MB",duration:"1 Day",price:99},{id:74,provider:"MTN",size:"230MB",duration:"1 Day",price:200},{id:76,provider:"MTN",size:"500MB",duration:"2 Days",price:250},{id:78,provider:"MTN",size:"1GB",duration:"1 Day",price:270},{id:81,provider:"MTN",size:"1GB",duration:"30 Days",price:280},{id:44,provider:"MTN",size:"500MB",duration:"30 Days",price:300},{id:77,provider:"MTN",size:"1GB",duration:"2 Days",price:399},{id:45,provider:"MTN",size:"1GB",duration:"7 Days",price:450},{id:46,provider:"MTN",size:"1GB",duration:"30 Days",price:570},{id:79,provider:"MTN",size:"2.5GB",duration:"1 Day",price:600},{id:27,provider:"MTN",size:"2.5GB",duration:"2 Days",price:900},{id:71,provider:"MTN",size:"2GB",duration:"7 Days",price:900},{id:47,provider:"MTN",size:"2GB",duration:"7 Days",price:930},{id:60,provider:"MTN",size:"4.5GB",duration:"1 Day",price:1050},{id:48,provider:"MTN",size:"2GB",duration:"30 Days",price:1150},{id:61,provider:"MTN",size:"4GB",duration:"2 Days",price:1175},{id:80,provider:"MTN",size:"5GB",duration:"14 Days",price:1299},{id:82,provider:"MTN",size:"5GB",duration:"30 Days",price:1299},{id:49,provider:"MTN",size:"3GB",duration:"30 Days",price:1370},{id:50,provider:"MTN",size:"5GB",duration:"30 Days",price:2050},{id:53,provider:"MTN",size:"6GB",duration:"7 Days",price:2495},{id:33,provider:"MTN",size:"7GB",duration:"30 Days",price:3499},{id:55,provider:"MTN",size:"11GB",duration:"7 Days",price:3550},{id:67,provider:"MTN",size:"10GB",duration:"30 Days",price:4800},{id:57,provider:"MTN",size:"36GB",duration:"30 Days",price:10800},{id:51,provider:"MTN",size:"75GB",duration:"30 Days",price:17990}
+].map(x=>({...x,bundle_id:x.id,code:String(x.id),name:x.size,network_name:x.provider,size_label:x.size}));
+
+function decodeCheapDataHubHtml(s){return String(s||"").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&#x27;/gi,"'").replace(/&#39;/gi,"'").replace(/&quot;/gi,'"').replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();}
+function parseCheapDataHubPlanPage(html){
+  const plans=[]; const rowRe=/<tr[^>]*>([\s\S]*?)<\/tr>/gi; let m;
+  while((m=rowRe.exec(String(html||"")))){
+    const cells=[]; const cellRe=/<td[^>]*>([\s\S]*?)<\/td>/gi; let c;
+    while((c=cellRe.exec(m[1])))cells.push(decodeCheapDataHubHtml(c[1]));
+    // Public table: Network | Service | Plan Name | Plan ID | Price
+    if(cells.length<5)continue;
+    const provider=cells[0].toUpperCase(), service=cells[1].toUpperCase(), id=Number(cells[3]);
+    const price=Number(String(cells[4]).replace(/[^0-9.]/g,""));
+    if(!provider||!service.includes("DATA")||!Number.isFinite(id)||id<=0||!Number.isFinite(price)||price<=0)continue;
+    const name=cells[2];
+    const dur=(name.match(/\(([^)]*(?:day|days|month|months))\)/i)||[])[1]||"";
+    const size=(name.match(/(\d+(?:\.\d+)?\s*(?:GB|MB))/i)||[])[1]||name;
+    const n=Number((size.match(/\d+(?:\.\d+)?/)||[])[0]||0);
+    const unit=(size.match(/GB|MB/i)||[])[0]||"MB";
+    plans.push({bundle_id:id,code:String(id),name,network_name:provider,size_label:size,duration:dur,price:Number(price.toFixed(2)),size_mb:unit.toUpperCase()==="GB"?n*1024:n,validity_days:/day/i.test(dur)?Number((dur.match(/\d+/)||[])[0]||0):/month/i.test(dur)?Number((dur.match(/\d+/)||[])[0]||0)*30:0});
+  }
+  return plans;
+}
+async function fetchCheapDataHubDataPlans(network){
+  const wanted=String(network||"").trim().toUpperCase(); if(!wanted)throw new Error("Network is required.");
+  const cached=CHEAPDATAHUB_PLAN_CACHE.get(wanted); if(cached&&Date.now()-cached.time<CHEAPDATAHUB_PLAN_CACHE_TTL_MS)return cached.data;
+  let plans=[];
+  try{const response=await fetch("https://www.cheapdatahub.ng/api/plan-ids/",{headers:{Accept:"text/html,application/xhtml+xml"}});const html=await response.text();if(response.ok)plans=parseCheapDataHubPlanPage(html);}catch(error){console.error("CHEAPDATAHUB PLAN PAGE ERROR:",error?.message||error);}
+  if(!plans.length)plans=CHEAPDATAHUB_FALLBACK_PLAN_LIST;
+  const filtered=plans.filter(p=>String(p.network_name||p.provider||"").toUpperCase()===wanted);
+  CHEAPDATAHUB_PLAN_CACHE.set(wanted,{time:Date.now(),data:filtered}); return filtered;
+}
+function cheapDataHubStatusOk(data,response){const raw=data?.status;if(typeof raw==="boolean")return raw;if(typeof raw==="string")return ["true","success","successful","completed","ok"].includes(raw.trim().toLowerCase());return response.ok;}
 
 function vtugateEndpoint(service){
   const base=String(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com").replace(/\/+$/,'');
@@ -2920,32 +2970,42 @@ async function findVTUGateDataFallback(originalPayload,providerData){
 async function callVTUProvider(payload){
   const service=serviceKey(payload?.service||"");
   const provider=providerForService(service);
-
-  if(!VTU_API_KEY){
-    return{success:false,configured:false,message:"VTU provider is not configured."};
-  }
-  const url=provider==='vtugate'?vtugateEndpoint(service):String(VTU_API_BASE_URL||"").replace(/\/+$/,'');
-  if(!url){return{success:false,configured:false,message:"VTU provider URL is not configured."};}
+  const isCheapDataHub=provider==='cheapdatahub';
+  const apiKey=isCheapDataHub?CHEAPDATAHUB_API_KEY:VTU_API_KEY;
+  if(!apiKey)return{success:false,configured:false,message:`${isCheapDataHub?'CheapDataHub':'VTU'} provider is not configured.`};
+  const url=isCheapDataHub?cheapDataHubEndpoint(service):vtugateEndpoint(service);
+  if(!url)return{success:false,configured:false,message:`${provider} does not support ${service}.`};
   try{
-    const isVTUGate=provider==='vtugate';
-    const form=isVTUGate?await buildVTUGateForm(payload):null;
-    const requestHeaders={"Authorization":`Bearer ${VTU_API_KEY}`,"Accept":"application/json"};
-    let response;
-    if(isVTUGate){
-      response=await fetch(url,{method:"POST",headers:{...requestHeaders,"Content-Type":"application/x-www-form-urlencoded"},body:form.toString()});
-      let firstData={};try{firstData=await response.json();}catch{firstData={};}
-      const providerOk=typeof firstData?.status==='boolean'?firstData.status:response.ok;
-      if(!response.ok||!providerOk) console.error("VTU PROVIDER RESPONSE:",JSON.stringify({provider,service,statusCode:response.status,data:firstData}));
-      return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data:firstData};
+    const requestHeaders={"Authorization":`Bearer ${apiKey}`,"Accept":"application/json","Content-Type":"application/json"};
+    if(isCheapDataHub){
+      let bodyPayload={};
+      if(service==='airtime'){
+        const network=String(payload?.network||'').trim().toUpperCase();
+        const providerId=CHEAPDATAHUB_PROVIDER_IDS[network];
+        const phone=String(payload?.phone||payload?.recipient||'').trim();
+        if(!providerId||!/^\d{11}$/.test(phone)||!Number.isFinite(Number(payload?.amount))||Number(payload.amount)<=0)return{success:false,configured:true,statusCode:422,data:{status:false,message:'Invalid CheapDataHub airtime payload.'}};
+        bodyPayload={provider_id:providerId,phone_number:phone,amount:Number(payload.amount)};
+      }else if(service==='data'){
+        const bundleId=Number(payload?.bundle_id||payload?.plan_id||0);
+        const phone=String(payload?.phone||payload?.recipient||'').trim();
+        if(!Number.isFinite(bundleId)||bundleId<=0||!/^\d{11}$/.test(phone))return{success:false,configured:true,statusCode:422,data:{status:false,message:'Invalid CheapDataHub data payload.'}};
+        bodyPayload={bundle_id:bundleId,phone_number:phone};
+      }else return{success:false,configured:false,message:`CheapDataHub does not support ${service} in this migration.`};
+      const response=await fetch(url,{method:'POST',headers:requestHeaders,body:JSON.stringify(bodyPayload)});
+      let data={};try{data=await response.json();}catch{data={};}
+      const providerOk=cheapDataHubStatusOk(data,response);
+      if(!response.ok||!providerOk)console.error('CHEAPDATAHUB PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,data}));
+      return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
     }
-    response=await fetch(url,{method:"POST",headers:{...requestHeaders,"Content-Type":"application/json"},body:JSON.stringify(payload||{})});
+    const form=await buildVTUGateForm(payload);
+    const response=await fetch(url,{method:'POST',headers:{...requestHeaders,'Content-Type':'application/x-www-form-urlencoded'},body:form.toString()});
     let data={};try{data=await response.json();}catch{data={};}
     const providerOk=typeof data?.status==='boolean'?data.status:response.ok;
-    if(!response.ok||!providerOk) console.error("VTU PROVIDER RESPONSE:",JSON.stringify({provider,service,statusCode:response.status,data}));
+    if(!response.ok||!providerOk)console.error('VTUGATE PROVIDER RESPONSE:',JSON.stringify({service,statusCode:response.status,data}));
     return{success:Boolean(response.ok&&providerOk),configured:true,statusCode:response.status,data};
   }catch(error){
-    console.error("VTU PROVIDER REQUEST ERROR:",error);
-    return{success:false,configured:true,statusCode:502,data:{},error:true,message:"VTU provider request failed."};
+    console.error(`${provider.toUpperCase()} PROVIDER REQUEST ERROR:`,error);
+    return{success:false,configured:true,statusCode:502,data:{},error:true,message:`${provider} provider request failed.`};
   }
 }
 
@@ -3024,19 +3084,19 @@ if(serviceKey(data.service)==='airtime'){
 // For data, verify the exact live plan so customers cannot alter the wholesale amount in the browser.
 if(serviceKey(data.service)==='data') {
   const network=clean(providerPayload.network||data.network).toUpperCase();
-  const code=clean(providerPayload.plan_code||providerPayload.planCode||providerPayload.plan);
-  const serviceId=Number(providerPayload.service_id||data.service_id||0);
-  if(!network||!code||!serviceId) return {success:false,statusCode:400,message:'A valid data plan is required.'};
+  const code=clean(providerPayload.bundle_id||providerPayload.plan_code||providerPayload.planCode||providerPayload.plan);
+  if(!network||!code) return {success:false,statusCode:400,message:'A valid data plan is required.'};
   try {
-    const livePlans=await fetchVTUGateDataPlans(network);
-    const livePlan=livePlans.find(x=>String(x.code||x.plan_code||'')===code && Number(x.service_id||0)===serviceId);
+    const livePlans=await fetchCheapDataHubDataPlans(network);
+    const livePlan=livePlans.find(x=>String(x.bundle_id||x.code||'')===code);
     if(!livePlan) return {success:false,statusCode:400,message:'This data plan is no longer available. Please refresh and choose another plan.'};
     const wholesale=Number(livePlan.price);
     const expectedCustomer=customerPriceFromCost(wholesale,pricingConfig(service));
     if(!Number.isFinite(wholesale)||wholesale<=0||expectedCustomer===null) return {success:false,statusCode:400,message:'Unable to price this data plan.'};
     if(Math.abs(amount-expectedCustomer)>0.01) return {success:false,statusCode:400,message:'This data plan price has changed. Please refresh the plans and try again.'};
     pricingCostOverride=wholesale;
-    pricing={...estimatedProviderCost(service,amount),cost:Number(wholesale.toFixed(2)),source:'live_data_plan'};
+    pricing={...estimatedProviderCost(service,amount),cost:Number(wholesale.toFixed(2)),source:'cheapdatahub_data_plan'};
+    providerPayload.bundle_id=Number(livePlan.bundle_id);
   } catch(error) {
     return {success:false,statusCode:502,message:error?.message||'Unable to verify the selected data plan.'};
   }
@@ -3092,7 +3152,7 @@ const actualProviderCost=providerCostFromResponse(providerData,amount);
 const providerCost=actualProviderCost===null?pricing.cost:actualProviderCost;
 const pricingSource=actualProviderCost===null?pricing.source:'provider_response';
 const grossProfit=Number((amount-providerCost).toFixed(2));
-if(!providerResult.success && serviceKey(data.service)==='data' && vtuProviderName()==='vtugate' && isVTUGateBundleUnavailable(providerData)){
+if(false && !providerResult.success && serviceKey(data.service)==='data' && vtuProviderName()==='vtugate' && isVTUGateBundleUnavailable(providerData)){
   const fallbackPayload=await findVTUGateDataFallback(data.providerPayload||data,providerData);
   if(fallbackPayload){
     console.warn('VTUGATE DATA BUNDLE REJECTED; RETRYING ALTERNATE LIVE PLAN:',JSON.stringify({network:fallbackPayload.network,service_id:fallbackPayload.service_id,plan_code:fallbackPayload.plan_code,amount:fallbackPayload.amount}));
@@ -3133,7 +3193,8 @@ return {
   balance:(await getWallet(userId))?.balance||0
 };
 }
-const providerStatusRaw=String(providerData.status||providerData.data?.status||providerData.data?.order_status||providerData.data?.data?.status||"").toLowerCase();
+const rawStatus=String(providerData.status||providerData.data?.status||providerData.data?.order_status||providerData.data?.data?.status||"").toLowerCase();
+const providerStatusRaw=["true","false","1","0","success","successful","ok"].includes(rawStatus)?"":rawStatus;
 const providerMessage=String(providerData.message||providerData.data?.message||providerData.data?.provider_message||"").toLowerCase();
 const providerStatus=providerStatusRaw||(/processing|queued|initiated|pending|on-hold/.test(providerMessage)?"processing":/failed|cancelled|refunded/.test(providerMessage)?"failed":"successful");
 const pending=["pending","processing","queued","in_progress","initiated","processing-api","queued-api","pending-api","on-hold"].includes(providerStatus);
@@ -3302,6 +3363,15 @@ async function resolveFlutterwaveAccount(bankCode,accountNumber){
   if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.data?.message||"Unable to verify the bank account."};
   return{success:true,accountName:String(name).trim(),accountNumber:r.data.data.account_number||String(accountNumber)};
 }
+async function paystackRequest(path,options={}){
+  if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};
+  try{
+    const response=await fetch(`${PAYSTACK_API_URL}${path}`,{...options,headers:{'Authorization':`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json',...(options.headers||{})}});
+    let data={};try{data=await response.json()}catch{}
+    return{success:Boolean(response.ok&&data?.status),statusCode:response.status,data};
+  }catch(e){return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}
+}
+
 async function payscribePayoutRequest(path,options={}){
   if(!payscribeConfigured())return{success:false,statusCode:503,message:'Payscribe is not configured.'};
   try{
@@ -4714,74 +4784,23 @@ const b=await body(req);
 const network=clean(b.network).toUpperCase();
 if(!network)return send(res,400,{success:false,message:"Network is required."});
 try{
-  const rawPlans=await fetchVTUGateDataPlans(network);
+  const rawPlans=await fetchCheapDataHubDataPlans(network);
   const dataService=await getService('data');
   const dataPricing=pricingConfig(dataService);
   const byPlan=new Map();
   for(const plan of rawPlans){
-    const code=clean(plan.code||plan.plan_code);
-    if(!code)continue;
-    if(isVTUGateDataPlanUnavailable(network,plan.service_id,code))continue;
-    const size=Number(plan.size_mb||0);
-    const validity=Number(plan.validity_days||0);
-    const price=Number(plan.price||0);
-    if(!Number.isFinite(price)||price<=0)continue;
+    const bundleId=Number(plan.bundle_id||plan.id||plan.code||0), price=Number(plan.price||0);
+    if(!Number.isFinite(bundleId)||bundleId<=0||!Number.isFinite(price)||price<=0)continue;
     const customerPrice=customerPriceFromCost(price,dataPricing);
     if(customerPrice===null||customerPrice<=0)continue;
-    const key=`${code}|${size}|${validity}`;
-    const row={
-      code,
-      name:clean(plan.name||code),
-      customer_price:customerPrice,
-      network_name:clean(plan.network_name||network).toUpperCase(),
-      service_id:Number(plan.service_id),
-      size_mb:size,
-      validity_days:validity,
-      delivery_rate:plan.delivery_rate===null||plan.delivery_rate===undefined?null:Number(plan.delivery_rate),
-      delivery_comment:clean(plan.delivery_comment||"")
-    };
-    const previous=byPlan.get(key);
-    if(!previous||row.customer_price<previous.customer_price)byPlan.set(key,row);
+    byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||plan.size_label||String(bundleId)),customer_price:customerPrice,provider_price:Number(price.toFixed(2)),network_name:clean(plan.network_name||network).toUpperCase(),service_id:null,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),duration:clean(plan.duration||"")});
   }
-  const plans=Array.from(byPlan.values())
-    .filter(plan=>plan && plan.delivery_rate!==null && plan.delivery_rate!==undefined && Number.isFinite(Number(plan.delivery_rate)) && Number(plan.delivery_rate)>=95)
-    .sort((a,b)=>Number(b.delivery_rate)-Number(a.delivery_rate) || Number(a.customer_price)-Number(b.customer_price) || Number(a.size_mb)-Number(b.size_mb))
-    .slice(0,13);
+  const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,30);
   return send(res,200,{success:true,network,plans});
 }catch(error){
-  console.error("VTU DATA PLAN CATALOG ERROR:",error);
-  return send(res,502,{success:false,message:error?.message||"Unable to fetch data plans."});
+  console.error('CHEAPDATAHUB DATA PLAN CATALOG ERROR:',error?.message||error);
+  return send(res,502,{success:false,message:'Unable to load CheapDataHub data plans right now.'});
 }
-}
-
-/*
-VTUGATE ELECTRICITY METER VERIFICATION
-*/
-if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){
-  const rl=rateLimit(req,"electricity-verify",30,60*1000);
-  if(!rl.allowed)return rateLimitedResponse(res,rl);
-  const user=await userFromToken(req);
-  if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-  if(vtuProviderName()!=="vtugate")return send(res,503,{success:false,message:"VTUGATE electricity verification is not configured."});
-  if(!VTU_API_KEY)return send(res,503,{success:false,message:"VTU provider is not configured."});
-  try{
-    const b=await body(req);
-    const provider=String(b.provider||"").trim();
-    const meterNumber=String(b.meterNumber||b.meter_number||"").trim();
-    const meterType=String(b.meterType||b.meter_type||"Prepaid").trim();
-    if(!provider||!meterNumber)return send(res,400,{success:false,message:"Provider and meter number are required."});
-    const base=String(VTU_API_BASE_URL||"https://api.vtugate.com").replace(/\\+$/,'').replace(/\/api\/v1$/i,'');
-    const url=base+"/api/v1/verifyelectricity";
-    const form=new URLSearchParams({provider,meter_number:meterNumber,meter_type:meterType}).toString();
-    const response=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${VTU_API_KEY}`,Accept:"application/json","Content-Type":"application/x-www-form-urlencoded"},body:form});
-    let data={};try{data=await response.json();}catch{}
-    console.log("VTUGATE ELECTRICITY VERIFY:",JSON.stringify({provider,meterNumber,meterType,statusCode:response.status,data}));
-    if(!response.ok||data?.status!==true)return send(res,response.status>=400&&response.status<500?response.status:502,{success:false,message:data?.message||"Unable to verify electricity meter.",provider_data:data});
-    return send(res,200,{success:true,message:data?.message||"Electricity meter verified successfully.",data:data?.data||data,provider_data:data});
-  }catch(error){
-    console.error("VTUGATE ELECTRICITY VERIFY ERROR:",error?.message||error);
-    return send(res,502,{success:false,message:"Unable to verify electricity meter right now."});
-  }
 }
 
 /*
@@ -4905,7 +4924,8 @@ status:ready?"online":"degraded",
 database,
 configuration:{
 paystack:Boolean(PAYSTACK_SECRET_KEY),
-vtu:Boolean(process.env.VTU_API_KEY&& (process.env.VTU_API_BASE_URL||process.env.VTU_API_URL)),
+vtu:Boolean((VTU_API_KEY&&VTU_API_BASE_URL)||(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL)),
+cheapdatahub:Boolean(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()
@@ -5474,7 +5494,7 @@ PAYSTACK_SECRET_KEY?
 
 console.log(
 `VTU configured: ${
-process.env.VTU_API_KEY&&(process.env.VTU_API_BASE_URL||process.env.VTU_API_URL)?
+(VTU_API_KEY&&VTU_API_BASE_URL)||(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL)?
 "YES":
 "NO"
 }`

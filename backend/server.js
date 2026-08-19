@@ -1705,6 +1705,25 @@ message:"Admin logged out successfully."
 }
 
 
+/* ===================== ADMIN WALLET / REVENUE HELPERS ===================== */
+async function ensureAdminWallet(client,adminId){
+  await client.query(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);
+}
+async function addAdminLedger(client,adminId,type,amount,balanceAfter,description,ref){
+  await client.query(`INSERT INTO admin_wallet_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(reference) DO NOTHING`,[adminId,type,Number(amount),Number(balanceAfter),String(ref),String(description)]);
+}
+async function getAdminWallet(adminId){
+  await db(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);
+  const row=(await db(`SELECT balance,created_at,updated_at FROM admin_wallets WHERE admin_id=$1`,[adminId])).rows[0]||{};
+  return {balance:Number(row.balance||0),created_at:row.created_at||null,updated_at:row.updated_at||null};
+}
+async function ensureAdminRevenueWallet(client,adminId){
+  await client.query(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);
+}
+async function addAdminRevenueLedger(client,adminId,type,amount,balanceAfter,description,ref){
+  await client.query(`INSERT INTO admin_revenue_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(reference) DO NOTHING`,[adminId,type,Number(amount),Number(balanceAfter),String(ref),String(description)]);
+}
+
 /* ===================== FLUTTERWAVE VIRTUAL ACCOUNT FUNDING ===================== */
 
 function flutterwaveConfigured(){
@@ -1868,6 +1887,252 @@ const b=await body(req),accountNumber=clean(b.accountNumber||b.account_number);i
 const r=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type='admin' AND owner_id=$1 AND account_number=$2 LIMIT 1`,[String(admin.id),accountNumber]);if(!r.rows.length)return{success:false,statusCode:404,message:"Flutterwave admin funding account not found."};
 return{success:true,account:r.rows[0],message:"Transfer to this Flutterwave account. The operating wallet will be credited automatically after Flutterwave confirms the transfer."};
 }
+
+
+/* ===================== ADMIN DASHBOARD API HELPERS ===================== */
+
+async function adminCsrfToken(req){
+  const sessionToken=getAdminSessionToken(req);
+  if(!sessionToken)return null;
+  let r=await db(`SELECT csrf_token FROM admin_sessions WHERE token=$1 AND expires_at>NOW()`,[sessionToken]);
+  if(!r.rows.length)return null;
+  let csrf=r.rows[0].csrf_token;
+  if(!csrf){
+    csrf=token();
+    await db(`UPDATE admin_sessions SET csrf_token=$1 WHERE token=$2`,[csrf,sessionToken]);
+  }
+  return csrf;
+}
+
+async function requireAdmin(req){
+  return await adminFromToken(req);
+}
+
+async function requireAdminCsrf(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const supplied=String(req.headers["x-admin-csrf"]||"");
+  const expected=await adminCsrfToken(req);
+  if(!expected||!supplied||supplied!==expected)return{success:false,statusCode:403,message:"Invalid admin CSRF token."};
+  return{success:true,admin};
+}
+
+async function adminMe(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  return{success:true,admin:{id:admin.id,email:admin.email}};
+}
+
+async function adminStatsResponse(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+
+  const users=(await db(`SELECT COUNT(*)::int AS count FROM users`)).rows[0];
+  const active=(await db(`SELECT COUNT(*)::int AS count FROM users WHERE COALESCE(status,'active')<>'suspended'`)).rows[0];
+  const wallet=(await db(`SELECT COALESCE(SUM(balance),0) AS total FROM wallets`)).rows[0];
+  const tx=(await db(`SELECT COUNT(*)::int AS count FROM transactions`)).rows[0];
+  const payments=(await db(`SELECT COUNT(*)::int AS count FROM payments`)).rows[0];
+  const statuses=(await db(`SELECT
+    COUNT(*) FILTER(WHERE status='successful')::int AS successful,
+    COUNT(*) FILTER(WHERE status IN ('pending','processing'))::int AS pending,
+    COUNT(*) FILTER(WHERE status='failed')::int AS failed,
+    COALESCE(SUM(CASE WHEN type='debit' AND status='successful'
+      THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit
+    FROM transactions`)).rows[0];
+
+  await db(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
+  await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
+  const aw=(await db(`SELECT balance FROM admin_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
+  const rw=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
+
+  return{
+    success:true,
+    stats:{
+      users:Number(users?.count||0),
+      walletBalance:Number(wallet?.total||0),
+      transactions:Number(tx?.count||0),
+      payments:Number(payments?.count||0),
+      grossProfit:Number(statuses?.gross_profit||0),
+      successful:Number(statuses?.successful||0),
+      pending:Number(statuses?.pending||0),
+      failed:Number(statuses?.failed||0),
+      activeUsers:Number(active?.count||0),
+      adminWalletBalance:Number(aw?.balance||0),
+      adminRevenueBalance:Number(rw?.balance||0)
+    }
+  };
+}
+
+async function adminUsersResponse(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const r=await db(`SELECT u.user_id,u.name,u.email,u.phone,COALESCE(u.status,'active') AS status,
+    COALESCE(w.balance,0) AS balance,u.created_at
+    FROM users u LEFT JOIN wallets w ON w.user_id=u.user_id
+    ORDER BY u.created_at DESC LIMIT 1000`);
+  return{success:true,users:r.rows.map(x=>({...x,balance:Number(x.balance||0)}))};
+}
+
+async function adminTransactionsResponse(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const r=await db(`SELECT t.id,t.user_id,t.type,t.service,t.amount,t.reference,t.status,t.date,
+    t.provider_reference,t.metadata,u.email,u.name,
+    COALESCE((t.metadata->'pricing'->>'providerCost')::numeric,0) AS provider_cost,
+    COALESCE((t.metadata->'pricing'->>'grossProfit')::numeric,0) AS gross_profit
+    FROM transactions t LEFT JOIN users u ON u.user_id=t.user_id
+    ORDER BY t.date DESC LIMIT 1000`);
+  return{success:true,transactions:r.rows.map(x=>({...x,amount:Number(x.amount||0),providerCost:Number(x.provider_cost||0),grossProfit:Number(x.gross_profit||0)}))};
+}
+
+async function adminPaymentsResponse(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const r=await db(`SELECT id,reference,user_id,email,amount,amount_kobo,status,credited,created_at,credited_at
+    FROM payments ORDER BY created_at DESC LIMIT 1000`);
+  return{success:true,payments:r.rows.map(x=>({...x,amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)}))};
+}
+
+async function adminSupport(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==="list"){
+    const r=await db(`SELECT t.id,t.user_id,t.subject,t.message,t.status,t.created_at,t.updated_at,u.name,u.email
+      FROM support_tickets t LEFT JOIN users u ON u.user_id=t.user_id
+      ORDER BY t.updated_at DESC LIMIT 200`);
+    return{success:true,tickets:r.rows};
+  }
+  const b=await body(req);
+  const ticketId=Number(b.ticketId||b.ticket_id);
+  if(!Number.isInteger(ticketId)||ticketId<1)return{success:false,statusCode:400,message:"Invalid ticket."};
+  if(action==="status"){
+    const status=clean(b.status).toLowerCase();
+    if(!["open","pending","resolved","closed"].includes(status))return{success:false,statusCode:400,message:"Invalid ticket status."};
+    const r=await db(`UPDATE support_tickets SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING id,status`,[status,ticketId]);
+    if(!r.rows.length)return{success:false,statusCode:404,message:"Support ticket not found."};
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
+      [admin.id,"support_status","ticket",String(ticketId),JSON.stringify({status}),requestIp(req)]);
+    return{success:true,ticket:r.rows[0]};
+  }
+  if(action==="reply"){
+    const message=clean(b.message);
+    if(message.length<1)return{success:false,statusCode:400,message:"Reply message is required."};
+    const t=await db(`SELECT id FROM support_tickets WHERE id=$1`,[ticketId]);
+    if(!t.rows.length)return{success:false,statusCode:404,message:"Support ticket not found."};
+    await db(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'admin',$2,$3)`,[ticketId,String(admin.id),message]);
+    await db(`UPDATE support_tickets SET status='pending',updated_at=NOW() WHERE id=$1`,[ticketId]);
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
+      [admin.id,"support_reply","ticket",String(ticketId),JSON.stringify({message}),requestIp(req)]);
+    return{success:true,message:"Reply sent."};
+  }
+  return{success:false,statusCode:400,message:"Unsupported support action."};
+}
+
+async function adminAuditResponse(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const r=await db(`SELECT l.id,l.admin_id,a.email,l.action,l.target_type,l.target_id,l.details,l.ip,l.created_at
+    FROM admin_audit_logs l LEFT JOIN admins a ON a.id=l.admin_id
+    ORDER BY l.created_at DESC LIMIT 500`);
+  return{success:true,logs:r.rows};
+}
+
+async function adminServices(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==="list"){
+    const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY name`);
+    return{success:true,services:r.rows.map(x=>({...x,fee:Number(x.fee||0),config:x.config||{}}))};
+  }
+  const b=await body(req),key=clean(b.key);
+  if(!key)return{success:false,statusCode:400,message:"Service key is required."};
+  const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,
+    [Boolean(b.enabled),Boolean(b.maintenance),Number(b.fee||0),JSON.stringify(b.config||{}),key]);
+  if(!r.rows.length)return{success:false,statusCode:404,message:"Service not found."};
+  await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
+    [admin.id,"service_update","service",key,JSON.stringify({enabled:Boolean(b.enabled),maintenance:Boolean(b.maintenance),fee:Number(b.fee||0)}),requestIp(req)]);
+  return{success:true,service:{...r.rows[0],fee:Number(r.rows[0].fee||0)}};
+}
+
+async function adminSettings(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==="get"){
+    const r=await db(`SELECT key,value FROM platform_settings`);
+    const settings={};
+    for(const row of r.rows)settings[row.key]=row.value;
+    return{success:true,settings};
+  }
+  const b=await body(req);
+  for(const key of ["maintenance_mode","registration_enabled"]){
+    if(Object.prototype.hasOwnProperty.call(b,key)){
+      await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW())
+        ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,
+        [key,JSON.stringify(Boolean(b[key]))]);
+    }
+  }
+  return adminSettings(req,"get");
+}
+
+async function adminSecurity(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==="events"){
+    const r=await db(`SELECT s.id,s.admin_id,a.email,s.event_type,s.severity,s.details,s.ip,s.created_at
+      FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id
+      ORDER BY s.created_at DESC LIMIT 500`);
+    return{success:true,events:r.rows};
+  }
+  if(action==="sessions"){
+    const r=await db(`SELECT s.created_at,s.expires_at,a.email,s.admin_id
+      FROM admin_sessions s JOIN admins a ON a.id=s.admin_id
+      WHERE s.expires_at>NOW() ORDER BY s.created_at DESC`);
+    return{success:true,sessions:r.rows};
+  }
+  if(action==="revoke"){
+    const current=getAdminSessionToken(req);
+    const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current||""]);
+    await recordSecurityEvent("admin_sessions_revoked","warning",{revoked:r.rowCount},req,admin.id);
+    return{success:true,revoked:r.rowCount||0};
+  }
+  return{success:false,statusCode:400,message:"Unsupported security action."};
+}
+
+async function adminUserAction(req){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const b=await body(req),userId=clean(b.userId||b.user_id),action=clean(b.action).toLowerCase();
+  if(!userId||!["suspend","activate"].includes(action))return{success:false,statusCode:400,message:"Invalid user action."};
+  const status=action==="suspend"?"suspended":"active";
+  const r=await db(`UPDATE users SET status=$1,updated_at=NOW() WHERE user_id=$2 RETURNING user_id,status`,[status,userId]);
+  if(!r.rows.length)return{success:false,statusCode:404,message:"User not found."};
+  await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
+    [admin.id,action,"user",userId,JSON.stringify({status}),requestIp(req)]);
+  return{success:true,user:r.rows[0]};
+}
+
+async function adminWalletAdjust(req,mode){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const b=await body(req),userId=clean(b.userId||b.user_id),amount=Number(b.amount),reason=clean(b.reason)||`Admin ${mode}`;
+  if(!userId||!validAmount(amount))return{success:false,statusCode:400,message:"Valid user ID and amount are required."};
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const u=await client.query(`SELECT user_id FROM users WHERE user_id=$1 FOR UPDATE`,[userId]);
+    if(!u.rows.length){await client.query("ROLLBACK");return{success:false,statusCode:404,message:"User not found."};}
+    await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
+    const w=await client.query(`SELECT balance FROM wallets WHERE user_id=$1 FOR UPDATE`,[userId]);
+    const old=Number(w.rows[0].balance||0),delta=mode==="credit"?amount:-amount,next=old+delta;
+    if(next<0){await client.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient wallet balance."};}
+    await client.query(`UPDATE wallets SET balance=$1,updated_at=NOW() WHERE user_id=$2`,[next,userId]);
+    await client.query("COMMIT");
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
+      [admin.id,`wallet_${mode}`,"user",userId,JSON.stringify({amount,reason,balance_after:next}),requestIp(req)]);
+    return{success:true,message:"Wallet updated.",balance:next};
+  }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
+}
+
 
 async function handleAdminRoutes(
 req,

@@ -15,6 +15,7 @@ const PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS=Number(process.env.PAYSCRIBE_WEBHOOK_T
 const STROWALLET_PUBLIC_KEY=process.env.STROWALLET_PUBLIC_KEY||process.env.STROWALLET_API_KEY||"";
 const STROWALLET_BASE_URL=(process.env.STROWALLET_BASE_URL||"https://strowallet.com/api").replace(/\/+$/,"");
 const STROWALLET_MODE=(process.env.STROWALLET_MODE||"live").toLowerCase();
+const STROWALLET_SENDER_NAME=process.env.STROWALLET_SENDER_NAME||"BOLTIV TECHNOLOGIES LIMITED";
 const STROWALLET_VA_PATH=process.env.STROWALLET_VA_PATH||"/virtual-bank/new-customer";
 const STROWALLET_WEBHOOK_URL=process.env.STROWALLET_WEBHOOK_URL||"";
 const BACKEND_PUBLIC_URL=(process.env.BACKEND_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||"").replace(/\/+$/,"");
@@ -1914,7 +1915,7 @@ if(!strowalletConfigured()) throw new Error("Strowallet is not configured.");
 let url=`${STROWALLET_BASE_URL}${pathname.startsWith("/")?pathname:"/"+pathname}`;
 const params=new URLSearchParams();
 if(query) Object.entries(query).forEach(([k,v])=>{ if(v!=null&&v!=="") params.set(k,String(v)); });
-if(method==="GET" && [...params].length) url+=`?${params.toString()}`;
+if([...params].length) url+=`?${params.toString()}`;
 const headers={"Accept":"application/json"};
 let fetchBody;
 if(method!=="GET" && body){
@@ -3637,6 +3638,80 @@ async function verifyPayscribePayoutTransfer(identifier){
   return{success:true,data:d};
 }
 
+
+/* ===================== STROWALLET REVENUE PAYOUTS ===================== */
+
+function strowalletDetails(data){
+  const d=data?.data ?? data?.details ?? data?.result ?? data;
+  return d && typeof d === 'object' ? d : {};
+}
+
+function strowalletMessage(data,fallback='Strowallet request failed.'){
+  const raw=data?.message ?? data?.error ?? data?.msg ?? data?.statusMessage;
+  if(typeof raw==='string' && raw.trim()) return raw.trim();
+  if(raw && typeof raw==='object') return String(raw.message||raw.error||raw.msg||JSON.stringify(raw));
+  return fallback;
+}
+
+async function strowalletPayoutBanks(){
+  try{
+    const data=await strowalletRequest('/banks/lists/',{method:'GET',query:{public_key:STROWALLET_PUBLIC_KEY}});
+    const d=strowalletDetails(data);
+    const raw=Array.isArray(d)?d:(Array.isArray(d.banks)?d.banks:(Array.isArray(d.data)?d.data:[]));
+    const banks=raw.map(x=>({
+      code:String(x.code||x.bank_code||x.bankCode||x.bankCodeId||'').trim(),
+      name:String(x.name||x.bank_name||x.bankName||x.bank||'').trim()
+    })).filter(x=>x.code&&x.name);
+    if(!banks.length) throw new Error(strowalletMessage(data,'Strowallet returned no Nigerian banks.'));
+    return {success:true,banks};
+  }catch(e){
+    return {success:false,statusCode:e.status||502,message:e.message||'Unable to load Strowallet banks.'};
+  }
+}
+
+async function resolveStrowalletPayoutAccount(bankCode,accountNumber){
+  try{
+    const data=await strowalletRequest('/banks/get-customer-name/',{
+      method:'GET',
+      query:{public_key:STROWALLET_PUBLIC_KEY,bank_code:String(bankCode),account_number:String(accountNumber)}
+    });
+    const d=strowalletDetails(data);
+    const name=d?.account_name||d?.accountName||d?.name||d?.customer_name||d?.customerName||d?.account?.name||d?.account?.account_name||d?.account?.accountName;
+    const number=d?.account_number||d?.accountNumber||d?.account?.account_number||d?.account?.accountNumber||String(accountNumber);
+    const nameEnquiryReference=d?.name_enquiry_reference||d?.nameEnquiryReference||d?.enquiry_reference||d?.enquiryReference||d?.sessionId||d?.session_id||d?.reference||d?.account?.name_enquiry_reference||d?.account?.nameEnquiryReference||'';
+    if(!name) return {success:false,statusCode:400,message:strowalletMessage(data,'Unable to verify the Strowallet bank account.')};
+    if(!nameEnquiryReference) return {success:false,statusCode:502,message:'Strowallet verified the account name but did not return a name-enquiry reference required to send the transfer.'};
+    return {success:true,accountName:String(name).trim(),accountNumber:String(number).trim(),nameEnquiryReference:String(nameEnquiryReference).trim()};
+  }catch(e){
+    return {success:false,statusCode:e.status||502,message:e.message||'Unable to verify the Strowallet bank account.'};
+  }
+}
+
+async function strowalletBankTransfer({amount,bankCode,accountNumber,nameEnquiryReference,narration,reference}){
+  try{
+    const data=await strowalletRequest('/banks/request/',{
+      method:'POST',
+      query:{
+        public_key:STROWALLET_PUBLIC_KEY,
+        amount:String(amount),
+        bank_code:String(bankCode),
+        account_number:String(accountNumber),
+        narration:String(narration||'BOLTIV revenue withdrawal'),
+        name_enquiry_reference:String(nameEnquiryReference||''),
+        SenderName:String(STROWALLET_SENDER_NAME),
+        mode:STROWALLET_MODE
+      }
+    });
+    const d=strowalletDetails(data);
+    const rawStatus=String(d?.status||d?.transaction_status||d?.transfer_status||data?.status||'').toLowerCase();
+    const transferId=d?.transaction_id||d?.transactionId||d?.trans_id||d?.transfer_id||d?.transferId||d?.reference||d?.id||data?.reference||data?.id||null;
+    const status=['success','successful','completed','complete'].includes(rawStatus)?'successful':(['failed','fail','reversed','cancelled','canceled'].includes(rawStatus)?'failed':'processing');
+    return {success:true,status,transferId,message:strowalletMessage(data,status==='processing'?'Strowallet transfer submitted and is processing.':'Strowallet transfer completed.'),data};
+  }catch(e){
+    return {success:false,statusCode:e.status||502,message:e.message||'Unable to initiate Strowallet bank transfer.',data:e.data||{}};
+  }
+}
+
 async function adminRevenue(req,action){
   const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
   if(action==='summary'){
@@ -3649,36 +3724,29 @@ async function adminRevenue(req,action){
     const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
     return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
   }
-  if(action==='banks')return payscribePayoutBanks();
+  if(action==='banks'){
+    if(!strowalletConfigured())return{success:false,statusCode:503,message:'Strowallet is not configured.'};
+    return strowalletPayoutBanks();
+  }
   if(action==='verify'){
     const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
     if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank code and 10-digit account number.'};
-    return resolvePayscribePayoutAccount(bankCode,accountNumber);
+    if(!strowalletConfigured())return{success:false,statusCode:503,message:'Strowallet is not configured.'};
+    return resolveStrowalletPayoutAccount(bankCode,accountNumber);
   }
   if(action==='status'){
     const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:'Withdrawal ID is required.'};
     const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:'Withdrawal not found.'};
     if(!row.reference||['successful','failed'].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
-    const r=await verifyPayscribePayoutTransfer(row.provider_transfer_id||row.reference);
-    if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.message||'Unable to check transfer status.'};
-    const d=r.data||{},ps=String(d.status||d.transaction_status||'').toLowerCase();let ns=row.status;
-    if(['success','successful','completed'].includes(ps))ns='successful';
-    else if(['failed','fail','reversed','cancelled','canceled'].includes(ps))ns='failed';
-    else ns='processing';
-    if(ns!==row.status){
-      const c=await pool.connect();try{await c.query('BEGIN');
-        await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=COALESCE($2,provider_transfer_id),provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$4`,[ns,d.trans_id||d.transaction_id||null,d.message||ps,row.id]);
-        if(ns==='failed'){await ensureAdminRevenueWallet(c,admin.id);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(row.amount),admin.id]);if(w.rows.length)await addAdminRevenueLedger(c,admin.id,'withdrawal_reversal',Number(row.amount),Number(w.rows[0].balance),'Failed Payscribe withdrawal reversal',`REVERSAL-${row.reference}`);}
-        await c.query('COMMIT');
-      }catch(e){try{await c.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to update withdrawal status.'};}finally{c.release();}
-    }
-    const fresh=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[row.id])).rows[0];return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount)}};
+    return{success:true,withdrawal:{...row,amount:Number(row.amount)},provider:'strowallet',message:'Strowallet does not currently document a separate outgoing-transfer status endpoint in its public API reference. The withdrawal remains in its provider-reported state.'};
+
   }
   if(action==='withdraw'){
     const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
     if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:'Minimum withdrawal is ₦1,000.'};
     if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank account.'};
-    const verified=await resolvePayscribePayoutAccount(bankCode,accountNumber);
+    if(!strowalletConfigured())return{success:false,statusCode:503,message:'Strowallet is not configured.'};
+    const verified=await resolveStrowalletPayoutAccount(bankCode,accountNumber);
     if(!verified.success)return{success:false,statusCode:verified.statusCode||400,message:verified.message||'Unable to verify the bank account.'};
     const client=await pool.connect();let row;
     try{await client.query('BEGIN');await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);
@@ -3688,17 +3756,16 @@ async function adminRevenue(req,action){
       const ref=reference('BOLTIV-WD').toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,50);
       const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
       row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
-      await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin Payscribe bank withdrawal',`WD-${ref}`);
+      await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin Strowallet bank withdrawal',`WD-${ref}`);
       await client.query('COMMIT');
     }catch(e){try{await client.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to reserve BOLTIV balance for withdrawal.'};}finally{client.release();}
-    const tr=await payscribePayoutRequest('/payouts/transfer',{method:'POST',body:JSON.stringify({amount:String(amount),bank:String(bankCode),account:String(verified.accountNumber),currency:'NGN',narration:'BOLTIV admin withdrawal',ref:row.reference})});
-    if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||'Payscribe transfer failed');return{success:false,statusCode:tr.statusCode||400,message:tr.message||'Payscribe transfer failed.',withdrawalId:row.id};}
-    const d=payscribePayoutDetails(tr.data),transId=d?.trans_id||d?.transaction_id||d?.id||null;
-    const ps=String(d?.status||d?.transaction_status||'processing').toLowerCase();const status=['success','successful','completed'].includes(ps)?'successful':(['failed','fail','reversed','cancelled','canceled'].includes(ps)?'failed':'processing');
-    if(status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,d?.message||'Payscribe transfer failed');
-    else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,transId,d?.message||ps,row.id]);
-    await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'payscribe',providerTransferId:transId},req);
-    return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:'payscribe'};
+    const tr=await strowalletBankTransfer({amount,bankCode,accountNumber:verified.accountNumber,nameEnquiryReference:verified.nameEnquiryReference,narration:'BOLTIV revenue withdrawal',reference:row.reference});
+    if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||'Strowallet transfer failed');return{success:false,statusCode:tr.statusCode||400,message:tr.message||'Strowallet transfer failed.',withdrawalId:row.id};}
+    const status=tr.status||'processing',transId=tr.transferId||row.reference;
+    if(status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||'Strowallet transfer failed');
+    else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,transId,tr.message||status,row.id]);
+    await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'strowallet',providerTransferId:transId},req);
+    return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted to Strowallet and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:'strowallet'};
   }
   return{success:false,statusCode:400,message:'Unknown revenue action.'};
 }

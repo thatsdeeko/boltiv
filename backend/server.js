@@ -1779,8 +1779,27 @@ country:"NG"
 });
 const customerId=extractPayscribeCustomerId(data);
 if(!customerId) throw new Error("Payscribe did not return a customer_id.");
-const result=await db(`INSERT INTO payscribe_customers(user_id,payscribe_customer_id,tier,status) VALUES($1,$2,$3,'active') ON CONFLICT(user_id) DO UPDATE SET payscribe_customer_id=EXCLUDED.payscribe_customer_id,updated_at=NOW() RETURNING *`,[user.user_id,customerId,Number(payscribeDetails(data)?.tier||0)]);
+const tier=Number(payscribeDetails(data)?.tier||0);
+try{
+const result=await db(`INSERT INTO payscribe_customers(user_id,payscribe_customer_id,tier,status) VALUES($1,$2,$3,'active') ON CONFLICT(user_id) DO UPDATE SET payscribe_customer_id=EXCLUDED.payscribe_customer_id,tier=GREATEST(payscribe_customers.tier,EXCLUDED.tier),status='active',updated_at=NOW() RETURNING *`,[user.user_id,customerId,tier]);
 return result.rows[0];
+}catch(error){
+// A second activation request can race the first one. Both requests may
+// receive the same Payscribe customer ID, so the unique provider-ID
+// constraint can fire even though the user_id lookup above was empty.
+if(error?.code!=='23505')throw error;
+const byCustomer=await db(`SELECT * FROM payscribe_customers WHERE payscribe_customer_id=$1 LIMIT 1`,[customerId]);
+if(byCustomer.rows.length&&String(byCustomer.rows[0].user_id)===String(user.user_id)){
+return byCustomer.rows[0];
+}
+if(byCustomer.rows.length){
+const e=new Error('This Payscribe customer is already linked to another BOLTIV account. Please contact BOLTIV support.');
+e.code='PAYSCRIBE_CUSTOMER_ALREADY_LINKED';
+e.data={constraint:error?.constraint||null};
+throw e;
+}
+throw error;
+}
 }
 
 async function upgradePayscribeTier1(user, customerId, kyc){
@@ -3278,7 +3297,7 @@ async function recordSecurityEvent(eventType,severity,details={},req=null,adminI
 
 async function adminServices(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services ORDER BY key`);return{success:true,services:r.rows};}const b=await body(req);const key=serviceKey(b.key||b.service);const existing=await getService(key);if(!existing)return{success:false,statusCode:404,message:'Service not found.'};const enabled=b.enabled===undefined?existing.enabled:Boolean(b.enabled);const maintenance=b.maintenance===undefined?existing.maintenance:Boolean(b.maintenance);const fee=b.fee===undefined?Number(existing.fee||0):Number(b.fee);if(!Number.isFinite(fee)||fee<0)return{success:false,statusCode:400,message:'Invalid service fee.'};const incomingConfig=b.config===undefined?{}:(b.config||{});const oldConfig=existing.config&&typeof existing.config==='object'?existing.config:{};const config={...oldConfig,...incomingConfig,pricing:{...(oldConfig.pricing||{}),...(incomingConfig.pricing||{})}};if(config.pricing){const mode=String(config.pricing.mode||'discount').toLowerCase();const discount=Number(config.pricing.discount_pct||0);const fixedProfit=Number(config.pricing.fixed_profit||0);const markupMode=String(config.pricing.markup_mode||'fixed').toLowerCase();const markupPct=Number(config.pricing.markup_pct||0);const markupFixed=Number(config.pricing.markup_fixed||0);if(!['discount','fixed'].includes(mode)||!Number.isFinite(discount)||discount<0||discount>100||!Number.isFinite(fixedProfit)||fixedProfit<0||!['fixed','percentage'].includes(markupMode)||!Number.isFinite(markupPct)||markupPct<0||markupPct>100||!Number.isFinite(markupFixed)||markupFixed<0)return{success:false,statusCode:400,message:'Invalid pricing configuration.'};config.pricing={...config.pricing,mode,discount_pct:discount,fixed_profit:fixedProfit,markup_mode:markupMode,markup_pct:markupPct,markup_fixed:markupFixed};}const r=await db(`UPDATE services SET enabled=$1,maintenance=$2,fee=$3,config=$4::jsonb,updated_at=NOW() WHERE key=$5 RETURNING key,name,icon,enabled,fee,maintenance,config,updated_at`,[enabled,maintenance,fee,JSON.stringify(config),key]);await adminAudit(admin,'service_updated','service',key,{enabled,maintenance,fee,config},req);return{success:true,service:r.rows[0]};}
 async function adminSettings(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='get')return{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}};const b=await body(req);if(b.maintenance_mode!==undefined)await setPlatformSetting('maintenance_mode',Boolean(b.maintenance_mode));if(b.registration_enabled!==undefined)await setPlatformSetting('registration_enabled',Boolean(b.registration_enabled));const settings={maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))};await adminAudit(admin,'platform_settings_updated','settings','platform',settings,req);return{success:true,settings};}
-async function adminSecurity(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='events'){const r=await db(`SELECT s.*,a.email FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id ORDER BY s.created_at DESC LIMIT 500`);return{success:true,events:r.rows};}if(action==='sessions'){const r=await db(`SELECT created_at,expires_at FROM admin_sessions WHERE admin_id=$1 AND expires_at>NOW() ORDER BY created_at DESC`,[admin.id]);return{success:true,sessions:r.rows};}if(action==='revoke'){const auth=String(req.headers.authorization||'');const current=auth.startsWith('Bearer ')?auth.slice(7).trim():'';const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current]);await recordSecurityEvent('sessions_revoked','warning',{revoked:Number(r.rowCount||0)},req,admin.id);await adminAudit(admin,'sessions_revoked','admin',String(admin.id),{revoked:Number(r.rowCount||0)},req);return{success:true,revoked:Number(r.rowCount||0)};}return{success:false,statusCode:400,message:'Unknown security action.'};}
+async function adminSecurity(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='events'){const r=await db(`SELECT s.*,a.email FROM security_events s LEFT JOIN admins a ON a.id=s.admin_id ORDER BY s.created_at DESC LIMIT 500`);return{success:true,events:r.rows};}if(action==='sessions'){const r=await db(`SELECT id,created_at,expires_at FROM admin_sessions WHERE admin_id=$1 AND expires_at>NOW() ORDER BY created_at DESC`,[admin.id]);return{success:true,sessions:r.rows};}if(action==='revoke'){const auth=String(req.headers.authorization||'');const current=auth.startsWith('Bearer ')?auth.slice(7).trim():'';const r=await db(`DELETE FROM admin_sessions WHERE admin_id=$1 AND token<>$2`,[admin.id,current]);await recordSecurityEvent('sessions_revoked','warning',{revoked:Number(r.rowCount||0)},req,admin.id);await adminAudit(admin,'sessions_revoked','admin',String(admin.id),{revoked:Number(r.rowCount||0)},req);return{success:true,revoked:Number(r.rowCount||0)};}return{success:false,statusCode:400,message:'Unknown security action.'};}
 
 async function adminAudit(admin,action,targetType,targetId,details,req){
 try{

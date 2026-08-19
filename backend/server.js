@@ -11,6 +11,14 @@ const PAYSCRIBE_VA_CREATE_PATH=process.env.PAYSCRIBE_VA_CREATE_PATH||"/collectio
 const PAYSCRIBE_WEBHOOK_SECRET=process.env.PAYSCRIBE_WEBHOOK_SECRET||PAYSCRIBE_API_KEY;
 const PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS=Number(process.env.PAYSCRIBE_WEBHOOK_TOLERANCE_SECONDS||300);
 
+// Strowallet — customer wallet funding (replaces Payscribe virtual accounts)
+const STROWALLET_PUBLIC_KEY=process.env.STROWALLET_PUBLIC_KEY||process.env.STROWALLET_API_KEY||"";
+const STROWALLET_BASE_URL=(process.env.STROWALLET_BASE_URL||"https://strowallet.com/api").replace(/\/+$/,"");
+const STROWALLET_MODE=(process.env.STROWALLET_MODE||"live").toLowerCase();
+const STROWALLET_VA_PATH=process.env.STROWALLET_VA_PATH||"/virtual-bank/new-customer";
+const STROWALLET_WEBHOOK_URL=process.env.STROWALLET_WEBHOOK_URL||"";
+const BACKEND_PUBLIC_URL=(process.env.BACKEND_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||"").replace(/\/+$/,"");
+
 const FLW_SECRET_KEY=process.env.FLW_SECRET_KEY||"";
 const FLW_BASE_URL=(process.env.FLW_BASE_URL||"https://api.flutterwave.com/v3").replace(/\/+$/,"");
 const FLW_CALLBACK_URL=process.env.FLW_CALLBACK_URL||"";
@@ -372,6 +380,34 @@ processed_at TIMESTAMPTZ,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
 
+await db(`
+CREATE TABLE IF NOT EXISTS strowallet_virtual_accounts(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT UNIQUE NOT NULL,
+account_number TEXT UNIQUE NOT NULL,
+account_name TEXT,
+bank_name TEXT,
+bank_code TEXT,
+currency TEXT NOT NULL DEFAULT 'NGN',
+status TEXT NOT NULL DEFAULT 'active',
+provider_customer_id TEXT,
+session_id TEXT,
+metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS strowallet_va_account_idx ON strowallet_virtual_accounts(account_number)`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS strowallet_webhook_events(
+id BIGSERIAL PRIMARY KEY,
+event_id TEXT UNIQUE NOT NULL,
+event_type TEXT,
+payload JSONB NOT NULL,
+processed BOOLEAN NOT NULL DEFAULT FALSE,
+processed_at TIMESTAMPTZ,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS admins(
@@ -1852,6 +1888,170 @@ const r=await db(`SELECT * FROM payscribe_virtual_accounts WHERE user_id=$1 LIMI
 if(r.rows.length) return {success:true,account:r.rows[0]};
 const c=await db(`SELECT * FROM payscribe_customers WHERE user_id=$1 LIMIT 1`,[user.user_id]);
 return {success:true,account:null,customer:c.rows[0]||null};
+}
+
+/* ===================== STROWALLET FUNDING ===================== */
+
+function strowalletConfigured(){
+return Boolean(STROWALLET_PUBLIC_KEY);
+}
+
+function strowalletWebhookTarget(){
+if(STROWALLET_WEBHOOK_URL) return STROWALLET_WEBHOOK_URL;
+if(BACKEND_PUBLIC_URL) return `${BACKEND_PUBLIC_URL}/api/strowallet/webhook`;
+return "";
+}
+
+function normalizeNgPhone(phone){
+let p=String(phone||"").replace(/\D/g,"");
+if(p.startsWith("234")&&p.length===13) p="0"+p.slice(3);
+if(p.length===10&&p.startsWith("7")||p.startsWith("8")||p.startsWith("9")) p="0"+p;
+return p;
+}
+
+async function strowalletRequest(pathname, {method="POST", body=null, query=null}={}){
+if(!strowalletConfigured()) throw new Error("Strowallet is not configured.");
+let url=`${STROWALLET_BASE_URL}${pathname.startsWith("/")?pathname:"/"+pathname}`;
+const params=new URLSearchParams();
+if(query) Object.entries(query).forEach(([k,v])=>{ if(v!=null&&v!=="") params.set(k,String(v)); });
+if(method==="GET" && [...params].length) url+=`?${params.toString()}`;
+const headers={"Accept":"application/json"};
+let fetchBody;
+if(method!=="GET" && body){
+headers["Content-Type"]="application/x-www-form-urlencoded";
+const form=new URLSearchParams();
+Object.entries(body).forEach(([k,v])=>{ if(v!=null&&v!=="") form.set(k,String(v)); });
+fetchBody=form.toString();
+}
+const response=await fetch(url,{method,headers,body:fetchBody});
+let data={};
+try{data=await response.json();}catch{}
+if(!response.ok){
+const msg=data?.message||data?.error||data?.msg||`Strowallet request failed (${response.status}).`;
+const error=new Error(typeof msg==="string"?msg:"Strowallet request failed.");
+error.status=response.status;
+error.data=data;
+throw error;
+}
+return data;
+}
+
+function extractStrowalletAccount(data){
+const d=data?.data||data?.account||data?.message||data||{};
+const nested=d?.account||d?.virtual_account||d?.virtualAccount||d||{};
+return {
+accountNumber:clean(d?.accountNumber||d?.account_number||d?.account||nested?.accountNumber||nested?.account_number||nested?.account||""),
+accountName:clean(d?.accountName||d?.account_name||d?.name||nested?.accountName||nested?.account_name||""),
+bankName:clean(d?.bankName||d?.bank_name||d?.bank||nested?.bankName||nested?.bank_name||"Nombank MFB"),
+bankCode:clean(d?.bankCode||d?.bank_code||nested?.bankCode||nested?.bank_code||""),
+customerId:clean(d?.customerId||d?.customer_id||d?.id||nested?.customerId||""),
+sessionId:clean(d?.sessionId||d?.session_id||""),
+currency:"NGN",
+raw:d
+};
+}
+
+async function getStrowalletFundingAccount(user){
+const r=await db(`SELECT * FROM strowallet_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
+if(r.rows.length) return {success:true,account:r.rows[0]};
+return {success:true,account:null};
+}
+
+async function createStrowalletVirtualAccount(user){
+const existing=await db(`SELECT * FROM strowallet_virtual_accounts WHERE user_id=$1 LIMIT 1`,[user.user_id]);
+if(existing.rows.length) return {success:true,account:existing.rows[0],existing:true};
+
+const webhook=strowalletWebhookTarget();
+if(!webhook) throw new Error("Strowallet webhook URL is not configured. Set STROWALLET_WEBHOOK_URL or BACKEND_PUBLIC_URL.");
+
+const accountName=clean(user.name||user.email||"BOLTIV User");
+const phone=normalizeNgPhone(user.phone);
+const email=clean(user.email);
+if(!phone||phone.length<11) throw new Error("A valid Nigerian phone number is required on your profile to create a funding account.");
+if(!email) throw new Error("An email address is required on your profile to create a funding account.");
+
+const path=STROWALLET_VA_PATH.startsWith("/")?STROWALLET_VA_PATH:`/${STROWALLET_VA_PATH}`;
+const data=await strowalletRequest(path,{
+method:"POST",
+body:{
+public_key:STROWALLET_PUBLIC_KEY,
+email,
+accountName,
+phone,
+webhookUrl:webhook,
+mode:STROWALLET_MODE
+}
+});
+
+const account=extractStrowalletAccount(data);
+if(!account.accountNumber){
+const e=new Error(data?.message||data?.error||"Strowallet did not return a virtual account number. Check STROWALLET_VA_PATH and your API key.");
+e.data=data;
+throw e;
+}
+
+const result=await db(`INSERT INTO strowallet_virtual_accounts(user_id,account_number,account_name,bank_name,bank_code,currency,status,provider_customer_id,session_id,metadata)
+VALUES($1,$2,$3,$4,$5,'NGN','active',$6,$7,$8)
+ON CONFLICT(user_id) DO UPDATE SET
+account_number=EXCLUDED.account_number,
+account_name=EXCLUDED.account_name,
+bank_name=EXCLUDED.bank_name,
+bank_code=EXCLUDED.bank_code,
+status='active',
+provider_customer_id=EXCLUDED.provider_customer_id,
+session_id=EXCLUDED.session_id,
+metadata=EXCLUDED.metadata,
+updated_at=NOW()
+RETURNING *`,[
+user.user_id,
+account.accountNumber,
+account.accountName||accountName,
+account.bankName,
+account.bankCode||null,
+account.customerId||null,
+account.sessionId||null,
+JSON.stringify(account.raw||{})
+]);
+return {success:true,account:result.rows[0],existing:false};
+}
+
+async function creditStrowalletFunding(payload){
+const accountNumber=clean(payload?.accountNumber||payload?.account_number||"");
+const amount=Number(payload?.settledAmount||payload?.settled_amount||payload?.transactionAmount||payload?.transaction_amount||payload?.amount||0);
+const sessionId=clean(payload?.sessionId||payload?.session_id||payload?.settlementId||payload?.settlement_id||payload?.initiationTranRef||"");
+const reference=sessionId||`STW-${accountNumber}-${Date.now()}`;
+
+if(!accountNumber) throw new Error("Strowallet webhook missing accountNumber.");
+if(!Number.isFinite(amount)||amount<=0) throw new Error("Strowallet webhook has an invalid amount.");
+
+const lookup=await db(`SELECT user_id,account_number FROM strowallet_virtual_accounts WHERE account_number=$1 LIMIT 1`,[accountNumber]);
+if(!lookup.rows.length) throw new Error(`No BOLTIV user mapped to Strowallet account ${accountNumber}.`);
+const userId=lookup.rows[0].user_id;
+
+const client=await pool.connect();
+try{
+await client.query("BEGIN");
+const duplicate=await client.query(`SELECT processed FROM strowallet_webhook_events WHERE event_id=$1 FOR UPDATE`,[reference]);
+if(duplicate.rows.length&&duplicate.rows[0].processed){
+await client.query("COMMIT");
+return {success:true,duplicate:true};
+}
+await client.query(`INSERT INTO strowallet_webhook_events(event_id,event_type,payload,processed) VALUES($1,$2,$3,FALSE) ON CONFLICT(event_id) DO NOTHING`,[reference,"virtual_account.credit",JSON.stringify(payload)]);
+const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,userId]);
+if(!wr.rows.length){
+await client.query(`INSERT INTO wallets(user_id,balance,created_at,updated_at) VALUES($1,$2,NOW(),NOW()) ON CONFLICT(user_id) DO UPDATE SET balance=wallets.balance+$2,updated_at=NOW() RETURNING balance`,[userId,amount]);
+}
+await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING`,[userId,amount,`FUND-${reference}`,reference,JSON.stringify({provider:"strowallet",payload})]);
+await client.query(`UPDATE strowallet_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[reference]);
+await client.query("COMMIT");
+try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${Number(amount).toLocaleString("en-NG",{minimumFractionDigits:2})} via bank transfer.`,"payment");}catch{}
+return {success:true,duplicate:false,amount,userId};
+}catch(e){
+try{await client.query("ROLLBACK");}catch{}
+throw e;
+}finally{
+client.release();
+}
 }
 
 function payscribeWebhookSignatureValid(req, rawBody){
@@ -4600,43 +4800,57 @@ PAYMENT INITIALIZATION
 
 
 /*
-PAYSCRIBE PERSONAL FUNDING ACCOUNT
+STROWALLET PERSONAL FUNDING ACCOUNT
+(Also accepts legacy /api/payscribe/funding-account paths for older clients)
 */
 
-if(req.method==="GET"&&path==="/api/payscribe/funding-account"){
+if(req.method==="GET"&&(path==="/api/funding-account"||path==="/api/payscribe/funding-account"||path==="/api/strowallet/funding-account")){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-if(!payscribeConfigured())return send(res,503,{success:false,message:"Payscribe is not configured."});
+if(!strowalletConfigured())return send(res,503,{success:false,message:"Strowallet is not configured. Set STROWALLET_PUBLIC_KEY on the server."});
 try{
-const result=await getPayscribeFundingAccount(user);
+const result=await getStrowalletFundingAccount(user);
 return send(res,200,result);
 }catch(error){
-console.error("PAYSCRIBE ACCOUNT LOOKUP ERROR:",error);
+console.error("STROWALLET ACCOUNT LOOKUP ERROR:",error);
 return send(res,502,{success:false,message:error.message||"Unable to load funding account."});
 }
 }
 
-if(req.method==="POST"&&path==="/api/payscribe/funding-account/activate"){
+if(req.method==="POST"&&(path==="/api/funding-account/activate"||path==="/api/payscribe/funding-account/activate"||path==="/api/strowallet/funding-account/activate")){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-if(!payscribeConfigured())return send(res,503,{success:false,message:"Payscribe is not configured."});
-const b=await body(req);
+if(!strowalletConfigured())return send(res,503,{success:false,message:"Strowallet is not configured. Set STROWALLET_PUBLIC_KEY on the server."});
 try{
-const customer=await ensurePayscribeCustomer(user);
-if(Number(customer.tier)<1){
-const tier=await upgradePayscribeTier1(user,customer.payscribe_customer_id,b);
-if(!tier.success)return send(res,400,tier);
-}
-const result=await createPayscribeVirtualAccount(user,customer.payscribe_customer_id);
+const result=await createStrowalletVirtualAccount(user);
 return send(res,200,{success:true,message:"Personal funding account is ready.",account:result.account});
 }catch(error){
-console.error("PAYSCRIBE FUNDING ACCOUNT ACTIVATION ERROR:",error?.data||error);
+console.error("STROWALLET FUNDING ACCOUNT ACTIVATION ERROR:",error?.data||error);
 return send(res,502,{success:false,message:error.message||"Unable to activate your personal funding account."});
 }
 }
 
+if(req.method==="POST"&&path==="/api/strowallet/webhook"){
+let rawBody="";
+req.on("data",chunk=>{rawBody+=chunk;});
+req.on("end",async()=>{
+try{
+let payload;try{payload=JSON.parse(rawBody||"{}");}catch{payload={};}
+if(!payload||(!payload.accountNumber&&!payload.account_number&&!payload.sessionId)){
+return send(res,400,{success:false,message:"Invalid Strowallet webhook payload."});
+}
+const result=await creditStrowalletFunding(payload);
+return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Funding webhook processed.",...result});
+}catch(error){
+console.error("STROWALLET WEBHOOK ERROR:",error);
+return send(res,500,{success:false,message:error.message||"Webhook processing failed."});
+}
+});
+return;
+}
+
 /*
-PAYSCRIBE WEBHOOK
+PAYSCRIBE WEBHOOK (legacy — kept for safety if any old events still arrive)
 */
 
 if(req.method==="POST"&&path==="/api/payscribe/webhook"){

@@ -218,7 +218,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="stat"><div class="stat-label">ADJUSTMENTS</div><div class="stat-value">—</div></div>
 </div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>ADMIN OPERATING WALLET</h2></div><div class="section-body"><div class="notice">Fund this wallet with real money through Paystack. Customer credits and debits move money between this admin wallet and customer wallets.</div><div id="adminWalletBalance" class="amount" style="font-size:22px;margin:8px 0 14px">₦0.00</div><button class="btn primary" onclick="openAdminFunding()">FUND ADMIN WALLET</button></div></div><div class="section"><div class="section-head"><h2>CREDIT / DEBIT USER</h2></div><div class="section-body"><div class="notice">Credits now require enough money in the admin operating wallet. This prevents creating customer wallet money from nowhere.</div><button class="btn primary" onclick="openWalletCredit()">CREDIT USER</button> <button class="btn danger" onclick="openWalletDebit()">DEBIT USER</button></div></div>
+<div class="section"><div class="section-head"><h2>ADMIN OPERATING WALLET</h2></div><div class="section-body"><div class="notice">Fund this wallet with real money through Flutterwave bank transfer. Customer credits and debits move money between this admin wallet and customer wallets.</div><div id="adminWalletBalance" class="amount" style="font-size:22px;margin:8px 0 14px">₦0.00</div><button class="btn primary" onclick="openAdminFunding()">FUND ADMIN WALLET</button></div></div><div class="section"><div class="section-head"><h2>CREDIT / DEBIT USER</h2></div><div class="section-body"><div class="notice">Credits now require enough money in the admin operating wallet. This prevents creating customer wallet money from nowhere.</div><button class="btn primary" onclick="openWalletCredit()">CREDIT USER</button> <button class="btn danger" onclick="openWalletDebit()">DEBIT USER</button></div></div>
 <div class="section"><div class="section-head"><h2>WALLET HISTORY</h2></div><div class="section-body"><div class="empty">Wallet adjustment history will appear here.</div></div></div>
 </div>
 </section>
@@ -252,14 +252,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 </div>
 <div class="section"><div class="section-head"><h2>BOLTIV REVENUE WALLET</h2></div><div class="section-body"><div class="notice">When a customer successfully buys a service, the amount they paid is credited to this BOLTIV revenue wallet. VTUGATE remains the fulfilment provider and is paid from its own provider balance. This balance is separate from customer wallet balances.</div><div style="font-size:9px;color:#888;margin-top:12px">CURRENT WITHDRAWABLE BALANCE</div><div id="revenueBalance" class="amount" style="font-size:28px;margin:5px 0 2px">₦0.00</div></div></div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>ADMIN-ONLY STROWALLET BANK WITHDRAWAL</h2></div><div class="section-body">
-<div class="notice">Customers have no revenue-withdrawal endpoint. The backend requires an authenticated admin session for every withdrawal operation. Payouts are sent through Strowallet.</div>
+<div class="section"><div class="section-head"><h2>ADMIN-ONLY FLUTTERWAVE BANK WITHDRAWAL</h2></div><div class="section-body">
+<div class="notice">Customers have no revenue-withdrawal endpoint. The backend requires an authenticated admin session for every withdrawal operation. Payouts are sent through Flutterwave.</div>
 <label>BANK</label><select id="revenueBank"><option value="">Loading banks...</option></select>
 <label>ACCOUNT NUMBER</label><input id="revenueAccount" inputmode="numeric" maxlength="10" placeholder="10-digit account number">
 <button class="btn" onclick="verifyRevenueAccount()">VERIFY ACCOUNT</button>
 <div id="revenueAccountName" class="notice" style="display:none;margin-top:10px"></div>
 <label>AMOUNT (₦)</label><input id="revenueAmount" type="number" min="1000" step="0.01" placeholder="Minimum ₦1,000">
-<button class="btn primary" onclick="withdrawRevenue()">WITHDRAW VIA STROWALLET</button>
+<button class="btn primary" onclick="withdrawRevenue()">WITHDRAW VIA FLUTTERWAVE</button>
 <div id="revenueMessage" class="message" style="margin-top:10px"></div>
 </div></div>
 <div class="section"><div class="section-head"><h2>WITHDRAWAL HISTORY</h2><button class="btn" onclick="loadRevenue()">REFRESH</button></div><div id="revenueHistory" class="section-body"><div class="loading">Loading...</div></div></div>
@@ -693,7 +693,7 @@ ENABLED
 <div>
 <strong>Payment Processing</strong>
 <br>
-<small>Allow Paystack payments.</small>
+<small>Use Flutterwave payments and virtual accounts.</small>
 </div>
 
 <button class="btn">
@@ -731,7 +731,7 @@ ENABLED
 
 <div class="activity">
 <span>Payment Gateway</span>
-<strong>Paystack</strong>
+<strong>Flutterwave</strong>
 </div>
 
 <div class="activity">
@@ -820,9 +820,8 @@ async function logout(){
 }
 $("logout").onclick=logout;
 async function loadAdminWallet(){try{const d=await api('/api/admin/wallet');const b=Number(d.wallet?.balance||0);if($('adminWalletBalance'))$('adminWalletBalance').textContent='₦'+b.toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});if($('sAdminWallet'))$('sAdminWallet').textContent='₦'+b.toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});}catch(e){console.error('Admin wallet:',e);}}
-function openAdminFunding(){openModal('FUND ADMIN WALLET',`<div class="notice">This creates a real Paystack payment to fund your BOLTIV operating wallet.</div><label>AMOUNT</label><input id="adminFundAmount" type="number" min="100" step="0.01" placeholder="10000"><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="startAdminFunding()">CONTINUE TO PAYSTACK</button></div>`)}
-async function startAdminFunding(){try{const amount=Number($('adminFundAmount').value);const d=await api('/api/admin/wallet/fund/initialize',{method:'POST',body:JSON.stringify({amount})});closeModal();if(d.authorization_url)window.location.href=d.authorization_url;else alert('Payment initialized but no Paystack URL was returned.');}catch(e){alert(e.message)}}
-async function verifyAdminFundingFromUrl(){const ref=new URLSearchParams(location.search).get('admin_funding');if(!ref)return;try{const d=await api('/api/admin/wallet/fund/verify',{method:'POST',body:JSON.stringify({reference:ref})});alert(d.message||'Admin wallet updated.');await loadAdminWallet();await loadStats();}catch(e){alert(e.message)}finally{history.replaceState({},document.title,location.pathname);}}
+function openAdminFunding(){openModal('FUND ADMIN OPERATING WALLET',`<div class="notice">Create a Flutterwave one-time bank-transfer account for the amount you want to add. The operating wallet is credited automatically after Flutterwave confirms the transfer.</div><label>AMOUNT</label><input id="adminFundAmount" type="number" min="100" step="0.01" placeholder="10000"><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="startAdminFunding()">CREATE FLUTTERWAVE ACCOUNT</button></div><div id="adminFundResult" style="margin-top:12px"></div>`)}
+async function startAdminFunding(){try{const amount=Number($('adminFundAmount').value);const d=await api('/api/admin/wallet/funding-account',{method:'POST',body:JSON.stringify({amount})});if(!d.success)throw new Error(d.message||'Unable to create Flutterwave funding account.');$('adminFundResult').innerHTML=`<div class="notice success"><strong>TRANSFER TO THIS ACCOUNT</strong><div style="font-size:22px;font-weight:800;margin-top:8px">${esc(d.account?.account_number||'')}</div><div>${esc(d.account?.bank_name||'Bank')}</div><div style="color:#666">${esc(d.account?.account_name||'')}</div><div style="margin-top:8px;font-size:11px">Transfer the exact amount shown above. Your BOLTIV operating wallet will be credited automatically after Flutterwave confirms the transfer.</div></div>`;await loadAdminWallet();}catch(e){alert(e.message)}}
 async function loadUsers(){
  try{const d=await api("/api/admin/users");users=d.users||[];$("uTotal").textContent=users.length;$("uActive").textContent=users.filter(x=>x.status!=="suspended").length;$("uSuspended").textContent=users.filter(x=>x.status==="suspended").length;$("uBalance").textContent="₦"+users.reduce((a,x)=>a+Number(x.balance||0),0).toLocaleString(undefined,{minimumFractionDigits:2});renderUsers(users)}catch(e){$("usersArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}
 }
@@ -869,7 +868,7 @@ async function loadRevenue(){
   revenueBanks=b.banks||[];
   $("revenueBank").innerHTML='<option value="">Select bank</option>'+revenueBanks.map(x=>`<option value="${esc(x.code)}">${esc(x.name)}</option>`).join("");
   const rows=d.withdrawals||[];
-  $("revenueHistory").innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>AMOUNT</th><th>ACCOUNT</th><th>STATUS</th><th>PROVIDER</th><th>REFERENCE</th></tr></thead><tbody>'+rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>₦${Number(x.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2})}</td><td>${esc(x.account_name)}<br><small>${esc(x.account_number)} • ${esc(x.bank_code)}</small></td><td><span class="badge ${x.status==='successful'?'successful':x.status==='failed'?'failed':'pending'}">${esc(x.status)}</span></td><td>${esc(x.provider||'strowallet')}</td><td>${esc(x.reference)}</td></tr>`).join("")+'</tbody></table></div>':'<div class="empty">No BOLTIV withdrawals yet.</div>';
+  $("revenueHistory").innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>AMOUNT</th><th>ACCOUNT</th><th>STATUS</th><th>PROVIDER</th><th>REFERENCE</th></tr></thead><tbody>'+rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>₦${Number(x.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2})}</td><td>${esc(x.account_name)}<br><small>${esc(x.account_number)} • ${esc(x.bank_code)}</small></td><td><span class="badge ${x.status==='successful'?'successful':x.status==='failed'?'failed':'pending'}">${esc(x.status)}</span></td><td>${esc(x.provider||'flutterwave')}</td><td>${esc(x.reference)}</td></tr>`).join("")+'</tbody></table></div>':'<div class="empty">No BOLTIV withdrawals yet.</div>';
  }catch(e){$("revenueHistory").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
 }
 async function verifyRevenueAccount(){
@@ -921,7 +920,6 @@ api("/api/admin/me")
   .then(d=>{ if(d && d.success){ sessionReady=true; showApp(d); } else { showLogin(); } })
   .catch(()=>showLogin());
 
-verifyAdminFundingFromUrl();
 </script>
 </body>
 </html>

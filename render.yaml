@@ -17,13 +17,17 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
-      - key: PAYSTACK_SECRET_KEY
-        sync: false
       - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_SECRET_HASH
         sync: false
       - key: FLW_BASE_URL
         value: https://api.flutterwave.com/v3
       - key: FLW_CALLBACK_URL
+        sync: false
+      - key: BACKEND_PUBLIC_URL
+        sync: false
+      - key: ADMIN_PHONE
         sync: false
       - key: VTU_API_BASE_URL
         value: https://api.vtugate.com

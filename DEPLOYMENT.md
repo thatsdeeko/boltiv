@@ -1,59 +1,48 @@
-# BOLTIV Production Deployment
+# BOLTIV Deployment — Flutterwave Only
 
-## Render backend
+BOLTIV now uses Flutterwave as the payment provider for:
 
-Set the Render service root directory to `backend`, or use the included `render.yaml` Blueprint.
+- Customer wallet deposits through Dynamic or Static NGN virtual accounts.
+- Permanent customer accounts using NIN or BVN.
+- Admin operating-wallet funding through a Flutterwave Dynamic virtual account.
+- Admin Revenue Wallet withdrawals to Nigerian bank accounts through Flutterwave Transfers.
 
-Required environment variables:
+## Required Render variables
 
-- `DATABASE_URL`
-- `PAYSTACK_SECRET_KEY`
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-- `VTU_API_BASE_URL`
-- `VTU_API_KEY`
-- `FRONTEND_URL`
-- `FRONTEND_ORIGIN`
+```env
+DATABASE_URL=
+FRONTEND_URL=https://boltiv.ng
+FRONTEND_ORIGIN=https://boltiv.ng
+BACKEND_PUBLIC_URL=https://boltiv-backend.onrender.com
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+ADMIN_PHONE=
+FLW_SECRET_KEY=
+FLW_BASE_URL=https://api.flutterwave.com/v3
+FLW_SECRET_HASH=
+FLW_CALLBACK_URL=
+```
 
-Optional but recommended:
+Keep the Flutterwave secret key and webhook secret hash server-side only.
 
-- `RESEND_API_KEY`
-- `MAIL_FROM`
+## Flutterwave webhook
 
-The backend exposes `GET /api/health`. Render should use `/api/health` as its health-check path.
+Configure this URL in Flutterwave Dashboard → Settings → Webhooks:
 
-## Paystack
+`https://<your-render-service>.onrender.com/api/flutterwave/webhook`
 
-Set the Paystack webhook URL to the deployed backend endpoint:
+Set the same random secret hash in `FLW_SECRET_HASH`. The backend accepts Flutterwave's current `flutterwave-signature` HMAC format and the v3 `verif-hash` format.
 
-`https://<your-render-service>.onrender.com/api/paystack/webhook`
+## Customer funding
 
-Do not put the Paystack secret key in frontend HTML or JavaScript.
+- Static: customer chooses NIN or BVN and receives a reusable permanent account.
+- Dynamic: customer chooses a deposit amount and receives a temporary account for that deposit.
+- Flutterwave sends `charge.completed`; BOLTIV maps the webhook to the stored virtual-account `tx_ref` and credits the correct wallet idempotently.
 
-## Frontend
+## Admin funding
 
-The current frontend pages use the deployed backend URL directly. If the backend URL changes, update the API base URLs in the frontend pages before deployment.
+Admin → Wallets → Fund Admin Wallet → enter amount → create Flutterwave Dynamic account → transfer → Flutterwave webhook → admin operating wallet credited.
 
-## Final smoke test
+## Revenue withdrawal
 
-After deployment verify:
-
-1. `GET /api/health` returns HTTP 200 and `database: connected`.
-2. Registration and login work.
-3. Wallet funding initializes and Paystack returns to the frontend.
-4. Paystack webhook reaches `/api/paystack/webhook`.
-5. Wallet balance changes only after verified payment.
-6. Airtime/data/cable/electricity transactions require the transaction PIN.
-7. Failed transactions refund correctly.
-8. Admin login works.
-9. Admin audit logs are populated.
-10. A suspended user cannot use an existing session.
-
-
-VTUGATE airtime service IDs are resolved dynamically from /api/v1/fetchservices for the selected network (MTN, AIRTEL, GLO, 9MOBILE), with a 5-minute server cache. VTU_AIRTIME_SERVICE_ID may be left blank; if set, it overrides dynamic lookup.
-
-## BOLTIV customer-sale revenue wallet
-
-Successful customer service purchases now credit the admin-only BOLTIV Revenue Wallet with the amount the customer paid. Gross profit remains separately calculated as customer price minus provider cost. The revenue withdrawal flow uses Paystack Transfers so it matches the Paystack account receiving customer payments.
-
-See `DEPLOYMENT_REVENUE.md` for the full flow and environment requirements.
+Admin → Revenue & Withdrawals → select bank → verify account → enter amount → Flutterwave Transfer. Pending transfers are reconciled through Flutterwave transfer status/webhooks; failed transfers reverse the reserved revenue balance.

@@ -3302,15 +3302,6 @@ async function resolveFlutterwaveAccount(bankCode,accountNumber){
   if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.data?.message||"Unable to verify the bank account."};
   return{success:true,accountName:String(name).trim(),accountNumber:r.data.data.account_number||String(accountNumber)};
 }
-async function paystackRequest(path,options={}){
-  if(!PAYSTACK_SECRET_KEY)return{success:false,statusCode:503,message:'Paystack is not configured.'};
-  try{
-    const response=await fetch(`${PAYSTACK_API_URL}${path}`,{...options,headers:{'Authorization':`Bearer ${PAYSTACK_SECRET_KEY}`,'Content-Type':'application/json',...(options.headers||{})}});
-    let data={};try{data=await response.json()}catch{}
-    return{success:Boolean(response.ok&&data?.status),statusCode:response.status,data};
-  }catch(e){return{success:false,statusCode:502,message:'Unable to connect to Paystack.'};}
-}
-
 async function payscribePayoutRequest(path,options={}){
   if(!payscribeConfigured())return{success:false,statusCode:503,message:'Payscribe is not configured.'};
   try{
@@ -3411,72 +3402,6 @@ async function adminRevenue(req,action){
     else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,transId,d?.message||ps,row.id]);
     await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'payscribe',providerTransferId:transId},req);
     return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:'payscribe'};
-  }
-  return{success:false,statusCode:400,message:'Unknown revenue action.'};
-}
-async function adminRevenue(req,action){
-  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
-  if(action==='summary'){
-    await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
-    const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
-    const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
-    const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
-    const reserved=(await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing') THEN amount ELSE 0 END),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1`,[admin.id])).rows[0];
-    const balance=Number(w?.balance||0),hold=Number(reserved?.reserved||0);
-    const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
-    return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
-  }
-  if(action==='banks'){const r=await paystackRequest('/bank?country=nigeria&perPage=100');if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||'Unable to load banks.'};return{success:true,banks:Array.isArray(r.data?.data)?r.data.data:[]};}
-  if(action==='verify'){
-    const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
-    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank code and 10-digit account number.'};
-    const r=await paystackRequest(`/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);
-    const name=r.data?.data?.account_name;if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:r.data?.message||'Unable to verify the bank account.'};
-    return{success:true,accountName:String(name).trim(),accountNumber:r.data.data.account_number||accountNumber};
-  }
-  if(action==='status'){
-    const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:'Withdrawal ID is required.'};
-    const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:'Withdrawal not found.'};
-    if(!row.reference||['successful','failed'].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount)}};
-    const r=await paystackRequest(`/transfer/verify/${encodeURIComponent(row.reference)}`);
-    if(!r.success)return{success:false,statusCode:r.statusCode||502,message:r.data?.message||'Unable to check transfer status.'};
-    const ps=String(r.data?.data?.status||'').toLowerCase();let ns=row.status;
-    if(['success','successful','completed'].includes(ps))ns='successful';else if(['failed','reversed'].includes(ps))ns='failed';else ns='processing';
-    if(ns!==row.status){
-      const c=await pool.connect();try{await c.query('BEGIN');
-        await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$4`,[ns,r.data?.data?.id||null,r.data?.message||ps,row.id]);
-        if(ns==='failed'){await ensureAdminRevenueWallet(c,admin.id);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(row.amount),admin.id]);if(w.rows.length)await addAdminRevenueLedger(c,admin.id,'withdrawal_reversal',Number(row.amount),Number(w.rows[0].balance),'Failed withdrawal reversal',`REVERSAL-${row.reference}`);}
-        await c.query('COMMIT');
-      }catch(e){try{await c.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to update withdrawal status.'};}finally{c.release();}
-    }
-    const fresh=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[row.id])).rows[0];return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount)}};
-  }
-  if(action==='withdraw'){
-    const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
-    if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:'Minimum withdrawal is ₦1,000.'};
-    if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:'Enter a valid Nigerian bank account.'};
-    const verifyResult=await paystackRequest(`/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);const verifiedName=verifyResult.data?.data?.account_name;const verified={success:Boolean(verifyResult.success&&verifiedName),accountName:verifiedName?String(verifiedName).trim():'',accountNumber:verifyResult.data?.data?.account_number||accountNumber};if(!verified.success)return{success:false,statusCode:verifyResult.statusCode||400,message:verifyResult.data?.message||'Unable to verify the bank account.'};
-    const client=await pool.connect();let row;
-    try{await client.query('BEGIN');await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);
-      const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);const balance=Number(w.rows[0]?.balance||0);
-      const reserved=(await client.query(`SELECT COALESCE(SUM(amount),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1 AND status IN ('pending','processing')`,[admin.id])).rows[0];const available=Math.max(0,Number((balance-Number(reserved?.reserved||0)).toFixed(2)));
-      if(amount>available){await client.query('ROLLBACK');return{success:false,statusCode:400,message:`Insufficient BOLTIV balance. Available: ₦${available.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};}
-      const ref=reference('BOLTIV-WD').toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,50);
-      const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
-      row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];
-      await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin bank withdrawal',`WD-${ref}`);
-      await client.query('COMMIT');
-    }catch(e){try{await client.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to reserve BOLTIV balance for withdrawal.'};}finally{client.release();}
-    const recipient=await paystackRequest('/transferrecipient',{method:'POST',body:JSON.stringify({type:'nuban',name:verified.accountName,account_number:verified.accountNumber,bank_code:bankCode,currency:'NGN'})});
-    if(!recipient.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,'Recipient creation failed');return{success:false,statusCode:400,message:recipient.data?.message||'Unable to create transfer recipient.',withdrawalId:row.id};}
-    const recipientCode=recipient.data?.data?.recipient_code;
-    if(!recipientCode){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,'Paystack did not return a recipient code');return{success:false,statusCode:502,message:'Unable to create a valid transfer recipient.',withdrawalId:row.id};}
-    const tr=await paystackRequest('/transfer',{method:'POST',body:JSON.stringify({source:'balance',amount:Math.round(amount*100),recipient:recipientCode,reference:row.reference,reason:'BOLTIV withdrawal',currency:'NGN'})});
-    if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.data?.message||'Transfer failed');return{success:false,statusCode:400,message:tr.data?.message||'Paystack transfer failed.',withdrawalId:row.id};}
-    const ps=String(tr.data?.data?.status||'pending').toLowerCase();const status=['success','successful','completed'].includes(ps)?'successful':(['failed','reversed'].includes(ps)?'failed':'processing');
-    await db(`UPDATE admin_revenue_withdrawals SET status=$1,recipient_code=$2,provider_transfer_id=$3,provider_message=$4,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$5`,[status,recipientCode,tr.data?.data?.id||null,tr.data?.message||ps,row.id]);
-    await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status},req);
-    return{success:true,message:status==='successful'?'BOLTIV withdrawal completed.':'BOLTIV withdrawal submitted and is being processed.',withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount};
   }
   return{success:false,statusCode:400,message:'Unknown revenue action.'};
 }

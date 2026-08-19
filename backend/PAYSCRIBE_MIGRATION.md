@@ -42,4 +42,4 @@ using the `X-Payscribe-Event-Id`, `X-Payscribe-Timestamp`, and `X-Payscribe-Sign
 
 The exact Collections virtual-account endpoint should be copied from the current Payscribe Collections documentation/dashboard into `PAYSCRIBE_VA_CREATE_PATH`. The rest of the integration intentionally does not hard-code an undocumented endpoint.
 
-Paystack admin withdrawal functionality is left intact because it is separate from customer wallet funding.
+Admin revenue withdrawals use the Payscribe Payout API. Paystack is not used by the admin revenue withdrawal routes.

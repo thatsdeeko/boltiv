@@ -1,0 +1,11 @@
+BOLTIV STROWALLET PAYOUT CLEANUP
+
+This deployment removes the remaining Payscribe payout integration and Payscribe environment variables/documentation.
+
+Current Strowallet provider paths:
+- Customer wallet funding: Strowallet personal virtual accounts + webhook
+- Revenue wallet withdrawal: Strowallet bank list + account verification + bank transfer
+
+Payscribe payout endpoints/functions/routes have been removed.
+
+Note: Paystack and Flutterwave integrations used by unrelated legacy/payment flows were intentionally retained to avoid breaking those flows. They are not used by the Strowallet revenue withdrawal endpoints.

@@ -252,14 +252,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 </div>
 <div class="section"><div class="section-head"><h2>BOLTIV REVENUE WALLET</h2></div><div class="section-body"><div class="notice">When a customer successfully buys a service, the amount they paid is credited to this BOLTIV revenue wallet. VTUGATE remains the fulfilment provider and is paid from its own provider balance. This balance is separate from customer wallet balances.</div><div style="font-size:9px;color:#888;margin-top:12px">CURRENT WITHDRAWABLE BALANCE</div><div id="revenueBalance" class="amount" style="font-size:28px;margin:5px 0 2px">₦0.00</div></div></div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>ADMIN-ONLY BANK WITHDRAWAL</h2></div><div class="section-body">
-<div class="notice">Customers have no revenue-withdrawal endpoint. The backend requires an authenticated admin session for every withdrawal operation.</div>
+<div class="section"><div class="section-head"><h2>ADMIN-ONLY STROWALLET BANK WITHDRAWAL</h2></div><div class="section-body">
+<div class="notice">Customers have no revenue-withdrawal endpoint. The backend requires an authenticated admin session for every withdrawal operation. Payouts are sent through Strowallet.</div>
 <label>BANK</label><select id="revenueBank"><option value="">Loading banks...</option></select>
 <label>ACCOUNT NUMBER</label><input id="revenueAccount" inputmode="numeric" maxlength="10" placeholder="10-digit account number">
 <button class="btn" onclick="verifyRevenueAccount()">VERIFY ACCOUNT</button>
 <div id="revenueAccountName" class="notice" style="display:none;margin-top:10px"></div>
 <label>AMOUNT (₦)</label><input id="revenueAmount" type="number" min="1000" step="0.01" placeholder="Minimum ₦1,000">
-<button class="btn primary" onclick="withdrawRevenue()">WITHDRAW BOLTIV BALANCE</button>
+<button class="btn primary" onclick="withdrawRevenue()">WITHDRAW VIA STROWALLET</button>
 <div id="revenueMessage" class="message" style="margin-top:10px"></div>
 </div></div>
 <div class="section"><div class="section-head"><h2>WITHDRAWAL HISTORY</h2><button class="btn" onclick="loadRevenue()">REFRESH</button></div><div id="revenueHistory" class="section-body"><div class="loading">Loading...</div></div></div>
@@ -869,7 +869,7 @@ async function loadRevenue(){
   revenueBanks=b.banks||[];
   $("revenueBank").innerHTML='<option value="">Select bank</option>'+revenueBanks.map(x=>`<option value="${esc(x.code)}">${esc(x.name)}</option>`).join("");
   const rows=d.withdrawals||[];
-  $("revenueHistory").innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>AMOUNT</th><th>ACCOUNT</th><th>STATUS</th><th>REFERENCE</th></tr></thead><tbody>'+rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>₦${Number(x.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2})}</td><td>${esc(x.account_name)}<br><small>${esc(x.account_number)} • ${esc(x.bank_code)}</small></td><td><span class="badge ${x.status==='successful'?'successful':x.status==='failed'?'failed':'pending'}">${esc(x.status)}</span></td><td>${esc(x.reference)}</td></tr>`).join("")+'</tbody></table></div>':'<div class="empty">No BOLTIV withdrawals yet.</div>';
+  $("revenueHistory").innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>AMOUNT</th><th>ACCOUNT</th><th>STATUS</th><th>PROVIDER</th><th>REFERENCE</th></tr></thead><tbody>'+rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>₦${Number(x.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2})}</td><td>${esc(x.account_name)}<br><small>${esc(x.account_number)} • ${esc(x.bank_code)}</small></td><td><span class="badge ${x.status==='successful'?'successful':x.status==='failed'?'failed':'pending'}">${esc(x.status)}</span></td><td>${esc(x.provider||'strowallet')}</td><td>${esc(x.reference)}</td></tr>`).join("")+'</tbody></table></div>':'<div class="empty">No BOLTIV withdrawals yet.</div>';
  }catch(e){$("revenueHistory").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
 }
 async function verifyRevenueAccount(){

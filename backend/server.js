@@ -105,8 +105,53 @@ async function db(query,params=[]){
 return pool.query(query,params);
 }
 
+/*
+PLATFORM SETTINGS
+Values in platform_settings are stored as JSONB. Return the
+decoded value so booleans such as false remain false (Boolean("false")
+would incorrectly evaluate to true).
+*/
+async function getPlatformSetting(key,fallback=null){
+try{
+const result=await db(
+`SELECT value FROM platform_settings WHERE key=$1 LIMIT 1`,
+[key]
+);
+
+if(!result.rows.length){
+return fallback;
+}
+
+const value=result.rows[0].value;
+
+if(value===null||value===undefined){
+return fallback;
+}
+
+return value;
+}catch(error){
+console.error("PLATFORM SETTING ERROR:",error.message);
+return fallback;
+}
+
+}
+
 function clean(value){
 return String(value??"").trim();
+}
+
+function normalizeNigerianPhone(phone){
+let value=clean(phone);
+
+if(/^\+234\d{10}$/.test(value)){
+return "0"+value.slice(4);
+}
+
+if(/^234\d{10}$/.test(value)){
+return "0"+value.slice(3);
+}
+
+return value;
 }
 
 function validEmail(email){
@@ -1032,7 +1077,7 @@ name=
 clean(name);
 
 phone=
-clean(phone);
+normalizeNigerianPhone(phone);
 
 if(name.length<2){
 

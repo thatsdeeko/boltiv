@@ -1,189 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="theme-color" content="#ffffff">
-<meta name="description" content="BOLTIV — fast, simple digital services.">
-<title>BOLTIV — Home</title>
+<meta name="theme-color" content="#b8860b">
+<title>BOLTIV — Digital Services & Payments in Nigeria</title>
+<meta name="description" content="BOLTIV brings airtime, data, electricity, cable TV and other everyday digital services together in one simple, secure platform.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<link rel="canonical" href="https://boltiv.ng/">
 <link rel="icon" type="image/png" href="assets/boltiv-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BOLTIV">
+<meta property="og:title" content="BOLTIV — Digital Services & Payments in Nigeria">
+<meta property="og:description" content="A simple place for everyday digital services including airtime, data, electricity and cable TV.">
+<meta property="og:url" content="https://boltiv.ng/">
+<meta property="og:image" content="https://boltiv.ng/assets/boltiv-logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="BOLTIV — Digital Services & Payments in Nigeria">
+<meta name="twitter:description" content="Everyday digital services, in one place.">
+<meta name="twitter:image" content="https://boltiv.ng/assets/boltiv-logo.png">
 <link rel="stylesheet" href="style.css">
-<script>
-if(window.location.pathname.endsWith('/index.html'))window.history.replaceState(null,document.title,'/'+window.location.search+window.location.hash);
-boltivRequireAuth();
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"BOLTIV","url":"https://boltiv.ng/","logo":"https://boltiv.ng/assets/boltiv-logo.png","description":"BOLTIV is a Nigerian digital services and payments platform for everyday services such as airtime, data, electricity and cable TV."}
 </script>
-
-<style id="boltiv-coming-modal-inline">
-body.modal-open{overflow:hidden!important}
-.coming-modal{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important;visibility:visible!important;pointer-events:none!important}
-.coming-modal[hidden]{display:none!important}
-.coming-modal.is-open{pointer-events:auto!important}
-.coming-modal-backdrop{position:absolute!important;inset:0!important;background:rgba(15,14,11,.62)!important;backdrop-filter:blur(6px)!important;opacity:0!important;transition:opacity .2s ease!important}
-.coming-modal-card{position:relative!important;z-index:2!important;width:min(100%,360px)!important;padding:30px 24px 24px!important;border:1px solid rgba(201,159,22,.32)!important;border-radius:28px!important;background:#fffdf7!important;box-shadow:0 28px 80px rgba(0,0,0,.28)!important;text-align:center!important;transform:translateY(20px) scale(.96)!important;opacity:0!important;transition:transform .22s ease,opacity .2s ease!important}
-.coming-modal.is-open .coming-modal-backdrop{opacity:1!important}
-.coming-modal.is-open .coming-modal-card{transform:translateY(0) scale(1)!important;opacity:1!important}
-.coming-modal-close{position:absolute!important;right:14px!important;top:12px!important;width:38px!important;height:38px!important;border:1px solid #eadfba!important;border-radius:50%!important;background:#fff!important;color:#9a7510!important;font-size:25px!important;line-height:1!important;cursor:pointer!important}
-.coming-modal-icon{width:66px!important;height:66px!important;margin:0 auto 15px!important;border-radius:20px!important;display:grid!important;place-items:center!important;background:linear-gradient(145deg,#f5d55f,#c79a16)!important;color:#fff!important;font-size:26px!important}
-.coming-modal-kicker{font-size:11px!important;font-weight:800!important;letter-spacing:.18em!important;color:#a27b0b!important;margin-bottom:7px!important}
-.coming-modal-card h2{margin:0!important;font-size:24px!important;line-height:1.15!important;color:#171717!important}
-.coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:#716e68!important;font-size:14px!important;line-height:1.55!important}
-.coming-modal-button{width:100%!important;min-height:50px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#e1bf43,#bd920b)!important;color:#fff!important;font-weight:800!important;cursor:pointer!important}
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"BOLTIV","url":"https://boltiv.ng/","potentialAction":{"@type":"SearchAction","target":"https://boltiv.ng/?q={search_term_string}","query-input":"required name=search_term_string"}}
+</script>
+<style>
+body{margin:0;background:#fffdf7;color:#171717;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.seo-page{min-height:100vh}.seo-wrap{width:min(1080px,92%);margin:auto}.seo-nav{display:flex;align-items:center;justify-content:space-between;padding:20px 0}.seo-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#171717;font-weight:1000;letter-spacing:.04em}.seo-brand img{width:46px;height:46px;object-fit:contain}.seo-actions{display:flex;gap:10px}.seo-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;padding:12px 18px;font-size:13px;font-weight:900}.seo-btn.primary{background:#b8860b;color:#fff}.seo-btn.secondary{border:1px solid #e3d39b;color:#8d6907;background:#fff}.seo-hero{padding:76px 0 64px;display:grid;grid-template-columns:1.1fr .9fr;gap:50px;align-items:center}.seo-kicker{color:#b8860b;font-size:12px;font-weight:1000;letter-spacing:.18em}.seo-hero h1{font-size:clamp(42px,7vw,72px);line-height:.98;margin:14px 0 18px;letter-spacing:-.04em}.seo-hero h1 span{color:#b8860b}.seo-hero p{font-size:18px;line-height:1.65;color:#68645b;max-width:620px}.seo-hero-actions{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}.seo-card{background:#fff;border:1px solid #eadfb9;border-radius:28px;padding:28px;box-shadow:0 20px 60px rgba(80,60,10,.09)}.seo-logo{width:150px;height:150px;object-fit:contain;display:block;margin:0 auto 16px}.seo-card h2{text-align:center;margin:0 0 8px}.seo-card p{text-align:center;color:#777;line-height:1.6;font-size:13px}.seo-services{padding:24px 0 70px}.seo-services h2{text-align:center;font-size:28px}.seo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}.seo-service{background:#fff;border:1px solid #ebe5d2;border-radius:18px;padding:22px}.seo-service strong{display:block;margin-bottom:7px}.seo-service span{color:#777;font-size:12px;line-height:1.5}.seo-footer{border-top:1px solid #ebe5d2;padding:28px 0 40px;color:#777;font-size:12px}.seo-footer a{color:#8d6907;margin-right:16px}@media(max-width:760px){.seo-hero{grid-template-columns:1fr;padding:48px 0}.seo-grid{grid-template-columns:1fr}.seo-actions{display:none}.seo-hero h1{font-size:46px}}
 </style>
 </head>
-<body class="boltiv-animated-home">
-<div class="home-ambient" aria-hidden="true">
-  <span class="ambient-orb ambient-orb-one"></span>
-  <span class="ambient-orb ambient-orb-two"></span>
-  <span class="ambient-orb ambient-orb-three"></span>
-  <span class="ambient-ring ambient-ring-one"></span>
-  <span class="ambient-ring ambient-ring-two"></span>
-  <span class="ambient-spark spark-one">✦</span>
-  <span class="ambient-spark spark-two">·</span>
-  <span class="ambient-spark spark-three">✦</span>
-  <span class="ambient-spark spark-four">·</span>
-</div>
-<div class="page boltiv-home">
-<div class="container">
-<header class="header home-header">
-  <a class="home-brand" href="index.html" aria-label="BOLTIV home"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
-  <div class="home-header-actions">
-    <button class="icon-button notification-button" onclick="location.href='notifications.html'" aria-label="Notifications"><span>♢</span><b id="notificationBadge" class="notification-badge" hidden>0</b></button>
-    <button class="profile-mini" id="profileButton" onclick="location.href='profile.html'">U</button>
-  </div>
-</header>
-
+<body><div class="seo-page"><div class="seo-wrap">
+<header class="seo-nav"><a class="seo-brand" href="/"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></a><div class="seo-actions"><a class="seo-btn secondary" href="login.html">Sign in</a><a class="seo-btn primary" href="register.html">Get started</a></div></header>
 <main>
-<section class="home-welcome">
-  <div>
-    <div class="eyebrow">WELCOME BACK</div>
-    <h1>Hello, <span id="userName">User</span></h1>
-    <p>Your everyday digital services, in one place.</p>
-  </div>
-</section>
-
-<section class="home-balance-card">
-  <div class="home-balance-top">
-    <div><div class="balance-label">AVAILABLE BALANCE</div><div class="balance-value" id="walletBalance">₦0.00</div></div>
-    <div class="balance-mark">₦</div>
-  </div>
-  <div class="home-balance-actions">
-    <button class="btn btn-primary" onclick="location.href='wallet.html'">+ FUND WALLET</button>
-    <button class="btn btn-light" onclick="location.href='transactions.html'">VIEW ACTIVITY</button>
-  </div>
-</section>
-
-<section class="section home-services-section">
-  <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="transactions.html">Activity →</a></div>
-  <div class="home-service-grid">
-    <a class="home-service-card" href="airtime.html"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
-    <a class="home-service-card" href="data.html"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
-    <a class="home-service-card" href="cable.html"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-    <a class="home-service-card" href="electricity.html"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
-
-    <a class="home-service-card" href="exam-pin.html"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
-    <button type="button" class="home-service-card coming-soon" data-service="Betting"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="Recharge PIN"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="SMS"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
-
-    <button type="button" class="home-service-card coming-soon" data-service="Bulk SMS"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="Gift Cards"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="Insurance"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="International Airtime"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
-  </div>
-</section>
-
-<section class="section home-recent-section">
-  <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="transactions.html">See all →</a></div>
-  <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
-</section>
-
-<section class="section home-trust-card">
-  <div class="trust-icon">✓</div>
-  <div><strong>Simple, secure payments</strong><p>Fund your wallet once and use it across BOLTIV services. Every purchase gets a transaction reference.</p></div>
-</section>
+<section class="seo-hero"><div><div class="seo-kicker">BOLTIV DIGITAL SERVICES</div><h1>Everyday services.<br><span>One simple place.</span></h1><p>Buy airtime and data, pay electricity bills, renew cable TV and access everyday digital services through BOLTIV.</p><div class="seo-hero-actions"><a class="seo-btn primary" href="register.html">Get started</a><a class="seo-btn secondary" href="#services">Explore services</a></div></div><div class="seo-card"><img class="seo-logo" src="assets/boltiv-logo.png" alt="BOLTIV"><h2>Simple. Secure. Built for you.</h2><p>Manage your everyday digital services from one BOLTIV account.</p></div></section>
+<section id="services" class="seo-services"><h2>Our services</h2><div class="seo-grid"><div class="seo-service"><strong>Airtime</strong><span>Recharge any supported network quickly.</span></div><div class="seo-service"><strong>Data</strong><span>Choose a data bundle that fits your needs.</span></div><div class="seo-service"><strong>Electricity</strong><span>Pay your electricity bill with ease.</span></div><div class="seo-service"><strong>Cable TV</strong><span>Renew your TV subscription in one place.</span></div><div class="seo-service"><strong>Exam PINs</strong><span>Access available examination PIN products.</span></div><div class="seo-service"><strong>More services</strong><span>More useful digital services are being prepared for BOLTIV.</span></div></div></section>
 </main>
-</div>
-</div>
-
-<div class="coming-modal" id="comingModal" hidden aria-hidden="true">
-  <div class="coming-modal-backdrop" data-close-coming></div>
-  <section class="coming-modal-card" role="dialog" aria-modal="true" aria-labelledby="comingTitle">
-    <button class="coming-modal-close" type="button" data-close-coming aria-label="Close">×</button>
-    <div class="coming-modal-icon" aria-hidden="true"><span>✦</span></div>
-    <div class="coming-modal-kicker">COMING SOON</div>
-    <h2 id="comingTitle">Service is on the way</h2>
-    <p id="comingMessage">We're preparing this service for BOLTIV. You'll be able to use it here once it's ready.</p>
-    <button class="coming-modal-button" type="button" data-close-coming>GOT IT</button>
-  </section>
-</div>
-
-<nav class="bottom-nav">
-<button class="nav-item active" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
-<button class="nav-item" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
-<button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button>
-<button class="nav-item" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
-</nav>
-
-<script>
-const API_BASE='https://boltiv-backend.onrender.com';
-const TOKEN_KEY='boltivAuthToken';
-const USER_KEY='boltivUser';
-const money=v=>'₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-const typeInfo=t=>{const s=String(t.service||'').toLowerCase();if(s.includes('airtime'))return['airtime','Airtime','☎'];if(s.includes('data'))return['data','Data','⌁'];if(s.includes('electric'))return['electricity','Electricity','ϟ'];if(s.includes('cable')||s.includes('tv'))return['cable','Cable TV','▣'];if(s.includes('wallet')||s.includes('fund'))return['wallet','Wallet Funding','₦'];return['other','Transaction','•']};
-const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDateString('en-NG',{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})};
-async function loadHome(){
- await window.boltivAuthReady;
- const token=boltivMemoryStorage.getItem(TOKEN_KEY)||'cookie-session'; if(!token){location.replace('login.html');return;}
- try{
-  const [meRes,walletRes,txRes,noteRes]=await Promise.all([
-   fetch(API_BASE+'/api/me',{headers:{Authorization:'Bearer '+token}}),
-   fetch(API_BASE+'/api/wallet',{headers:{Authorization:'Bearer '+token}}),
-   fetch(API_BASE+'/api/transactions',{headers:{Authorization:'Bearer '+token},cache:'no-store'}),
-   fetch(API_BASE+'/api/notifications',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
-  ]);
-  if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
-  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0};
-  if(me.user){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();}
-  if(wallet.success&&wallet.wallet){const b=Number(wallet.wallet.balance||0);document.getElementById('walletBalance').textContent=money(b);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
-  renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
- }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('login.html');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
-}
-function renderRecent(items){
- const list=document.getElementById('recentList'); if(!items.length){list.innerHTML='<div class="home-empty"><span>↯</span><strong>No transactions yet</strong><small>Your purchases and wallet funding will appear here.</small></div>';return;}
- list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
-}
-document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
-const comingModal=document.getElementById('comingModal');
-const comingTitle=document.getElementById('comingTitle');
-const comingMessage=document.getElementById('comingMessage');
-let lastComingTrigger=null;
-function openComingModal(name,trigger){
-  if(!comingModal)return;
-  lastComingTrigger=trigger||null;
-  comingTitle.textContent=String(name||'This service')+' is coming soon';
-  comingMessage.textContent='We are preparing '+String(name||'this service')+' for BOLTIV. It will be available here once the service is ready.';
-  comingModal.hidden=false;
-  comingModal.setAttribute('aria-hidden','false');
-  document.body.classList.add('modal-open');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>comingModal.classList.add('is-open')));
-}
-function closeComingModal(){
-  if(!comingModal)return;
-  comingModal.classList.remove('is-open');
-  comingModal.setAttribute('aria-hidden','true');
-  document.body.classList.remove('modal-open');
-  setTimeout(()=>{comingModal.hidden=true;if(lastComingTrigger&&lastComingTrigger.focus)lastComingTrigger.focus();},220);
-}
-// Event delegation makes the Coming Soon cards reliable even if other page scripts rerender content.
-document.addEventListener('click',e=>{
-  const card=e.target.closest('.coming-soon');
-  if(card){e.preventDefault();e.stopPropagation();openComingModal(card.dataset.service||'This service',card);return;}
-  if(e.target.closest('[data-close-coming]')){e.preventDefault();closeComingModal();}
-},true);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&comingModal&&!comingModal.hidden)closeComingModal();});
-loadHome();
-setInterval(loadHome,30000);
-</script>
-</body>
-</html>
+<footer class="seo-footer"><strong>BOLTIV</strong><div style="margin-top:10px"><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms &amp; Conditions</a><a href="contact.html">Contact</a></div><div style="margin-top:12px">© 2026 BOLTIV. All rights reserved.</div></footer>
+</div></div></body></html>

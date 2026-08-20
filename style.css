@@ -351,6 +351,7 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
  .boltiv-animated-home .home-service-card{opacity:1;transform:none}
 }
 @media(max-width:600px){.ambient-ring-one{width:300px;height:300px}.ambient-ring-two{width:240px;height:240px}.ambient-orb-one{width:180px;height:180px}.ambient-orb-two{width:230px;height:230px}}
+@media(max-width:899px){.home-service-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.home-service-card{min-height:112px;padding:10px;border-radius:15px;overflow:hidden}.home-service-card .service-icon{width:34px;height:34px;font-size:16px;border-radius:11px}.home-service-card strong{margin-top:9px;font-size:10px;line-height:1.15;white-space:normal}.home-service-card small{margin-top:3px;font-size:7.5px;line-height:1.2}.home-service-wide{grid-column:auto;min-height:112px;display:flex;align-items:flex-start}.home-service-card.coming-soon{opacity:.92}}
 /* MOBILE APP NAVIGATION: always visible; page content clears the fixed nav */
 .page{padding-bottom:calc(96px + env(safe-area-inset-bottom))!important}
 @media(min-width:900px){.page{padding-bottom:calc(98px + env(safe-area-inset-bottom))!important}}

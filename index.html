@@ -60,9 +60,18 @@ if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html'
   <div class="home-service-grid">
     <a class="home-service-card" href="airtime.html"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
     <a class="home-service-card" href="data.html"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
-    <a class="home-service-card" href="electricity.html"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
     <a class="home-service-card" href="cable.html"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-    <a class="home-service-card home-service-wide" href="exam-pin.html"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
+    <a class="home-service-card" href="electricity.html"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
+
+    <a class="home-service-card" href="exam-pin.html"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
+    <a class="home-service-card coming-soon" href="#" data-service="Betting"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></a>
+    <a class="home-service-card coming-soon" href="#" data-service="Recharge PIN"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></a>
+    <a class="home-service-card coming-soon" href="#" data-service="SMS"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></a>
+
+    <a class="home-service-card coming-soon" href="#" data-service="Bulk SMS"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></a>
+    <a class="home-service-card coming-soon" href="#" data-service="Gift Cards"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></a>
+    <a class="home-service-card coming-soon" href="#" data-service="Insurance"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></a>
+    <a class="home-service-card coming-soon" href="#" data-service="International Airtime"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></a>
   </div>
 </section>
 
@@ -115,6 +124,7 @@ function renderRecent(items){
  list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
 }
 document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
+document.querySelectorAll('.coming-soon').forEach(card=>card.addEventListener('click',e=>{e.preventDefault();const name=card.dataset.service||'This service';alert(name+' is coming soon. We are preparing it for BOLTIV.');}));
 loadHome();
 setInterval(loadHome,30000);
 </script>

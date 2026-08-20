@@ -1083,6 +1083,44 @@ function clearUserSessionCookie(res){
   res.setHeader('Set-Cookie',parts.join('; '));
 }
 
+async function getPlatformSetting(key, fallback=null){
+  const settingKey=clean(key);
+  if(!settingKey)return fallback;
+  try{
+    const result=await db(`SELECT value FROM platform_settings WHERE key=$1 LIMIT 1`,[settingKey]);
+    if(!result.rows.length)return fallback;
+    const value=result.rows[0].value;
+    return value===null||value===undefined?fallback:value;
+  }catch(error){
+    console.error("PLATFORM SETTING READ ERROR:",error.message);
+    return fallback;
+  }
+}
+
+async function setTransactionPin(userId,pin,currentPin=""){
+  const id=clean(userId);
+  const nextPin=String(pin||"").trim();
+  const oldPin=String(currentPin||"").trim();
+
+  if(!id)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(!/^\d{4}$/.test(nextPin))return{success:false,statusCode:400,message:"Transaction PIN must contain exactly 4 digits."};
+
+  const existing=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[id]);
+  const existingHash=existing.rows[0]?.transaction_pin_hash||"";
+  if(existingHash){
+    if(!/^\d{4}$/.test(oldPin)||!verifyPassword(oldPin,existingHash)){
+      return{success:false,statusCode:400,message:"Current Transaction PIN is incorrect."};
+    }
+  }
+
+  const hash=hashPassword(nextPin);
+  await db(`INSERT INTO user_security(user_id,transaction_pin_hash,updated_at)
+    VALUES($1,$2,NOW())
+    ON CONFLICT(user_id) DO UPDATE SET transaction_pin_hash=EXCLUDED.transaction_pin_hash,updated_at=NOW()`,[id,hash]);
+
+  return{success:true,message:existingHash?"Transaction PIN changed successfully.":"Transaction PIN created successfully."};
+}
+
 async function userFromToken(req){
 
 const sessionToken=getUserSessionToken(req);

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="style.css">
 
 <script>
-if(localStorage.getItem("boltivLoggedIn")!=="true"){
+if(boltivMemoryStorage.getItem("boltivLoggedIn")!=="true"){
 location.replace("login.html");
 }
 </script>
@@ -577,7 +577,7 @@ maximumFractionDigits:2
 function getBalance(){
 
 return Number(
-localStorage.getItem("boltivWalletBalance")||0
+boltivMemoryStorage.getItem("boltivWalletBalance")||0
 );
 
 }
@@ -591,7 +591,7 @@ document.getElementById("balance")
 
 async function syncTransactions(){
 try{
-const token=localStorage.getItem("boltivAuthToken")||"";
+const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
 if(!token)return;
 const r=await fetch("https://boltiv-backend.onrender.com/api/transactions",{headers:{Authorization:"Bearer "+token}});
 const d=await r.json();
@@ -605,7 +605,7 @@ phone:t.recipient||"",
 id:t.reference||t.id,
 provider:t.provider_reference||""
 }));
-localStorage.setItem("boltivTransactions",JSON.stringify(mapped));
+boltivMemoryStorage.setItem("boltivTransactions",JSON.stringify(mapped));
 renderHistory();
 }catch(e){console.warn("Transaction sync failed",e);}
 }
@@ -615,7 +615,7 @@ function getTransactions(){
 try{
 
 const data=JSON.parse(
-localStorage.getItem("boltivTransactions")||"[]"
+boltivMemoryStorage.getItem("boltivTransactions")||"[]"
 );
 
 return Array.isArray(data)?data:[];
@@ -633,7 +633,7 @@ function getFirstName(){
 try{
 
 const user=JSON.parse(
-localStorage.getItem("boltivUser")||"null"
+boltivMemoryStorage.getItem("boltivUser")||"null"
 );
 
 return(

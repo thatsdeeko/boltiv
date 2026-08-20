@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#f7f7f5">
@@ -919,17 +919,17 @@ registerButton.onclick=async()=>{
         // Registration now returns a fresh authenticated session so the
         // user can create their Transaction PIN immediately.
         if(data.token){
-            localStorage.setItem("boltivAuthToken",data.token);
+            boltivMemoryStorage.setItem("boltivAuthToken",data.token);
         }
 
         if(data.user){
-            localStorage.setItem("boltivUser",JSON.stringify(data.user));
-            if(data.user.email) localStorage.setItem("boltivUserEmail",data.user.email);
+            boltivMemoryStorage.setItem("boltivUser",JSON.stringify(data.user));
+            if(data.user.email) boltivMemoryStorage.setItem("boltivUserEmail",data.user.email);
         }
 
-        localStorage.setItem("boltivLoggedIn","true");
-        localStorage.removeItem("boltivBalance");
-        localStorage.removeItem("boltivTransactions");
+        boltivMemoryStorage.setItem("boltivLoggedIn","true");
+        boltivMemoryStorage.removeItem("boltivBalance");
+        boltivMemoryStorage.removeItem("boltivTransactions");
 
         successUser.textContent=
             "Welcome, "+name;
@@ -987,7 +987,7 @@ createTransactionPin.onclick=async()=>{
         return;
     }
 
-    const token=localStorage.getItem("boltivAuthToken")||"";
+    const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
     if(!token){
         pinSetupStatus.textContent="Your registration session expired. Please log in and create your PIN from Security.";
         pinSetupStatus.className="pin-setup-status error";

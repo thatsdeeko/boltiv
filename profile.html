@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="style.css">
 
 <script>
-if(localStorage.getItem("boltivLoggedIn")!=="true"){
+if(boltivMemoryStorage.getItem("boltivLoggedIn")!=="true"){
 location.replace("login.html");
 }
 </script>
@@ -340,7 +340,7 @@ function getUser(){
 try{
 
 const user=JSON.parse(
-localStorage.getItem("boltivUser")||"{}"
+boltivMemoryStorage.getItem("boltivUser")||"{}"
 );
 
 return user&&typeof user==="object"
@@ -358,7 +358,7 @@ return{};
 
 function saveUser(user){
 
-localStorage.setItem(
+boltivMemoryStorage.setItem(
 "boltivUser",
 JSON.stringify(user)
 );
@@ -617,7 +617,7 @@ return;
 
 
 /* SAVE TO SERVER */
-const token=localStorage.getItem("boltivAuthToken")||"";
+const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
 saveBtn.disabled=true;
 saveBtn.textContent="SAVING...";
 try{
@@ -716,7 +716,7 @@ document
 .getElementById("confirmLogout")
 .onclick=()=>{
 
-localStorage.removeItem("boltivLoggedIn");
+boltivMemoryStorage.removeItem("boltivLoggedIn");
 
 logoutModal.classList.remove("show");
 

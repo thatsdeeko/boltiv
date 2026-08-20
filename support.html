@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="style.css">
 
 <script>
-if(localStorage.getItem("boltivLoggedIn")!=="true"){
+if(boltivMemoryStorage.getItem("boltivLoggedIn")!=="true"){
 location.replace("login.html");
 }
 </script>
@@ -536,7 +536,7 @@ function getUser(){
 
 try{
 return JSON.parse(
-localStorage.getItem("boltivUser")||"{}"
+boltivMemoryStorage.getItem("boltivUser")||"{}"
 )||{};
 
 }catch(error){
@@ -633,7 +633,7 @@ Message:
 ${text}`;
 
 try{
-const r=await fetch("https://boltiv-backend.onrender.com/api/support/tickets",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({subject:selectedIssue,message:text})});
+const r=await fetch("https://boltiv-backend.onrender.com/api/support/tickets",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({subject:selectedIssue,message:text})});
 const d=await r.json();
 if(!r.ok||!d.success)throw new Error(d.message||"Unable to create support ticket.");
 alert(d.message+" You can also continue with WhatsApp support.");
@@ -643,7 +643,7 @@ location.href=`https://wa.me/${phone}?text=${encodeURIComponent(supportMessage)}
 };
 
 const API="https://boltiv-backend.onrender.com";
-const auth=()=>({Authorization:"Bearer "+(localStorage.getItem("boltivAuthToken")||"")});
+const auth=()=>({Authorization:"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")});
 const ticketList=document.getElementById("ticketList");
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;")}
 async function loadTickets(){

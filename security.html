@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="style.css">
 
 <script>
-if(localStorage.getItem("boltivLoggedIn")!=="true"){
+if(boltivMemoryStorage.getItem("boltivLoggedIn")!=="true"){
 location.replace("login.html");
 }
 </script>
@@ -804,7 +804,7 @@ message.className=
 
 function getPin(){
 
-return localStorage.getItem(
+return boltivMemoryStorage.getItem(
 "boltivTransactionPin"
 );
 
@@ -965,7 +965,7 @@ return;
 }
 
 
-localStorage.setItem(
+boltivMemoryStorage.setItem(
 "boltivTransactionPin",
 pin
 );
@@ -990,7 +990,7 @@ successModal.classList.add("show");
 ========================= */
 const API_BASE="https://boltiv-backend.onrender.com";
 async function pinRequest(pin,currentPin=""){
-const r=await fetch(API_BASE+"/api/security/transaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
+const r=await fetch(API_BASE+"/api/security/transaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
 return r.json();
 }
 

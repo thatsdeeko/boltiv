@@ -464,7 +464,7 @@ providerPayload={bundle_id:bundleId,phone_number:recipient};
 // Persist human-readable purchase details so receipts, transaction history,
 // and notifications can render the same information returned to the customer.
 pricingMeta.network=authoritative.network_name||normalizeDataNetwork(data.network||data.providerPayload?.network);
-pricingMeta.plan=clean(authoritative.name||data.plan_name||data.plan||data.providerPayload?.plan_name||data.providerPayload?.plan||String(bundleId));
+pricingMeta.plan=clean(data.plan_name||data.providerPayload?.plan_name||data.plan||data.providerPayload?.plan||authoritative.name||String(bundleId));
 
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0);const quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."};if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."};

@@ -475,6 +475,10 @@ pricingMeta={providerCost:Number((authoritative.provider_price*quantity).toFixed
 providerPayload={product_id:productId,quantity};recipient=null;
 }else{
 const network=normalizeDataNetwork(data.network||data.providerPayload?.network);const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};const providerId=providerIds[network];if(!providerId)return {success:false,statusCode:400,message:"Unsupported network."};providerPayload={provider_id:providerId,phone_number:recipient,amount};
+// Keep the airtime network in transaction metadata so activity/receipts
+// remain complete even after the purchase has left the service page.
+pricingMeta.network=network;
+pricingMeta.plan=null;
 }
 const referenceValue=reference("BOLTIV-TX");
 const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"cheapdatahub",request:providerPayload,pricing:pricingMeta}});
@@ -2989,23 +2993,60 @@ if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=await body(req); const result=await setTransactionPin(user.user_id,b.pin,b.currentPin||""); return send(res,result.success?200:400,result);
 }
 if(req.method==="GET"&&path==="/api/transactions/detail"){
-const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0]; return send(res,200,{success:true,transaction:{...t,amount:Number(t.amount)}});
+const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0];
+let meta=t.metadata; if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}} meta=meta&&typeof meta==="object"?meta:{};
+const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
+const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
+const enrichedMeta={...meta};
+if(!enrichedMeta.network)enrichedMeta.network=requestMeta.network||requestMeta.network_provider||"";
+if(!enrichedMeta.plan)enrichedMeta.plan=pricing.plan||requestMeta.plan_name||requestMeta.plan||((String(t.service).toLowerCase()==="data"&&requestMeta.bundle_id)?`Plan ${requestMeta.bundle_id}`:"");
+if(!enrichedMeta.phone)enrichedMeta.phone=t.recipient||requestMeta.phone||requestMeta.phone_number||"";
+return send(res,200,{success:true,transaction:{...t,metadata:enrichedMeta,amount:Number(t.amount)}});
 }
 if(req.method==="GET"&&path==="/api/notifications"){
 // Backfill transaction notifications for successful purchases that may have
 // completed before notification creation, or where a previous notification
 // insert failed. This makes the notifications page self-healing.
 try{
-  const recent=await db(`SELECT id,user_id,service,amount,metadata FROM transactions WHERE user_id=$1 AND status='successful' AND type='debit' AND date>NOW()-INTERVAL '30 days' ORDER BY date DESC LIMIT 100`,[user.user_id]);
+  // Backfill from the transactions table itself. Older successful purchases may
+  // have been recorded before notification creation was added, and some legacy
+  // rows do not use type='debit'. The service name is the safer discriminator.
+  const recent=await db(`
+    SELECT id,user_id,type,service,amount,status,date,metadata
+    FROM transactions
+    WHERE user_id=$1
+      AND status='successful'
+      AND date>NOW()-INTERVAL '30 days'
+      AND LOWER(COALESCE(service,'')) <> 'wallet funding'
+    ORDER BY date DESC
+    LIMIT 100
+  `,[user.user_id]);
   for(const tx of recent.rows){
     const meta=tx.metadata&&typeof tx.metadata==="object"?tx.metadata:{};
     let message=`Your ${String(tx.service||"service")} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
-    if(String(tx.service).toLowerCase()==="data"){
-      const network=clean(meta.network||meta.network_provider||"");
-      const plan=clean(meta.plan||meta.plan_name||"");
+    if(String(tx.service).toLowerCase().includes("data")){
+      const network=clean(meta.network||meta.network_provider||meta.request?.network||"");
+      const plan=clean(meta.plan||meta.plan_name||meta.request?.plan_name||meta.pricing?.plan||"");
       if(network||plan)message=`Your ${network||"Data"} ${plan||"data plan"} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
     }
     await addNotificationOnce(user.user_id,"Transaction successful",message,"transaction",`tx-success-${tx.id}`);
+  }
+
+  // Also backfill wallet-funding notifications for older deposits.
+  const funding=await db(`
+    SELECT id,user_id,amount,date,provider_reference
+    FROM transactions
+    WHERE user_id=$1
+      AND status='successful'
+      AND LOWER(COALESCE(service,''))='wallet funding'
+      AND date>NOW()-INTERVAL '30 days'
+    ORDER BY date DESC
+    LIMIT 100
+  `,[user.user_id]);
+  for(const tx of funding.rows){
+    const amount=Number(tx.amount);
+    const message=`Your wallet was credited with ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} via Flutterwave bank transfer.`;
+    await addNotificationOnce(user.user_id,"Wallet credited",message,"payment",`wallet-fund-${tx.id}`);
   }
 }catch(error){console.error("NOTIFICATION BACKFILL ERROR:",error?.stack||error?.message||error);}
 const r=await db(`SELECT id,title,message,type,read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[user.user_id]);

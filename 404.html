@@ -13,14 +13,34 @@
 <body>
 <div id="boltiv-router-error">
   <h1>BOLTIV</h1>
-  <p>Unable to load this page. Please try again.</p>
+  <p>Page not found.</p>
 </div>
 
 <script>
 (function () {
   "use strict";
 
-  var routes = {"/login/":"login.html","/register/":"register.html","/dashboard/":"dashboard.html","/airtime/":"airtime.html","/data/":"data.html","/electricity/":"electricity.html","/cable/":"cable.html","/wallet/":"wallet.html","/transactions/":"transactions.html","/profile/":"profile.html","/notifications/":"notifications.html","/support/":"support.html","/contact/":"contact.html","/privacy/":"privacy.html","/terms/":"terms.html","/forgot-password/":"forgot-password.html","/reset-password/":"reset-password.html","/security/":"security.html","/history/":"history.html"};
+  var routes = {
+    "/login/":"login.html",
+    "/register/":"register.html",
+    "/dashboard/":"dashboard.html",
+    "/airtime/":"airtime.html",
+    "/data/":"data.html",
+    "/electricity/":"electricity.html",
+    "/cable/":"cable.html",
+    "/wallet/":"wallet.html",
+    "/transactions/":"transactions.html",
+    "/profile/":"profile.html",
+    "/notifications/":"notifications.html",
+    "/support/":"support.html",
+    "/contact/":"contact.html",
+    "/privacy/":"privacy.html",
+    "/terms/":"terms.html",
+    "/forgot-password/":"forgot-password.html",
+    "/reset-password/":"reset-password.html",
+    "/security/":"security.html",
+    "/history/":"history.html"
+  };
 
   function normalisePath(path) {
     path = path || "/";
@@ -29,82 +49,148 @@
     return path;
   }
 
-  var path = normalisePath(window.location.pathname);
-  var target = routes[path];
-
-  if (!target) return;
+  function isExternal(value) {
+    return /^(?:[a-z]+:|\/\/|data:|blob:|mailto:|tel:|javascript:|#)/i.test(value || "");
+  }
 
   function resolveUrl(value, base) {
     try { return new URL(value, base).href; }
     catch (e) { return value; }
   }
 
-  fetch("/" + target, { credentials: "same-origin", cache: "no-cache" })
-    .then(function (response) {
-      if (!response.ok) throw new Error("HTTP " + response.status);
-      return response.text();
-    })
-    .then(function (html) {
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(html, "text/html");
+  var path = normalisePath(window.location.pathname);
+  var target = routes[path];
 
-      // Replace document metadata.
-      document.title = doc.title || "BOLTIV";
-      var oldMeta = document.head.querySelectorAll("meta[data-boltiv-router]");
-      oldMeta.forEach(function (n) { n.remove(); });
-      doc.head.querySelectorAll("meta").forEach(function (meta) {
-        var clone = meta.cloneNode(true);
-        clone.setAttribute("data-boltiv-router", "1");
-        document.head.appendChild(clone);
-      });
+  if (!target) return;
 
-      // Replace body.
-      document.body.innerHTML = doc.body ? doc.body.innerHTML : html;
+  var targetBase = window.location.origin + "/" + target;
 
-      // Keep the clean URL in the address bar.
-      window.history.replaceState({ boltivRoute: target }, "", path);
+  fetch("/" + target, {
+    credentials: "same-origin",
+    cache: "no-cache"
+  })
+  .then(function (response) {
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    return response.text();
+  })
+  .then(function (html) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(html, "text/html");
 
-      // Fix relative assets because the fetched page was originally a flat .html file.
-      document.querySelectorAll("[src]").forEach(function (el) {
-        var src = el.getAttribute("src");
-        if (src && !/^(?:[a-z]+:|\/\/|data:|blob:|#)/i.test(src)) {
-          el.setAttribute("src", resolveUrl(src, window.location.origin + "/" + target));
-        }
-      });
-      document.querySelectorAll("[href]").forEach(function (el) {
-        var href = el.getAttribute("href");
-        if (href && !/^(?:[a-z]+:|\/\/|data:|mailto:|tel:|javascript:|#)/i.test(href)) {
-          // Preserve clean application routes; resolve ordinary assets relative to the flat page.
-          var clean = normalisePath(href);
-          if (routes[clean]) {
-            el.setAttribute("href", clean);
-          } else {
-            el.setAttribute("href", resolveUrl(href, window.location.origin + "/" + target));
-          }
-        }
-      });
+    /*
+     * IMPORTANT:
+     * The clean-URL router must carry over the target page's HEAD.
+     * Previously only body/meta were copied, so /login/ and /register/
+     * lost style.css, inline <style> blocks and head scripts.
+     */
 
-      // Re-execute scripts from the fetched page.
-      var scripts = Array.prototype.slice.call(document.querySelectorAll("script"));
-      scripts.forEach(function (oldScript) {
-        var s = document.createElement("script");
-        Array.prototype.slice.call(oldScript.attributes).forEach(function (a) {
-          s.setAttribute(a.name, a.value);
-        });
-        if (oldScript.src) {
-          s.src = resolveUrl(oldScript.getAttribute("src"), window.location.origin + "/" + target);
-        } else {
-          s.textContent = oldScript.textContent;
-        }
-        oldScript.parentNode.replaceChild(s, oldScript);
-      });
-    })
-    .catch(function () {
-      // Keep the clean URL, but show a useful error rather than another 404 redirect.
-      var box = document.getElementById("boltiv-router-error");
-      if (box) box.innerHTML =
-        "<h1>BOLTIV</h1><p>Unable to load this page. Please try again.</p>";
+    var newHeadNodes = Array.prototype.slice.call(doc.head.children);
+    var headStylesAndMetadata = [];
+    var headScripts = [];
+
+    newHeadNodes.forEach(function (node) {
+      var clone = node.cloneNode(true);
+
+      if (clone.hasAttribute("href") && !isExternal(clone.getAttribute("href"))) {
+        clone.setAttribute(
+          "href",
+          resolveUrl(clone.getAttribute("href"), targetBase)
+        );
+      }
+
+      if (clone.hasAttribute("src") && !isExternal(clone.getAttribute("src"))) {
+        clone.setAttribute(
+          "src",
+          resolveUrl(clone.getAttribute("src"), targetBase)
+        );
+      }
+
+      if (clone.tagName.toLowerCase() === "script") {
+        headScripts.push(clone);
+      } else {
+        headStylesAndMetadata.push(clone);
+      }
     });
+
+    document.head.innerHTML = "";
+    headStylesAndMetadata.forEach(function (node) {
+      document.head.appendChild(node);
+    });
+
+    document.title = doc.title || "BOLTIV";
+
+    document.body.innerHTML = doc.body ? doc.body.innerHTML : html;
+
+    window.history.replaceState({ boltivRoute: target }, "", path);
+
+    /*
+     * Resolve assets/links against the original flat HTML file.
+     */
+    document.querySelectorAll("[src]").forEach(function (el) {
+      var src = el.getAttribute("src");
+      if (src && !isExternal(src)) {
+        el.setAttribute("src", resolveUrl(src, targetBase));
+      }
+    });
+
+    document.querySelectorAll("[href]").forEach(function (el) {
+      var href = el.getAttribute("href");
+      if (!href || isExternal(href)) return;
+
+      var clean = normalisePath(href);
+      if (routes[clean]) {
+        el.setAttribute("href", clean);
+      } else {
+        el.setAttribute("href", resolveUrl(href, targetBase));
+      }
+    });
+
+    /*
+     * Run head scripts after the target body exists.
+     */
+    headScripts.forEach(function (oldScript) {
+      var s = document.createElement("script");
+
+      Array.prototype.slice.call(oldScript.attributes).forEach(function (a) {
+        s.setAttribute(a.name, a.value);
+      });
+
+      if (oldScript.src) {
+        s.src = oldScript.src;
+      } else {
+        s.textContent = oldScript.textContent;
+      }
+
+      document.head.appendChild(s);
+    });
+
+    /*
+     * Re-execute body scripts because innerHTML does not execute them.
+     */
+    var scripts = Array.prototype.slice.call(document.body.querySelectorAll("script"));
+    scripts.forEach(function (oldScript) {
+      var s = document.createElement("script");
+
+      Array.prototype.slice.call(oldScript.attributes).forEach(function (a) {
+        s.setAttribute(a.name, a.value);
+      });
+
+      if (oldScript.src) {
+        s.src = resolveUrl(oldScript.getAttribute("src"), targetBase);
+      } else {
+        s.textContent = oldScript.textContent;
+      }
+
+      oldScript.parentNode.replaceChild(s, oldScript);
+    });
+  })
+  .catch(function () {
+    var box = document.getElementById("boltiv-router-error");
+    if (box) {
+      box.innerHTML =
+        "<h1>BOLTIV</h1><p>Unable to load this page. Please try again.</p>";
+    }
+  });
 })();
 </script>
 </body>

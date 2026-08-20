@@ -412,9 +412,25 @@ message.className="message";
    PROFILE LOAD
 ========================= */
 
-function loadProfile(){
+async function loadProfile(userOverride){
 
-const user=getUser();
+let user=userOverride;
+
+if(!user){
+  try{
+    user=await window.boltivAuthReady;
+  }catch(error){
+    user=null;
+  }
+}
+
+if(!user || typeof user!=="object"){
+  return;
+}
+
+// Keep the in-memory profile snapshot synchronized with the authenticated
+// server user. This is not localStorage/sessionStorage.
+saveUser(user);
 
 const name=String(
 user.name||
@@ -793,15 +809,19 @@ location.href=item.dataset.page;
    INITIAL LOAD
 ========================= */
 
-loadProfile();
+// Wait for the authenticated server user before rendering profile fields.
+// The previous version called loadProfile() immediately, which could run
+// before /api/auth/me completed and left the default "User" / empty fields.
+window.boltivAuthReady.then((user)=>{
+  if(user) loadProfile(user);
+});
 
 
 /* REFRESH WHEN RETURNING */
 
-window.addEventListener(
-"pageshow",
-loadProfile
-);
+window.addEventListener("pageshow",()=>{
+  loadProfile();
+});
 
 </script>
 

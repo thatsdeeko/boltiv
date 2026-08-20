@@ -590,6 +590,36 @@ return false;
 
 }
 
+async function setTransactionPin(userId,pin,currentPin=""){
+  const supplied=String(pin??"").trim();
+  if(!/^\d{4}$/.test(supplied)){
+    return {success:false,message:"Transaction PIN must contain exactly 4 digits."};
+  }
+
+  const existing=await db(
+    `SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,
+    [userId]
+  );
+
+  if(existing.rows[0]?.transaction_pin_hash){
+    const current=String(currentPin??"").trim();
+    if(!/^\d{4}$/.test(current) || !verifyPassword(current,existing.rows[0].transaction_pin_hash)){
+      return {success:false,message:"Current Transaction PIN is incorrect."};
+    }
+  }
+
+  const transactionPinHash=hashPassword(supplied);
+  await db(
+    `INSERT INTO user_security(user_id,transaction_pin_hash,updated_at)
+     VALUES($1,$2,NOW())
+     ON CONFLICT(user_id) DO UPDATE
+     SET transaction_pin_hash=EXCLUDED.transaction_pin_hash,updated_at=NOW()`,
+    [userId,transactionPinHash]
+  );
+
+  return {success:true,message:existing.rows[0]?.transaction_pin_hash?"Transaction PIN changed successfully.":"Transaction PIN created successfully."};
+}
+
 async function setup(){
 
 if(!DATABASE_URL){

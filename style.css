@@ -238,3 +238,78 @@ button,input,select,textarea{font-size:inherit}
 @media (min-width: 1200px){
   .container{width:min(100%,1180px);max-width:1180px}
 }
+
+/* =========================================================
+   BOLTIV UI REFRESH — WHITE + GOLD FINTECH SYSTEM
+   ========================================================= */
+:root{
+  --gold:#c9a227;
+  --gold2:#9b7415;
+  --gold3:#ead99b;
+  --gold-soft:#fffaf0;
+  --bg:#fbfbf9;
+  --card:#fff;
+  --text:#171717;
+  --muted:#747474;
+  --line:#e9e7df;
+  --success:#218c52;
+  --danger:#c74444;
+  --shadow:0 10px 32px rgba(25,25,20,.055);
+}
+body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.page{background:var(--bg)}
+.header{background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.brand-name,.brand,.brand-name{color:var(--gold2)!important}
+.brand-tagline{color:#96938a}
+.profile-mini{border-color:var(--gold3);background:var(--gold-soft);color:var(--gold2);transition:.18s ease}.profile-mini:active{transform:scale(.96)}
+.btn-primary{background:var(--gold);color:#171717;box-shadow:0 7px 18px rgba(201,162,39,.18)}
+.btn-primary:hover{background:#b88f1d}.btn-light,.btn-secondary{background:#fff;border:1px solid var(--line);color:#3d3b35}
+.btn-light:hover,.btn-secondary:hover{border-color:var(--gold3);color:var(--gold2)}
+.section-link{font-size:11px;font-weight:800;color:var(--gold2)}
+
+/* HOME */
+.boltiv-home .container{padding-bottom:18px}
+.home-header{height:76px}
+.home-brand{display:flex;align-items:center;gap:9px;color:var(--gold2);font-weight:950;letter-spacing:3px;font-size:24px}
+.home-brand img{width:34px;height:40px;object-fit:contain}
+.home-header-actions{display:flex;align-items:center;gap:8px}
+.icon-button{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:#fff;color:#716d62;font-size:19px;display:flex;align-items:center;justify-content:center}
+.home-welcome{padding:26px 2px 18px}
+.eyebrow{font-size:9px;font-weight:900;letter-spacing:1.7px;color:var(--gold2);margin-bottom:7px}
+.home-welcome h1{font-size:27px;line-height:1.15;letter-spacing:-.6px;margin:0}.home-welcome h1 span{color:var(--gold2)}
+.home-welcome p{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.5}
+.home-balance-card{padding:20px;border:1px solid var(--gold3);border-radius:22px;background:linear-gradient(145deg,#fffdf7,#fff);box-shadow:var(--shadow)}
+.home-balance-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.balance-label{font-size:9px;letter-spacing:1.5px;font-weight:850;color:#777}.balance-value{font-size:34px;font-weight:950;letter-spacing:-1px;color:var(--gold2);margin-top:7px}
+.balance-mark{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--gold);color:#fff;font-weight:950;font-size:20px;box-shadow:0 8px 18px rgba(201,162,39,.2)}
+.home-balance-actions{display:grid;grid-template-columns:1.15fr 1fr;gap:9px;margin-top:19px}.home-balance-actions .btn{padding:13px 10px;font-size:10px}
+.home-services-section{margin-top:25px}.home-service-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.home-service-card{min-height:125px;padding:16px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 5px 18px rgba(25,25,20,.035);display:flex;flex-direction:column;align-items:flex-start;transition:.18s ease}
+.home-service-card:active{transform:translateY(1px);border-color:var(--gold3)}
+.service-icon{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:var(--gold-soft);border:1px solid var(--gold3);color:var(--gold2);font-size:18px;font-weight:950}
+.home-service-card strong{margin-top:14px;font-size:12px}.home-service-card small{margin-top:4px;color:#85827a;font-size:9px;line-height:1.35}.home-service-wide{grid-column:1/-1;min-height:90px;display:grid;grid-template-columns:40px 1fr;column-gap:13px;align-items:center}.home-service-wide strong{margin:0}.home-service-wide small{margin:3px 0 0}
+.home-recent-section{margin-top:27px}.home-recent-list{display:flex;flex-direction:column;gap:8px}.home-transaction{width:100%;display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--line);border-radius:15px;background:#fff;text-align:left;box-shadow:0 3px 13px rgba(25,25,20,.025)}.home-transaction .transaction-icon{width:39px;height:39px;border-radius:12px;flex-shrink:0}.home-tx-main{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}.home-tx-main strong{font-size:11px}.home-tx-main small{font-size:8.5px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.home-tx-right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}.home-tx-right b{font-size:10.5px}.credit{color:var(--success)}.debit{color:#34322d}.status-pill{font-size:7px;font-weight:900;text-transform:uppercase;padding:3px 6px;border-radius:20px;background:#f4f4f1;color:#777}.status-pill.success{background:#edf8f1;color:var(--success)}.status-pill.pending{background:var(--gold-soft);color:var(--gold2)}.status-pill.failed{background:#fff1f1;color:var(--danger)}
+.home-loading,.home-empty{padding:25px 14px;text-align:center;color:#8b8982;border:1px dashed var(--line);border-radius:15px;background:#fff;font-size:10px}.home-empty span{display:block;font-size:24px;color:var(--gold2);margin-bottom:7px}.home-empty strong{display:block;color:#333;font-size:11px}.home-empty small{display:block;margin-top:4px;font-size:9px}
+.home-trust-card{display:flex;gap:12px;align-items:flex-start;margin-top:18px;padding:15px;border:1px solid var(--gold3);border-radius:16px;background:var(--gold-soft)}.trust-icon{width:34px;height:34px;border-radius:11px;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:950;flex-shrink:0}.home-trust-card strong{font-size:11px}.home-trust-card p{margin-top:4px;color:#777;font-size:9px;line-height:1.5}
+
+/* ALL SERVICE PAGES */
+.airtime-page,.data-page{background:var(--bg)}
+.airtime-header,.data-header{padding:17px 0 13px!important;border-bottom:1px solid var(--line)!important}
+.airtime-title,.data-title{font-size:21px!important;letter-spacing:-.3px!important}.airtime-subtitle,.data-subtitle{font-size:8px!important;letter-spacing:1.3px!important;color:var(--gold2)!important;font-weight:900}
+.back-button{width:38px!important;height:38px!important;border:1px solid var(--line)!important;border-radius:50%!important;background:#fff!important;color:#59564f!important}
+.airtime-hero,.data-hero{margin-top:15px!important;padding:19px!important;border:1px solid var(--gold3)!important;border-radius:19px!important;background:linear-gradient(145deg,#fffdf7,#fff)!important;box-shadow:var(--shadow)}
+.airtime-hero-label,.data-hero-label{font-size:8px!important;letter-spacing:1.6px!important;color:var(--gold2)!important}.airtime-hero-title,.data-hero-title{font-size:24px!important;letter-spacing:-.5px!important}.airtime-hero-text,.data-hero-text{font-size:10px!important;line-height:1.55!important;color:#777!important}
+.airtime-card,.data-card{margin-top:12px!important;border:1px solid var(--line)!important;border-radius:19px!important;background:#fff!important;box-shadow:var(--shadow)!important}
+.airtime-label,.data-label{font-size:8.5px!important;letter-spacing:1.2px!important;color:#666!important}.airtime-input,.data-input{border:1px solid #deddd6!important;border-radius:12px!important;background:#fff!important}.network-button,.amount-button,.plan-button{border:1px solid var(--line)!important;border-radius:13px!important;background:#fff!important}.network-button.active,.amount-button.active,.plan-button.active{border-color:var(--gold)!important;background:var(--gold-soft)!important;box-shadow:0 0 0 1px var(--gold)!important}.purchase-button{background:var(--gold)!important;color:#171717!important;border:0!important;border-radius:13px!important;box-shadow:0 8px 20px rgba(201,162,39,.18)!important}
+
+/* WALLET */
+.balance-card{border-color:var(--gold3)!important;background:linear-gradient(145deg,#fffdf7,#fff)!important;box-shadow:var(--shadow)!important}.wallet-action{border-color:var(--line)!important}.wallet-action-icon{color:var(--gold2)!important}.wallet-modal-confirm{background:var(--gold)!important;color:#171717!important;border-color:var(--gold)!important}.wallet-modal-cancel{background:#fff!important;color:#444!important}.wallet-modal-icon{background:var(--gold-soft)!important;color:var(--gold2)!important;border-color:var(--gold3)!important}
+
+/* TRANSACTIONS */
+.transactions-header{padding:17px 0 13px!important;border-bottom:1px solid var(--line)!important}.transactions-title{font-size:21px!important;letter-spacing:-.3px!important}.transactions-subtitle{font-size:8px!important;letter-spacing:1.3px!important;color:var(--gold2)!important;font-weight:900}.search-box{background:#fff!important;border:1px solid var(--line)!important;border-radius:13px!important}.filter-button{border-color:var(--line)!important;background:#fff!important}.filter-button.active{background:var(--gold)!important;border-color:var(--gold)!important;color:#171717!important}.transaction-summary{border-color:var(--gold3)!important;background:var(--gold-soft)!important}.transaction-item{border-color:var(--line)!important;box-shadow:0 3px 12px rgba(25,25,20,.025)!important}.transaction-icon{background:var(--gold-soft)!important;border-color:var(--gold3)!important;color:var(--gold2)!important}.modal-card{border-color:var(--gold3)!important}.close-button{background:var(--gold)!important;color:#171717!important;border-color:var(--gold)!important}
+
+/* BOTTOM NAV */
+.bottom-nav{height:70px!important;background:rgba(255,255,255,.96)!important;border-top:1px solid var(--line)!important;box-shadow:0 -8px 24px rgba(25,25,20,.04)!important}.nav-item{font-size:8px!important}.nav-icon{font-size:19px!important}.nav-item.active{color:var(--gold2)!important}.nav-item.active .nav-icon{transform:translateY(-1px)}
+
+@media(min-width:900px){
+ .container{max-width:1120px!important}.home-header{height:82px}.home-welcome{padding:42px 0 22px}.home-welcome h1{font-size:40px}.home-welcome p{font-size:14px}.home-balance-card{max-width:760px;padding:27px}.balance-value{font-size:43px}.home-service-grid{grid-template-columns:repeat(4,1fr)}.home-service-wide{grid-column:auto;min-height:125px;display:flex;align-items:flex-start}.home-recent-section{max-width:760px}.home-trust-card{max-width:760px}.bottom-nav{max-width:1120px!important}.home-services-section{margin-top:36px}
+}

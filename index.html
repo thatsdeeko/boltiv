@@ -3,429 +3,107 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="theme-color" content="#f7f7f5">
-<link rel="canonical" href="https://boltiv.ng/">
-<title>BOLTIV — Dashboard</title>
-<script>
-/* BOLTIV clean root URL: keep index.html for GitHub Pages, but don't show it in the address bar. */
-if (window.location.pathname.endsWith("/index.html")) {
-  window.history.replaceState(
-    null,
-    document.title,
-    "/" + window.location.search + window.location.hash
-  );
-}
-</script>
-
-<style>
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;background:#ffffff;color:#171717;font-family:Arial,Helvetica,sans-serif}
-body{min-height:100vh}
-button,a{font-family:inherit;cursor:pointer}
-a{text-decoration:none;color:inherit}
-.page{min-height:100vh;padding-bottom:40px}
-.container{width:min(100% - 30px,480px);margin:auto}
-.header{display:flex;align-items:center;justify-content:space-between;padding:24px 0}
-.brand{display:flex;align-items:center;gap:8px;color:#b8860b;font-size:23px;font-weight:1000;letter-spacing:3px}.brand img{width:34px;height:40px;object-fit:contain;display:block}
-.login{padding:10px 15px;border:1px solid #b8860b;border-radius:10px;background:transparent;color:#b8860b;font-size:11px;font-weight:1000}
-.hero{padding:30px 0 25px}
-.hero-label{color:#b8860b;font-size:11px;font-weight:1000;letter-spacing:2px}
-.hero h1{margin:12px 0 0;font-size:35.2px;line-height:1.05;font-weight:1000}
-.hero h1 span{color:#b8860b}
-.hero p{margin:12px 0 0;color:#777;font-size:12.1px;line-height:1.7}
-.wallet{margin-top:22px;padding:20px;border:1px solid #ead99b;border-radius:20px;background:linear-gradient(145deg,#fffdf4,#fafaf8)}
-.wallet-label{color:#777;font-size:10px;font-weight:1000;letter-spacing:1.5px}
-.wallet-balance{margin-top:8px;color:#b8860b;font-size:33px;font-weight:1000}
-.wallet-email{margin-top:7px;color:#666;font-size:10px}
-.hero-button{margin-top:15px;padding:13px 18px;border:0;border-radius:12px;background:#b8860b;color:#f7f7f5;font-size:11px;font-weight:1000}
-.section{margin-top:30px}
-.title{color:#777;font-size:10px;font-weight:1000;letter-spacing:1.5px;margin-bottom:13px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
-.card{min-height:125px;padding:17px;border:1px solid #e5e5e1;border-radius:19px;background:linear-gradient(145deg,#ffffff,#fafaf8)}
-.exam-card{grid-column:1/-1;width:100%;max-width:300px;justify-self:center;text-align:center}.exam-card .icon{margin-left:auto;margin-right:auto}.exam-card .name,.exam-card .text{text-align:center}
-.icon{width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#fffdf4;border:1px solid #ead99b;color:#b8860b;font-size:19.8px;font-weight:1000}
-.name{margin-top:16px;font-size:11px;font-weight:1000}
-.text{margin-top:5px;color:#666;font-size:7.7px;line-height:1.5}
-.info{padding:20px;border:1px solid #e5e5e1;border-radius:20px;background:#ffffff}
-.info h2{margin:0;color:#171717;font-size:16.5px}
-.info p{margin:10px 0 0;color:#777;font-size:11px;line-height:1.8}
-.steps{display:flex;flex-direction:column;gap:10px}
-.step{display:flex;gap:12px;align-items:flex-start;padding:15px;border:1px solid #e5e5e1;border-radius:16px;background:#ffffff}
-.step-number{width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:10px;background:#fffdf4;border:1px solid #ead99b;color:#b8860b;font-size:11px;font-weight:1000}
-.step h3{margin:0;font-size:11px}
-.step p{margin:5px 0 0;color:#666;font-size:10px;line-height:1.5}
-.contact-card{padding:20px;border:1px solid #ead99b;border-radius:20px;background:linear-gradient(145deg,#fffdf4,#fafaf8)}
-.contact-item{padding:11px 0;border-bottom:1px solid #222;color:#888;font-size:11px}
-.contact-item:last-child{border-bottom:0}
-.contact-item strong{display:block;margin-bottom:4px;color:#b8860b;font-size:10px}
-.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
-.links a{padding:10px 12px;border:1px solid #e5e5e1;border-radius:10px;color:#888;font-size:10px}
-.footer{margin-top:40px;padding:25px 0;border-top:1px solid #e5e5e1;text-align:center;color:#555;font-size:10px;line-height:1.7}
-.footer strong{color:#b8860b}
-
-/* Desktop layout: keep the dashboard compact, centered and readable on wide screens. */
-@media (min-width: 900px){
-  .page{padding-bottom:60px}
-  .container{width:min(100% - 64px,1100px)}
-  .header{padding:28px 0}
-  .brand{font-size:27px;gap:10px}
-  .brand img{width:43px;height:50px}
-  .hero{padding:54px 0 36px}
-  .hero h1{font-size:52px;line-height:1.08}
-  .hero p{font-size:15px;max-width:720px}
-  .wallet{margin-top:28px;padding:28px;max-width:760px}
-  .wallet-balance{font-size:42px}
-  .hero-button{font-size:13px;padding:14px 22px}
-  .section{margin-top:46px}
-  .title{font-size:12px;margin-bottom:16px}
-  .grid{grid-template-columns:repeat(4,1fr);gap:18px}
-  .card{min-height:185px;padding:22px;border-radius:22px}
-  .exam-card{grid-column:2 / span 2;max-width:100%;text-align:center}.exam-card .icon{margin-left:auto;margin-right:auto}
-  .icon{width:50px;height:50px;font-size:22px}
-  .name{margin-top:20px;font-size:14px}
-  .text{font-size:11px;line-height:1.6}
-  .info,.contact-card{padding:26px}
-  .info h2{font-size:21px}
-  .info p{font-size:13px;line-height:1.75}
-  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-  .step{min-height:145px;padding:18px}
-  .step h3{font-size:13px}
-  .step p{font-size:11px}
-  .contact-item{font-size:13px}
-  .contact-item strong{font-size:11px}
-  .links a{font-size:11px}
-  .footer{font-size:11px}
-}
-</style>
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="BOLTIV — fast, simple digital services.">
+<title>BOLTIV — Home</title>
 <link rel="icon" type="image/png" href="assets/boltiv-icon.png">
+<link rel="stylesheet" href="style.css">
+<script>
+if(window.location.pathname.endsWith('/index.html'))window.history.replaceState(null,document.title,'/'+window.location.search+window.location.hash);
+if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html');
+</script>
 </head>
-
 <body>
-
-<div class="page">
+<div class="page boltiv-home">
 <div class="container">
-
-<header class="header">
-<div class="brand"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
-<div style="display:flex;gap:8px;align-items:center"><button class="login" onclick="location.href='notifications.html'">🔔</button><button class="login" id="logoutButton">LOGOUT</button></div>
+<header class="header home-header">
+  <a class="home-brand" href="index.html" aria-label="BOLTIV home"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
+  <div class="home-header-actions">
+    <button class="icon-button" onclick="location.href='notifications.html'" aria-label="Notifications">♢</button>
+    <button class="profile-mini" id="profileButton" onclick="location.href='profile.html'">U</button>
+  </div>
 </header>
 
-<section class="hero">
-
-<div class="hero-label">WELCOME TO BOLTIV</div>
-
-<h1>
-Hello, <span id="userName">User.</span>
-</h1>
-
-<p>
-Manage your everyday digital services from one convenient platform.
-</p>
-
-<div class="wallet">
-
-<div class="wallet-label">
-WALLET BALANCE
-</div>
-
-<div class="wallet-balance" id="walletBalance">
-₦0.00
-</div>
-
-
-
-</div>
-
-<button
-class="hero-button"
-onclick="location.href='wallet.html'">
-FUND WALLET
-</button>
-
+<main>
+<section class="home-welcome">
+  <div>
+    <div class="eyebrow">WELCOME BACK</div>
+    <h1>Hello, <span id="userName">User</span></h1>
+    <p>Your everyday digital services, in one place.</p>
+  </div>
 </section>
 
-<section class="section">
-
-<div class="title">
-OUR SERVICES
-</div>
-
-<div class="grid">
-
-<div class="card"
-onclick="location.href='airtime.html'">
-<div class="icon">☎</div>
-<div class="name">Airtime</div>
-<div class="text">
-Recharge your phone quickly and conveniently.
-</div>
-</div>
-
-<div class="card"
-onclick="location.href='data.html'">
-<div class="icon">◉</div>
-<div class="name">Data</div>
-<div class="text">
-Purchase affordable data bundles for your line.
-</div>
-</div>
-
-<div class="card"
-onclick="location.href='electricity.html'">
-<div class="icon">ϟ</div>
-<div class="name">Electricity</div>
-<div class="text">
-Pay your electricity bills conveniently.
-</div>
-</div>
-
-<div class="card"
-onclick="location.href='cable.html'">
-<div class="icon">▣</div>
-<div class="name">Cable TV</div>
-<div class="text">
-Renew your TV subscription with ease.
-</div>
-</div>
-
-<div class="card exam-card" onclick="location.href='exam-pin.html'">
-<div class="icon">🎓</div>
-<div class="name">Exam PINs</div>
-<div class="text">Buy available WAEC, NECO and NABTEB exam PINs instantly.</div>
-</div>
-
-</div>
-
+<section class="home-balance-card">
+  <div class="home-balance-top">
+    <div><div class="balance-label">AVAILABLE BALANCE</div><div class="balance-value" id="walletBalance">₦0.00</div></div>
+    <div class="balance-mark">₦</div>
+  </div>
+  <div class="home-balance-actions">
+    <button class="btn btn-primary" onclick="location.href='wallet.html'">+ FUND WALLET</button>
+    <button class="btn btn-light" onclick="location.href='transactions.html'">VIEW ACTIVITY</button>
+  </div>
 </section>
 
-<section class="section">
-
-<div class="title">
-ABOUT BOLTIV
-</div>
-
-<div class="info">
-
-<h2>
-Fast. Simple. Reliable.
-</h2>
-
-<p>
-BOLTIV is a digital services platform designed to make everyday payments more convenient.
-Customers can fund their wallet and use their available balance to purchase airtime, data, electricity and cable TV services.
-</p>
-
-<p>
-Our goal is to provide a simple and convenient experience for managing essential digital services from one platform.
-</p>
-
-</div>
+<section class="section home-services-section">
+  <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="transactions.html">Activity →</a></div>
+  <div class="home-service-grid">
+    <a class="home-service-card" href="airtime.html"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
+    <a class="home-service-card" href="data.html"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
+    <a class="home-service-card" href="electricity.html"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
+    <a class="home-service-card" href="cable.html"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
+    <a class="home-service-card home-service-wide" href="exam-pin.html"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
+  </div>
 </section>
 
-<section class="section">
-
-<div class="title">
-HOW IT WORKS
-</div>
-
-<div class="steps">
-
-<div class="step">
-<div class="step-number">01</div>
-<div>
-<h3>Create an account</h3>
-<p>
-Register for a BOLTIV account to access the platform.
-</p>
-</div>
-</div>
-
-<div class="step">
-<div class="step-number">02</div>
-<div>
-<h3>Fund your wallet</h3>
-<p>
-Add funds securely to your BOLTIV wallet.
-</p>
-</div>
-</div>
-
-<div class="step">
-<div class="step-number">03</div>
-<div>
-<h3>Choose a service</h3>
-<p>
-Select airtime, data, electricity or cable TV.
-</p>
-</div>
-</div>
-
-<div class="step">
-<div class="step-number">04</div>
-<div>
-<h3>Complete your transaction</h3>
-<p>
-Confirm your details and receive your service.
-</p>
-</div>
-</div>
-
-</div>
+<section class="section home-recent-section">
+  <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="transactions.html">See all →</a></div>
+  <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
 </section>
 
-<section class="section">
-
-<div class="title">
-CONTACT BOLTIV
-</div>
-
-<div class="contact-card">
-
-<div class="contact-item">
-<strong>EMAIL</strong>
-boltivsupport@gmail.com
-</div>
-
-<div class="contact-item">
-<strong>PHONE</strong>
-07086836820
-</div>
-
-<div class="contact-item">
-<strong>CUSTOMER SUPPORT</strong>
-Our support team is available to assist customers with questions and transaction issues.
-</div>
-
-</div>
+<section class="section home-trust-card">
+  <div class="trust-icon">✓</div>
+  <div><strong>Simple, secure payments</strong><p>Fund your wallet once and use it across BOLTIV services. Every purchase gets a transaction reference.</p></div>
 </section>
-
-<section class="section">
-
-<div class="title">
-LEGAL & INFORMATION
-</div>
-
-<div class="info">
-
-<h2>
-Customer Information
-</h2>
-
-<p>
-Customers are responsible for providing accurate information when making transactions.
-Transaction details should be reviewed carefully before confirmation.
-</p>
-
-<div class="links">
-<a href="privacy.html">Privacy Policy</a>
-<a href="terms.html">Terms & Conditions</a>
-<a href="contact.html">Contact Us</a>
-</div>
-
-</div>
-</section>
-
-<footer class="footer">
-<strong>BOLTIV</strong><br>
-Digital services made simple.<br><br>
-© 2026 BOLTIV. All rights reserved.
-</footer>
-
+</main>
 </div>
 </div>
+
+<nav class="bottom-nav">
+<button class="nav-item active" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
+<button class="nav-item" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
+<button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button>
+<button class="nav-item" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
+</nav>
 
 <script>
-const API_BASE="https://boltiv-backend.onrender.com";
-const TOKEN_KEY="boltivAuthToken";
-const USER_KEY="boltivUser";
-const EMAIL_KEY="boltivUserEmail";
-
-const userName=document.getElementById("userName");
-const walletBalance=document.getElementById("walletBalance");
-const logoutButton=document.getElementById("logoutButton");
-
-async function loadAccount(){
-  const token=localStorage.getItem(TOKEN_KEY);
-  if(!token){
-    location.replace("login.html");
-    return;
-  }
-
-  try{
-    const response=await fetch(API_BASE+"/api/me",{
-      method:"GET",
-      headers:{"Accept":"application/json","Authorization":"Bearer "+token}
-    });
-
-    let data={success:false};
-    try{ data=await response.json(); }catch(e){}
-
-    if(response.status===401 || response.status===403){
-      throw new Error("SESSION_EXPIRED");
-    }
-
-    if(!response.ok || !data.success){
-      throw new Error(data.message || "Unable to load account.");
-    }
-
-    if(data.user){
-      localStorage.setItem(USER_KEY,JSON.stringify(data.user));
-      localStorage.setItem(EMAIL_KEY,data.user.email||"");
-      userName.textContent=(data.user.name||"User")+".";
-    }
-
-    let walletData=data.wallet||null;
-    try{
-      const walletResponse=await fetch(API_BASE+"/api/wallet",{method:"GET",headers:{"Accept":"application/json","Authorization":"Bearer "+token}});
-      if(walletResponse.ok){const wd=await walletResponse.json();if(wd.success&&wd.wallet) walletData=wd.wallet;}
-    }catch(e){console.warn("BOLTIV WALLET LOAD ERROR",e);}
-
-    if(walletData){
-      const balance=Number(walletData.balance||0);
-      walletBalance.textContent="₦"+balance.toLocaleString("en-NG",{
-        minimumFractionDigits:2,maximumFractionDigits:2
-      });
-      localStorage.setItem("boltivBalance",String(balance));
-      localStorage.setItem("boltivWalletBalance",String(balance));
-    }
-
-    localStorage.setItem("boltivLoggedIn","true");
-  }catch(error){
-    console.error("BOLTIV SESSION ERROR:",error);
-    if(error.message==="SESSION_EXPIRED"){
-      localStorage.removeItem("boltivLoggedIn");
-      localStorage.removeItem(USER_KEY);
-      localStorage.removeItem(EMAIL_KEY);
-      localStorage.removeItem(TOKEN_KEY);
-      location.replace("login.html");
-    }
-  }
+const API_BASE='https://boltiv-backend.onrender.com';
+const TOKEN_KEY='boltivAuthToken';
+const USER_KEY='boltivUser';
+const money=v=>'₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const typeInfo=t=>{const s=String(t.service||'').toLowerCase();if(s.includes('airtime'))return['airtime','Airtime','☎'];if(s.includes('data'))return['data','Data','⌁'];if(s.includes('electric'))return['electricity','Electricity','ϟ'];if(s.includes('cable')||s.includes('tv'))return['cable','Cable TV','▣'];if(s.includes('wallet')||s.includes('fund'))return['wallet','Wallet Funding','₦'];return['other','Transaction','•']};
+const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDateString('en-NG',{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})};
+async function loadHome(){
+ const token=localStorage.getItem(TOKEN_KEY); if(!token){location.replace('login.html');return;}
+ try{
+  const [meRes,walletRes,txRes]=await Promise.all([
+   fetch(API_BASE+'/api/me',{headers:{Authorization:'Bearer '+token}}),
+   fetch(API_BASE+'/api/wallet',{headers:{Authorization:'Bearer '+token}}),
+   fetch(API_BASE+'/api/transactions',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
+  ]);
+  if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
+  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]};
+  if(me.user){localStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();}
+  if(wallet.success&&wallet.wallet){const b=Number(wallet.wallet.balance||0);document.getElementById('walletBalance').textContent=money(b);localStorage.setItem('boltivBalance',String(b));localStorage.setItem('boltivWalletBalance',String(b));}
+  renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]);
+ }catch(e){if(e.message==='SESSION_EXPIRED'){localStorage.clear();location.replace('login.html');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
 }
-
-logoutButton.onclick=async()=>{
-  const token=localStorage.getItem(TOKEN_KEY);
-  logoutButton.disabled=true;
-  logoutButton.textContent="LOGGING OUT...";
-  try{
-    if(token){
-      await fetch(API_BASE+"/api/auth/logout",{
-        method:"POST",
-        headers:{"Accept":"application/json","Authorization":"Bearer "+token}
-      });
-    }
-  }catch(error){
-    console.error("BOLTIV LOGOUT ERROR:",error);
-  }
-  localStorage.removeItem("boltivLoggedIn");
-  localStorage.removeItem(USER_KEY);
-  localStorage.removeItem(EMAIL_KEY);
-  localStorage.removeItem("boltivBalance");
-  localStorage.removeItem("boltivTransactions");
-  localStorage.removeItem(TOKEN_KEY);
-  location.replace("login.html");
-};
-
-loadAccount();
+function renderRecent(items){
+ const list=document.getElementById('recentList'); if(!items.length){list.innerHTML='<div class="home-empty"><span>↯</span><strong>No transactions yet</strong><small>Your purchases and wallet funding will appear here.</small></div>';return;}
+ list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
+}
+document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
+loadHome();
 </script>
 </body>
 </html>

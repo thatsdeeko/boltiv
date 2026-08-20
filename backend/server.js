@@ -257,38 +257,96 @@ return parseCheapDataHubPlanTable(html).filter(p=>p.network_name===selected);
 }finally{clearTimeout(timer);}
 }
 
-async function cheapDataHubRequest(endpoint,payload){
-if(!CHEAPDATAHUB_API_KEY)return {success:false,statusCode:503,message:"CheapDataHub is not configured on the server."};
+async function cheapDataHubRequest(endpoint,payload,options={}){
+if(!CHEAPDATAHUB_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"CheapDataHub is not configured on the server."};
+const timeoutMs=Number(options.timeoutMs||15000);
+const controller=new AbortController();
+const timer=setTimeout(()=>controller.abort(),timeoutMs);
+try{
 const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{
 method:"POST",
 headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,"Content-Type":"application/json",Accept:"application/json"},
-body:JSON.stringify(payload)
+body:JSON.stringify(payload),signal:controller.signal
 });
-let data={};
-try{data=await response.json();}catch{}
-const statusValue=String(data.status??data.success??"").toLowerCase();
-const success=response.ok&&(statusValue==="true"||statusValue==="success"||data.success===true||Boolean(data.reference&&response.status<300));
-return {success,statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Transaction successful.":"Transaction was not successful.")};
+let data={};try{data=await response.json();}catch{}
+const statusValue=String(data.status??data.success??data.data?.status??"").toLowerCase();
+const providerReference=data.reference||data.transaction_id||data.data?.reference||data.data?.transaction_id||null;
+if(["true","success","successful"].includes(statusValue))return {success:true,outcome:"successful",statusCode:response.status,data,providerReference,message:data.message||"Transaction successful."};
+if(["pending","processing","initiated"].includes(statusValue))return {success:true,outcome:"pending",statusCode:response.status,data,providerReference,message:data.message||"Transaction is being processed."};
+if(statusValue==="failed")return {success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:data.message||"Transaction failed."};
+if(statusValue==="refunded")return {success:false,outcome:"refunded",statusCode:response.status,data,providerReference,message:data.message||"Transaction was refunded by the provider."};
+if(response.status===409)return {success:false,outcome:"duplicate_unknown",statusCode:409,data,providerReference,message:data.message||"Provider reports an existing transaction; status verification is required."};
+if(response.status>=500)return {success:false,outcome:"unknown",statusCode:response.status,data,providerReference,message:data.message||`CheapDataHub server error (${response.status}); transaction status must be verified.`};
+return {success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:data.message||`CheapDataHub request failed (${response.status}).`};
+}catch(e){
+if(e.name==="AbortError")return {success:false,outcome:"unknown",statusCode:504,data:{},providerReference:null,message:"CheapDataHub did not respond in time. Your transaction is being verified."};
+return {success:false,outcome:"unknown",statusCode:502,data:{},providerReference:null,message:"CheapDataHub connection could not be confirmed. Your transaction is being verified."};
+}finally{clearTimeout(timer);}
 }
 
-async function cheapDataHubGet(endpoint){
-if(!CHEAPDATAHUB_API_KEY)return {success:false,statusCode:503,message:"CheapDataHub is not configured on the server."};
-const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{method:"GET",headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,Accept:"application/json"}});
+async function cheapDataHubGet(endpoint,options={}){
+if(!CHEAPDATAHUB_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"CheapDataHub is not configured on the server."};
+const timeoutMs=Number(options.timeoutMs||10000);
+const controller=new AbortController();
+const timer=setTimeout(()=>controller.abort(),timeoutMs);
+try{
+const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{method:"GET",headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,Accept:"application/json"},signal:controller.signal});
 let data={};try{data=await response.json();}catch{}
-const statusValue=String(data.status??data.success??"").toLowerCase();
-const success=response.ok&&(statusValue==="true"||statusValue==="success"||data.success===true);
-return {success,statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Request successful.":"Request was not successful.")};
+const statusValue=String(data.status??data.success??data.data?.status??data.transaction?.status??"").toLowerCase();
+const success=["true","success","successful"].includes(statusValue);
+return {success,outcome:success?"successful":(["pending","processing","initiated"].includes(statusValue)?"pending":(statusValue==="failed"?"failed":(statusValue==="refunded"?"refunded":"unknown"))),statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Request successful.":"Request status is unknown.")};
+}catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,message:"CheapDataHub status could not be verified."};}finally{clearTimeout(timer);}
 }
 
 async function debitWallet(userId,amount){
 const client=await pool.connect();
+try{await client.query("BEGIN");await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);const r=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,userId]);if(!r.rows.length){await client.query("ROLLBACK");return {success:false,message:"Insufficient wallet balance."};}await client.query("COMMIT");return {success:true,balance:Number(r.rows[0].balance)};}catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
+}
+
+async function createVTUTransactionAndDebit(data){
+const client=await pool.connect();
 try{
 await client.query("BEGIN");
-await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
-const r=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,userId]);
-if(!r.rows.length){await client.query("ROLLBACK");return {success:false,message:"Insufficient wallet balance."};}
+await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[data.userId]);
+if(data.idempotencyKey){
+const existing=await client.query(`SELECT id,reference,status,amount,provider_reference FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1 FOR UPDATE`,[data.userId,data.idempotencyKey]);
+if(existing.rows.length){await client.query("COMMIT");return {success:true,existing:true,transaction:existing.rows[0]};}
+}
+const wallet=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[data.amount,data.userId]);
+if(!wallet.rows.length){await client.query("ROLLBACK");return {success:false,message:"Insufficient wallet balance."};}
+let inserted;
+try{
+inserted=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference) VALUES($1,'debit',$2,$3,$4,'processing',$5,$6::jsonb,$7,$8) RETURNING id,reference,status,amount,provider_reference`,[data.userId,data.service,data.amount,data.reference,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null]);
+}catch(e){
+if(e.code==="23505"&&data.idempotencyKey){const existing=await client.query(`SELECT id,reference,status,amount,provider_reference FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1 FOR UPDATE`,[data.userId,data.idempotencyKey]);if(existing.rows.length){await client.query("ROLLBACK");return {success:true,existing:true,transaction:existing.rows[0]};}}
+throw e;
+}
 await client.query("COMMIT");
-return {success:true,balance:Number(r.rows[0].balance)};
+return {success:true,existing:false,transaction:inserted.rows[0],balance:Number(wallet.rows[0].balance)};
+}catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
+}
+
+async function finalizeVTUTransaction(transactionId,outcome,providerData={},providerReference=null){
+const client=await pool.connect();
+try{
+await client.query("BEGIN");
+const q=await client.query(`SELECT * FROM transactions WHERE id=$1 FOR UPDATE`,[transactionId]);
+if(!q.rows.length){await client.query("ROLLBACK");return {success:false,message:"Transaction not found."};}
+const tx=q.rows[0];
+const ref=providerReference||tx.provider_reference||providerData.reference||providerData.transaction_id||providerData.data?.reference||providerData.data?.transaction_id||null;
+if(tx.status==="successful"){await client.query("COMMIT");return {success:true,status:"successful",alreadyFinal:true};}
+if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,status:"refunded",alreadyFinal:true};}
+if(outcome==="successful"){
+await client.query(`UPDATE transactions SET status='successful',provider_reference=COALESCE(provider_reference,$2),completed_at=NOW(),last_provider_status='successful',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
+await client.query("COMMIT");return {success:true,status:"successful"};
+}
+if(outcome==="failed"||outcome==="refunded"){
+if(!tx.refunded_at){await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2`,[Number(tx.amount),tx.user_id]);}
+await client.query(`UPDATE transactions SET status='refunded',provider_reference=COALESCE(provider_reference,$2),refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),last_provider_status=$4,refund_reason=$5,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData,refund_reason:outcome}),outcome,outcome]);
+await client.query("COMMIT");return {success:true,status:"refunded",refunded:!tx.refunded_at};
+}
+await client.query(`UPDATE transactions SET status='pending',provider_reference=COALESCE(provider_reference,$2),last_provider_status='pending',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
+await client.query("COMMIT");return {success:true,status:"pending"};
 }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
 
@@ -297,8 +355,31 @@ await db(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$
 }
 
 async function insertVTUTransaction(data){
-await db(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference,completed_at,refunded_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12) ON CONFLICT(reference) DO NOTHING`,[
-data.userId,data.type||"debit",data.service,data.amount,data.reference,data.status,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null,data.status==="successful"?new Date():null,data.status==="failed"?new Date():null]);
+await db(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference,completed_at,refunded_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12) ON CONFLICT(reference) DO NOTHING`,[data.userId,data.type||"debit",data.service,data.amount,data.reference,data.status,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null,data.status==="successful"?new Date():null,data.status==="failed"?new Date():null]);
+}
+
+async function getCheapDataHubTransaction(providerReference){
+if(!providerReference)return {success:false,outcome:"unknown",message:"Missing provider reference."};
+return cheapDataHubGet(`transactions/${encodeURIComponent(providerReference)}`);
+}
+
+async function reconcileCheapDataHubTransactions(){
+let rows=[];
+try{rows=(await db(`SELECT id,provider_reference FROM transactions WHERE service IN ('airtime','data','exam_pin') AND status IN ('processing','pending') AND provider_reference IS NOT NULL AND date>NOW()-INTERVAL '48 hours' ORDER BY date ASC LIMIT 100`)).rows;}catch(e){console.error("CHEAPDATAHUB RECONCILIATION QUERY ERROR:",e);return {success:false,error:e.message};}
+let checked=0,finalized=0;
+for(const tx of rows){
+try{const result=await getCheapDataHubTransaction(tx.provider_reference);checked++;if(["successful","failed","refunded"].includes(result.outcome)){await finalizeVTUTransaction(tx.id,result.outcome,result.data||{},tx.provider_reference);finalized++;}}catch(e){console.error("CHEAPDATAHUB RECONCILIATION ERROR:",tx.id,e);}}
+return {success:true,checked,finalized};
+}
+
+async function reconcilePendingTransactions(){return reconcileCheapDataHubTransactions();}
+
+async function adminRefund(req){
+const check=await requireAdminCsrf(req);if(!check.success)return check;
+const b=await body(req);const ref=clean(b.reference);const reason=clean(b.reason)||"Admin approved refund";
+if(!ref)return {success:false,statusCode:400,message:"Transaction reference is required."};
+const client=await pool.connect();
+try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2`,[Number(tx.amount),tx.user_id]);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
 }
 
 async function processVTUTransaction(user,data){
@@ -310,54 +391,29 @@ if(!["airtime","data","exam_pin"].includes(service))return {success:false,status
 if(!validAmount(amount))return {success:false,statusCode:400,message:"Invalid amount."};
 if(service!=="exam_pin"&&!/^0\d{10}$/.test(clean(data.phone)))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
 const idem=clean(data.idempotencyKey||data.idempotency_key);
-if(idem){
-const existing=await db(`SELECT reference,status,amount FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1`,[userId,idem]);
-if(existing.rows.length)return {success:existing.rows[0].status==="successful"||existing.rows[0].status==="pending",message:existing.rows[0].status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:existing.rows[0].reference,status:existing.rows[0].status,amount:Number(existing.rows[0].amount),alreadyProcessed:true};
-}
 const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);
 if(!security.rows[0]?.transaction_pin_hash)return {success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
 const suppliedPin=String(data.transactionPin||"");
 if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return {success:false,statusCode:400,message:"Incorrect Transaction PIN."};
-const referenceValue=reference("BOLTIV-TX");
-const debit=await debitWallet(userId,amount);
-if(!debit.success)return {success:false,statusCode:400,message:debit.message,balance:0};
-let providerResult;
-try{
+let providerPayload,recipient=clean(data.phone);
 if(service==="data"){
-const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);
-if(!Number.isInteger(bundleId)||bundleId<=0)throw new Error("Invalid data plan.");
-providerResult=await cheapDataHubRequest("data/purchase",{bundle_id:bundleId,phone_number:clean(data.phone)});
+const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);if(!Number.isInteger(bundleId)||bundleId<=0)return {success:false,statusCode:400,message:"Invalid data plan."};providerPayload={bundle_id:bundleId,phone_number:recipient};
 }else if(service==="exam_pin"){
-const productId=Number(data.product_id||data.providerPayload?.product_id||0);
-const quantity=Number(data.quantity||data.providerPayload?.quantity||1);
-if(!Number.isInteger(productId)||productId<=0)throw new Error("Invalid exam PIN product.");
-if(![1,2,5].includes(quantity))throw new Error("Exam PIN quantity must be 1, 2, or 5.");
-providerResult=await cheapDataHubRequest("exam-pin/purchase",{product_id:productId,quantity});
+const productId=Number(data.product_id||data.providerPayload?.product_id||0);const quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."};if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."};providerPayload={product_id:productId,quantity};recipient=null;
 }else{
-const network=normalizeDataNetwork(data.network||data.providerPayload?.network);
-const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};
-const providerId=providerIds[network];
-if(!providerId)throw new Error("Unsupported network.");
-providerResult=await cheapDataHubRequest("airtime/purchase",{provider_id:providerId,phone_number:clean(data.phone),amount});
+const network=normalizeDataNetwork(data.network||data.providerPayload?.network);const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};const providerId=providerIds[network];if(!providerId)return {success:false,statusCode:400,message:"Unsupported network."};providerPayload={provider_id:providerId,phone_number:recipient,amount};
 }
-}catch(e){
-await refundWallet(userId,amount);
-await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:"failed",recipient:clean(data.phone),idempotencyKey:idem,metadata:{error:e.message}});
-return {success:false,statusCode:502,message:e.message||"Provider connection failed."};
-}
-const providerData=providerResult.data||{};
-const providerReference=providerData.reference||providerData.transaction_id||providerData.data?.reference||providerData.data?.transaction_id||null;
-if(!providerResult.success){
-await refundWallet(userId,amount);
-await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:"failed",recipient:clean(data.phone),idempotencyKey:idem,providerReference,metadata:providerData});
-return {success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded."};
-}
-const providerStatus=String(providerData.status||"").toLowerCase();
-const pending=["pending","processing","initiated"].includes(providerStatus);
-const finalStatus=pending?"pending":"successful";
-await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:finalStatus,recipient:clean(data.phone),idempotencyKey:idem,providerReference,metadata:providerData});
+const referenceValue=reference("BOLTIV-TX");
+const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"cheapdatahub",request:providerPayload}});
+if(!reserved.success)return {success:false,statusCode:400,message:reserved.message,balance:0};
+if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return {success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
+let providerResult;
+try{providerResult=await cheapDataHubRequest(service==="data"?"data/purchase":service==="exam_pin"?"exam-pin/purchase":"airtime/purchase",providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"CheapDataHub connection could not be confirmed. Your transaction is being verified."};}
+const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||providerData.reference||providerData.transaction_id||providerData.data?.reference||providerData.data?.transaction_id||null;
+const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);
 const wallet=await getWallet(userId);
-return {success:true,status:finalStatus,message:providerResult.message|| (pending?"Your transaction is being processed.":"Transaction successful."),reference:referenceValue,providerReference,balance:wallet?.balance??debit.balance,providerData,delivery:providerData?.data?.delivery||providerData?.delivery||null,pins:providerData?.data?.delivery?.pins||providerData?.delivery?.pins||[]};
+if(finalized.status==="refunded")return {success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};
+return {success:true,status:finalized.status,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,providerData,delivery:providerData?.data?.delivery||providerData?.delivery||null,pins:providerData?.data?.delivery?.pins||providerData?.delivery?.pins||[]};
 }
 
 function token(){
@@ -522,6 +578,20 @@ await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS refunded_at TIMESTAM
 await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
 await db(`CREATE INDEX IF NOT EXISTS transactions_status_idx ON transactions(status)`);
 await db(`CREATE INDEX IF NOT EXISTS transactions_provider_reference_idx ON transactions(provider_reference) WHERE provider_reference IS NOT NULL`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS refund_reason TEXT`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS last_provider_status TEXT`);
+await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_attempts INTEGER NOT NULL DEFAULT 0`);
+await db(`CREATE TABLE IF NOT EXISTS cheapdatahub_webhook_events(
+ id BIGSERIAL PRIMARY KEY,
+ event_id TEXT UNIQUE NOT NULL,
+ event_type TEXT,
+ provider_reference TEXT,
+ payload JSONB NOT NULL,
+ processed BOOLEAN NOT NULL DEFAULT FALSE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ processed_at TIMESTAMPTZ
+)`);
+await db(`CREATE INDEX IF NOT EXISTS cheapdatahub_webhook_provider_ref_idx ON cheapdatahub_webhook_events(provider_reference) WHERE provider_reference IS NOT NULL`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS user_security(
@@ -2978,6 +3048,23 @@ if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 try{const b=await body(req),accountType=String(b.accountType||"static").toLowerCase();let result;if(accountType==="dynamic")result=await createCustomerFlutterwaveDynamicAccount(user,Number(b.amount));else result=await createCustomerFlutterwaveStaticAccount(user,String(b.identityType||"").toLowerCase(),String(b.identityNumber||""));return send(res,200,result);}catch(error){console.error("FLUTTERWAVE FUNDING ACCOUNT ACTIVATION ERROR:",error);return send(res,400,{success:false,message:error.message||"Unable to create funding account."});}
 }
 
+if(req.method==="POST"&&path==="/api/cheapdatahub/webhook"){
+let rawBody="";req.on("data",chunk=>{rawBody+=chunk;});req.on("end",async()=>{try{
+let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{success:false,message:"Invalid JSON payload."});}
+// CheapDataHub webhook authentication must be configured with the provider's current secret/signature contract.
+// If CHEAPDATAHUB_WEBHOOK_SECRET is configured, accept a constant-time HMAC SHA-256 signature.
+const secret=String(process.env.CHEAPDATAHUB_WEBHOOK_SECRET||"");
+if(secret){const supplied=String(req.headers["x-cheapdatahub-signature"]||req.headers["x-webhook-signature"]||"");const expected=crypto.createHmac("sha256",secret).update(rawBody).digest("hex");const suppliedBuf=Buffer.from(supplied);const expectedBuf=Buffer.from(expected);if(suppliedBuf.length!==expectedBuf.length||!crypto.timingSafeEqual(suppliedBuf,expectedBuf))return send(res,401,{success:false,message:"Invalid CheapDataHub webhook signature."});}else if(process.env.NODE_ENV==="production"){return send(res,503,{success:false,message:"CheapDataHub webhook secret is not configured."});}
+const eventId=clean(payload.event_id||payload.id||payload.event?.id||payload.reference||payload.data?.id);const providerReference=clean(payload.reference||payload.transaction_id||payload.data?.reference||payload.data?.transaction_id);const status=String(payload.status||payload.data?.status||payload.event_type||payload.event||"").toLowerCase();
+if(!eventId)return send(res,400,{success:false,message:"CheapDataHub webhook is missing an event identifier."});
+const existing=await db(`SELECT processed FROM cheapdatahub_webhook_events WHERE event_id=$1 LIMIT 1`,[eventId]);if(existing.rows[0]?.processed)return send(res,200,{success:true,duplicate:true});
+await db(`INSERT INTO cheapdatahub_webhook_events(event_id,event_type,provider_reference,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(event_id) DO NOTHING`,[eventId,status,providerReference,JSON.stringify(payload)]);
+let tx=null;if(providerReference){const q=await db(`SELECT id FROM transactions WHERE provider_reference=$1 AND service IN ('airtime','data','exam_pin') ORDER BY date DESC LIMIT 1`,[providerReference]);tx=q.rows[0]||null;}
+if(tx){const outcome=["successful","success","true"].includes(status)?"successful":(status==="failed"?"failed":(status==="refunded"?"refunded":"pending"));await finalizeVTUTransaction(tx.id,outcome,payload,providerReference);}
+await db(`UPDATE cheapdatahub_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);return send(res,200,{success:true,matched:Boolean(tx)});
+}catch(error){console.error("CHEAPDATAHUB WEBHOOK ERROR:",error);return send(res,500,{success:false,message:"Webhook processing failed."});}});return;
+}
+
 if(req.method==="POST"&&path==="/api/flutterwave/webhook"){
 let rawBody="";req.on("data",chunk=>{rawBody+=chunk;});req.on("end",async()=>{
 try{
@@ -3427,9 +3514,11 @@ console.log(
 );
 
 // Reconcile provider-pending transactions every 5 minutes.
+const reconcileIntervalMs=Math.max(30000,Number(process.env.PENDING_RECONCILE_INTERVAL_MS||300000));
+setTimeout(()=>reconcileCheapDataHubTransactions().catch(error=>console.error("INITIAL CHEAPDATAHUB RECONCILIATION ERROR:",error)),15000).unref();
 setInterval(()=>{
-  reconcilePendingTransactions().catch(error=>console.error("AUTOMATIC TRANSACTION RECONCILIATION ERROR:",error));
-},5*60*1000).unref();
+  reconcileCheapDataHubTransactions().catch(error=>console.error("AUTOMATIC CHEAPDATAHUB RECONCILIATION ERROR:",error));
+},reconcileIntervalMs).unref();
 
 console.log(
 `Admin configured: ${

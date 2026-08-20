@@ -58,7 +58,7 @@ function normalizeTransaction(t){
   meta=meta&&typeof meta==="object"?meta:{};
   const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
   const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
-  return {...t,type,amount:Number(t.amount||0),createdAt:t.date||t.createdAt||"",phone:t.recipient||meta.phone||requestMeta.phone||requestMeta.phone_number||t.phone||"",network:meta.network||meta.network_provider||requestMeta.network||requestMeta.network_provider||t.network||"",provider:meta.provider||t.provider||"",plan:meta.plan||meta.plan_name||pricing.plan||requestMeta.plan_name||requestMeta.plan||t.plan||"",smartcard:meta.smartcard||meta.iuc||t.smartcard||"",meterNumber:meta.meterNumber||meta.meter||t.meterNumber||"",meterType:meta.meterType||t.meterType||"",id:t.reference||t.id};
+  return {...t,type,amount:Number(t.amount||0),createdAt:t.date||t.createdAt||"",phone:t.recipient||meta.phone||requestMeta.phone||requestMeta.phone_number||t.phone||"",network:meta.network||meta.network_provider||pricing.network||pricing.network_name||requestMeta.network||requestMeta.network_provider||t.network||"",provider:meta.provider||t.provider||"",plan:meta.plan||meta.plan_name||pricing.plan||requestMeta.plan_name||requestMeta.plan||t.plan||"",smartcard:meta.smartcard||meta.iuc||t.smartcard||"",meterNumber:meta.meterNumber||meta.meter||t.meterNumber||"",meterType:meta.meterType||t.meterType||"",id:t.reference||t.id};
 }
 async function syncTransactions(){
   const token=localStorage.getItem("boltivAuthToken")||"";

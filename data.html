@@ -23,12 +23,9 @@ function close(){modal.classList.remove("show");modalBtn.style.display="block"}
 modalBtn.onclick=close;modal.onclick=e=>{if(e.target===modal)close()};
 function esc(v){return String(v??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]))}
 function planLabel(plan){
-  if(Number(plan.size_mb)>0){
-    const mb=Number(plan.size_mb);
-    if(mb>=1024){const gb=mb/1024;return (Number.isInteger(gb)?gb:gb.toFixed(2))+"GB"}
-    return mb+"MB";
-  }
-  return plan.name||plan.code;
+  // Keep the exact plan name returned by BOLTIV/our live catalog.
+  // This is also what the backend persists on the transaction receipt.
+  return String(plan?.name||plan?.code||"").trim();
 }
 function renderPlans(plans){
   selectedPlan=null;

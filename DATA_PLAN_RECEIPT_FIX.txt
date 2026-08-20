@@ -1,0 +1,8 @@
+BOLTIV DATA PLAN RECEIPT FIX
+
+1. The backend now stores the authoritative live CheapDataHub/BOLTIV plan name returned for the selected bundle ID, instead of trusting the frontend's shortened label.
+2. The data page now preserves the exact live plan name in the purchase request/confirmation.
+3. Transaction history and receipt fallbacks no longer invent a label such as "Plan 76"; the stored plan name is preferred.
+4. Existing historical transactions that were already saved as "Plan 76" cannot be reconstructed unless the original plan name was stored elsewhere. New purchases will contain the exact plan name.
+
+Deploy the backend and frontend together from this ZIP.

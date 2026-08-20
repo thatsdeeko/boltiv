@@ -133,7 +133,8 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const typeInfo=t=>{const s=String(t.service||'').toLowerCase();if(s.includes('airtime'))return['airtime','Airtime','☎'];if(s.includes('data'))return['data','Data','⌁'];if(s.includes('electric'))return['electricity','Electricity','ϟ'];if(s.includes('cable')||s.includes('tv'))return['cable','Cable TV','▣'];if(s.includes('wallet')||s.includes('fund'))return['wallet','Wallet Funding','₦'];return['other','Transaction','•']};
 const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDateString('en-NG',{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})};
 async function loadHome(){
- const token=boltivMemoryStorage.getItem(TOKEN_KEY); if(!token){location.replace('login.html');return;}
+ await window.boltivAuthReady;
+ const token=boltivMemoryStorage.getItem(TOKEN_KEY)||'cookie-session'; if(!token){location.replace('login.html');return;}
  try{
   const [meRes,walletRes,txRes,noteRes]=await Promise.all([
    fetch(API_BASE+'/api/me',{headers:{Authorization:'Bearer '+token}}),

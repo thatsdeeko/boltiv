@@ -24,6 +24,8 @@
         mem.set('boltivUser',JSON.stringify(d.user));
         if(d.user.email) mem.set('boltivUserEmail',d.user.email);
         mem.set('boltivLoggedIn','true');
+        // Compatibility marker only; the real credential is the HttpOnly cookie.
+        mem.set('boltivAuthToken','cookie-session');
         return d.user;
       }
     }catch(e){}

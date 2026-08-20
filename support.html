@@ -8,9 +8,7 @@
 <link rel="stylesheet" href="style.css">
 
 <script>
-if(boltivMemoryStorage.getItem("boltivLoggedIn")!=="true"){
-location.replace("login.html");
-}
+boltivRequireAuth();
 </script>
 
 <style>

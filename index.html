@@ -19,7 +19,7 @@ if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html'
 <header class="header home-header">
   <a class="home-brand" href="index.html" aria-label="BOLTIV home"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
   <div class="home-header-actions">
-    <button class="icon-button" onclick="location.href='notifications.html'" aria-label="Notifications">♢</button>
+    <button class="icon-button notification-button" onclick="location.href='notifications.html'" aria-label="Notifications"><span>♢</span><b id="notificationBadge" class="notification-badge" hidden>0</b></button>
     <button class="profile-mini" id="profileButton" onclick="location.href='profile.html'">U</button>
   </div>
 </header>
@@ -86,24 +86,26 @@ const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDate
 async function loadHome(){
  const token=localStorage.getItem(TOKEN_KEY); if(!token){location.replace('login.html');return;}
  try{
-  const [meRes,walletRes,txRes]=await Promise.all([
+  const [meRes,walletRes,txRes,noteRes]=await Promise.all([
    fetch(API_BASE+'/api/me',{headers:{Authorization:'Bearer '+token}}),
    fetch(API_BASE+'/api/wallet',{headers:{Authorization:'Bearer '+token}}),
-   fetch(API_BASE+'/api/transactions',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
+   fetch(API_BASE+'/api/transactions',{headers:{Authorization:'Bearer '+token},cache:'no-store'}),
+   fetch(API_BASE+'/api/notifications',{headers:{Authorization:'Bearer '+token},cache:'no-store'})
   ]);
   if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
-  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]};
+  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0};
   if(me.user){localStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();}
   if(wallet.success&&wallet.wallet){const b=Number(wallet.wallet.balance||0);document.getElementById('walletBalance').textContent=money(b);localStorage.setItem('boltivBalance',String(b));localStorage.setItem('boltivWalletBalance',String(b));}
-  renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]);
+  renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
  }catch(e){if(e.message==='SESSION_EXPIRED'){localStorage.clear();location.replace('login.html');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
 }
 function renderRecent(items){
  const list=document.getElementById('recentList'); if(!items.length){list.innerHTML='<div class="home-empty"><span>↯</span><strong>No transactions yet</strong><small>Your purchases and wallet funding will appear here.</small></div>';return;}
- list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
+ list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
 }
 document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
 loadHome();
+setInterval(loadHome,30000);
 </script>
 </body>
 </html>

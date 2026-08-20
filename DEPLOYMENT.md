@@ -5,7 +5,7 @@ BOLTIV now uses Flutterwave as the payment provider for:
 - Customer wallet deposits through Dynamic or Static NGN virtual accounts.
 - Permanent customer accounts using NIN or BVN.
 - Admin operating-wallet funding through a Flutterwave Dynamic virtual account.
-- Admin Revenue Wallet withdrawals to Nigerian bank accounts through Flutterwave Transfers.
+- Revenue withdrawals are performed manually in the Flutterwave dashboard; BOLTIV does not initiate bank transfers.
 
 ## Required Render variables
 
@@ -45,4 +45,4 @@ Admin → Wallets → Fund Admin Wallet → enter amount → create Flutterwave 
 
 ## Revenue withdrawal
 
-Admin → Revenue & Withdrawals → select bank → verify account → enter amount → Flutterwave Transfer. Pending transfers are reconciled through Flutterwave transfer status/webhooks; failed transfers reverse the reserved revenue balance.
+BOLTIV does not initiate revenue withdrawals. Withdrawals are performed directly in the Flutterwave dashboard. BOLTIV keeps revenue/ledger records for accounting and reconciliation.

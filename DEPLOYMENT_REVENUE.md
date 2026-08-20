@@ -1,6 +1,6 @@
 # BOLTIV Revenue Wallet — Flutterwave Withdrawals
 
-Revenue-wallet withdrawals use Flutterwave's Nigerian bank list, account-name resolution, transfer API, transfer webhooks, and transfer-status endpoint.
+Revenue withdrawals are handled directly in the Flutterwave dashboard. BOLTIV does not expose an in-app revenue withdrawal endpoint.
 
 Flow:
 

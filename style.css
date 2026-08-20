@@ -313,3 +313,5 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
 @media(min-width:900px){
  .container{max-width:1120px!important}.home-header{height:82px}.home-welcome{padding:42px 0 22px}.home-welcome h1{font-size:40px}.home-welcome p{font-size:14px}.home-balance-card{max-width:760px;padding:27px}.balance-value{font-size:43px}.home-service-grid{grid-template-columns:repeat(4,1fr)}.home-service-wide{grid-column:auto;min-height:125px;display:flex;align-items:flex-start}.home-recent-section{max-width:760px}.home-trust-card{max-width:760px}.bottom-nav{max-width:1120px!important}.home-services-section{margin-top:36px}
 }
+
+.notification-button{position:relative}.notification-badge{position:absolute;top:-3px;right:-2px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;background:#b8860b;color:#fff;font-size:8px;font-weight:1000;display:flex;align-items:center;justify-content:center;border:2px solid #fff}.notification-badge[hidden]{display:none}

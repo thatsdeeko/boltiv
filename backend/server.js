@@ -763,6 +763,14 @@ await db(`CREATE TABLE IF NOT EXISTS admin_revenue_withdrawals(id BIGSERIAL PRIM
 await db(`CREATE INDEX IF NOT EXISTS admin_revenue_withdrawals_admin_idx ON admin_revenue_withdrawals(admin_id,created_at DESC)`);
 await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS recipient_type TEXT NOT NULL DEFAULT 'user'`);
 await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS admin_id BIGINT`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS email TEXT`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS amount NUMERIC(14,2) DEFAULT 0`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS amount_kobo BIGINT DEFAULT 0`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS credited BOOLEAN DEFAULT FALSE`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()`);
+await db(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS credited_at TIMESTAMPTZ`);
+await db(`UPDATE payments p SET email=COALESCE(NULLIF(p.email,''),u.email) FROM users u WHERE u.user_id=p.user_id AND (p.email IS NULL OR p.email='')`);
 await db(`CREATE TABLE IF NOT EXISTS admin_audit_logs(
 id BIGSERIAL PRIMARY KEY,
 admin_id BIGINT,
@@ -2323,7 +2331,20 @@ return true;
 }
 async function resolvePlatformAlert(key){await db(`UPDATE platform_alerts SET status='resolved',resolved_at=COALESCE(resolved_at,NOW()) WHERE alert_key=$1 AND status='open'`,[key]);}
 async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['cheapdatahub_config',!CHEAPDATAHUB_API_KEY,'critical','CheapDataHub is not configured','The CheapDataHub API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
-async function adminAlerts(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT id,alert_key,severity,title,message,status,details,first_seen_at,last_seen_at,resolved_at FROM platform_alerts ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END,last_seen_at DESC LIMIT 200`);return{success:true,alerts:r.rows};}if(action==='resolve'){const b=await body(req),key=clean(b.alertKey||b.alert_key);if(!key)return{success:false,statusCode:400,message:'Alert key is required.'};await resolvePlatformAlert(key);await adminAudit(admin,'alert_resolved','platform_alert',key,{},req);return{success:true};}if(action==='reconcile'){const r=await runPlatformAlerts();return{success:Boolean(r),reconciliation:r};}return{success:false,statusCode:400,message:'Unsupported alert action.'};}
+async function adminAlerts(req,action){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
+  if(action==='list'){
+    try{const r=await db(`SELECT id,alert_key,severity,title,message,status,details,first_seen_at,last_seen_at,resolved_at FROM platform_alerts ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END,last_seen_at DESC LIMIT 200`);return{success:true,alerts:r.rows};}
+    catch(e){console.error('ADMIN ALERT LIST ERROR',e?.stack||e?.message||e);return{success:false,statusCode:500,message:'Unable to load platform alerts right now.'};}
+  }
+  if(action==='resolve'){const b=await body(req),key=clean(b.alertKey||b.alert_key);if(!key)return{success:false,statusCode:400,message:'Alert key is required.'};try{await resolvePlatformAlert(key);await adminAudit(admin,'alert_resolved','platform_alert',key,{},req);return{success:true};}catch(e){console.error('ADMIN ALERT RESOLVE ERROR',e?.stack||e?.message||e);return{success:false,statusCode:500,message:'Unable to resolve that alert.'};}}
+  if(action==='reconcile'){
+    try{const r=await runPlatformAlerts();if(!r)return{success:false,statusCode:500,message:'Reconciliation check failed. Check server logs for details.'};return{success:true,reconciliation:r};}
+    catch(e){console.error('ADMIN ALERT RECONCILE ERROR',e?.stack||e?.message||e);return{success:false,statusCode:500,message:'Reconciliation check failed. Check server logs for details.'};}
+  }
+  return{success:false,statusCode:400,message:'Unsupported alert action.'};
+}
 async function adminAnalytics(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const daily=(await db(`WITH d AS (SELECT generate_series(CURRENT_DATE-13,CURRENT_DATE,interval '1 day')::date day) SELECT d.day,COALESCE((SELECT COUNT(*) FROM users u WHERE u.created_at::date=d.day),0)::int users,COALESCE((SELECT COUNT(*) FROM transactions t WHERE t.date::date=d.day),0)::int transactions,COALESCE((SELECT COUNT(*) FROM transactions t WHERE t.date::date=d.day AND t.status='successful'),0)::int successful,COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.date::date=d.day AND t.type='debit' AND t.status='successful'),0) sales,COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.date::date=d.day AND t.type='credit' AND t.service='Wallet Funding' AND t.status='successful'),0) funding,COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.date::date=d.day AND t.status='refunded'),0) refunds,COALESCE((SELECT SUM(COALESCE((t.metadata->'pricing'->>'grossProfit')::numeric,0)) FROM transactions t WHERE t.date::date=d.day AND t.type='debit' AND t.status='successful'),0) profit FROM d ORDER BY d.day`)).rows;const services=(await db(`SELECT service,COUNT(*)::int transactions,COUNT(*) FILTER(WHERE status='successful')::int successful,COALESCE(SUM(amount) FILTER(WHERE status='successful' AND type='debit'),0) sales,COALESCE(SUM(COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0)) FILTER(WHERE status='successful' AND type='debit'),0) profit FROM transactions WHERE date>=NOW()-INTERVAL '30 days' GROUP BY service ORDER BY sales DESC`)).rows;const topUsers=(await db(`SELECT u.user_id,u.name,u.email,COUNT(t.id)::int transactions,COALESCE(SUM(t.amount) FILTER(WHERE t.type='debit' AND t.status='successful'),0) spend FROM users u JOIN transactions t ON t.user_id=u.user_id WHERE t.date>=NOW()-INTERVAL '30 days' GROUP BY u.user_id,u.name,u.email ORDER BY spend DESC LIMIT 10`)).rows;return{success:true,daily:daily.map(x=>({...x,sales:Number(x.sales||0),funding:Number(x.funding||0),refunds:Number(x.refunds||0),profit:Number(x.profit||0)})),services:services.map(x=>({...x,sales:Number(x.sales||0),profit:Number(x.profit||0)})),topUsers:topUsers.map(x=>({...x,spend:Number(x.spend||0)}))};}
 
 async function adminStatsResponse(req){
@@ -2391,9 +2412,18 @@ async function adminTransactionsResponse(req){
 async function adminPaymentsResponse(req){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  const r=await db(`SELECT id,reference,user_id,email,amount,amount_kobo,status,credited,created_at,credited_at
-    FROM payments ORDER BY created_at DESC LIMIT 1000`);
-  return{success:true,payments:r.rows.map(x=>({...x,amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)}))};
+  try{
+    const r=await db(`SELECT p.id,p.reference,p.user_id,COALESCE(NULLIF(p.email,''),u.email,'') AS email,
+      COALESCE(p.amount,0) AS amount,COALESCE(p.amount_kobo,0) AS amount_kobo,
+      COALESCE(p.status,'pending') AS status,COALESCE(p.credited,FALSE) AS credited,
+      COALESCE(p.created_at,NOW()) AS created_at,p.credited_at
+      FROM payments p LEFT JOIN users u ON u.user_id=p.user_id
+      ORDER BY p.created_at DESC NULLS LAST,p.id DESC LIMIT 1000`);
+    return{success:true,payments:r.rows.map(x=>({...x,amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)}))};
+  }catch(e){
+    console.error('ADMIN PAYMENTS ERROR',e?.stack||e?.message||e);
+    return{success:false,statusCode:500,message:'Unable to load payment history right now.'};
+  }
 }
 
 async function adminMonitoring(req){

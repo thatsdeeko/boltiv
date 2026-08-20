@@ -1,6 +1,6 @@
 # BOLTIV Revenue Wallet — Strowallet Withdrawals
 
-Revenue-wallet withdrawals now use Strowallet's documented Nigerian bank-transfer API as the only revenue-withdrawal provider.
+Revenue withdrawals are intentionally disabled inside BOLTIV.
 
 ## Render environment
 
@@ -13,9 +13,9 @@ Required:
 
 The existing Strowallet customer funding variables remain in use for virtual-account funding.
 
-## Withdrawal flow
+## Withdrawal policy
 
-1. Admin opens **Revenue & Withdrawals**.
+1. Admin reviews BOLTIV revenue and ledger records in the admin dashboard.
 2. BOLTIV loads banks from Strowallet.
 3. Admin enters a Nigerian 10-digit account number.
 4. BOLTIV verifies the account through Strowallet's `GET /banks/get-customer-name/` endpoint.

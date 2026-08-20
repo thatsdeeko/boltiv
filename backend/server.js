@@ -257,6 +257,42 @@ return parseCheapDataHubPlanTable(html).filter(p=>p.network_name===selected);
 }finally{clearTimeout(timer);}
 }
 
+const cheapDataHubPlanCache=new Map();
+async function getAuthoritativeCheapDataHubDataPlan(network,bundleId){
+const selected=normalizeDataNetwork(network);
+const id=Number(bundleId);
+if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");
+const key=selected;
+let entry=cheapDataHubPlanCache.get(key);
+if(!entry||Date.now()-entry.at>60000){
+  entry={at:Date.now(),plans:await fetchCheapDataHubDataPlans(selected)};
+  cheapDataHubPlanCache.set(key,entry);
+}
+const plan=entry.plans.find(x=>Number(x.bundle_id)===id);
+if(!plan)throw new Error("The selected data plan is no longer available.");
+const service=await getService("data");
+if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");
+const customerPrice=customerPriceFromCost(Number(plan.price),pricingConfig(service));
+if(!Number.isFinite(customerPrice)||customerPrice<=0)throw new Error("Unable to determine the current data price.");
+return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};
+}
+
+async function getAuthoritativeCheapDataHubExamProduct(productId){
+const id=Number(productId);
+if(!Number.isInteger(id)||id<=0)throw new Error("Invalid exam PIN product.");
+const provider=await cheapDataHubGet("exam-pin/products");
+if(!provider.success)throw new Error(provider.message||"Unable to verify exam PIN pricing.");
+const service=await getService("exam_pin");
+if(!service||service.enabled===false||service.maintenance===true)throw new Error("Exam PIN service is currently unavailable.");
+const raw=Array.isArray(provider.data?.data)?provider.data.data:(Array.isArray(provider.data?.products)?provider.data.products:(Array.isArray(provider.data)?provider.data:[]));
+const found=raw.find(p=>Number(p.product_id??p.id)===id);
+if(!found)throw new Error("The selected exam PIN product is no longer available.");
+const providerPrice=Number(found.price??found.amount??found.cost??0);
+const customerPrice=customerPriceFromCost(providerPrice,pricingConfig(service));
+if(!Number.isFinite(providerPrice)||providerPrice<=0||!Number.isFinite(customerPrice)||customerPrice<=0)throw new Error("Unable to determine the current exam PIN price.");
+return {product_id:id,provider_price:providerPrice,customer_price:customerPrice,name:clean(found.name??found.exam_name??found.title??"Exam PIN")};
+}
+
 async function cheapDataHubRequest(endpoint,payload,options={}){
 if(!CHEAPDATAHUB_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"CheapDataHub is not configured on the server."};
 const timeoutMs=Number(options.timeoutMs||15000);
@@ -314,9 +350,11 @@ if(existing.rows.length){await client.query("COMMIT");return {success:true,exist
 }
 const wallet=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[data.amount,data.userId]);
 if(!wallet.rows.length){await client.query("ROLLBACK");return {success:false,message:"Insufficient wallet balance."};}
+await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:data.userId,direction:"debit",amount:-Number(data.amount),balanceAfter:Number(wallet.rows[0].balance),reference:`WALLET-DEBIT-${data.reference}`,category:"vtu_debit",description:`Wallet debit for ${data.service}`,metadata:{service:data.service,recipient:data.recipient||null}});
 let inserted;
 try{
 inserted=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference) VALUES($1,'debit',$2,$3,$4,'processing',$5,$6::jsonb,$7,$8) RETURNING id,reference,status,amount,provider_reference`,[data.userId,data.service,data.amount,data.reference,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null]);
+await client.query(`UPDATE financial_ledger SET transaction_id=$1 WHERE reference=$2`,[inserted.rows[0].id,`WALLET-DEBIT-${data.reference}`]);
 }catch(e){
 if(e.code==="23505"&&data.idempotencyKey){const existing=await client.query(`SELECT id,reference,status,amount,provider_reference FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1 FOR UPDATE`,[data.userId,data.idempotencyKey]);if(existing.rows.length){await client.query("ROLLBACK");return {success:true,existing:true,transaction:existing.rows[0]};}}
 throw e;
@@ -338,12 +376,20 @@ if(tx.status==="successful"){await client.query("COMMIT");return {success:true,s
 if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,status:"refunded",alreadyFinal:true};}
 if(outcome==="successful"){
 await client.query(`UPDATE transactions SET status='successful',provider_reference=COALESCE(provider_reference,$2),completed_at=NOW(),last_provider_status='successful',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
-await client.query("COMMIT");return {success:true,status:"successful"};
+const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
+await recordRevenueSale(client,fresh);
+await client.query("COMMIT");try{await addNotificationOnce(tx.user_id,"Transaction successful",`Your ${String(tx.service||"service")} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.` ,"transaction",`tx-success-${tx.id}`);}catch{}return {success:true,status:"successful"};
 }
 if(outcome==="failed"||outcome==="refunded"){
-if(!tx.refunded_at){await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2`,[Number(tx.amount),tx.user_id]);}
+if(!tx.refunded_at){
+const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(tx.amount),tx.user_id]);
+if(!wr.rows.length)throw new Error("Wallet could not be credited for refund.");
+await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:Number(tx.amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-REFUND-${tx.reference}`,transactionId:tx.id,category:"vtu_refund",description:`Refund for ${tx.service}`,metadata:{reason:outcome}});
+}
 await client.query(`UPDATE transactions SET status='refunded',provider_reference=COALESCE(provider_reference,$2),refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),last_provider_status=$4,refund_reason=$5,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData,refund_reason:outcome}),outcome,outcome]);
-await client.query("COMMIT");return {success:true,status:"refunded",refunded:!tx.refunded_at};
+const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
+if(!tx.refunded_at)await recordRevenueRefund(client,fresh);
+await client.query("COMMIT");if(!tx.refunded_at){try{await addNotificationOnce(tx.user_id,"Transaction refunded",`Your ${String(tx.service||"service")} transaction of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} could not be completed. The amount has been returned to your wallet.` ,"transaction",`tx-refund-${tx.id}`);}catch{}}return {success:true,status:"refunded",refunded:!tx.refunded_at};
 }
 await client.query(`UPDATE transactions SET status='pending',provider_reference=COALESCE(provider_reference,$2),last_provider_status='pending',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
 await client.query("COMMIT");return {success:true,status:"pending"};
@@ -379,7 +425,7 @@ const check=await requireAdminCsrf(req);if(!check.success)return check;
 const b=await body(req);const ref=clean(b.reference);const reason=clean(b.reason)||"Admin approved refund";
 if(!ref)return {success:false,statusCode:400,message:"Transaction reference is required."};
 const client=await pool.connect();
-try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2`,[Number(tx.amount),tx.user_id]);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
+try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(tx.amount),tx.user_id]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:Number(tx.amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-ADMIN-REFUND-${tx.reference}`,transactionId:tx.id,category:"admin_refund",description:`Admin refund for ${tx.service}`,metadata:{reason,admin_id:check.admin.id}});await recordRevenueRefund(client,tx);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
 }
 
 async function processVTUTransaction(user,data){
@@ -395,16 +441,25 @@ const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE us
 if(!security.rows[0]?.transaction_pin_hash)return {success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
 const suppliedPin=String(data.transactionPin||"");
 if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return {success:false,statusCode:400,message:"Incorrect Transaction PIN."};
-let providerPayload,recipient=clean(data.phone);
+let providerPayload,recipient=clean(data.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
 if(service==="data"){
-const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);if(!Number.isInteger(bundleId)||bundleId<=0)return {success:false,statusCode:400,message:"Invalid data plan."};providerPayload={bundle_id:bundleId,phone_number:recipient};
+const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);if(!Number.isInteger(bundleId)||bundleId<=0)return {success:false,statusCode:400,message:"Invalid data plan."};
+let authoritative;try{authoritative=await getAuthoritativeCheapDataHubDataPlan(data.network||data.providerPayload?.network,bundleId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}
+if(Math.abs(Number(amount)-Number(authoritative.customer_price))>0.009)return {success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};
+pricingMeta={providerCost:Number(authoritative.provider_price),customerPrice:Number(authoritative.customer_price),grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2))};
+providerPayload={bundle_id:bundleId,phone_number:recipient};
 }else if(service==="exam_pin"){
-const productId=Number(data.product_id||data.providerPayload?.product_id||0);const quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."};if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."};providerPayload={product_id:productId,quantity};recipient=null;
+const productId=Number(data.product_id||data.providerPayload?.product_id||0);const quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."};if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."};
+let authoritative;try{authoritative=await getAuthoritativeCheapDataHubExamProduct(productId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current exam PIN price."};}
+const expectedTotal=Number((authoritative.customer_price*quantity).toFixed(2));
+if(Math.abs(Number(amount)-expectedTotal)>0.009)return {success:false,statusCode:400,message:"The selected exam PIN price has changed. Please refresh the products and try again."};
+pricingMeta={providerCost:Number((authoritative.provider_price*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-authoritative.provider_price*quantity).toFixed(2))};
+providerPayload={product_id:productId,quantity};recipient=null;
 }else{
 const network=normalizeDataNetwork(data.network||data.providerPayload?.network);const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};const providerId=providerIds[network];if(!providerId)return {success:false,statusCode:400,message:"Unsupported network."};providerPayload={provider_id:providerId,phone_number:recipient,amount};
 }
 const referenceValue=reference("BOLTIV-TX");
-const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"cheapdatahub",request:providerPayload}});
+const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"cheapdatahub",request:providerPayload,pricing:pricingMeta}});
 if(!reserved.success)return {success:false,statusCode:400,message:reserved.message,balance:0};
 if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return {success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
 let providerResult;
@@ -581,18 +636,6 @@ await db(`CREATE INDEX IF NOT EXISTS transactions_provider_reference_idx ON tran
 await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS refund_reason TEXT`);
 await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS last_provider_status TEXT`);
 await db(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS provider_attempts INTEGER NOT NULL DEFAULT 0`);
-await db(`CREATE TABLE IF NOT EXISTS cheapdatahub_webhook_events(
- id BIGSERIAL PRIMARY KEY,
- event_id TEXT UNIQUE NOT NULL,
- event_type TEXT,
- provider_reference TEXT,
- payload JSONB NOT NULL,
- processed BOOLEAN NOT NULL DEFAULT FALSE,
- created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
- processed_at TIMESTAMPTZ
-)`);
-await db(`CREATE INDEX IF NOT EXISTS cheapdatahub_webhook_provider_ref_idx ON cheapdatahub_webhook_events(provider_reference) WHERE provider_reference IS NOT NULL`);
-
 await db(`
 CREATE TABLE IF NOT EXISTS user_security(
 user_id TEXT PRIMARY KEY,
@@ -610,6 +653,8 @@ status TEXT NOT NULL DEFAULT 'open',
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
+await db(`ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS transaction_reference TEXT`);
+await db(`CREATE INDEX IF NOT EXISTS support_tickets_transaction_ref_idx ON support_tickets(transaction_reference) WHERE transaction_reference IS NOT NULL`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS notifications(
@@ -621,6 +666,8 @@ type TEXT NOT NULL DEFAULT 'info',
 read BOOLEAN NOT NULL DEFAULT FALSE,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
+await db(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupe_key TEXT`);
+await db(`CREATE UNIQUE INDEX IF NOT EXISTS notifications_dedupe_idx ON notifications(dedupe_key) WHERE dedupe_key IS NOT NULL`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS payments(
@@ -815,6 +862,17 @@ password_reset_tokens_expiry_idx
 ON password_reset_tokens(expires_at)`
 );
 
+await db(`CREATE TABLE IF NOT EXISTS financial_ledger( id BIGSERIAL PRIMARY KEY, account_type TEXT NOT NULL, owner_id TEXT NOT NULL, direction TEXT NOT NULL CHECK(direction IN ('credit','debit','opening')), amount NUMERIC(14,2) NOT NULL, balance_after NUMERIC(14,2) NOT NULL, reference TEXT UNIQUE NOT NULL, transaction_id BIGINT, category TEXT NOT NULL, description TEXT NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS financial_ledger_account_idx ON financial_ledger(account_type,owner_id,created_at DESC)`);
+await db(`CREATE INDEX IF NOT EXISTS financial_ledger_transaction_idx ON financial_ledger(transaction_id)`);
+await db(`CREATE INDEX IF NOT EXISTS financial_ledger_category_idx ON financial_ledger(category,created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS platform_alerts( id BIGSERIAL PRIMARY KEY, alert_key TEXT UNIQUE NOT NULL, severity TEXT NOT NULL DEFAULT 'warning', title TEXT NOT NULL, message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', details JSONB NOT NULL DEFAULT '{}'::jsonb, first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), resolved_at TIMESTAMPTZ, email_sent_at TIMESTAMPTZ)`);
+await db(`CREATE INDEX IF NOT EXISTS platform_alerts_status_idx ON platform_alerts(status,last_seen_at DESC)`);
+await db(`ALTER TABLE platform_alerts ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ`);
+await db(`INSERT INTO financial_ledger(account_type,owner_id,direction,amount,balance_after,reference,category,description) SELECT 'customer_wallet',w.user_id,'opening',w.balance,w.balance,'OPENING-CUSTOMER-'||w.user_id,'opening_balance','Opening balance at Phase 3 ledger activation' FROM wallets w WHERE NOT EXISTS(SELECT 1 FROM financial_ledger f WHERE f.account_type='customer_wallet' AND f.owner_id=w.user_id)`);
+await db(`INSERT INTO financial_ledger(account_type,owner_id,direction,amount,balance_after,reference,category,description) SELECT 'admin_wallet',a.admin_id,'opening',a.balance,a.balance,'OPENING-ADMIN-'||a.admin_id,'opening_balance','Opening admin operating wallet balance' FROM admin_wallets a WHERE NOT EXISTS(SELECT 1 FROM financial_ledger f WHERE f.account_type='admin_wallet' AND f.owner_id=a.admin_id::text)`);
+await db(`INSERT INTO financial_ledger(account_type,owner_id,direction,amount,balance_after,reference,category,description) SELECT 'revenue_wallet',a.admin_id,'opening',a.balance,a.balance,'OPENING-REVENUE-'||a.admin_id,'opening_balance','Opening BOLTIV revenue wallet balance' FROM admin_revenue_wallets a WHERE NOT EXISTS(SELECT 1 FROM financial_ledger f WHERE f.account_type='revenue_wallet' AND f.owner_id=a.admin_id::text)`);
+
 console.log(
 "DATABASE SETUP COMPLETE"
 );
@@ -861,6 +919,31 @@ result.rows[0].balance
 )
 };
 
+}
+
+async function addNotification(userId,title,message,type="info"){
+  const uid=clean(userId),t=clean(title),m=clean(message),k=clean(type)||"info";
+  if(!uid||!t||!m)return false;
+  await db(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[uid,t,m,k]);
+  return true;
+}
+async function addNotificationOnce(userId,title,message,type="info",dedupeKey=""){
+  const uid=clean(userId),t=clean(title),m=clean(message),k=clean(type)||"info";
+  if(!uid||!t||!m)return false;
+  if(dedupeKey){const r=await db(`INSERT INTO notifications(user_id,title,message,type,dedupe_key) VALUES($1,$2,$3,$4,$5) ON CONFLICT(dedupe_key) DO NOTHING RETURNING id`,[uid,t,m,k,clean(dedupeKey)]);return Boolean(r.rows.length);}
+  return addNotification(uid,t,m,k);
+}
+async function adminNotifications(req){
+  const admin=await adminFromToken(req); if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const b=await body(req),recipient=clean(b.recipient||"all").toLowerCase(),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general");
+  if(title.length<2||message.length<2)return{success:false,statusCode:400,message:"Notification title and message are required."};
+  let userIds=[];
+  if(recipient==="selected"){
+    const id=clean(b.userId||b.user_id); if(!id)return{success:false,statusCode:400,message:"Select a user."};
+    const u=await db(`SELECT user_id FROM users WHERE user_id=$1 LIMIT 1`,[id]); if(!u.rows.length)return{success:false,statusCode:404,message:"User not found."}; userIds=[u.rows[0].user_id];
+  }else{userIds=(await db(`SELECT user_id FROM users WHERE status='active' ORDER BY created_at ASC`)).rows.map(x=>x.user_id);}
+  if(!userIds.length)return{success:false,statusCode:400,message:"No eligible users found."};
+  const client=await pool.connect(); try{await client.query("BEGIN");for(const uid of userIds)await client.query(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[uid,title,message,type]);await client.query("COMMIT");try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({recipient,count:userIds.length,title,type}),requestIp(req)]);}catch{}return{success:true,sent:userIds.length,message:`Notification sent to ${userIds.length} user(s).`};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
 }
 
 async function getTransactions(userId){
@@ -2020,12 +2103,18 @@ message:"Admin logged out successfully."
 }
 
 
+/* ===================== PHASE 3 FINANCIAL LEDGER ===================== */
+async function addFinancialLedger(client,{accountType,ownerId,direction,amount,balanceAfter,reference,transactionId=null,category,description,metadata={}}){
+  await client.query(`INSERT INTO financial_ledger(account_type,owner_id,direction,amount,balance_after,reference,transaction_id,category,description,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) ON CONFLICT(reference) DO NOTHING`,[String(accountType),String(ownerId),String(direction),Number(amount),Number(balanceAfter),String(reference),transactionId||null,String(category),String(description),JSON.stringify(metadata||{})]);
+}
+
 /* ===================== ADMIN WALLET / REVENUE HELPERS ===================== */
 async function ensureAdminWallet(client,adminId){
   await client.query(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);
 }
 async function addAdminLedger(client,adminId,type,amount,balanceAfter,description,ref){
   await client.query(`INSERT INTO admin_wallet_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(reference) DO NOTHING`,[adminId,type,Number(amount),Number(balanceAfter),String(ref),String(description)]);
+  await addFinancialLedger(client,{accountType:"admin_wallet",ownerId:String(adminId),direction:Number(amount)>=0?"credit":"debit",amount:Number(amount),balanceAfter:Number(balanceAfter),reference:`FIN-${ref}`,category:type,description,metadata:{source:"admin_wallet"}});
 }
 async function getAdminWallet(adminId){
   await db(`INSERT INTO admin_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[adminId]);
@@ -2037,6 +2126,43 @@ async function ensureAdminRevenueWallet(client,adminId){
 }
 async function addAdminRevenueLedger(client,adminId,type,amount,balanceAfter,description,ref){
   await client.query(`INSERT INTO admin_revenue_ledger(admin_id,type,amount,balance_after,reference,description) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(reference) DO NOTHING`,[adminId,type,Number(amount),Number(balanceAfter),String(ref),String(description)]);
+  await addFinancialLedger(client,{accountType:"revenue_wallet",ownerId:String(adminId),direction:Number(amount)>=0?"credit":"debit",amount:Number(amount),balanceAfter:Number(balanceAfter),reference:`FIN-${ref}`,category:type,description,metadata:{source:"revenue_wallet"}});
+}
+
+async function getPrimaryAdminId(client){
+  const r=await client.query(`SELECT id FROM admins WHERE LOWER(email)=LOWER($1) LIMIT 1`,[ADMIN_EMAIL]);
+  if(r.rows[0]?.id)return Number(r.rows[0].id);
+  const fallback=await client.query(`SELECT id FROM admins ORDER BY id ASC LIMIT 1`);
+  return fallback.rows[0]?.id?Number(fallback.rows[0].id):null;
+}
+
+async function recordRevenueSale(client,tx){
+  const adminId=await getPrimaryAdminId(client);
+  if(!adminId)return false;
+  await ensureAdminRevenueWallet(client,adminId);
+  const saleRef=`SALE-${tx.reference}`;
+  const existing=await client.query(`SELECT id FROM admin_revenue_ledger WHERE reference=$1 LIMIT 1`,[saleRef]);
+  if(existing.rows.length)return true;
+  const w=await client.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(tx.amount),adminId]);
+  if(!w.rows.length)throw new Error("Revenue wallet could not be credited.");
+  await addAdminRevenueLedger(client,adminId,"sale",Number(tx.amount),Number(w.rows[0].balance),`Customer ${tx.service} sale`,saleRef);
+  return true;
+}
+
+async function recordRevenueRefund(client,tx){
+  const adminId=await getPrimaryAdminId(client);
+  if(!adminId)return false;
+  const saleRef=`SALE-${tx.reference}`;
+  const sale=await client.query(`SELECT id FROM admin_revenue_ledger WHERE reference=$1 LIMIT 1`,[saleRef]);
+  if(!sale.rows.length)return false;
+  const refundRef=`REFUND-${tx.reference}`;
+  const existing=await client.query(`SELECT id FROM admin_revenue_ledger WHERE reference=$1 LIMIT 1`,[refundRef]);
+  if(existing.rows.length)return true;
+  await ensureAdminRevenueWallet(client,adminId);
+  const w=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(tx.amount),adminId]);
+  if(!w.rows.length)throw new Error("Revenue wallet could not be debited for refund.");
+  await addAdminRevenueLedger(client,adminId,"refund",-Number(tx.amount),Number(w.rows[0].balance),`Refunded customer ${tx.service} sale`,refundRef);
+  return true;
 }
 
 /* ===================== FLUTTERWAVE VIRTUAL ACCOUNT FUNDING ===================== */
@@ -2092,7 +2218,7 @@ if(Number(vd.amount||0)<=0)throw new Error("Flutterwave transaction amount is in
 }
 const client=await pool.connect();try{await client.query("BEGIN");const eventId=txId||txRef||accountNumber;const existing=await client.query(`SELECT processed FROM flutterwave_webhook_events WHERE event_id=$1 FOR UPDATE`,[eventId]);if(existing.rows.length&&existing.rows[0].processed){await client.query("COMMIT");return{success:true,duplicate:true};}await client.query(`INSERT INTO flutterwave_webhook_events(event_id,event_type,payload,processed) VALUES($1,$2,$3,FALSE) ON CONFLICT(event_id) DO NOTHING`,[eventId,String(payload?.event||payload?.type||"charge.completed"),JSON.stringify(payload)]);
 if(va.owner_type==="admin"){const adminId=Number(va.owner_id);await ensureAdminWallet(client,adminId);const wr=await client.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,adminId]);if(!wr.rows.length)throw new Error("Admin wallet could not be credited.");await addAdminLedger(client,adminId,"funding",amount,Number(wr.rows[0].balance),"Flutterwave virtual-account funding",`FLW-ADMIN-${eventId}`);await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");return{success:true,duplicate:false,amount,ownerType:"admin",adminId};}
-const userId=String(va.owner_id);await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET balance=wallets.balance+$2,updated_at=NOW()`,[userId,amount]);const referenceValue=`FUND-${eventId}`;await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING`,[userId,amount,referenceValue,txRef||txId,JSON.stringify({provider:"flutterwave",account_number:accountNumber||va.account_number,account_type:va.account_type,payload})]);await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} via Flutterwave bank transfer.` ,"payment");}catch{}return{success:true,duplicate:false,amount,userId};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
+const userId=String(va.owner_id);await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,userId]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");const referenceValue=`FUND-${eventId}`;const tr=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING RETURNING id`,[userId,amount,referenceValue,txRef||txId,JSON.stringify({provider:"flutterwave",account_number:accountNumber||va.account_number,account_type:va.account_type,payload})]);await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:userId,direction:"credit",amount:Number(amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-FUND-${eventId}`,transactionId:tr.rows[0]?.id||null,category:"wallet_funding",description:"Flutterwave wallet funding",metadata:{provider_reference:txRef||txId}});await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} via Flutterwave bank transfer.` ,"payment");}catch{}return{success:true,duplicate:false,amount,userId};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
 }
 async function getAdminFlutterwaveFundingAccount(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const r=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type='admin' AND owner_id=$1 AND account_type='dynamic' AND status='active' AND (expiry_date IS NULL OR expiry_date>NOW()) ORDER BY created_at DESC LIMIT 1`,[String(admin.id)]);return{success:true,account:r.rows[0]||null};}
 async function createAdminFlutterwaveFundingAccount(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:"Enter an amount of at least ₦100."};try{return await createFlutterwaveVirtualAccount({ownerType:"admin",ownerId:String(admin.id),user:{name:"BOLTIV TECHNOLOGIES LIMITED",email:admin.email,phone:process.env.ADMIN_PHONE||"08000000000"},accountType:"dynamic",amount});}catch(e){return{success:false,statusCode:400,message:e.message||"Unable to create Flutterwave admin funding account."};}
@@ -2116,79 +2242,15 @@ const message=r?.data?.message||r?.data?.error||r?.message;
 return typeof message==="string"&&message.trim()?message.trim():fallback;
 }
 
-async function flutterwaveBanks(){
-const r=await flutterwaveRequest("/banks/NG?include_provider_type=1");
-if(!r.success)return{success:false,statusCode:r.statusCode||502,message:flutterwaveError(r,"Unable to load Nigerian banks.")};
-return{success:true,banks:Array.isArray(r.data?.data)?r.data.data.map(x=>({code:String(x.code||x.bank_code||""),name:String(x.name||x.bank_name||"")})).filter(x=>x.code&&x.name):[]};
-}
-async function resolveFlutterwaveAccount(bankCode,accountNumber){
-const r=await flutterwaveRequest("/accounts/resolve",{method:"POST",body:JSON.stringify({account_bank:String(bankCode),account_number:String(accountNumber)})});
-const d=r.data?.data||{};const name=d.account_name||d.accountName;
-if(!r.success||!name)return{success:false,statusCode:r.statusCode||400,message:flutterwaveError(r,"Unable to verify the bank account.")};
-return{success:true,accountName:String(name).trim(),accountNumber:String(d.account_number||accountNumber).trim()};
-}
-async function flutterwaveBankTransfer({amount,bankCode,accountNumber,narration,referenceValue}){
-const payload={account_bank:String(bankCode),account_number:String(accountNumber),amount:Number(amount),currency:"NGN",debit_currency:"NGN",beneficiary_name:"BOLTIV Technologies Limited",reference:String(referenceValue),narration:String(narration||"BOLTIV revenue withdrawal")};
-if(FLW_CALLBACK_URL)payload.callback_url=FLW_CALLBACK_URL;
-const r=await flutterwaveRequest("/transfers",{method:"POST",body:JSON.stringify(payload),headers:{"X-Idempotency-Key":String(referenceValue)}});
-if(!r.success)return{success:false,statusCode:r.statusCode||400,message:flutterwaveError(r,"Flutterwave transfer failed.")};
-const d=r.data?.data||{};const raw=String(d.status||r.data?.status||"NEW").toUpperCase();
-const status=["SUCCESSFUL","COMPLETED"].includes(raw)?"successful":(["FAILED","REVERSED","CANCELLED","CANCELED"].includes(raw)?"failed":"processing");
-return{success:true,status,transferId:d.id||null,providerReference:d.reference||null,message:r.data?.message||raw,data:r.data};
-}
-async function getFlutterwaveTransferStatus(id){
-const r=await flutterwaveRequest(`/transfers/${encodeURIComponent(id)}`);
-if(!r.success)return{success:false,statusCode:r.statusCode||502,message:flutterwaveError(r,"Unable to check transfer status.")};
-const d=r.data?.data||{};const raw=String(d.status||"").toUpperCase();
-const status=["SUCCESSFUL","COMPLETED"].includes(raw)?"successful":(["FAILED","REVERSED","CANCELLED","CANCELED"].includes(raw)?"failed":"processing");
-return{success:true,status,providerMessage:d.complete_message||r.data?.message||raw,data:d};
-}
-
 async function adminRevenue(req,action){
 const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-if(action==='summary'){
+if(action!=="summary")return{success:false,statusCode:404,message:"Revenue withdrawal is disabled in BOLTIV. Use the Flutterwave dashboard for withdrawals."};
 await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
 const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
 const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
 const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
-const reserved=(await db(`SELECT COALESCE(SUM(CASE WHEN status IN ('pending','processing') THEN amount ELSE 0 END),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1`,[admin.id])).rows[0];
-const balance=Number(w?.balance||0),hold=Number(reserved?.reserved||0);const rows=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id]);
-return{success:true,summary:{balance,sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),reserved:hold,available:Math.max(0,Number((balance-hold).toFixed(2)))},withdrawals:rows.rows.map(x=>({...x,amount:Number(x.amount||0),provider:"flutterwave"}))};
+return{success:true,summary:{balance:Number(w?.balance||0),sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0)},withdrawalsDisabled:true,withdrawalInstructions:"Withdrawals are handled directly in the Flutterwave dashboard."};
 }
-if(action==='banks')return flutterwaveBanks();
-if(action==='verify'){
-const b=await body(req),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
-if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank code and 10-digit account number."};
-return resolveFlutterwaveAccount(bankCode,accountNumber);
-}
-if(action==='status'){
-const b=await body(req),id=Number(b.id||0);if(!id)return{success:false,statusCode:400,message:"Withdrawal ID is required."};
-const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,admin.id])).rows[0];if(!row)return{success:false,statusCode:404,message:"Withdrawal not found."};
-if(!row.provider_transfer_id||["successful","failed"].includes(String(row.status)))return{success:true,withdrawal:{...row,amount:Number(row.amount),provider:"flutterwave"}};
-const tr=await getFlutterwaveTransferStatus(row.provider_transfer_id);if(!tr.success)return tr;
-if(tr.status!==row.status){await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE completed_at END WHERE id=$3`,[tr.status,tr.providerMessage||tr.status,row.id]);if(tr.status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.providerMessage||'Flutterwave transfer failed.');}
-const fresh=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[row.id])).rows[0];return{success:true,withdrawal:{...fresh,amount:Number(fresh.amount),provider:"flutterwave"}};
-}
-if(action==='withdraw'){
-const b=await body(req),amount=Number(b.amount),bankCode=clean(b.bankCode||b.bank_code),accountNumber=clean(b.accountNumber||b.account_number);
-if(!Number.isFinite(amount)||amount<1000)return{success:false,statusCode:400,message:"Minimum withdrawal is ₦1,000."};
-if(!bankCode||!/^[0-9]{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid Nigerian bank account."};
-if(!flutterwaveConfigured())return{success:false,statusCode:503,message:"Flutterwave is not configured."};
-const verified=await resolveFlutterwaveAccount(bankCode,accountNumber);if(!verified.success)return verified;
-const client=await pool.connect();let row;
-try{await client.query("BEGIN");await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[`boltiv-revenue-withdraw:${admin.id}`]);await ensureAdminRevenueWallet(client,admin.id);const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);const balance=Number(w.rows[0]?.balance||0);const reserved=(await client.query(`SELECT COALESCE(SUM(amount),0) AS reserved FROM admin_revenue_withdrawals WHERE admin_id=$1 AND status IN ('pending','processing')`,[admin.id])).rows[0];const available=Math.max(0,Number((balance-Number(reserved?.reserved||0)).toFixed(2)));if(amount>available){await client.query("ROLLBACK");return{success:false,statusCode:400,message:`Insufficient BOLTIV balance. Available: ₦${available.toLocaleString("en-NG",{minimumFractionDigits:2})}.`};}const ref=reference("BOLTIV-WD").toLowerCase().replace(/[^a-z0-9_-]/g,"-").slice(0,50);const br=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);row=(await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'processing',$6) RETURNING *`,[admin.id,amount,bankCode,verified.accountNumber,verified.accountName,ref])).rows[0];await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,Number(br.rows[0].balance),'Admin Flutterwave bank withdrawal',`WD-${ref}`);await client.query("COMMIT");}catch(e){try{await client.query("ROLLBACK")}catch{};return{success:false,statusCode:500,message:"Unable to reserve BOLTIV balance for withdrawal."};}finally{client.release();}
-const tr=await flutterwaveBankTransfer({amount,bankCode,accountNumber:verified.accountNumber,narration:"BOLTIV revenue withdrawal",referenceValue:row.reference});
-if(!tr.success){await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||"Flutterwave transfer failed");return{success:false,statusCode:tr.statusCode||400,message:tr.message||"Flutterwave transfer failed.",withdrawalId:row.id};}
-const status=tr.status||"processing";
-if(status==='failed')await reverseRevenueWithdrawal(admin.id,row.id,row.amount,tr.message||"Flutterwave transfer failed");
-else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=$2,provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1 IN ('successful','failed') THEN NOW() ELSE NULL END WHERE id=$4`,[status,tr.transferId||null,tr.message||status,row.id]);
-await adminAudit(admin,'revenue_withdrawal_created','revenue_withdrawal',String(row.id),{amount,bankCode,accountNumber:verified.accountNumber,accountName:verified.accountName,reference:row.reference,status,provider:'flutterwave',providerTransferId:tr.transferId},req);
-return{success:true,message:status==='successful'?"BOLTIV withdrawal completed.":"BOLTIV withdrawal submitted to Flutterwave and is being processed.",withdrawalId:row.id,reference:row.reference,status,accountName:verified.accountName,amount,provider:"flutterwave"};
-}
-return{success:false,statusCode:400,message:"Unknown revenue action."};
-}
-async function reverseRevenueWithdrawal(adminId,id,amount,reason){const c=await pool.connect();try{await c.query("BEGIN");const row=(await c.query(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 FOR UPDATE`,[id,adminId])).rows[0];if(!row){await c.query("ROLLBACK");return;}if(row.status==='failed'){await c.query("COMMIT");return;}await ensureAdminRevenueWallet(c,adminId);const w=await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(amount),adminId]);if(w.rows.length)await addAdminRevenueLedger(c,adminId,'withdrawal_reversal',Number(amount),Number(w.rows[0].balance),reason,`REVERSAL-${row.reference}`);await c.query(`UPDATE admin_revenue_withdrawals SET status='failed',provider_message=$1,updated_at=NOW(),completed_at=NOW() WHERE id=$2`,[reason,id]);await c.query("COMMIT");}catch(e){try{await c.query("ROLLBACK")}catch{}console.error("REVENUE WITHDRAWAL REVERSAL ERROR",e)}finally{c.release();}}
-
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
 async function initializeAdminWalletFunding(req){
 const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
@@ -2237,6 +2299,32 @@ async function adminMe(req){
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
   return{success:true,admin:{id:admin.id,email:admin.email}};
 }
+
+async function getFinancialReconciliation(){
+const customer=(await db(`SELECT COALESCE(SUM(balance),0) balance FROM wallets`)).rows[0];
+const customerLedger=(await db(`SELECT COALESCE(SUM(amount),0) balance FROM financial_ledger WHERE account_type='customer_wallet'`)).rows[0];
+const admin=(await db(`SELECT COALESCE(SUM(balance),0) balance FROM admin_wallets`)).rows[0];
+const adminLedger=(await db(`SELECT COALESCE(SUM(amount),0) balance FROM financial_ledger WHERE account_type='admin_wallet'`)).rows[0];
+const revenue=(await db(`SELECT COALESCE(SUM(balance),0) balance FROM admin_revenue_wallets`)).rows[0];
+const revenueLedger=(await db(`SELECT COALESCE(SUM(amount),0) balance FROM financial_ledger WHERE account_type='revenue_wallet'`)).rows[0];
+const fundingTx=(await db(`SELECT COALESCE(SUM(amount) FILTER(WHERE type='credit' AND status='successful' AND service='Wallet Funding'),0) total FROM transactions`)).rows[0];
+const fundingLedger=(await db(`SELECT COALESCE(SUM(amount) FILTER(WHERE category='wallet_funding'),0) total FROM financial_ledger WHERE account_type='customer_wallet'`)).rows[0];
+const pending=(await db(`SELECT COUNT(*)::int count,COALESCE(SUM(amount),0) amount FROM transactions WHERE status IN ('pending','processing')`)).rows[0];
+const out={customerWallet:Number(customer?.balance||0),customerLedger:Number(customerLedger?.balance||0),adminWallet:Number(admin?.balance||0),adminLedger:Number(adminLedger?.balance||0),revenueWallet:Number(revenue?.balance||0),revenueLedger:Number(revenueLedger?.balance||0),fundingTransactions:Number(fundingTx?.total||0),fundingLedger:Number(fundingLedger?.total||0),pendingCount:Number(pending?.count||0),pendingAmount:Number(pending?.amount||0)};
+out.customerVariance=Number((out.customerWallet-out.customerLedger).toFixed(2));out.adminVariance=Number((out.adminWallet-out.adminLedger).toFixed(2));out.revenueVariance=Number((out.revenueWallet-out.revenueLedger).toFixed(2));out.fundingVariance=Number((out.fundingTransactions-out.fundingLedger).toFixed(2));out.ok=[out.customerVariance,out.adminVariance,out.revenueVariance,out.fundingVariance].every(v=>Math.abs(v)<0.01);return out;
+}
+async function upsertPlatformAlert(alertKey,severity,title,message,details={}){
+const r=await db(`INSERT INTO platform_alerts(alert_key,severity,title,message,status,details) VALUES($1,$2,$3,$4,'open',$5::jsonb) ON CONFLICT(alert_key) DO UPDATE SET severity=EXCLUDED.severity,title=EXCLUDED.title,message=EXCLUDED.message,status='open',details=EXCLUDED.details,last_seen_at=NOW(),resolved_at=NULL RETURNING *`,[alertKey,severity,title,message,JSON.stringify(details)]);
+const row=r.rows[0];
+if(row&&severity==='critical'&&RESEND_API_KEY&&ADMIN_EMAIL){
+const last=row.email_sent_at?new Date(row.email_sent_at).getTime():0;
+if(!last||Date.now()-last>3600000){try{await sendEmail({to:ADMIN_EMAIL,subject:`BOLTIV ALERT: ${title}`,html:`<h2>${title}</h2><p>${message}</p><pre>${JSON.stringify(details,null,2)}</pre>`});await db(`UPDATE platform_alerts SET email_sent_at=NOW() WHERE alert_key=$1`,[alertKey]);}catch(e){console.error('ALERT EMAIL ERROR',e.message)}}}
+return true;
+}
+async function resolvePlatformAlert(key){await db(`UPDATE platform_alerts SET status='resolved',resolved_at=COALESCE(resolved_at,NOW()) WHERE alert_key=$1 AND status='open'`,[key]);}
+async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['cheapdatahub_config',!CHEAPDATAHUB_API_KEY,'critical','CheapDataHub is not configured','The CheapDataHub API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
+async function adminAlerts(req,action){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};if(action==='list'){const r=await db(`SELECT id,alert_key,severity,title,message,status,details,first_seen_at,last_seen_at,resolved_at FROM platform_alerts ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END,last_seen_at DESC LIMIT 200`);return{success:true,alerts:r.rows};}if(action==='resolve'){const b=await body(req),key=clean(b.alertKey||b.alert_key);if(!key)return{success:false,statusCode:400,message:'Alert key is required.'};await resolvePlatformAlert(key);await adminAudit(admin,'alert_resolved','platform_alert',key,{},req);return{success:true};}if(action==='reconcile'){const r=await runPlatformAlerts();return{success:Boolean(r),reconciliation:r};}return{success:false,statusCode:400,message:'Unsupported alert action.'};}
+async function adminAnalytics(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const daily=(await db(`WITH d AS (SELECT generate_series(CURRENT_DATE-13,CURRENT_DATE,interval '1 day')::date day) SELECT d.day,COALESCE((SELECT COUNT(*) FROM users u WHERE u.created_at::date=d.day),0)::int users,COALESCE((SELECT COUNT(*) FROM transactions t WHERE t.date::date=d.day),0)::int transactions,COALESCE((SELECT COUNT(*) FROM transactions t WHERE t.date::date=d.day AND t.status='successful'),0)::int successful,COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.date::date=d.day AND t.type='debit' AND t.status='successful'),0) sales,COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.date::date=d.day AND t.type='credit' AND t.service='Wallet Funding' AND t.status='successful'),0) funding,COALESCE((SELECT SUM(ABS(t.amount)) FROM transactions t WHERE t.date::date=d.day AND t.status='refunded'),0) refunds,COALESCE((SELECT SUM(COALESCE((t.metadata->'pricing'->>'grossProfit')::numeric,0)) FROM transactions t WHERE t.date::date=d.day AND t.type='debit' AND t.status='successful'),0) profit FROM d ORDER BY d.day`)).rows;const services=(await db(`SELECT service,COUNT(*)::int transactions,COUNT(*) FILTER(WHERE status='successful')::int successful,COALESCE(SUM(amount) FILTER(WHERE status='successful' AND type='debit'),0) sales,COALESCE(SUM(COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0)) FILTER(WHERE status='successful' AND type='debit'),0) profit FROM transactions WHERE date>=NOW()-INTERVAL '30 days' GROUP BY service ORDER BY sales DESC`)).rows;const topUsers=(await db(`SELECT u.user_id,u.name,u.email,COUNT(t.id)::int transactions,COALESCE(SUM(t.amount) FILTER(WHERE t.type='debit' AND t.status='successful'),0) spend FROM users u JOIN transactions t ON t.user_id=u.user_id WHERE t.date>=NOW()-INTERVAL '30 days' GROUP BY u.user_id,u.name,u.email ORDER BY spend DESC LIMIT 10`)).rows;return{success:true,daily:daily.map(x=>({...x,sales:Number(x.sales||0),funding:Number(x.funding||0),refunds:Number(x.refunds||0),profit:Number(x.profit||0)})),services:services.map(x=>({...x,sales:Number(x.sales||0),profit:Number(x.profit||0)})),topUsers:topUsers.map(x=>({...x,spend:Number(x.spend||0)}))};}
 
 async function adminStatsResponse(req){
   const admin=await adminFromToken(req);
@@ -2308,11 +2396,19 @@ async function adminPaymentsResponse(req){
   return{success:true,payments:r.rows.map(x=>({...x,amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)}))};
 }
 
+async function adminMonitoring(req){
+  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const started=Date.now();let database="connected";try{await db("SELECT 1")}catch{database="unavailable"}
+  let d={};try{d=(await db(`SELECT COUNT(*) FILTER (WHERE status IN ('processing','pending'))::int pending,COUNT(*) FILTER (WHERE status IN ('processing','pending') AND date<NOW()-INTERVAL '10 minutes')::int stale_pending,COUNT(*) FILTER (WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed_last_hour,COUNT(*) FILTER (WHERE status='successful' AND date>=NOW()-INTERVAL '24 hours')::int successful_last_24h,COUNT(*) FILTER (WHERE status IN ('failed','refunded') AND date>=NOW()-INTERVAL '24 hours')::int unsuccessful_last_24h,MAX(date) FILTER (WHERE status='successful') last_successful FROM transactions`)).rows[0]||{}}catch{return{success:false,statusCode:500,message:"Unable to load monitoring metrics."}}
+  const total=Number(d.successful_last_24h||0)+Number(d.unsuccessful_last_24h||0);const rate=total?Math.round(Number(d.successful_last_24h||0)/total*1000)/10:100;
+  return{success:true,monitoring:{database,cheapdatahub:Boolean(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL),pending:Number(d.pending||0),stalePending:Number(d.stale_pending||0),failedLastHour:Number(d.failed_last_hour||0),successfulLast24h:Number(d.successful_last_24h||0),unsuccessfulLast24h:Number(d.unsuccessful_last_24h||0),successRate:rate,lastSuccessful:d.last_successful||null,responseMs:Date.now()-started,timestamp:new Date().toISOString()}};
+}
+
 async function adminSupport(req,action){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
   if(action==="list"){
-    const r=await db(`SELECT t.id,t.user_id,t.subject,t.message,t.status,t.created_at,t.updated_at,u.name,u.email
+    const r=await db(`SELECT t.id,t.user_id,t.subject,t.message,t.status,t.transaction_reference,t.created_at,t.updated_at,u.name,u.email
       FROM support_tickets t LEFT JOIN users u ON u.user_id=t.user_id
       ORDER BY t.updated_at DESC LIMIT 200`);
     return{success:true,tickets:r.rows};
@@ -2323,8 +2419,9 @@ async function adminSupport(req,action){
   if(action==="status"){
     const status=clean(b.status).toLowerCase();
     if(!["open","pending","resolved","closed"].includes(status))return{success:false,statusCode:400,message:"Invalid ticket status."};
-    const r=await db(`UPDATE support_tickets SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING id,status`,[status,ticketId]);
+    const r=await db(`UPDATE support_tickets SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING id,status,user_id`,[status,ticketId]);
     if(!r.rows.length)return{success:false,statusCode:404,message:"Support ticket not found."};
+    try{await addNotification(r.rows[0].user_id,"Support ticket updated",`Ticket #${ticketId} is now ${status}.`,"support");}catch{}
     await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
       [admin.id,"support_status","ticket",String(ticketId),JSON.stringify({status}),requestIp(req)]);
     return{success:true,ticket:r.rows[0]};
@@ -2332,10 +2429,11 @@ async function adminSupport(req,action){
   if(action==="reply"){
     const message=clean(b.message);
     if(message.length<1)return{success:false,statusCode:400,message:"Reply message is required."};
-    const t=await db(`SELECT id FROM support_tickets WHERE id=$1`,[ticketId]);
+    const t=await db(`SELECT id,user_id FROM support_tickets WHERE id=$1`,[ticketId]);
     if(!t.rows.length)return{success:false,statusCode:404,message:"Support ticket not found."};
     await db(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'admin',$2,$3)`,[ticketId,String(admin.id),message]);
     await db(`UPDATE support_tickets SET status='pending',updated_at=NOW() WHERE id=$1`,[ticketId]);
+    try{await addNotification(t.rows[0].user_id,"Support replied",`There is a new reply on support ticket #${ticketId}.`,"support");}catch{}
     await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
       [admin.id,"support_reply","ticket",String(ticketId),JSON.stringify({message}),requestIp(req)]);
     return{success:true,message:"Reply sent."};
@@ -2441,6 +2539,8 @@ async function adminWalletAdjust(req,mode){
     const old=Number(w.rows[0].balance||0),delta=mode==="credit"?amount:-amount,next=old+delta;
     if(next<0){await client.query("ROLLBACK");return{success:false,statusCode:400,message:"Insufficient wallet balance."};}
     await client.query(`UPDATE wallets SET balance=$1,updated_at=NOW() WHERE user_id=$2`,[next,userId]);
+    const adjRef=`ADMIN-${mode.toUpperCase()}-${reference("WALLET")}`;
+    await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:userId,direction:delta>=0?"credit":"debit",amount:delta,balanceAfter:next,reference:adjRef,category:`admin_wallet_${mode}`,description:reason,metadata:{admin_id:admin.id}});
     await client.query("COMMIT");
     await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,
       [admin.id,`wallet_${mode}`,"user",userId,JSON.stringify({amount,reason,balance_after:next}),requestIp(req)]);
@@ -2618,15 +2718,6 @@ result
 
 
 if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==='GET'&&path==='/api/admin/revenue/banks'){const result=await adminRevenue(req,'banks');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==='POST'&&path==='/api/admin/revenue/verify-account'){const result=await adminRevenue(req,'verify');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==='POST'&&path==='/api/admin/revenue/withdraw'){const result=await adminRevenue(req,'withdraw');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==='POST'&&path==='/api/admin/revenue/status'){const result=await adminRevenue(req,'status');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/profit"){const result=await adminProfitWithdrawals(req,"summary");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/profit/banks"){const result=await adminProfitWithdrawals(req,"banks");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/profit/verify-account"){const result=await adminProfitWithdrawals(req,"verify");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/profit/withdraw"){const result=await adminProfitWithdrawals(req,"create");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/profit/status"){const result=await adminProfitWithdrawals(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -2635,6 +2726,13 @@ if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adm
 if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
 if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/analytics"){const result=await adminAnalytics(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/reconciliation"){const admin=await adminFromToken(req);if(!admin)return;const result=await getFinancialReconciliation();return send(res,200,{success:true,reconciliation:result});}
+if(req.method==="GET"&&path==="/api/admin/ledger"){const admin=await adminFromToken(req);if(!admin)return;const r=await db(`SELECT id,account_type,owner_id,direction,amount,balance_after,reference,transaction_id,category,description,created_at FROM financial_ledger ORDER BY created_at DESC LIMIT 300`);return send(res,200,{success:true,ledger:r.rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}))});}
+if(req.method==="GET"&&path==="/api/admin/alerts"){const result=await adminAlerts(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/alerts/reconcile"){const result=await adminAlerts(req,"reconcile");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/alerts/resolve"){const result=await adminAlerts(req,"resolve");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupport(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
@@ -2865,22 +2963,23 @@ return send(res,200,{success:true,user:r.rows[0],message:"Profile updated succes
 }catch(e){if(e.code==="23505")return send(res,409,{success:false,message:"That email address is already in use."}); throw e;}
 }
 if(req.method==="POST"&&path==="/api/support/tickets"){
-const b=await body(req); const subject=clean(b.subject),message=clean(b.message); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."});
+const b=await body(req); const subject=clean(b.subject),message=clean(b.message),transactionReference=clean(b.transactionReference||b.reference); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."});
 const client=await pool.connect();
 try{
 await client.query("BEGIN");
-const r=await client.query(`INSERT INTO support_tickets(user_id,subject,message) VALUES($1,$2,$3) RETURNING id,subject,message,status,created_at`,[user.user_id,subject,message]);
+const r=await client.query(`INSERT INTO support_tickets(user_id,subject,message,transaction_reference) VALUES($1,$2,$3,$4) RETURNING id,subject,message,status,transaction_reference,created_at`,[user.user_id,subject,message,transactionReference||null]);
 await client.query(`INSERT INTO support_messages(ticket_id,sender_type,sender_id,message) VALUES($1,'user',$2,$3)`,[r.rows[0].id,user.user_id,message]);
 await client.query("COMMIT");
+try{await addNotification(user.user_id,"Support request received",`Your support ticket #${r.rows[0].id} has been created. We will review it shortly.`,"support");}catch{}
 return send(res,201,{success:true,ticket:r.rows[0],message:`Support ticket #${r.rows[0].id} created.`});
 }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
 if(req.method==="GET"&&path==="/api/support/tickets"){
-const r=await db(`SELECT id,subject,message,status,created_at,updated_at FROM support_tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,[user.user_id]); return send(res,200,{success:true,tickets:r.rows});
+const r=await db(`SELECT id,subject,message,status,transaction_reference,created_at,updated_at FROM support_tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,[user.user_id]); return send(res,200,{success:true,tickets:r.rows});
 }
 if(req.method==="GET"&&path==="/api/support/ticket"){
 const id=Number(url.searchParams.get("id")); if(!Number.isInteger(id)||id<1)return send(res,400,{success:false,message:"Invalid ticket."});
-const t=await db(`SELECT id,subject,message,status,created_at,updated_at FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
+const t=await db(`SELECT id,subject,message,status,transaction_reference,created_at,updated_at FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
 if(!t.rows.length)return send(res,404,{success:false,message:"Support ticket not found."});
 const m=await db(`SELECT id,sender_type,message,created_at FROM support_messages WHERE ticket_id=$1 ORDER BY created_at ASC`,[id]);
 return send(res,200,{success:true,ticket:t.rows[0],messages:m.rows});
@@ -3048,23 +3147,6 @@ if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 try{const b=await body(req),accountType=String(b.accountType||"static").toLowerCase();let result;if(accountType==="dynamic")result=await createCustomerFlutterwaveDynamicAccount(user,Number(b.amount));else result=await createCustomerFlutterwaveStaticAccount(user,String(b.identityType||"").toLowerCase(),String(b.identityNumber||""));return send(res,200,result);}catch(error){console.error("FLUTTERWAVE FUNDING ACCOUNT ACTIVATION ERROR:",error);return send(res,400,{success:false,message:error.message||"Unable to create funding account."});}
 }
 
-if(req.method==="POST"&&path==="/api/cheapdatahub/webhook"){
-let rawBody="";req.on("data",chunk=>{rawBody+=chunk;});req.on("end",async()=>{try{
-let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{success:false,message:"Invalid JSON payload."});}
-// CheapDataHub webhook authentication must be configured with the provider's current secret/signature contract.
-// If CHEAPDATAHUB_WEBHOOK_SECRET is configured, accept a constant-time HMAC SHA-256 signature.
-const secret=String(process.env.CHEAPDATAHUB_WEBHOOK_SECRET||"");
-if(secret){const supplied=String(req.headers["x-cheapdatahub-signature"]||req.headers["x-webhook-signature"]||"");const expected=crypto.createHmac("sha256",secret).update(rawBody).digest("hex");const suppliedBuf=Buffer.from(supplied);const expectedBuf=Buffer.from(expected);if(suppliedBuf.length!==expectedBuf.length||!crypto.timingSafeEqual(suppliedBuf,expectedBuf))return send(res,401,{success:false,message:"Invalid CheapDataHub webhook signature."});}else if(process.env.NODE_ENV==="production"){return send(res,503,{success:false,message:"CheapDataHub webhook secret is not configured."});}
-const eventId=clean(payload.event_id||payload.id||payload.event?.id||payload.reference||payload.data?.id);const providerReference=clean(payload.reference||payload.transaction_id||payload.data?.reference||payload.data?.transaction_id);const status=String(payload.status||payload.data?.status||payload.event_type||payload.event||"").toLowerCase();
-if(!eventId)return send(res,400,{success:false,message:"CheapDataHub webhook is missing an event identifier."});
-const existing=await db(`SELECT processed FROM cheapdatahub_webhook_events WHERE event_id=$1 LIMIT 1`,[eventId]);if(existing.rows[0]?.processed)return send(res,200,{success:true,duplicate:true});
-await db(`INSERT INTO cheapdatahub_webhook_events(event_id,event_type,provider_reference,payload) VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(event_id) DO NOTHING`,[eventId,status,providerReference,JSON.stringify(payload)]);
-let tx=null;if(providerReference){const q=await db(`SELECT id FROM transactions WHERE provider_reference=$1 AND service IN ('airtime','data','exam_pin') ORDER BY date DESC LIMIT 1`,[providerReference]);tx=q.rows[0]||null;}
-if(tx){const outcome=["successful","success","true"].includes(status)?"successful":(status==="failed"?"failed":(status==="refunded"?"refunded":"pending"));await finalizeVTUTransaction(tx.id,outcome,payload,providerReference);}
-await db(`UPDATE cheapdatahub_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);return send(res,200,{success:true,matched:Boolean(tx)});
-}catch(error){console.error("CHEAPDATAHUB WEBHOOK ERROR:",error);return send(res,500,{success:false,message:"Webhook processing failed."});}});return;
-}
-
 if(req.method==="POST"&&path==="/api/flutterwave/webhook"){
 let rawBody="";req.on("data",chunk=>{rawBody+=chunk;});req.on("end",async()=>{
 try{
@@ -3080,14 +3162,6 @@ let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{su
 const event=String(payload?.event||payload?.type||payload?.event_type||"").toLowerCase();
 if(event==="charge.completed"||event==="account_transaction"||event==="bank_transfer_transaction"||payload?.["event.type"]==="BANK_TRANSFER_TRANSACTION"){
 const result=await creditFlutterwaveVirtualAccount(payload);return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Flutterwave funding webhook processed.",...result});
-}
-if(event==="transfer.completed"||event==="transfer_completed"||payload?.["event.type"]==="Transfer"){
-const d=payload?.data||payload?.transfer||{};const providerId=String(d.id||"");const referenceValue=clean(d.reference||d.tx_ref||"");const rawStatus=String(d.status||"").toUpperCase();const status=["SUCCESSFUL","COMPLETED"].includes(rawStatus)?"successful":(["FAILED","REVERSED","CANCELLED","CANCELED"].includes(rawStatus)?"failed":"processing");
-let q;
-if(providerId)q=await db(`SELECT * FROM admin_revenue_withdrawals WHERE provider_transfer_id=$1 LIMIT 1`,[providerId]);
-if(!q||!q.rows.length)q=await db(`SELECT * FROM admin_revenue_withdrawals WHERE reference=$1 LIMIT 1`,[referenceValue]);
-if(q.rows.length){const row=q.rows[0];if(status!==row.status){if(status==='failed')await reverseRevenueWithdrawal(row.admin_id,row.id,row.amount,d.complete_message||"Flutterwave transfer failed.");else await db(`UPDATE admin_revenue_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1='successful' THEN NOW() ELSE completed_at END WHERE id=$3`,[status,d.complete_message||status,row.id]);}return send(res,200,{success:true,withdrawalId:row.id,status});}
-return send(res,200,{success:true,message:"Flutterwave transfer webhook received; no matching BOLTIV withdrawal was found."});
 }
 return send(res,200,{success:true,message:"Flutterwave webhook received."});
 }catch(error){console.error("FLUTTERWAVE WEBHOOK ERROR:",error);return send(res,500,{success:false,message:error.message||"Webhook processing failed."});}
@@ -3486,6 +3560,8 @@ async function startServer(){
 try{
 
 await setup();
+setTimeout(()=>runPlatformAlerts().catch(e=>console.error("INITIAL ALERT CHECK ERROR",e)),5000).unref();
+setInterval(()=>runPlatformAlerts().catch(e=>console.error("ALERT CHECK ERROR",e)),300000).unref();
 
 await cleanupPasswordResetTokens();
 

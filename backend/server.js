@@ -1028,17 +1028,24 @@ for(const item of rows){
   const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
   const existing=clean(meta.plan||meta.plan_name||pricing.plan||requestMeta.plan_name||requestMeta.plan||"");
   if(existing && !/^Plan \d+$/i.test(existing))continue;
-  const network=clean(meta.network||meta.network_provider||requestMeta.network||requestMeta.network_provider||"");
-  const bundleId=requestMeta.bundle_id||meta.bundle_id||item.bundle_id;
+  const network=clean(meta.network||meta.network_provider||pricing.network||pricing.network_name||requestMeta.network||requestMeta.network_provider||"");
+  const bundleId=requestMeta.bundle_id||meta.bundle_id||pricing.bundle_id||item.bundle_id;
   const resolved=await resolveDataPlanName(network,bundleId);
   if(resolved){
     item.metadata={...meta,plan:resolved,plan_name:resolved};
   }
 }
-return rows.map(item=>({
-...item,
-amount:Number(item.amount)
-}));
+return rows.map(item=>{
+  let meta=item.metadata;
+  if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}}
+  meta=meta&&typeof meta==="object"?meta:{};
+  const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
+  const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
+  const network=clean(meta.network||meta.network_provider||pricing.network||pricing.network_name||requestMeta.network||requestMeta.network_provider||item.network||"");
+  const plan=clean(meta.plan||meta.plan_name||pricing.plan||pricing.plan_name||requestMeta.plan_name||requestMeta.plan||item.plan||"");
+  const phone=clean(item.recipient||meta.phone||requestMeta.phone||requestMeta.phone_number||item.phone||"");
+  return {...item,amount:Number(item.amount),phone,network,plan};
+});
 
 }
 
@@ -3043,7 +3050,7 @@ let meta=t.metadata; if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{
 const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
 const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
 const enrichedMeta={...meta};
-if(!enrichedMeta.network)enrichedMeta.network=requestMeta.network||requestMeta.network_provider||"";
+if(!enrichedMeta.network)enrichedMeta.network=pricing.network||pricing.network_name||requestMeta.network||requestMeta.network_provider||"";
 if(!enrichedMeta.plan)enrichedMeta.plan=pricing.plan||requestMeta.plan_name||requestMeta.plan||"";
 if(String(t.service).toLowerCase().includes("data") && (/^Plan \d+$/i.test(String(enrichedMeta.plan||"")) || !enrichedMeta.plan)){
   const resolved=await resolveDataPlanName(enrichedMeta.network||requestMeta.network||requestMeta.network_provider,requestMeta.bundle_id||enrichedMeta.bundle_id);
@@ -3074,12 +3081,17 @@ try{
     const meta=tx.metadata&&typeof tx.metadata==="object"?tx.metadata:{};
     let message=`Your ${String(tx.service||"service")} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
     if(String(tx.service).toLowerCase().includes("data")){
-      const network=clean(meta.network||meta.network_provider||meta.request?.network||"");
-      let plan=clean(meta.plan||meta.plan_name||meta.request?.plan_name||meta.pricing?.plan||"");
-      if(/^Plan \d+$/i.test(plan)||!plan)plan=await resolveDataPlanName(network||meta.request?.network||meta.request?.network_provider,meta.request?.bundle_id||meta.bundle_id);
+      const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
+      const network=clean(meta.network||meta.network_provider||pricing.network||pricing.network_name||meta.request?.network||meta.request?.network_provider||"");
+      let plan=clean(meta.plan||meta.plan_name||pricing.plan||pricing.plan_name||meta.request?.plan_name||meta.request?.plan||"");
+      if(/^Plan \d+$/i.test(plan)||!plan)plan=await resolveDataPlanName(network||meta.request?.network||meta.request?.network_provider,meta.request?.bundle_id||meta.bundle_id||pricing.bundle_id);
       if(network||plan)message=`Your ${network||"Data"} ${plan||"data plan"} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
     }
-    await addNotificationOnce(user.user_id,"Transaction successful",message,"transaction",`tx-success-${tx.id}`);
+    try{
+      await addNotificationOnce(user.user_id,"Transaction successful",message,"transaction",`tx-success-${tx.id}`);
+    }catch(error){
+      console.error("NOTIFICATION BACKFILL ITEM ERROR:",error?.stack||error?.message||error);
+    }
   }
 
   // Also backfill wallet-funding notifications for older deposits.
@@ -3790,7 +3802,7 @@ RESEND_API_KEY?
 
 console.error(
 "STARTUP ERROR:",
-error
+error?.stack||error?.message||error
 );
 
 process.exit(1);

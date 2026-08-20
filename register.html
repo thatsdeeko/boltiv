@@ -919,7 +919,10 @@ registerButton.onclick=async()=>{
         // Registration now returns a fresh authenticated session so the
         // user can create their Transaction PIN immediately.
         // Authentication is stored only in the HttpOnly cookie set by the backend.
-        boltivMemoryStorage.setItem("boltivAuthToken","cookie-session");
+        if(data.sessionToken){
+            document.cookie = "boltiv_session=" + encodeURIComponent(data.sessionToken) + "; Path=/; Max-Age=2592000; SameSite=Lax; Secure";
+            boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
+        }
 
         if(data.user){
             boltivMemoryStorage.setItem("boltivUser",JSON.stringify(data.user));

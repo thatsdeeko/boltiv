@@ -496,9 +496,12 @@ async function login(){
         NEVER SAVE THE PASSWORD.
         */
 
-        // Authentication is stored only in the HttpOnly cookie set by the backend.
-        // Keep an in-memory compatibility marker for older page code; it is not a credential.
-        boltivMemoryStorage.setItem("boltivAuthToken","cookie-session");
+        // Persist only the server-issued session token in a browser cookie.
+        // No localStorage/sessionStorage is used.
+        if(data.sessionToken){
+            document.cookie = "boltiv_session=" + encodeURIComponent(data.sessionToken) + "; Path=/; Max-Age=2592000; SameSite=Lax; Secure";
+            boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
+        }
 
 
         if(data.user){

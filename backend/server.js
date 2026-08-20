@@ -277,6 +277,21 @@ if(!Number.isFinite(customerPrice)||customerPrice<=0)throw new Error("Unable to 
 return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};
 }
 
+function findTransactionField(value, keys, depth=0){
+  if(depth>6||value==null)return "";
+  if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}
+  if(typeof value!=="object")return "";
+  for(const key of keys){
+    const v=value[key];
+    if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();
+  }
+  for(const key of Object.keys(value)){
+    const found=findTransactionField(value[key],keys,depth+1);
+    if(found)return found;
+  }
+  return "";
+}
+
 async function resolveDataPlanName(network,bundleId){
   const selected=normalizeDataNetwork(network);
   const id=Number(bundleId);

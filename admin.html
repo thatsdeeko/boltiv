@@ -873,6 +873,20 @@ async function loadPending(){
 }
 
 function filterPayments(){const q=$("paymentSearch").value.toLowerCase();renderPayments(payments.filter(p=>[p.reference,p.email,p.user_id].join(" ").toLowerCase().includes(q)))}
+function filterAudit(){
+ const q=$("auditSearch")?$("auditSearch").value.trim().toLowerCase():"";
+ const type=$("auditType")?$("auditType").value:"";
+ const list=(window.auditLogs||[]).filter(x=>{
+  const hay=[x.email,x.admin_id,x.action,x.target_type,x.target_id,JSON.stringify(x.details||{})].join(" ").toLowerCase();
+  return (!q||hay.includes(q))&&(!type||String(x.action||"").toLowerCase()===type.toLowerCase()||String(x.target_type||"").toLowerCase()===type.toLowerCase());
+ });
+ renderAudit(list);
+}
+function renderAudit(list){
+ const area=$("auditArea");
+ if(!area)return;
+ area.innerHTML=list.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+list.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>';
+}
 
 async function loadServices(){try{const d=await api("/api/admin/services");const a=d.services||[];$('servicesArea').innerHTML=a.map(x=>{const p=x.config&&x.config.pricing||{};const mode=p.mode||'discount';const value=mode==='fixed'?`₦${Number(p.fixed_profit||0).toLocaleString()}`:`${Number(p.discount_pct||0)}%`;return `<div class="service-card"><div class="service-icon">${esc(x.icon||'⚙')}</div><div class="service-name">${esc(x.name)}</div><div class="service-status" style="color:${x.enabled&&!x.maintenance?'var(--green)':'var(--yellow)'}">● ${x.enabled&&!x.maintenance?'ACTIVE':'DISABLED'}</div><div style="font-size:10px;margin-top:8px">Pricing: ${esc(mode)} ${value}</div><div style="font-size:10px;margin-top:4px">Fee: ₦${Number(x.fee||0).toLocaleString()}</div><button class="btn" style="margin-top:12px" onclick="manageService('${esc(x.key)}')">MANAGE</button></div>`}).join('')}catch(e){$('servicesArea').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
 async function manageService(key){try{const d=await api('/api/admin/services');const x=(d.services||[]).find(v=>v.key===key);if(!x)return;const p=x.config&&x.config.pricing||{};openModal('MANAGE '+String(x.name).toUpperCase(),`<label>STATUS</label><select id="svcEnabled"><option value="true" ${x.enabled?'selected':''}>ENABLED</option><option value="false" ${!x.enabled?'selected':''}>DISABLED</option></select><label>MAINTENANCE</label><select id="svcMaintenance"><option value="false" ${!x.maintenance?'selected':''}>OFF</option><option value="true" ${x.maintenance?'selected':''}>ON</option></select><label>SERVICE FEE</label><input id="svcFee" type="number" min="0" step="0.01" value="${Number(x.fee||0)}"><label>PRICING MODE</label><select id="svcPricingMode"><option value="discount" ${String(p.mode||'discount')==='discount'?'selected':''}>PROVIDER DISCOUNT %</option><option value="fixed" ${String(p.mode||'discount')==='fixed'?'selected':''}>FIXED PROFIT PER SALE</option></select><label>DISCOUNT %</label><input id="svcDiscount" type="number" min="0" max="100" step="0.01" value="${Number(p.discount_pct||0)}"><label>FIXED PROFIT</label><input id="svcFixedProfit" type="number" min="0" step="0.01" value="${Number(p.fixed_profit||0)}"><div style="font-size:9px;color:#666;margin-top:8px">Use the provider's real wholesale discount/cost. Profit is recorded after successful service transactions.</div><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveService('${esc(x.key)}')">SAVE</button></div>`)}catch(e){alert(e.message)}}
@@ -887,10 +901,15 @@ async function loadAudit(){
  try{
   const d=await api("/api/admin/audit");
   const a=d.logs||[];
-  $("auditArea").innerHTML=a.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+a.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>';
+  window.auditLogs=a;
+  $("aTotal").textContent=a.length;
+  $("aToday").textContent=a.filter(x=>new Date(x.created_at).toDateString()===new Date().toDateString()).length;
+  $("aAdmin").textContent=a.filter(x=>String(x.action||"").startsWith("admin_")).length;
+  $("aSecurity").textContent=a.filter(x=>String(x.action||"").includes("security")||String(x.action||"").includes("login")).length;
   filterAudit();
  }catch(e){$("auditArea").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
 }
+
 api("/api/admin/me")
   .then(d=>{ if(d && d.success){ sessionReady=true; showApp(d); loadMonitoring(); } else { showLogin(); } })
   .catch(()=>showLogin());

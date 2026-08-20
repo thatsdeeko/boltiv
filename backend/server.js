@@ -2492,11 +2492,11 @@ async function adminPaymentsResponse(req){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
   try{
-    const r=await db(`SELECT p.id,p.reference,p.user_id,COALESCE(NULLIF(p.email,''),u.email,'') AS email,
+    const r=await db(`SELECT p.id,p.reference,p.user_id,COALESCE(NULLIF(p.email,''),'') AS email,
       COALESCE(p.amount,0) AS amount,COALESCE(p.amount_kobo,0) AS amount_kobo,
       COALESCE(p.status,'pending') AS status,COALESCE(p.credited,FALSE) AS credited,
       COALESCE(p.created_at,NOW()) AS created_at,p.credited_at
-      FROM payments p LEFT JOIN users u ON u.user_id=p.user_id
+      FROM payments p
       ORDER BY p.created_at DESC NULLS LAST,p.id DESC LIMIT 1000`);
     return{success:true,payments:r.rows.map(x=>({...x,amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)}))};
   }catch(e){

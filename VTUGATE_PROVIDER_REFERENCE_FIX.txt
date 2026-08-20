@@ -1,0 +1,9 @@
+BOLTIV VTUGATE PROVIDER REFERENCE FIX
+
+What was fixed:
+1. VTUGATE provider transaction identifiers are now extracted from common response fields, including reference, transaction_id, transactionId, id, and nested data/result/transaction variants.
+2. Successful and pending VTUGATE transactions now save the extracted provider identifier into transactions.provider_reference.
+3. The admin transactions API now returns provider_reference to admin.html.
+4. For older transactions where provider_reference is blank but the original VTUGATE response was saved in metadata.providerResponse, the admin dashboard falls back to extracting the provider identifier from that saved response.
+
+This keeps the existing BOLTIV transaction reference separate from the VTUGATE provider transaction ID.

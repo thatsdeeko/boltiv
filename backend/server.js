@@ -145,6 +145,34 @@ return {...row,fee:Number(row.fee||0),config:row.config&&typeof row.config==="ob
 
 function pricingConfig(service){
 const config=service?.config&&typeof service.config==="object"?service.config:{};
+const adminPricing=config.pricing&&typeof config.pricing==="object"?config.pricing:null;
+
+/*
+   ADMIN DASHBOARD PRICING FORMAT
+   { pricing: { mode: "discount"|"fixed", discount_pct, fixed_profit } }
+
+   Keep support for the older markup format too, so existing services do not
+   break when their configuration was saved by an older dashboard.
+*/
+if(adminPricing){
+  let mode=clean(adminPricing.mode||"discount").toLowerCase();
+  if(mode==="discount"||mode==="provider_discount")mode="provider_discount";
+  else if(mode==="fixed"||mode==="fixed_profit")mode="fixed_profit";
+  else mode="provider_discount";
+
+  const discountPct=Number(adminPricing.discount_pct??adminPricing.discountPercent??0);
+  const fixedProfit=Number(adminPricing.fixed_profit??adminPricing.fixedProfit??0);
+  const serviceFee=Number(service?.fee||0);
+
+  return {
+    markup_mode:mode,
+    markup_pct:Number.isFinite(discountPct)?Math.min(100,Math.max(0,discountPct)):0,
+    markup_fixed:Number.isFinite(fixedProfit)?Math.max(0,fixedProfit):0,
+    service_fee:Number.isFinite(serviceFee)?Math.max(0,serviceFee):0
+  };
+}
+
+/* Legacy pricing configuration */
 let mode=clean(config.markup_mode??config.markupMode??config.pricing_mode??config.pricingMode??"none").toLowerCase();
 if(mode==="percent")mode="percentage";
 if(mode==="fixed_amount")mode="fixed";
@@ -154,7 +182,8 @@ const fixed=Number(config.markup_fixed??config.markupFixed??config.fixed??servic
 return {
 markup_mode:["none","percentage","fixed","percentage_plus_fixed"].includes(mode)?mode:"none",
 markup_pct:Number.isFinite(pct)?Math.max(0,pct):0,
-markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0
+markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0,
+service_fee:0
 };
 }
 
@@ -163,9 +192,21 @@ const n=Number(cost);
 if(!Number.isFinite(n)||n<=0)return null;
 const p=pricing||{};
 let price=n;
-if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
+
+/* Current Admin Dashboard pricing */
+if(p.markup_mode==="provider_discount"){
+  price=n*(1-Number(p.markup_pct||0)/100);
+  price+=Number(p.markup_fixed||0);
+  price+=Number(p.service_fee||0);
+}
+else if(p.markup_mode==="fixed_profit"){
+  price=n+Number(p.markup_fixed||0)+Number(p.service_fee||0);
+}
+/* Legacy pricing */
+else if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
 else if(p.markup_mode==="percentage")price+=n*Number(p.markup_pct||0)/100;
 else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)/100+Number(p.markup_fixed||0);
+
 return Number(price.toFixed(2));
 }
 
@@ -3279,7 +3320,7 @@ return;
 PUBLIC PLATFORM CONFIGURATION
 */
 if(req.method==='GET'&&path==='/api/pricing'){
-  const keys=['airtime','data','cable','electricity'];
+  const keys=['airtime','data','cable','electricity','exam_pin'];
   const out={};
   for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={markup_mode:p.markup_mode,markup_pct:p.markup_pct,markup_fixed:p.markup_fixed};}
   return send(res,200,{success:true,pricing:out});

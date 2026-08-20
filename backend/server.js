@@ -121,6 +121,189 @@ function validAmount(amount){
 return Number.isFinite(amount)&&amount>0;
 }
 
+
+/* =========================================================
+   CHEAPDATAHUB DATA CATALOG + SERVICE PRICING
+   ========================================================= */
+
+const CHEAPDATAHUB_PLAN_IDS_URL="https://www.cheapdatahub.ng/api/plan-ids/";
+
+function normalizeDataNetwork(value){
+const n=clean(value).toUpperCase().replace(/\s+/g,"");
+if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE";
+return ["MTN","AIRTEL","GLO"].includes(n)?n:"";
+}
+
+async function getService(key){
+const serviceKey=clean(key).toLowerCase();
+if(!serviceKey)return null;
+const result=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1 LIMIT 1`,[serviceKey]);
+if(!result.rows.length)return null;
+const row=result.rows[0];
+return {...row,fee:Number(row.fee||0),config:row.config&&typeof row.config==="object"?row.config:{}};
+}
+
+function pricingConfig(service){
+const config=service?.config&&typeof service.config==="object"?service.config:{};
+let mode=clean(config.markup_mode??config.markupMode??config.pricing_mode??config.pricingMode??"none").toLowerCase();
+if(mode==="percent")mode="percentage";
+if(mode==="fixed_amount")mode="fixed";
+if(mode==="cost_plus")mode="percentage_plus_fixed";
+const pct=Number(config.markup_pct??config.markupPercent??config.percentage??0);
+const fixed=Number(config.markup_fixed??config.markupFixed??config.fixed??service?.fee??0);
+return {
+markup_mode:["none","percentage","fixed","percentage_plus_fixed"].includes(mode)?mode:"none",
+markup_pct:Number.isFinite(pct)?Math.max(0,pct):0,
+markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0
+};
+}
+
+function customerPriceFromCost(cost,pricing){
+const n=Number(cost);
+if(!Number.isFinite(n)||n<=0)return null;
+const p=pricing||{};
+let price=n;
+if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
+else if(p.markup_mode==="percentage")price+=n*Number(p.markup_pct||0)/100;
+else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)/100+Number(p.markup_fixed||0);
+return Number(price.toFixed(2));
+}
+
+function decodeHtml(value){
+return String(value??"")
+.replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"')
+.replace(/&#39;|&apos;/gi,"'").replace(/&lt;/gi,"<").replace(/&gt;/gi,">")
+.replace(/&#(\d+);/g,(_,n)=>{try{return String.fromCodePoint(Number(n));}catch{return "";}})
+.replace(/&#x([0-9a-f]+);/gi,(_,n)=>{try{return String.fromCodePoint(parseInt(n,16));}catch{return "";}});
+}
+
+function htmlCellText(value){
+return decodeHtml(String(value??"").replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"").replace(/<[^>]+>/g," ").replace(/\s+/g," ")).trim();
+}
+
+function parseCheapDataHubPlanTable(html){
+const plans=[];
+const rows=String(html||"").match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[];
+for(const row of rows){
+const cells=[...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>htmlCellText(m[1]));
+if(cells.length<5)continue;
+const network=normalizeDataNetwork(cells[0]);
+const service=clean(cells[1]).toUpperCase();
+const name=clean(cells[2]);
+const bundleId=Number(cells[3].replace(/[^0-9]/g,""));
+const price=Number(cells[4].replace(/[^0-9.]/g,""));
+if(!network||service!=="DATA"||!Number.isInteger(bundleId)||bundleId<=0||!Number.isFinite(price)||price<=0)continue;
+if(!name||/\(UNAVAILABLE\)/i.test(name))continue;
+const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
+let sizeMb=0;
+if(sizeMatch){const v=Number(sizeMatch[1]);sizeMb=sizeMatch[2].toUpperCase()==="GB"?Math.round(v*1024):Math.round(v);}
+const validityMatch=name.match(/\b(\d+)\s*(?:day|days)\b/i);
+plans.push({network_name:network,name,bundle_id:bundleId,price,size_mb:sizeMb,validity_days:validityMatch?Number(validityMatch[1]):0});
+}
+return plans;
+}
+
+async function fetchCheapDataHubDataPlans(network){
+const selected=normalizeDataNetwork(network);
+if(!selected)throw new Error("Unsupported network.");
+const controller=new AbortController();
+const timer=setTimeout(()=>controller.abort(),10000);
+try{
+const response=await fetch(CHEAPDATAHUB_PLAN_IDS_URL,{headers:{Accept:"text/html,application/xhtml+xml"},signal:controller.signal});
+if(!response.ok)throw new Error(`CheapDataHub plan page returned HTTP ${response.status}`);
+const html=await response.text();
+return parseCheapDataHubPlanTable(html).filter(p=>p.network_name===selected);
+}finally{clearTimeout(timer);}
+}
+
+async function cheapDataHubRequest(endpoint,payload){
+if(!CHEAPDATAHUB_API_KEY)return {success:false,statusCode:503,message:"CheapDataHub is not configured on the server."};
+const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{
+method:"POST",
+headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,"Content-Type":"application/json",Accept:"application/json"},
+body:JSON.stringify(payload)
+});
+let data={};
+try{data=await response.json();}catch{}
+const statusValue=String(data.status??data.success??"").toLowerCase();
+const success=response.ok&&(statusValue==="true"||statusValue==="success"||data.success===true||Boolean(data.reference&&response.status<300));
+return {success,statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Transaction successful.":"Transaction was not successful.")};
+}
+
+async function debitWallet(userId,amount){
+const client=await pool.connect();
+try{
+await client.query("BEGIN");
+await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);
+const r=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[amount,userId]);
+if(!r.rows.length){await client.query("ROLLBACK");return {success:false,message:"Insufficient wallet balance."};}
+await client.query("COMMIT");
+return {success:true,balance:Number(r.rows[0].balance)};
+}catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
+}
+
+async function refundWallet(userId,amount){
+await db(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2`,[amount,userId]);
+}
+
+async function insertVTUTransaction(data){
+await db(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference,completed_at,refunded_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12) ON CONFLICT(reference) DO NOTHING`,[
+data.userId,data.type||"debit",data.service,data.amount,data.reference,data.status,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null,data.status==="successful"?new Date():null,data.status==="failed"?new Date():null]);
+}
+
+async function processVTUTransaction(user,data){
+const userId=clean(user.user_id);
+const service=clean(data.service||data.providerPayload?.service).toLowerCase();
+const amount=Number(data.amount);
+if(!userId)return {success:false,statusCode:401,message:"Unauthorized."};
+if(!["airtime","data"].includes(service))return {success:false,statusCode:400,message:"This service is not available through CheapDataHub yet."};
+if(!validAmount(amount))return {success:false,statusCode:400,message:"Invalid amount."};
+if(!/^0\d{10}$/.test(clean(data.phone)))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
+const idem=clean(data.idempotencyKey||data.idempotency_key);
+if(idem){
+const existing=await db(`SELECT reference,status,amount FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1`,[userId,idem]);
+if(existing.rows.length)return {success:existing.rows[0].status==="successful"||existing.rows[0].status==="pending",message:existing.rows[0].status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:existing.rows[0].reference,status:existing.rows[0].status,amount:Number(existing.rows[0].amount),alreadyProcessed:true};
+}
+const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);
+if(!security.rows[0]?.transaction_pin_hash)return {success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
+const suppliedPin=String(data.transactionPin||"");
+if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return {success:false,statusCode:400,message:"Incorrect Transaction PIN."};
+const referenceValue=reference("BOLTIV-TX");
+const debit=await debitWallet(userId,amount);
+if(!debit.success)return {success:false,statusCode:400,message:debit.message,balance:0};
+let providerResult;
+try{
+if(service==="data"){
+const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);
+if(!Number.isInteger(bundleId)||bundleId<=0)throw new Error("Invalid data plan.");
+providerResult=await cheapDataHubRequest("data/purchase",{bundle_id:bundleId,phone_number:clean(data.phone)});
+}else{
+const network=normalizeDataNetwork(data.network||data.providerPayload?.network);
+const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};
+const providerId=providerIds[network];
+if(!providerId)throw new Error("Unsupported network.");
+providerResult=await cheapDataHubRequest("airtime/purchase",{provider_id:providerId,phone_number:clean(data.phone),amount});
+}
+}catch(e){
+await refundWallet(userId,amount);
+await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:"failed",recipient:clean(data.phone),idempotencyKey:idem,metadata:{error:e.message}});
+return {success:false,statusCode:502,message:e.message||"Provider connection failed."};
+}
+const providerData=providerResult.data||{};
+const providerReference=providerData.reference||providerData.transaction_id||providerData.data?.reference||providerData.data?.transaction_id||null;
+if(!providerResult.success){
+await refundWallet(userId,amount);
+await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:"failed",recipient:clean(data.phone),idempotencyKey:idem,providerReference,metadata:providerData});
+return {success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded."};
+}
+const providerStatus=String(providerData.status||"").toLowerCase();
+const pending=["pending","processing","initiated"].includes(providerStatus);
+const finalStatus=pending?"pending":"successful";
+await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:finalStatus,recipient:clean(data.phone),idempotencyKey:idem,providerReference,metadata:providerData});
+const wallet=await getWallet(userId);
+return {success:true,status:finalStatus,message:providerResult.message|| (pending?"Your transaction is being processed.":"Transaction successful."),reference:referenceValue,providerReference,balance:wallet?.balance??debit.balance};
+}
+
 function token(){
 return crypto.randomBytes(32).toString("hex");
 }
@@ -430,6 +613,12 @@ await db(`CREATE INDEX IF NOT EXISTS support_messages_ticket_idx ON support_mess
 
 await db(`CREATE TABLE IF NOT EXISTS platform_settings(key TEXT PRIMARY KEY,value JSONB NOT NULL,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE TABLE IF NOT EXISTS services(key TEXT PRIMARY KEY,name TEXT NOT NULL,icon TEXT,enabled BOOLEAN NOT NULL DEFAULT TRUE,fee NUMERIC(14,2) NOT NULL DEFAULT 0,maintenance BOOLEAN NOT NULL DEFAULT FALSE,config JSONB NOT NULL DEFAULT '{}'::jsonb,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS icon TEXT`);
+await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE`);
+await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS fee NUMERIC(14,2) NOT NULL DEFAULT 0`);
+await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS maintenance BOOLEAN NOT NULL DEFAULT FALSE`);
+await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'::jsonb`);
+await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
 for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
@@ -2859,33 +3048,30 @@ result
 VTU DATA PLAN CATALOG
 */
 
-if(
-req.method==="POST"&&
-path==="/api/vtu/data/plans"
-){
+if(req.method==="POST"&&path==="/api/vtu/data/plans"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 const b=await body(req);
-const network=clean(b.network).toUpperCase();
-if(!network)return send(res,400,{success:false,message:"Network is required."});
+const network=normalizeDataNetwork(b.network);
+if(!network)return send(res,400,{success:false,message:"Unsupported network."});
 try{
-  const rawPlans=await fetchCheapDataHubDataPlans(network);
-  const dataService=await getService('data');
-  const dataPricing=pricingConfig(dataService);
-  const byPlan=new Map();
-  for(const plan of rawPlans){
-    const bundleId=Number(plan.bundle_id||plan.id||plan.code||0), price=Number(plan.price||0);
-    if(!Number.isFinite(bundleId)||bundleId<=0||!Number.isFinite(price)||price<=0)continue;
-    const customerPrice=customerPriceFromCost(price,dataPricing);
-    if(customerPrice===null||customerPrice<=0)continue;
-    byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||plan.size_label||String(bundleId)),customer_price:customerPrice,provider_price:Number(price.toFixed(2)),network_name:clean(plan.network_name||network).toUpperCase(),service_id:null,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),duration:clean(plan.duration||"")});
-  }
-  const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,30);
-  return send(res,200,{success:true,network,plans});
-}catch(error){
-  console.error('CHEAPDATAHUB DATA PLAN CATALOG ERROR:',error?.message||error);
-  return send(res,502,{success:false,message:'Unable to load CheapDataHub data plans right now.'});
+const rawPlans=await fetchCheapDataHubDataPlans(network);
+const service=await getService("data");
+if(!service)return send(res,503,{success:false,message:"Data service is not configured."});
+if(service.enabled===false)return send(res,503,{success:false,message:"Data service is currently unavailable."});
+if(service.maintenance===true)return send(res,503,{success:false,message:"Data service is currently under maintenance."});
+const pricing=pricingConfig(service);
+const byPlan=new Map();
+for(const plan of rawPlans){
+const bundleId=Number(plan.bundle_id||0), providerPrice=Number(plan.price||0);
+if(!Number.isInteger(bundleId)||bundleId<=0||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
+const customerPrice=customerPriceFromCost(providerPrice,pricing);
+if(customerPrice===null)continue;
+byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||String(bundleId)),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:null,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),duration:""});
 }
+const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
+return send(res,200,{success:true,network,plans});
+}catch(error){console.error("CHEAPDATAHUB DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load CheapDataHub data plans right now."});}
 }
 
 /*

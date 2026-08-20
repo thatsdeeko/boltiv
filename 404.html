@@ -1,24 +1,32 @@
 <!doctype html>
-<html lang="en"><head><script src="boltiv-client.js?v=20260820-nostorage"></script><meta charset="utf-8"><meta name="robots" content="noindex"><title>BOLTIV</title></head>
-<body><script>
-(async()=>{
-  const path=location.pathname.replace(/^\/+|\/+$/g,'');
-  const routes={
-    '':'/',
-    'login':'/login/','register':'/register/','wallet':'/wallet/','transactions':'/transactions/',
-    'airtime':'/airtime/','data':'/data/','cable':'/cable/','electricity':'/electricity/','profile':'/profile/',
-    'history':'/history/','notifications':'/notifications/','receipt':'/receipt/','contact':'/contact/',
-    'privacy':'/privacy/','terms':'/terms/','security':'/security/','support':'/support/',
-    'forgot-password':'/forgot-password/','reset-password':'/reset-password/','admin':'/admin/'
-  };
-  const file=routes[path] || null;
-  if(!file){document.body.textContent='Page not found'; return;}
-  try{
-    const r=await fetch('/'+file,{cache:'no-store'});
-    if(!r.ok) throw new Error('Page unavailable');
-    let html=await r.text();
-    html=html.replace(/<head([^>]*)>/i,'<head$1><base href="/">');
-    document.open(); document.write(html); document.close();
-  }catch(e){document.body.textContent='Unable to load this page. Please try again.';}
-})();
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex,follow">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BOLTIV</title>
+  <script>
+    (function () {
+      var routes = {"/":"index.html","/login/":"login.html","/register/":"register.html","/dashboard/":"dashboard.html","/airtime/":"airtime.html","/data/":"data.html","/electricity/":"electricity.html","/cable/":"cable.html","/wallet/":"wallet.html","/transactions/":"transactions.html","/profile/":"profile.html","/notifications/":"notifications.html","/support/":"support.html","/contact/":"contact.html","/privacy/":"privacy.html","/terms/":"terms.html","/forgot-password/":"forgot-password.html","/reset-password/":"reset-password.html","/security/":"security.html","/history/":"history.html"};
+      var path = window.location.pathname.replace(/\\/+$/, "/") || "/";
+      var target = routes[path];
+
+      // Only route known application paths. Unknown paths remain a real 404.
+      if (!target) return;
+
+      // Root is already served by index.html; don't loop.
+      if (path === "/" || window.location.pathname === "/" + target) return;
+
+      // Preserve query string and hash while loading the flat HTML page.
+      var suffix = window.location.search + window.location.hash;
+      window.location.replace("/" + target + suffix);
+    })();
+  </script>
+</head>
+<body>
+  <main style="font-family:system-ui,sans-serif;text-align:center;padding:48px">
+    <h1>BOLTIV</h1>
+    <p>Page not found.</p>
+  </main>
+</body>
+</html>

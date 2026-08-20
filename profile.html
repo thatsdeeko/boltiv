@@ -16,393 +16,34 @@ location.replace("login.html");
 
 <style>
 *{box-sizing:border-box}
-
-.profile-page{
-min-height:100vh;
-padding-bottom:110px;
-}
-
-.profile-top{
-display:flex;
-align-items:center;
-padding:18px 0 25px;
-}
-
-.profile-title{
-font-size:22px;
-font-weight:1000;
-color:#171717;
-}
-
-.profile-title span{
-color:#b8860b;
-}
-
-.profile-sub{
-margin-top:4px;
-font-size:10px;
-color:#666;
-letter-spacing:.5px;
-}
-
-.identity-card{
-padding:24px 20px;
-border-radius:24px;
-background:
-radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 35%),
-linear-gradient(145deg,#fffdf4,#ffffff);
-border:1px solid #e5e5e1;
-box-shadow:0 18px 50px rgba(0,0,0,.35);
-}
-
-.identity{
-display:flex;
-align-items:center;
-gap:15px;
-}
-
-.avatar{
-width:68px;
-height:68px;
-flex-shrink:0;
-border-radius:20px;
-display:flex;
-align-items:center;
-justify-content:center;
-background:linear-gradient(145deg,#b8860b,#8c701c);
-color:#f7f7f5;
-font-size:26.4px;
-font-weight:1000;
-}
-
-.identity-name{
-font-size:18.7px;
-font-weight:1000;
-color:#171717;
-word-break:break-word;
-}
-
-.identity-email{
-margin-top:5px;
-color:#777;
-font-size:11px;
-word-break:break-word;
-}
-
-.status{
-display:inline-flex;
-align-items:center;
-gap:5px;
-margin-top:9px;
-padding:5px 8px;
-border-radius:20px;
-background:#ffffffc12;
-color:#6fd47a;
-font-size:7.7px;
-font-weight:900;
-}
-
-.status-dot{
-width:5px;
-height:5px;
-border-radius:50%;
-background:#6fd47a;
-}
-
-.section{
-margin-top:25px;
-}
-
-.section-head{
-display:flex;
-align-items:center;
-justify-content:space-between;
-margin-bottom:10px;
-}
-
-.section-head h3{
-margin:0;
-color:#171717;
-font-size:12.1px;
-font-weight:1000;
-}
-
-.edit-btn{
-border:1px solid #b8860b;
-background:rgba(212,175,55,.08);
-color:#b8860b;
-padding:8px 11px;
-border-radius:9px;
-font-size:7.7px;
-font-weight:1000;
-}
-
-.details-card{
-padding:5px 18px 18px;
-border-radius:20px;
-background:#ffffff;
-border:1px solid #e5e5e1;
-}
-
-.detail{
-padding:17px 0;
-border-bottom:1px solid #e5e5e1;
-}
-
-.detail:last-child{
-border-bottom:0;
-}
-
-.detail-label{
-margin-bottom:7px;
-color:#666;
-font-size:7.7px;
-font-weight:900;
-letter-spacing:.7px;
-}
-
-.detail-input{
-width:100%;
-padding:0;
-border:0;
-outline:0;
-background:transparent;
-color:#eee;
-font-size:13.2px;
-font-weight:800;
-line-height:20px;
-}
-
-.detail-input:disabled{
-opacity:1;
--webkit-text-fill-color:#eee;
-}
-
-.detail-input.editing{
-padding:9px 10px;
-border-radius:9px;
-background:#ffffff;
-border:1px solid #332b16;
-color:#b8860b;
--webkit-text-fill-color:#b8860b;
-}
-
-.save-btn{
-display:none;
-width:100%;
-margin-top:14px;
-padding:15px;
-border:0;
-border-radius:14px;
-background:linear-gradient(135deg,#b8860b,#a78320);
-color:#f7f7f5;
-font-size:11px;
-font-weight:1000;
-}
-
-.save-btn.show{
-display:block;
-}
-
-.actions{
-display:grid;
-gap:9px;
-}
-
-.action{
-width:100%;
-padding:15px;
-display:flex;
-align-items:center;
-gap:12px;
-border-radius:15px;
-background:#ffffff;
-border:1px solid #e5e5e1;
-color:#171717;
-text-align:left;
-cursor:pointer;
-}
-
-.action:active{
-transform:scale(.98);
-border-color:#b8860b;
-}
-
-.action-icon{
-width:38px;
-height:38px;
-flex-shrink:0;
-display:flex;
-align-items:center;
-justify-content:center;
-border-radius:12px;
-background:#fffdf4;
-border:1px solid #403513;
-color:#b8860b;
-font-size:14.3px;
-}
-
-.action-text{
-flex:1;
-}
-
-.action-title{
-font-size:11px;
-font-weight:900;
-}
-
-.action-sub{
-margin-top:3px;
-color:#666;
-font-size:7.7px;
-line-height:1.4;
-}
-
-.action-arrow{
-color:#555;
-font-size:16.5px;
-}
-
-.logout{
-color:#e07777;
-}
-
-.logout .action-icon{
-color:#e07777;
-background:#1b0e0e;
-border-color:#422020;
-}
-
-.message{
-display:none;
-margin-top:12px;
-padding:12px;
-border-radius:11px;
-font-size:10px;
-line-height:1.5;
-text-align:center;
-}
-
-.message.show{
-display:block;
-}
-
-.message.error{
-background:#fff1f1;
-color:#ff8d8d;
-border:1px solid #4a2020;
-}
-
-.message.success{
-background:#122313;
-color:#8cff9a;
-border:1px solid #254d29;
-}
-
-/* MODAL */
-
-.modal{
-position:fixed;
-inset:0;
-z-index:9999;
-display:flex;
-align-items:center;
-justify-content:center;
-padding:20px;
-background:rgba(0,0,0,.82);
-backdrop-filter:blur(8px);
-opacity:0;
-visibility:hidden;
-transition:.25s;
-}
-
-.modal.show{
-opacity:1;
-visibility:visible;
-}
-
-.modal-box{
-width:100%;
-max-width:370px;
-padding:26px 22px;
-border-radius:24px;
-background:linear-gradient(145deg,#fffdf4,#ffffff);
-border:1px solid #b8860b;
-text-align:center;
-transform:translateY(20px) scale(.95);
-transition:.25s;
-}
-
-.modal.show .modal-box{
-transform:translateY(0) scale(1);
-}
-
-.modal-icon{
-width:58px;
-height:58px;
-margin:0 auto 15px;
-border-radius:50%;
-display:flex;
-align-items:center;
-justify-content:center;
-background:#fffdf4;
-border:1px solid #b8860b;
-color:#b8860b;
-font-size:24.2px;
-}
-
-.modal-title{
-color:#171717;
-font-size:18.7px;
-font-weight:1000;
-}
-
-.modal-text{
-margin-top:7px;
-color:#777;
-font-size:11px;
-line-height:1.6;
-}
-
-.modal-actions{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:8px;
-margin-top:18px;
-}
-
-.modal-btn{
-width:100%;
-padding:13px;
-border-radius:12px;
-font-size:11px;
-font-weight:1000;
-cursor:pointer;
-}
-
-.modal-btn.primary{
-border:0;
-background:#b8860b;
-color:#f7f7f5;
-}
-
-.modal-btn.secondary{
-border:1px solid #e5e5e1;
-background:#ffffff;
-color:#777;
-}
-
-/* LOGOUT MODAL */
-
-.logout-modal .modal-box{
-border-color:#422020;
-}
-
-.logout-modal .modal-icon{
-background:#1b0e0e;
-border-color:#422020;
-color:#e07777;
-}
+:root{--pgold:#c9a227;--pgold2:#a77f0b;--pcream:#fffaf0;--pline:#ebe6d7;--ptext:#171717;--pmuted:#777}
+.profile-page{min-height:100vh;padding-bottom:calc(112px + env(safe-area-inset-bottom));background:linear-gradient(180deg,#fff 0%,#fffdf7 55%,#f8f7f2 100%);position:relative;overflow:hidden}
+.profile-page:before,.profile-page:after{content:"";position:absolute;border-radius:50%;pointer-events:none;z-index:0;filter:blur(2px)}
+.profile-page:before{width:210px;height:210px;right:-100px;top:70px;background:radial-gradient(circle,rgba(212,175,55,.13),transparent 68%);animation:profileFloat 8s ease-in-out infinite}
+.profile-page:after{width:180px;height:180px;left:-110px;top:430px;background:radial-gradient(circle,rgba(212,175,55,.08),transparent 70%);animation:profileFloat 10s ease-in-out infinite reverse}
+@keyframes profileFloat{50%{transform:translateY(14px) scale(1.04)}}
+.profile-page .container{position:relative;z-index:1}
+.profile-top{display:flex;align-items:center;justify-content:space-between;padding:22px 0 18px}
+.profile-title{font-size:25px;font-weight:1000;color:var(--ptext);letter-spacing:-.5px}.profile-title span{color:var(--pgold2)}
+.profile-sub{margin-top:5px;font-size:9px;color:#8a8a84;letter-spacing:1.2px;font-weight:800}
+.profile-badge{width:44px;height:44px;border-radius:15px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #eadca8;display:flex;align-items:center;justify-content:center;color:var(--pgold2);font-size:19px;box-shadow:0 8px 24px rgba(180,145,35,.09)}
+.identity-card{position:relative;overflow:hidden;padding:23px 20px;border-radius:26px;background:linear-gradient(145deg,#fffdf5,#fff);border:1px solid #eadca8;box-shadow:0 14px 36px rgba(45,38,20,.07);animation:profileEnter .5s ease both}
+.identity-card:after{content:"";position:absolute;width:150px;height:150px;right:-55px;top:-70px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,.18),transparent 68%)}
+.identity{display:flex;align-items:center;gap:15px;position:relative;z-index:1}
+.avatar{width:70px;height:70px;flex-shrink:0;border-radius:21px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#d8b43b,#9d7608);color:#fff;font-size:25px;font-weight:1000;box-shadow:0 10px 24px rgba(167,127,11,.2);border:3px solid #fff8dc}
+.identity-name{font-size:19px;font-weight:1000;color:var(--ptext);word-break:break-word}.identity-email{margin-top:5px;color:#777;font-size:11px;word-break:break-word}
+.status{display:inline-flex;align-items:center;gap:6px;margin-top:9px;padding:6px 9px;border-radius:999px;background:#f6f1dc;color:#8b6d08;font-size:8px;font-weight:900;letter-spacing:.4px}.status-dot{width:6px;height:6px;border-radius:50%;background:#4caf68;box-shadow:0 0 0 3px rgba(76,175,104,.12)}
+.section{margin-top:26px;animation:profileEnter .5s ease both}.section:nth-of-type(2){animation-delay:.05s}.section:nth-of-type(3){animation-delay:.1s}.section:nth-of-type(4){animation-delay:.15s}
+@keyframes profileEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}.section-head h3{margin:0;color:#252525;font-size:13px;font-weight:1000;letter-spacing:.2px}.edit-btn{border:1px solid #dec873;background:#fffaf0;color:#9b760c;padding:8px 11px;border-radius:10px;font-size:8px;font-weight:1000}
+.details-card{padding:4px 18px 17px;border-radius:22px;background:#fff;border:1px solid var(--pline);box-shadow:0 8px 25px rgba(30,30,20,.035)}
+.detail{padding:15px 0;border-bottom:1px solid #efede6}.detail:last-of-type{border-bottom:0}.detail-label{margin-bottom:7px;color:#898982;font-size:8px;font-weight:900;letter-spacing:.9px}.detail-input{width:100%;padding:0;border:0;outline:0;background:transparent;color:#242424;font-size:13px;font-weight:800;line-height:20px}.detail-input:disabled{opacity:1;-webkit-text-fill-color:#242424}.detail-input.editing{padding:10px;border-radius:11px;background:#fffdf6;border:1px solid #d9bf61;color:#7f6209;-webkit-text-fill-color:#7f6209}
+.save-btn{display:none;width:100%;margin-top:14px;padding:15px;border:0;border-radius:14px;background:linear-gradient(135deg,#d4af37,#b8860b);color:#fff;font-size:11px;font-weight:1000;box-shadow:0 10px 22px rgba(184,134,11,.18)}.save-btn.show{display:block}
+.actions{display:grid;gap:10px}.action{width:100%;min-height:68px;padding:13px 14px;display:flex;align-items:center;gap:12px;border-radius:18px;background:#fff;border:1px solid var(--pline);color:#242424;text-align:left;cursor:pointer;box-shadow:0 7px 20px rgba(30,30,20,.035);transition:transform .18s,border-color .18s,box-shadow .18s}.action:active{transform:scale(.985);border-color:#d7bb59}.action-icon{width:40px;height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#fffaf0;border:1px solid #eadca8;color:#a77f0b;font-size:15px}.action-text{flex:1}.action-title{font-size:11px;font-weight:900;color:#202020}.action-sub{margin-top:4px;color:#85857f;font-size:8px;line-height:1.45}.action-arrow{color:#a6a39b;font-size:18px}.logout{color:#b44d4d}.logout .action-icon{color:#b44d4d;background:#fff4f4;border-color:#f0cccc}
+.message{display:none;margin-top:12px;padding:12px;border-radius:11px;font-size:10px;line-height:1.5;text-align:center}.message.show{display:block}.message.error{background:#fff1f1;color:#b44d4d;border:1px solid #f0cccc}.message.success{background:#eef9f0;color:#318048;border:1px solid #cde8d2}
+.modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,14,.55);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:.25s}.modal.show{opacity:1;visibility:visible}.modal-box{width:100%;max-width:370px;padding:26px 22px;border-radius:24px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #d8bd55;text-align:center;transform:translateY(20px) scale(.95);transition:.25s}.modal.show .modal-box{transform:translateY(0) scale(1)}.modal-icon{width:58px;height:58px;margin:0 auto 15px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fffaf0;border:1px solid #d8bd55;color:#a77f0b;font-size:24px}.modal-title{color:#171717;font-size:19px;font-weight:1000}.modal-text{margin-top:7px;color:#777;font-size:11px;line-height:1.6}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}.modal-btn{width:100%;padding:13px;border-radius:12px;font-size:11px;font-weight:1000;cursor:pointer}.modal-btn.primary{border:0;background:#c9a227;color:#fff}.modal-btn.secondary{border:1px solid #e5e5e1;background:#fff;color:#777}.logout-modal .modal-box{border-color:#e7baba}.logout-modal .modal-icon{background:#fff4f4;border-color:#e7baba;color:#b44d4d}
+@media(max-width:420px){.profile-title{font-size:23px}.identity-card{padding:21px 17px}.details-card{padding-left:15px;padding-right:15px}}
+@media(prefers-reduced-motion:reduce){.profile-page:before,.profile-page:after,.section,.identity-card{animation:none!important}.action{transition:none}}
 </style>
 <link rel="icon" type="image/png" href="assets/boltiv-icon.png">
 </head>
@@ -425,6 +66,7 @@ My <span>Profile</span>
 MANAGE YOUR BOLTIV ACCOUNT
 </div>
 </div>
+<div class="profile-badge">◆</div>
 </div>
 
 
@@ -552,175 +194,49 @@ SAVE CHANGES
 
 
 <!-- SECURITY -->
-
 <div class="section">
-
-<div class="section-head">
-<h3>Security</h3>
-</div>
-
+<div class="section-head"><h3>Security & Preferences</h3></div>
 <div class="actions">
-
-<button
-class="action"
-id="securityBtn"
-type="button">
-
-<div class="action-icon">
-⌾
-<button class="action" onclick="location.href='notifications.html'"><div class="action-icon">🔔</div><div class="action-text"><div class="action-title">Notifications</div><div class="action-sub">View account and transaction updates.</div></div><span>›</span></button></div>
-
-<div class="action-text">
-
-<div class="action-title">
-Security Settings
-</div>
-
-<div class="action-sub">
-Manage your Transaction PIN and account security
-</div>
-
-</div>
-
-<div class="action-arrow">
-›
-</div>
-
+<button class="action" id="securityBtn" type="button">
+<div class="action-icon">⌾</div>
+<div class="action-text"><div class="action-title">Security Settings</div><div class="action-sub">Manage your Transaction PIN and account security</div></div>
+<div class="action-arrow">›</div>
 </button>
-
+<button class="action" id="notificationsBtn" type="button">
+<div class="action-icon">🔔</div>
+<div class="action-text"><div class="action-title">Notifications</div><div class="action-sub">View account and transaction updates</div></div>
+<div class="action-arrow">›</div>
+</button>
 </div>
-
 </div>
-
 
 <!-- ACCOUNT -->
-
 <div class="section">
-
-<div class="section-head">
-<h3>Account</h3>
-</div>
-
+<div class="section-head"><h3>Account & Support</h3></div>
 <div class="actions">
-
-
-<!-- SUPPORT -->
-
-<button
-class="action"
-id="supportBtn"
-type="button">
-
-<div class="action-icon">
-?
-</div>
-
-<div class="action-text">
-
-<div class="action-title">
-Support
-</div>
-
-<div class="action-sub">
-Get help with your account and transactions
-</div>
-
-</div>
-
-<div class="action-arrow">
-›
-</div>
-
+<button class="action" id="supportBtn" type="button">
+<div class="action-icon">?</div>
+<div class="action-text"><div class="action-title">Support</div><div class="action-sub">Get help with your account and transactions</div></div>
+<div class="action-arrow">›</div>
 </button>
-
-
-<!-- LOGOUT -->
-
-<button
-class="action logout"
-id="logoutBtn"
-type="button">
-
-<div class="action-icon">
-↪
-</div>
-
-<div class="action-text">
-
-<div class="action-title">
-Log Out
-</div>
-
-<div class="action-sub">
-Sign out of your BOLTIV account
-</div>
-
-</div>
-
-<div class="action-arrow">
-›
-</div>
-
+<button class="action logout" id="logoutBtn" type="button">
+<div class="action-icon">↪</div>
+<div class="action-text"><div class="action-title">Log Out</div><div class="action-sub">Sign out of your BOLTIV account</div></div>
+<div class="action-arrow">›</div>
 </button>
-
-</div>
-
-</div>
-
-
 </div>
 </div>
 
+</div>
+</div>
 
 <!-- BOTTOM NAV -->
-
 <nav class="bottom-nav">
-
-<button
-class="nav-item"
-data-page="index.html"
-type="button">
-
-<span class="nav-icon">⌂</span>
-<span>Home</span>
-
-</button>
-
-
-<button
-class="nav-item"
-data-page="wallet.html"
-type="button">
-
-<span class="nav-icon">₦</span>
-<span>Wallet</span>
-
-</button>
-
-
-<button
-class="nav-item"
-data-page="transactions.html"
-type="button">
-
-<span class="nav-icon">↯</span>
-<span>Activity</span>
-
-</button>
-
-
-<button
-class="nav-item active"
-data-page="profile.html"
-type="button">
-
-<span class="nav-icon">◉</span>
-<span>Profile</span>
-
-</button>
-
+<button class="nav-item" data-page="index.html" type="button"><span class="nav-icon">⌂</span><span>Home</span></button>
+<button class="nav-item" data-page="wallet.html" type="button"><span class="nav-icon">₦</span><span>Wallet</span></button>
+<button class="nav-item" data-page="transactions.html" type="button"><span class="nav-icon">↯</span><span>Activity</span></button>
+<button class="nav-item active" data-page="profile.html" type="button"><span class="nav-icon">◉</span><span>Profile</span></button>
 </nav>
-
 
 <!-- PROFILE UPDATED MODAL -->
 
@@ -1133,6 +649,14 @@ document
 .onclick=()=>{
 
 location.href="security.html";
+
+};
+
+document
+.getElementById("notificationsBtn")
+.onclick=()=>{
+
+location.href="notifications.html";
 
 };
 

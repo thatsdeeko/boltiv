@@ -308,7 +308,7 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
 .transactions-header{padding:17px 0 13px!important;border-bottom:1px solid var(--line)!important}.transactions-title{font-size:21px!important;letter-spacing:-.3px!important}.transactions-subtitle{font-size:8px!important;letter-spacing:1.3px!important;color:var(--gold2)!important;font-weight:900}.search-box{background:#fff!important;border:1px solid var(--line)!important;border-radius:13px!important}.filter-button{border-color:var(--line)!important;background:#fff!important}.filter-button.active{background:var(--gold)!important;border-color:var(--gold)!important;color:#171717!important}.transaction-summary{border-color:var(--gold3)!important;background:var(--gold-soft)!important}.transaction-item{border-color:var(--line)!important;box-shadow:0 3px 12px rgba(25,25,20,.025)!important}.transaction-icon{background:var(--gold-soft)!important;border-color:var(--gold3)!important;color:var(--gold2)!important}.modal-card{border-color:var(--gold3)!important}.close-button{background:var(--gold)!important;color:#171717!important;border-color:var(--gold)!important}
 
 /* BOTTOM NAV */
-.bottom-nav{height:70px!important;background:rgba(255,255,255,.96)!important;border-top:1px solid var(--line)!important;box-shadow:0 -8px 24px rgba(25,25,20,.04)!important}.nav-item{font-size:8px!important}.nav-icon{font-size:19px!important}.nav-item.active{color:var(--gold2)!important}.nav-item.active .nav-icon{transform:translateY(-1px)}
+.bottom-nav{position:fixed!important;left:50%!important;bottom:0!important;transform:translateX(-50%)!important;height:70px!important;padding-bottom:env(safe-area-inset-bottom)!important;box-sizing:content-box!important;background:rgba(255,255,255,.96)!important;border-top:1px solid var(--line)!important;box-shadow:0 -8px 24px rgba(25,25,20,.04)!important}.nav-item{font-size:8px!important}.nav-icon{font-size:19px!important}.nav-item.active{color:var(--gold2)!important}.nav-item.active .nav-icon{transform:translateY(-1px)}
 
 @media(min-width:900px){
  .container{max-width:1120px!important}.home-header{height:82px}.home-welcome{padding:42px 0 22px}.home-welcome h1{font-size:40px}.home-welcome p{font-size:14px}.home-balance-card{max-width:760px;padding:27px}.balance-value{font-size:43px}.home-service-grid{grid-template-columns:repeat(4,1fr)}.home-service-wide{grid-column:auto;min-height:125px;display:flex;align-items:flex-start}.home-recent-section{max-width:760px}.home-trust-card{max-width:760px}.bottom-nav{max-width:1120px!important}.home-services-section{margin-top:36px}
@@ -320,8 +320,8 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
 /* BOLTIV HOME AMBIENT ANIMATION — subtle white + gold fintech motion */
 .boltiv-animated-home{position:relative;overflow-x:hidden;background:#fffdf8}
 .boltiv-animated-home .home-ambient{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
-.boltiv-animated-home .page,
-.boltiv-animated-home .bottom-nav{position:relative;z-index:1}
+.boltiv-animated-home .page{position:relative;z-index:1}
+.boltiv-animated-home .bottom-nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:1000}
 .home-ambient .ambient-orb{position:absolute;display:block;border-radius:50%;filter:blur(2px);opacity:.22;will-change:transform}
 .ambient-orb-one{width:230px;height:230px;right:-105px;top:105px;background:radial-gradient(circle at 35% 35%,rgba(201,162,39,.42),rgba(255,249,230,.06) 66%,transparent 72%);animation:boltivFloatOne 15s ease-in-out infinite}
 .ambient-orb-two{width:310px;height:310px;left:-180px;top:45%;background:radial-gradient(circle at 60% 45%,rgba(201,162,39,.25),rgba(255,249,230,.05) 65%,transparent 72%);animation:boltivFloatTwo 19s ease-in-out infinite}
@@ -351,3 +351,7 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
  .boltiv-animated-home .home-service-card{opacity:1;transform:none}
 }
 @media(max-width:600px){.ambient-ring-one{width:300px;height:300px}.ambient-ring-two{width:240px;height:240px}.ambient-orb-one{width:180px;height:180px}.ambient-orb-two{width:230px;height:230px}}
+/* MOBILE APP NAVIGATION: always visible; page content clears the fixed nav */
+.page{padding-bottom:calc(96px + env(safe-area-inset-bottom))!important}
+@media(min-width:900px){.page{padding-bottom:calc(98px + env(safe-area-inset-bottom))!important}}
+

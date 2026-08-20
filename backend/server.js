@@ -230,6 +230,15 @@ const success=response.ok&&(statusValue==="true"||statusValue==="success"||data.
 return {success,statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Transaction successful.":"Transaction was not successful.")};
 }
 
+async function cheapDataHubGet(endpoint){
+if(!CHEAPDATAHUB_API_KEY)return {success:false,statusCode:503,message:"CheapDataHub is not configured on the server."};
+const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{method:"GET",headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,Accept:"application/json"}});
+let data={};try{data=await response.json();}catch{}
+const statusValue=String(data.status??data.success??"").toLowerCase();
+const success=response.ok&&(statusValue==="true"||statusValue==="success"||data.success===true);
+return {success,statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Request successful.":"Request was not successful.")};
+}
+
 async function debitWallet(userId,amount){
 const client=await pool.connect();
 try{
@@ -256,9 +265,9 @@ const userId=clean(user.user_id);
 const service=clean(data.service||data.providerPayload?.service).toLowerCase();
 const amount=Number(data.amount);
 if(!userId)return {success:false,statusCode:401,message:"Unauthorized."};
-if(!["airtime","data"].includes(service))return {success:false,statusCode:400,message:"This service is not available through CheapDataHub yet."};
+if(!["airtime","data","exam_pin"].includes(service))return {success:false,statusCode:400,message:"This service is not available through CheapDataHub yet."};
 if(!validAmount(amount))return {success:false,statusCode:400,message:"Invalid amount."};
-if(!/^0\d{10}$/.test(clean(data.phone)))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
+if(service!=="exam_pin"&&!/^0\d{10}$/.test(clean(data.phone)))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
 const idem=clean(data.idempotencyKey||data.idempotency_key);
 if(idem){
 const existing=await db(`SELECT reference,status,amount FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1`,[userId,idem]);
@@ -277,6 +286,12 @@ if(service==="data"){
 const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);
 if(!Number.isInteger(bundleId)||bundleId<=0)throw new Error("Invalid data plan.");
 providerResult=await cheapDataHubRequest("data/purchase",{bundle_id:bundleId,phone_number:clean(data.phone)});
+}else if(service==="exam_pin"){
+const productId=Number(data.product_id||data.providerPayload?.product_id||0);
+const quantity=Number(data.quantity||data.providerPayload?.quantity||1);
+if(!Number.isInteger(productId)||productId<=0)throw new Error("Invalid exam PIN product.");
+if(![1,2,5].includes(quantity))throw new Error("Exam PIN quantity must be 1, 2, or 5.");
+providerResult=await cheapDataHubRequest("exam-pin/purchase",{product_id:productId,quantity});
 }else{
 const network=normalizeDataNetwork(data.network||data.providerPayload?.network);
 const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};
@@ -301,7 +316,7 @@ const pending=["pending","processing","initiated"].includes(providerStatus);
 const finalStatus=pending?"pending":"successful";
 await insertVTUTransaction({userId,service,amount,reference:referenceValue,status:finalStatus,recipient:clean(data.phone),idempotencyKey:idem,providerReference,metadata:providerData});
 const wallet=await getWallet(userId);
-return {success:true,status:finalStatus,message:providerResult.message|| (pending?"Your transaction is being processed.":"Transaction successful."),reference:referenceValue,providerReference,balance:wallet?.balance??debit.balance};
+return {success:true,status:finalStatus,message:providerResult.message|| (pending?"Your transaction is being processed.":"Transaction successful."),reference:referenceValue,providerReference,balance:wallet?.balance??debit.balance,providerData,delivery:providerData?.data?.delivery||providerData?.delivery||null,pins:providerData?.data?.delivery?.pins||providerData?.delivery?.pins||[]};
 }
 
 function token(){
@@ -621,7 +636,7 @@ await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DE
 await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
-for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['exam_pin','Exam PINs','🎓']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
 await db(`DELETE FROM services WHERE key IN ('education','betting','sms','recharge_pin')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
@@ -3075,12 +3090,33 @@ return send(res,200,{success:true,network,plans});
 }
 
 /*
+EXAM PIN CATALOG
+*/
+
+if(req.method==="GET"&&path==="/api/vtu/exam-pin/products"){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+try{
+const provider=await cheapDataHubGet("exam-pin/products");
+if(!provider.success)return send(res,provider.statusCode>=500?502:400,{success:false,message:provider.message||"Unable to load exam PIN products."});
+const service=await getService("exam_pin");
+if(!service)return send(res,503,{success:false,message:"Exam PIN service is not configured."});
+if(service.enabled===false)return send(res,503,{success:false,message:"Exam PIN service is currently unavailable."});
+if(service.maintenance===true)return send(res,503,{success:false,message:"Exam PIN service is currently under maintenance."});
+const pricing=pricingConfig(service);
+const raw=Array.isArray(provider.data?.data)?provider.data.data:(Array.isArray(provider.data?.products)?provider.data.products:(Array.isArray(provider.data)?provider.data:[]));
+const products=raw.map(p=>{const cost=Number(p.price??p.amount??p.cost??0);const price=customerPriceFromCost(cost,pricing);return {product_id:Number(p.product_id??p.id??0),name:clean(p.name??p.exam_name??p.title??"Exam PIN"),exam_name:clean(p.exam_name??p.name??""),provider_price:cost,customer_price:price};}).filter(p=>Number.isInteger(p.product_id)&&p.product_id>0&&p.provider_price>0&&p.customer_price>0&&p.name);
+return send(res,200,{success:true,products});
+}catch(error){console.error("EXAM PIN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load exam PIN products right now."});}
+}
+
+/*
 VTU TRANSACTION
 */
 
 if(
 req.method==="POST"&&
-["/api/vtu/purchase","/api/vtu/airtime","/api/vtu/data","/api/vtu/cable","/api/vtu/electricity"].includes(path)
+["/api/vtu/purchase","/api/vtu/airtime","/api/vtu/data","/api/vtu/cable","/api/vtu/electricity","/api/vtu/exam-pin"].includes(path)
 ){
 
 const rl=rateLimit(req,"vtu-transaction",30,60*1000);

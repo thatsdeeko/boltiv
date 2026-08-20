@@ -35,6 +35,41 @@
 .kyc-secure{display:flex;align-items:center;gap:7px;margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px solid #e8ecf1;border-radius:10px;font-size:11px;color:#64748b}
 .kyc-secure span{font-size:13px}
 @media(max-width:420px){.wallet-modal-card{padding:22px;border-radius:22px}.wallet-modal-title{font-size:20px}.wallet-modal-amount{font-size:28px}.kyc-row{grid-template-columns:1fr}}
+
+.funding-account-copy{
+  width:100%;
+  margin-top:9px;
+  padding:11px 12px;
+  border:1px solid #ead99b;
+  border-radius:10px;
+  background:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  cursor:pointer;
+  color:#171717;
+  text-align:left;
+  -webkit-tap-highlight-color:transparent;
+}
+.funding-account-copy:active{transform:scale(.99)}
+.funding-account-number{
+  font-size:24px;
+  font-weight:900;
+  letter-spacing:1.2px;
+  word-break:break-all;
+}
+.funding-copy-label{
+  flex:0 0 auto;
+  padding:7px 9px;
+  border-radius:8px;
+  background:#d2aa20;
+  color:#fff;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.7px;
+}
+.funding-account-copy.copied .funding-copy-label{background:#1f8a4c}
 </style><link rel="icon" type="image/png" href="assets/boltiv-icon.png">
 </head><body><div class="page"><div class="container"><header class="header"><div class="brand"><div class="brand-name">BOLTIV</div><div class="brand-tagline">DIGITAL PAYMENT HUB</div></div><button class="profile-mini" id="profileButton">U</button></header><section class="welcome"><div class="welcome-title">MY <span>WALLET</span></div><div class="welcome-text">Manage your balance and make payments securely with BOLTIV.</div></section><section class="balance-card"><div class="balance-label">AVAILABLE BALANCE</div><div class="balance-value" id="balance">₦0.00</div><div class="balance-actions"><button class="btn btn-primary" onclick="document.getElementById('amount').focus()">ADD MONEY</button><button class="btn btn-secondary" onclick="location.href='transactions.html'">ACTIVITY</button></div></section><section class="section"><div class="section-head"><h2 class="section-title">ADD MONEY</h2></div><div class="card"><div style="margin-bottom:16px"><div style="font-size:16.5px;font-weight:1000;color:#171717">Add money to your wallet</div><div style="font-size:11px;color:#777;line-height:1.5;margin-top:5px">Choose an amount to add to your BOLTIV wallet and use it across our payment services.</div></div><div class="form-group"><label class="label">CHOOSE AMOUNT</label><div class="provider-grid"><button class="provider-card amount-btn" data-amount="500"><div class="provider-name">₦500</div></button><button class="provider-card amount-btn" data-amount="1000"><div class="provider-name">₦1,000</div></button><button class="provider-card amount-btn" data-amount="2000"><div class="provider-name">₦2,000</div></button><button class="provider-card amount-btn" data-amount="5000"><div class="provider-name">₦5,000</div></button><button class="provider-card amount-btn" data-amount="10000"><div class="provider-name">₦10,000</div></button><button class="provider-card amount-btn" data-amount="20000"><div class="provider-name">₦20,000</div></button></div></div><div class="form-group"><label class="label">CUSTOM AMOUNT</label><div style="position:relative"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#b8860b;font-weight:900;font-size:13.2px;z-index:1">₦</span><input class="input" id="amount" type="number" inputmode="numeric" min="100" placeholder="Enter amount" style="padding-left:30px"></div></div><div id="fundSummary" style="display:none;margin:12px 0;padding:12px;background:#fffdf4;border:1px solid #ead99b;border-radius:10px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:10px;color:#777">AMOUNT TO ADD</span><strong id="summaryAmount" style="font-size:15.4px;color:#b8860b">₦0.00</strong></div></div><button class="btn btn-primary" id="fundBtn" style="width:100%">CONTINUE TO FUND</button></div></section><section class="section"><div class="notice"><strong>ONE WALLET. MULTIPLE SERVICES.</strong><br>Use your wallet balance for airtime, data, TV subscriptions and electricity payments.</div></section><section class="section"><div class="wallet-actions"><div class="wallet-action" onclick="location.href='airtime.html'"><div class="wallet-action-icon">☎</div><div class="wallet-action-title">AIRTIME</div></div><div class="wallet-action" onclick="location.href='data.html'"><div class="wallet-action-icon">⌁</div><div class="wallet-action-title">DATA</div></div><div class="wallet-action" onclick="location.href='cable.html'"><div class="wallet-action-icon">▣</div><div class="wallet-action-title">TV SUBSCRIPTION</div></div><div class="wallet-action" onclick="location.href='electricity.html'"><div class="wallet-action-icon">⚡</div><div class="wallet-action-title">ELECTRICITY</div></div></div></section><footer class="footer"><div class="footer-logo">BOLTIV</div><div class="footer-text">DIGITAL PAYMENT HUB</div></footer></div></div><nav class="bottom-nav"><button class="nav-item" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item active" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button><button class="nav-item" data-page="transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button><button class="nav-item" data-page="profile.html"><span class="nav-icon">◉</span><span>Profile</span></button></nav><div class="wallet-modal" id="walletModal" role="dialog" aria-modal="true" aria-labelledby="fundingModalTitle">
 <div class="wallet-modal-card" style="max-height:90vh;overflow:auto">
@@ -80,7 +115,52 @@ box.innerHTML=`<strong style="letter-spacing:.5px">YOUR BOLTIV FUNDING ACCOUNT</
 }
 async function loadFundingAccount(){const r=await API.request("/api/funding-account");if(r.success&&r.account){fundingAccount=r.account;renderFundingAccount(r.account);}return r;}
 async function activateFundingAccount(payload){toast("pending","Creating account","Setting up your Flutterwave funding account...");const r=await API.request("/api/funding-account/activate",{method:"POST",body:JSON.stringify(payload)});if(!r.success){const msg=typeof r.message==="string"?r.message:(r.message?.message||r.message?.error||"Unable to create funding account.");toast("error","Activation Failed",msg);return null}fundingAccount=r.account;showFundingResult(r.account);toast("success","Account Ready","Your Flutterwave funding account is ready.");return r;}
-function showFundingResult(account){const box=document.getElementById("fundingResult");if(!box||!account)return;box.style.display="block";box.innerHTML=`<strong>TRANSFER TO THIS ACCOUNT</strong><div style="font-size:22px;font-weight:800;margin-top:9px">${account.account_number||""}</div><div style="margin-top:4px">${account.bank_name||"Bank"}</div><div style="margin-top:4px;color:#666">${account.account_name||""}</div><div style="font-size:11px;color:#777;margin-top:9px">${account.account_type==="static"?"Permanent account — reuse it anytime.":"Dynamic account — use it for this deposit only."}</div>`;}
+function showFundingResult(account){
+  const box=document.getElementById("fundingResult");
+  if(!box||!account)return;
+  const accountNumber=String(account.account_number||"").trim();
+  box.style.display="block";
+  box.innerHTML=`
+    <strong>TRANSFER TO THIS ACCOUNT</strong>
+    <button type="button" id="copyFundingAccount" class="funding-account-copy" aria-label="Copy account number">
+      <span class="funding-account-number">${accountNumber}</span>
+      <span class="funding-copy-label">COPY</span>
+    </button>
+    <div style="margin-top:4px">${account.bank_name||"Bank"}</div>
+    <div style="margin-top:4px;color:#666">${account.account_name||""}</div>
+    <div style="font-size:11px;color:#777;margin-top:9px">${account.account_type==="static"?"Permanent account — reuse it anytime.":"Dynamic account — use it for this deposit only."}</div>
+  `;
+  const copyButton=document.getElementById("copyFundingAccount");
+  if(copyButton){
+    copyButton.onclick=async()=>{
+      try{
+        await navigator.clipboard.writeText(accountNumber);
+        copyButton.classList.add("copied");
+        copyButton.querySelector(".funding-copy-label").textContent="✓ COPIED";
+        toast("success","Account number copied","You can now paste it into your bank app.");
+        setTimeout(()=>{
+          if(copyButton.isConnected){
+            copyButton.classList.remove("copied");
+            copyButton.querySelector(".funding-copy-label").textContent="COPY";
+          }
+        },2200);
+      }catch(e){
+        const input=document.createElement("input");
+        input.value=accountNumber;
+        input.setAttribute("readonly","");
+        input.style.position="fixed";
+        input.style.opacity="0";
+        document.body.appendChild(input);
+        input.select();
+        try{document.execCommand("copy");}catch(_){}
+        input.remove();
+        copyButton.querySelector(".funding-copy-label").textContent="✓ COPIED";
+        toast("success","Account number copied","You can now paste it into your bank app.");
+        setTimeout(()=>{if(copyButton.isConnected)copyButton.querySelector(".funding-copy-label").textContent="COPY"},2200);
+      }
+    };
+  }
+}
 async function createWallet(){return API.request("/api/wallet/create",{method:"POST",body:JSON.stringify({userId:uid()})})}
 async function loadWallet(){let r=await API.request("/api/wallet");if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);localStorage.setItem("boltivBalance",String(b));localStorage.setItem("boltivWalletBalance",String(b));return r}if(r.message==="Wallet not found"){r=await createWallet();if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);localStorage.setItem("boltivBalance",String(b));localStorage.setItem("boltivWalletBalance",String(b));return r}}toast("error","Wallet Error",r.message||"Unable to load wallet")}
 function updateSummary(){const v=Number(amount.value);fundSummary.style.display=v>=100?"block":"none";if(v>=100)summaryAmount.textContent=money(v)}

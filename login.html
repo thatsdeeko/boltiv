@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><meta name="robots" content="noindex,nofollow"><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ffffff">
@@ -496,19 +496,17 @@ async function login(){
         NEVER SAVE THE PASSWORD.
         */
 
-        if(data.token){
-
-            localStorage.setItem(
-                "boltivAuthToken",
-                data.token
-            );
-
+        // Persist only the server-issued session token in a browser cookie.
+        // No localStorage/sessionStorage is used.
+        if(data.sessionToken){
+            document.cookie = "boltiv_session=" + encodeURIComponent(data.sessionToken) + "; Path=/; Max-Age=2592000; SameSite=Lax; Secure";
+            boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
         }
 
 
         if(data.user){
 
-            localStorage.setItem(
+            boltivMemoryStorage.setItem(
                 "boltivUser",
                 JSON.stringify(
                     data.user
@@ -518,7 +516,7 @@ async function login(){
 
             if(data.user.email){
 
-                localStorage.setItem(
+                boltivMemoryStorage.setItem(
                     "boltivUserEmail",
                     data.user.email
                 );
@@ -528,7 +526,7 @@ async function login(){
         }
 
 
-        localStorage.setItem(
+        boltivMemoryStorage.setItem(
             "boltivLoggedIn",
             "true"
         );
@@ -543,7 +541,7 @@ async function login(){
         setTimeout(()=>{
 
             location.href =
-                "index.html";
+                "dashboard.html";
 
         },500);
 

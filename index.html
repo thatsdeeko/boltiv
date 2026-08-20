@@ -12,6 +12,23 @@
 if(window.location.pathname.endsWith('/index.html'))window.history.replaceState(null,document.title,'/'+window.location.search+window.location.hash);
 if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html');
 </script>
+
+<style id="boltiv-coming-modal-inline">
+body.modal-open{overflow:hidden!important}
+.coming-modal{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important;visibility:visible!important;pointer-events:none!important}
+.coming-modal[hidden]{display:none!important}
+.coming-modal.is-open{pointer-events:auto!important}
+.coming-modal-backdrop{position:absolute!important;inset:0!important;background:rgba(15,14,11,.62)!important;backdrop-filter:blur(6px)!important;opacity:0!important;transition:opacity .2s ease!important}
+.coming-modal-card{position:relative!important;z-index:2!important;width:min(100%,360px)!important;padding:30px 24px 24px!important;border:1px solid rgba(201,159,22,.32)!important;border-radius:28px!important;background:#fffdf7!important;box-shadow:0 28px 80px rgba(0,0,0,.28)!important;text-align:center!important;transform:translateY(20px) scale(.96)!important;opacity:0!important;transition:transform .22s ease,opacity .2s ease!important}
+.coming-modal.is-open .coming-modal-backdrop{opacity:1!important}
+.coming-modal.is-open .coming-modal-card{transform:translateY(0) scale(1)!important;opacity:1!important}
+.coming-modal-close{position:absolute!important;right:14px!important;top:12px!important;width:38px!important;height:38px!important;border:1px solid #eadfba!important;border-radius:50%!important;background:#fff!important;color:#9a7510!important;font-size:25px!important;line-height:1!important;cursor:pointer!important}
+.coming-modal-icon{width:66px!important;height:66px!important;margin:0 auto 15px!important;border-radius:20px!important;display:grid!important;place-items:center!important;background:linear-gradient(145deg,#f5d55f,#c79a16)!important;color:#fff!important;font-size:26px!important}
+.coming-modal-kicker{font-size:11px!important;font-weight:800!important;letter-spacing:.18em!important;color:#a27b0b!important;margin-bottom:7px!important}
+.coming-modal-card h2{margin:0!important;font-size:24px!important;line-height:1.15!important;color:#171717!important}
+.coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:#716e68!important;font-size:14px!important;line-height:1.55!important}
+.coming-modal-button{width:100%!important;min-height:50px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#e1bf43,#bd920b)!important;color:#fff!important;font-weight:800!important;cursor:pointer!important}
+</style>
 </head>
 <body class="boltiv-animated-home">
 <div class="home-ambient" aria-hidden="true">
@@ -64,14 +81,14 @@ if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html'
     <a class="home-service-card" href="electricity.html"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
 
     <a class="home-service-card" href="exam-pin.html"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
-    <a class="home-service-card coming-soon" href="#" data-service="Betting"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></a>
-    <a class="home-service-card coming-soon" href="#" data-service="Recharge PIN"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></a>
-    <a class="home-service-card coming-soon" href="#" data-service="SMS"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></a>
+    <button type="button" class="home-service-card coming-soon" data-service="Betting"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
+    <button type="button" class="home-service-card coming-soon" data-service="Recharge PIN"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
+    <button type="button" class="home-service-card coming-soon" data-service="SMS"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
 
-    <a class="home-service-card coming-soon" href="#" data-service="Bulk SMS"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></a>
-    <a class="home-service-card coming-soon" href="#" data-service="Gift Cards"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></a>
-    <a class="home-service-card coming-soon" href="#" data-service="Insurance"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></a>
-    <a class="home-service-card coming-soon" href="#" data-service="International Airtime"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></a>
+    <button type="button" class="home-service-card coming-soon" data-service="Bulk SMS"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></button>
+    <button type="button" class="home-service-card coming-soon" data-service="Gift Cards"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></button>
+    <button type="button" class="home-service-card coming-soon" data-service="Insurance"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></button>
+    <button type="button" class="home-service-card coming-soon" data-service="International Airtime"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
   </div>
 </section>
 
@@ -140,11 +157,30 @@ const comingModal=document.getElementById('comingModal');
 const comingTitle=document.getElementById('comingTitle');
 const comingMessage=document.getElementById('comingMessage');
 let lastComingTrigger=null;
-function openComingModal(name,trigger){lastComingTrigger=trigger;comingTitle.textContent=name+' is coming soon';comingMessage.textContent='We are preparing '+name+' for BOLTIV. It will be available here once the service is ready.';comingModal.hidden=false;comingModal.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');requestAnimationFrame(()=>comingModal.classList.add('is-open'));setTimeout(()=>comingModal.querySelector('.coming-modal-button').focus(),80);}
-function closeComingModal(){comingModal.classList.remove('is-open');comingModal.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open');setTimeout(()=>{comingModal.hidden=true;if(lastComingTrigger)lastComingTrigger.focus();},180);}
-document.querySelectorAll('.coming-soon').forEach(card=>card.addEventListener('click',e=>{e.preventDefault();openComingModal(card.dataset.service||'This service',card);}));
-comingModal.querySelectorAll('[data-close-coming]').forEach(el=>el.addEventListener('click',closeComingModal));
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!comingModal.hidden)closeComingModal();});
+function openComingModal(name,trigger){
+  if(!comingModal)return;
+  lastComingTrigger=trigger||null;
+  comingTitle.textContent=String(name||'This service')+' is coming soon';
+  comingMessage.textContent='We are preparing '+String(name||'this service')+' for BOLTIV. It will be available here once the service is ready.';
+  comingModal.hidden=false;
+  comingModal.setAttribute('aria-hidden','false');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>comingModal.classList.add('is-open')));
+}
+function closeComingModal(){
+  if(!comingModal)return;
+  comingModal.classList.remove('is-open');
+  comingModal.setAttribute('aria-hidden','true');
+  document.body.classList.remove('modal-open');
+  setTimeout(()=>{comingModal.hidden=true;if(lastComingTrigger&&lastComingTrigger.focus)lastComingTrigger.focus();},220);
+}
+// Event delegation makes the Coming Soon cards reliable even if other page scripts rerender content.
+document.addEventListener('click',e=>{
+  const card=e.target.closest('.coming-soon');
+  if(card){e.preventDefault();e.stopPropagation();openComingModal(card.dataset.service||'This service',card);return;}
+  if(e.target.closest('[data-close-coming]')){e.preventDefault();closeComingModal();}
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&comingModal&&!comingModal.hidden)closeComingModal();});
 loadHome();
 setInterval(loadHome,30000);
 </script>

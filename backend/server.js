@@ -2972,7 +2972,7 @@ b.password,
 b.name,
 b.phone
 );
-if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); delete result._sessionToken; }
+if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); result.sessionToken=result._sessionToken; delete result._sessionToken; }
 return send(
 res,
 result.success?
@@ -3001,7 +3001,7 @@ await loginUser(
 b.email,
 b.password
 );
-if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); delete result._sessionToken; }
+if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); result.sessionToken=result._sessionToken; delete result._sessionToken; }
 return send(
 res,
 result.success?

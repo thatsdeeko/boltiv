@@ -1064,19 +1064,28 @@ return rows.map(item=>{
 
 }
 
-async function userFromToken(req){
-
-const authorization=
-req.headers.authorization||"";
-
-if(!authorization.startsWith(
-"Bearer "
-)){
-return null;
+function getUserSessionToken(req){
+  const cookieHeader=String(req.headers.cookie||'');
+  const match=cookieHeader.match(/(?:^|;\s*)boltiv_user_session=([^;]+)/);
+  if(match){try{return decodeURIComponent(match[1]);}catch(_){return match[1];}}
+  const authorization=req.headers.authorization||'';
+  if(authorization.startsWith('Bearer ')) return authorization.slice(7).trim();
+  return null;
+}
+function setUserSessionCookie(res,token){
+  const parts=[`boltiv_user_session=${encodeURIComponent(token)}`,'Path=/','HttpOnly','SameSite=None','Max-Age=2592000'];
+  if(process.env.NODE_ENV==='production' || FRONTEND_URL.startsWith('https://')) parts.push('Secure');
+  res.setHeader('Set-Cookie',parts.join('; '));
+}
+function clearUserSessionCookie(res){
+  const parts=['boltiv_user_session=','Path=/','HttpOnly','SameSite=None','Max-Age=0'];
+  if(process.env.NODE_ENV==='production' || FRONTEND_URL.startsWith('https://')) parts.push('Secure');
+  res.setHeader('Set-Cookie',parts.join('; '));
 }
 
-const sessionToken=
-authorization.slice(7).trim();
+async function userFromToken(req){
+
+const sessionToken=getUserSessionToken(req);
 
 if(!sessionToken){
 return null;
@@ -1236,7 +1245,7 @@ return{
 success:true,
 message:
 "Account created successfully. Please create your Transaction PIN.",
-token:sessionToken,
+_sessionToken:sessionToken,
 transactionPinSet:false,
 user:{
 id:user.user_id,
@@ -1350,7 +1359,7 @@ return{
 success:true,
 message:
 "Login successful.",
-token:sessionToken,
+_sessionToken:sessionToken,
 user:{
 id:user.user_id,
 userId:user.user_id,
@@ -1362,32 +1371,13 @@ email:user.email
 
 }
 
-async function logoutUser(req){
-
-const authorization=
-req.headers.authorization||"";
-
-if(authorization.startsWith(
-"Bearer "
-)){
-
-await db(
-`DELETE FROM user_sessions
-WHERE token=$1`,
-[
-authorization.slice(7).trim()
-]
-);
-
+async function logoutUser(req,res){
+  const sessionToken=getUserSessionToken(req);
+  if(sessionToken){ await db(`DELETE FROM user_sessions WHERE token=$1`,[sessionToken]); }
+  clearUserSessionCookie(res);
+  return{success:true,message:"Logged out successfully."};
 }
 
-return{
-success:true,
-message:
-"Logged out successfully."
-};
-
-  }
 async function sendEmail({
 to,
 subject,
@@ -2982,7 +2972,7 @@ b.password,
 b.name,
 b.phone
 );
-
+if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); delete result._sessionToken; }
 return send(
 res,
 result.success?
@@ -3011,7 +3001,7 @@ await loginUser(
 b.email,
 b.password
 );
-
+if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); delete result._sessionToken; }
 return send(
 res,
 result.success?
@@ -3024,6 +3014,15 @@ result
 
 
 /*
+CURRENT USER
+*/
+if(req.method==="GET"&&path==="/api/auth/me"){
+  const user=await userFromToken(req);
+  if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+  return send(res,200,{success:true,user:{id:user.user_id,userId:user.user_id,name:user.name||"",phone:user.phone||"",email:user.email||""}});
+}
+
+/*
 LOGOUT
 */
 
@@ -3033,7 +3032,7 @@ path==="/api/auth/logout"
 ){
 
 const result=
-await logoutUser(req);
+await logoutUser(req,res);
 
 return send(
 res,

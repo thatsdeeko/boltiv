@@ -277,6 +277,20 @@ if(!Number.isFinite(customerPrice)||customerPrice<=0)throw new Error("Unable to 
 return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};
 }
 
+async function resolveDataPlanName(network,bundleId){
+  const selected=normalizeDataNetwork(network);
+  const id=Number(bundleId);
+  if(!selected||!Number.isInteger(id)||id<=0)return "";
+  try{
+    const plans=await fetchCheapDataHubDataPlans(selected);
+    const plan=plans.find(x=>Number(x.bundle_id)===id);
+    return clean(plan?.name||"");
+  }catch(error){
+    console.error("DATA PLAN NAME LOOKUP ERROR:",error?.message||error);
+    return "";
+  }
+}
+
 async function getAuthoritativeCheapDataHubExamProduct(productId){
 const id=Number(productId);
 if(!Number.isInteger(id)||id<=0)throw new Error("Invalid exam PIN product.");
@@ -1003,11 +1017,27 @@ LIMIT 100`,
 [userId]
 );
 
-return result.rows.map(item=>({
+const rows=result.rows;
+for(const item of rows){
+  const service=String(item.service||"").toLowerCase();
+  if(!service.includes("data"))continue;
+  let meta=item.metadata;
+  if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}}
+  meta=meta&&typeof meta==="object"?meta:{};
+  const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
+  const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
+  const existing=clean(meta.plan||meta.plan_name||pricing.plan||requestMeta.plan_name||requestMeta.plan||"");
+  if(existing && !/^Plan \d+$/i.test(existing))continue;
+  const network=clean(meta.network||meta.network_provider||requestMeta.network||requestMeta.network_provider||"");
+  const bundleId=requestMeta.bundle_id||meta.bundle_id||item.bundle_id;
+  const resolved=await resolveDataPlanName(network,bundleId);
+  if(resolved){
+    item.metadata={...meta,plan:resolved,plan_name:resolved};
+  }
+}
+return rows.map(item=>({
 ...item,
-amount:Number(
-item.amount
-)
+amount:Number(item.amount)
 }));
 
 }
@@ -3014,7 +3044,11 @@ const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
 const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
 const enrichedMeta={...meta};
 if(!enrichedMeta.network)enrichedMeta.network=requestMeta.network||requestMeta.network_provider||"";
-if(!enrichedMeta.plan)enrichedMeta.plan=pricing.plan||requestMeta.plan_name||requestMeta.plan||((String(t.service).toLowerCase()==="data"&&requestMeta.bundle_id)?`Plan ${requestMeta.bundle_id}`:"");
+if(!enrichedMeta.plan)enrichedMeta.plan=pricing.plan||requestMeta.plan_name||requestMeta.plan||"";
+if(String(t.service).toLowerCase().includes("data") && (/^Plan \d+$/i.test(String(enrichedMeta.plan||"")) || !enrichedMeta.plan)){
+  const resolved=await resolveDataPlanName(enrichedMeta.network||requestMeta.network||requestMeta.network_provider,requestMeta.bundle_id||enrichedMeta.bundle_id);
+  if(resolved)enrichedMeta.plan=resolved;
+}
 if(!enrichedMeta.phone)enrichedMeta.phone=t.recipient||requestMeta.phone||requestMeta.phone_number||"";
 return send(res,200,{success:true,transaction:{...t,metadata:enrichedMeta,amount:Number(t.amount)}});
 }
@@ -3041,7 +3075,8 @@ try{
     let message=`Your ${String(tx.service||"service")} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
     if(String(tx.service).toLowerCase().includes("data")){
       const network=clean(meta.network||meta.network_provider||meta.request?.network||"");
-      const plan=clean(meta.plan||meta.plan_name||meta.request?.plan_name||meta.pricing?.plan||"");
+      let plan=clean(meta.plan||meta.plan_name||meta.request?.plan_name||meta.pricing?.plan||"");
+      if(/^Plan \d+$/i.test(plan)||!plan)plan=await resolveDataPlanName(network||meta.request?.network||meta.request?.network_provider,meta.request?.bundle_id||meta.bundle_id);
       if(network||plan)message=`Your ${network||"Data"} ${plan||"data plan"} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
     }
     await addNotificationOnce(user.user_id,"Transaction successful",message,"transaction",`tx-success-${tx.id}`);

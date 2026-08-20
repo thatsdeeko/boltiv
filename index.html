@@ -13,7 +13,18 @@ if(window.location.pathname.endsWith('/index.html'))window.history.replaceState(
 if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html');
 </script>
 </head>
-<body>
+<body class="boltiv-animated-home">
+<div class="home-ambient" aria-hidden="true">
+  <span class="ambient-orb ambient-orb-one"></span>
+  <span class="ambient-orb ambient-orb-two"></span>
+  <span class="ambient-orb ambient-orb-three"></span>
+  <span class="ambient-ring ambient-ring-one"></span>
+  <span class="ambient-ring ambient-ring-two"></span>
+  <span class="ambient-spark spark-one">✦</span>
+  <span class="ambient-spark spark-two">·</span>
+  <span class="ambient-spark spark-three">✦</span>
+  <span class="ambient-spark spark-four">·</span>
+</div>
 <div class="page boltiv-home">
 <div class="container">
 <header class="header home-header">

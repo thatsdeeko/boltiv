@@ -105,53 +105,8 @@ async function db(query,params=[]){
 return pool.query(query,params);
 }
 
-/*
-PLATFORM SETTINGS
-Values in platform_settings are stored as JSONB. Return the
-decoded value so booleans such as false remain false (Boolean("false")
-would incorrectly evaluate to true).
-*/
-async function getPlatformSetting(key,fallback=null){
-try{
-const result=await db(
-`SELECT value FROM platform_settings WHERE key=$1 LIMIT 1`,
-[key]
-);
-
-if(!result.rows.length){
-return fallback;
-}
-
-const value=result.rows[0].value;
-
-if(value===null||value===undefined){
-return fallback;
-}
-
-return value;
-}catch(error){
-console.error("PLATFORM SETTING ERROR:",error.message);
-return fallback;
-}
-
-}
-
 function clean(value){
 return String(value??"").trim();
-}
-
-function normalizeNigerianPhone(phone){
-let value=clean(phone);
-
-if(/^\+234\d{10}$/.test(value)){
-return "0"+value.slice(4);
-}
-
-if(/^234\d{10}$/.test(value)){
-return "0"+value.slice(3);
-}
-
-return value;
 }
 
 function validEmail(email){
@@ -423,7 +378,20 @@ if(outcome==="successful"){
 await client.query(`UPDATE transactions SET status='successful',provider_reference=COALESCE(provider_reference,$2),completed_at=NOW(),last_provider_status='successful',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
 const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
 await recordRevenueSale(client,fresh);
-await client.query("COMMIT");try{await addNotificationOnce(tx.user_id,"Transaction successful",`Your ${String(tx.service||"service")} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.` ,"transaction",`tx-success-${tx.id}`);}catch{}return {success:true,status:"successful"};
+await client.query("COMMIT");
+// Notifications are created after the transaction commit so a notification
+// failure can never roll back a successful customer purchase.
+try{
+  const meta=fresh.metadata&&typeof fresh.metadata==="object"?fresh.metadata:{};
+  let detail=`Your ${String(fresh.service||"service")} purchase of ₦${Number(fresh.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
+  if(String(fresh.service).toLowerCase()==="data"){
+    const network=clean(meta.network||meta.network_provider||"");
+    const plan=clean(meta.plan||meta.plan_name||"");
+    if(network||plan)detail=`Your ${network||"Data"} ${plan||"data plan"} purchase of ₦${Number(fresh.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
+  }
+  await addNotificationOnce(fresh.user_id,"Transaction successful",detail,"transaction",`tx-success-${fresh.id}`);
+}catch(error){console.error("TRANSACTION NOTIFICATION ERROR:",error?.stack||error?.message||error);}
+return {success:true,status:"successful"};
 }
 if(outcome==="failed"||outcome==="refunded"){
 if(!tx.refunded_at){
@@ -493,6 +461,11 @@ let authoritative;try{authoritative=await getAuthoritativeCheapDataHubDataPlan(d
 if(Math.abs(Number(amount)-Number(authoritative.customer_price))>0.009)return {success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};
 pricingMeta={providerCost:Number(authoritative.provider_price),customerPrice:Number(authoritative.customer_price),grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2))};
 providerPayload={bundle_id:bundleId,phone_number:recipient};
+// Persist human-readable purchase details so receipts, transaction history,
+// and notifications can render the same information returned to the customer.
+pricingMeta.network=authoritative.network_name||normalizeDataNetwork(data.network||data.providerPayload?.network);
+pricingMeta.plan=clean(authoritative.name||data.plan_name||data.plan||data.providerPayload?.plan_name||data.providerPayload?.plan||String(bundleId));
+
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0);const quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."};if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."};
 let authoritative;try{authoritative=await getAuthoritativeCheapDataHubExamProduct(productId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current exam PIN price."};}
@@ -588,36 +561,6 @@ error.message
 return false;
 }
 
-}
-
-async function setTransactionPin(userId,pin,currentPin=""){
-  const supplied=String(pin??"").trim();
-  if(!/^\d{4}$/.test(supplied)){
-    return {success:false,message:"Transaction PIN must contain exactly 4 digits."};
-  }
-
-  const existing=await db(
-    `SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,
-    [userId]
-  );
-
-  if(existing.rows[0]?.transaction_pin_hash){
-    const current=String(currentPin??"").trim();
-    if(!/^\d{4}$/.test(current) || !verifyPassword(current,existing.rows[0].transaction_pin_hash)){
-      return {success:false,message:"Current Transaction PIN is incorrect."};
-    }
-  }
-
-  const transactionPinHash=hashPassword(supplied);
-  await db(
-    `INSERT INTO user_security(user_id,transaction_pin_hash,updated_at)
-     VALUES($1,$2,NOW())
-     ON CONFLICT(user_id) DO UPDATE
-     SET transaction_pin_hash=EXCLUDED.transaction_pin_hash,updated_at=NOW()`,
-    [userId,transactionPinHash]
-  );
-
-  return {success:true,message:existing.rows[0]?.transaction_pin_hash?"Transaction PIN changed successfully.":"Transaction PIN created successfully."};
 }
 
 async function setup(){
@@ -1107,7 +1050,7 @@ name=
 clean(name);
 
 phone=
-normalizeNigerianPhone(phone);
+clean(phone);
 
 if(name.length<2){
 
@@ -3049,6 +2992,22 @@ if(req.method==="GET"&&path==="/api/transactions/detail"){
 const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0]; return send(res,200,{success:true,transaction:{...t,amount:Number(t.amount)}});
 }
 if(req.method==="GET"&&path==="/api/notifications"){
+// Backfill transaction notifications for successful purchases that may have
+// completed before notification creation, or where a previous notification
+// insert failed. This makes the notifications page self-healing.
+try{
+  const recent=await db(`SELECT id,user_id,service,amount,metadata FROM transactions WHERE user_id=$1 AND status='successful' AND type='debit' AND date>NOW()-INTERVAL '30 days' ORDER BY date DESC LIMIT 100`,[user.user_id]);
+  for(const tx of recent.rows){
+    const meta=tx.metadata&&typeof tx.metadata==="object"?tx.metadata:{};
+    let message=`Your ${String(tx.service||"service")} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
+    if(String(tx.service).toLowerCase()==="data"){
+      const network=clean(meta.network||meta.network_provider||"");
+      const plan=clean(meta.plan||meta.plan_name||"");
+      if(network||plan)message=`Your ${network||"Data"} ${plan||"data plan"} purchase of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
+    }
+    await addNotificationOnce(user.user_id,"Transaction successful",message,"transaction",`tx-success-${tx.id}`);
+  }
+}catch(error){console.error("NOTIFICATION BACKFILL ERROR:",error?.stack||error?.message||error);}
 const r=await db(`SELECT id,title,message,type,read,created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[user.user_id]);
 const unread=r.rows.filter(n=>!n.read).length;
 return send(res,200,{success:true,notifications:r.rows,unreadCount:unread});

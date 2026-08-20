@@ -88,6 +88,18 @@ if(localStorage.getItem('boltivLoggedIn')!=='true')location.replace('login.html'
 </div>
 </div>
 
+<div class="coming-modal" id="comingModal" hidden aria-hidden="true">
+  <div class="coming-modal-backdrop" data-close-coming></div>
+  <section class="coming-modal-card" role="dialog" aria-modal="true" aria-labelledby="comingTitle">
+    <button class="coming-modal-close" type="button" data-close-coming aria-label="Close">×</button>
+    <div class="coming-modal-icon" aria-hidden="true"><span>✦</span></div>
+    <div class="coming-modal-kicker">COMING SOON</div>
+    <h2 id="comingTitle">Service is on the way</h2>
+    <p id="comingMessage">We're preparing this service for BOLTIV. You'll be able to use it here once it's ready.</p>
+    <button class="coming-modal-button" type="button" data-close-coming>GOT IT</button>
+  </section>
+</div>
+
 <nav class="bottom-nav">
 <button class="nav-item active" data-page="index.html"><span class="nav-icon">⌂</span><span>Home</span></button>
 <button class="nav-item" data-page="wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
@@ -124,7 +136,15 @@ function renderRecent(items){
  list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
 }
 document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
-document.querySelectorAll('.coming-soon').forEach(card=>card.addEventListener('click',e=>{e.preventDefault();const name=card.dataset.service||'This service';alert(name+' is coming soon. We are preparing it for BOLTIV.');}));
+const comingModal=document.getElementById('comingModal');
+const comingTitle=document.getElementById('comingTitle');
+const comingMessage=document.getElementById('comingMessage');
+let lastComingTrigger=null;
+function openComingModal(name,trigger){lastComingTrigger=trigger;comingTitle.textContent=name+' is coming soon';comingMessage.textContent='We are preparing '+name+' for BOLTIV. It will be available here once the service is ready.';comingModal.hidden=false;comingModal.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');requestAnimationFrame(()=>comingModal.classList.add('is-open'));setTimeout(()=>comingModal.querySelector('.coming-modal-button').focus(),80);}
+function closeComingModal(){comingModal.classList.remove('is-open');comingModal.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open');setTimeout(()=>{comingModal.hidden=true;if(lastComingTrigger)lastComingTrigger.focus();},180);}
+document.querySelectorAll('.coming-soon').forEach(card=>card.addEventListener('click',e=>{e.preventDefault();openComingModal(card.dataset.service||'This service',card);}));
+comingModal.querySelectorAll('[data-close-coming]').forEach(el=>el.addEventListener('click',closeComingModal));
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!comingModal.hidden)closeComingModal();});
 loadHome();
 setInterval(loadHome,30000);
 </script>

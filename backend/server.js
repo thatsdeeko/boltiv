@@ -689,6 +689,15 @@ read BOOLEAN NOT NULL DEFAULT FALSE,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
 await db(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupe_key TEXT`);
+// Ensure the dedupe index can be created even if an earlier deployment inserted
+// duplicate backfill keys. Keep the oldest notification for each key.
+await db(`
+  DELETE FROM notifications n
+  USING notifications newer
+  WHERE n.dedupe_key IS NOT NULL
+    AND n.dedupe_key = newer.dedupe_key
+    AND n.id > newer.id
+`);
 await db(`CREATE UNIQUE INDEX IF NOT EXISTS notifications_dedupe_idx ON notifications(dedupe_key) WHERE dedupe_key IS NOT NULL`);
 
 await db(`
@@ -960,7 +969,13 @@ async function addNotification(userId,title,message,type="info"){
 async function addNotificationOnce(userId,title,message,type="info",dedupeKey=""){
   const uid=clean(userId),t=clean(title),m=clean(message),k=clean(type)||"info";
   if(!uid||!t||!m)return false;
-  if(dedupeKey){const r=await db(`INSERT INTO notifications(user_id,title,message,type,dedupe_key) VALUES($1,$2,$3,$4,$5) ON CONFLICT(dedupe_key) DO NOTHING RETURNING id`,[uid,t,m,k,clean(dedupeKey)]);return Boolean(r.rows.length);}
+  if(dedupeKey){
+  // The dedupe index is partial (dedupe_key IS NOT NULL), so PostgreSQL cannot
+  // infer it from ON CONFLICT(dedupe_key) alone. Use an un-targeted conflict
+  // clause so this remains safe across existing production schemas.
+  const r=await db(`INSERT INTO notifications(user_id,title,message,type,dedupe_key) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id`,[uid,t,m,k,clean(dedupeKey)]);
+  return Boolean(r.rows.length);
+}
   return addNotification(uid,t,m,k);
 }
 async function adminNotifications(req){

@@ -11,7 +11,7 @@
 <div id="summary" class="summary"><div class="summary-row"><span>Provider</span><strong id="sumProvider">-</strong></div><div class="summary-row"><span>Number</span><strong id="sumNumber">-</strong></div><div class="summary-row"><span>Plan</span><strong id="sumPlan">-</strong></div><div class="summary-row"><span>Amount</span><strong id="sumAmount">₦0.00</strong></div></div>
 <button id="pay" class="pay" disabled>PAY CABLE TV</button><div id="message" class="message"></div>
 </section></div></div>
-<nav class="bottom-nav"><button class="nav" onclick="location.href='/'"><span class="nav-icon">⌂</span>Home</button><button class="nav" onclick="location.href='wallet.html'"><span class="nav-icon">₦</span>Wallet</button><button class="nav" onclick="location.href='transactions.html'"><span class="nav-icon">↯</span>Activity</button><button class="nav" onclick="location.href='profile.html'"><span class="nav-icon">◉</span>Profile</button></nav>
+<nav class="bottom-nav"><button class="nav" onclick="location.href='/'"><span class="nav-icon">⌂</span>Home</button><button class="nav" onclick="location.href='/wallet/'"><span class="nav-icon">₦</span>Wallet</button><button class="nav" onclick="location.href='/transactions/'"><span class="nav-icon">↯</span>Activity</button><button class="nav" onclick="location.href='/profile/'"><span class="nav-icon">◉</span>Profile</button></nav>
 <script>
 // Cable TV logic
 const providers=document.querySelectorAll(".provider"),smartcard=document.getElementById("smartcard"),plan=document.getElementById("plan"),verify=document.getElementById("verify"),pay=document.getElementById("pay"),summary=document.getElementById("summary"),message=document.getElementById("message");let selectedProvider="DSTV",verified=false;

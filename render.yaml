@@ -1,39 +1,51 @@
 services:
   - type: web
-    name: boltiv-backend
-    runtime: node
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /api/health
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: FRONTEND_URL
-        value: https://boltiv.ng
-      - key: FRONTEND_ORIGIN
-        value: https://boltiv.ng
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: FLW_SECRET_KEY
-        sync: false
-      - key: FLW_SECRET_HASH
-        sync: false
-      - key: FLW_BASE_URL
-        value: https://api.flutterwave.com/v3
-      - key: FLW_CALLBACK_URL
-        sync: false
-      - key: BACKEND_PUBLIC_URL
-        sync: false
-      - key: ADMIN_PHONE
-        sync: false
-      - key: VTU_API_BASE_URL
-        value: https://api.vtugate.com
-      - key: VTU_API_KEY
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: MAIL_FROM
-        sync: false
+    runtime: static
+    name: boltiv-frontend
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /login/
+        destination: /login.html
+      - type: rewrite
+        source: /register/
+        destination: /register.html
+      - type: rewrite
+        source: /dashboard/
+        destination: /dashboard.html
+      - type: rewrite
+        source: /airtime/
+        destination: /airtime.html
+      - type: rewrite
+        source: /data/
+        destination: /data.html
+      - type: rewrite
+        source: /electricity/
+        destination: /electricity.html
+      - type: rewrite
+        source: /cable/
+        destination: /cable.html
+      - type: rewrite
+        source: /wallet/
+        destination: /wallet.html
+      - type: rewrite
+        source: /transactions/
+        destination: /transactions.html
+      - type: rewrite
+        source: /profile/
+        destination: /profile.html
+      - type: rewrite
+        source: /notifications/
+        destination: /notifications.html
+      - type: rewrite
+        source: /support/
+        destination: /support.html
+      - type: rewrite
+        source: /contact/
+        destination: /contact.html
+      - type: rewrite
+        source: /privacy/
+        destination: /privacy.html
+      - type: rewrite
+        source: /terms/
+        destination: /terms.html

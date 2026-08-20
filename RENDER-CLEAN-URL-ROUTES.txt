@@ -1,0 +1,33 @@
+BOLTIV CLEAN URLS — RENDER STATIC SITE ROUTES
+
+Keep all HTML files in the repository root. Configure these as REWRITE rules on the BOLTIV frontend Static Site in Render. Rewrites keep the clean URL in the browser while serving the corresponding .html file.
+
+Source -> Destination
+/login/ -> /login.html
+/register/ -> /register.html
+/dashboard/ -> /dashboard.html
+/wallet/ -> /wallet.html
+/airtime/ -> /airtime.html
+/data/ -> /data.html
+/electricity/ -> /electricity.html
+/cable/ -> /cable.html
+/transactions/ -> /transactions.html
+/profile/ -> /profile.html
+/notifications/ -> /notifications.html
+/support/ -> /support.html
+/contact/ -> /contact.html
+/privacy/ -> /privacy.html
+/terms/ -> /terms.html
+/history/ -> /history.html
+/betting/ -> /betting.html
+/exam-pin/ -> /exam-pin.html
+/recharge-pin/ -> /recharge-pin.html
+/receipt/ -> /receipt.html
+/security/ -> /security.html
+/sms/ -> /sms.html
+/forgot-password/ -> /forgot-password.html
+/reset-password/ -> /reset-password.html
+/admin/ -> /admin.html
+/404/ -> /404.html
+
+Important: Use REWRITE, not Redirect, so the browser remains on /login/, /dashboard/, etc. Render documents that rewrite rules are configured from the Static Site Redirects/Rewrites section.

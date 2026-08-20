@@ -408,11 +408,11 @@ AVAILABLE BALANCE
 
 <div class="balance-actions">
 
-<button class="btn btn-primary" onclick="location.href='wallet.html'">
+<button class="btn btn-primary" onclick="location.href='/wallet/'">
 ADD MONEY
 </button>
 
-<button class="btn btn-secondary" onclick="location.href='transactions.html'">
+<button class="btn btn-secondary" onclick="location.href='/transactions/'">
 ACTIVITY
 </button>
 
@@ -490,22 +490,22 @@ DIGITAL PAYMENT HUB
 
 <nav class="bottom-nav">
 
-<button class="nav-item" data-page="index.html">
+<button class="nav-item" data-page="/">
 <span class="nav-icon">⌂</span>
 <span>Home</span>
 </button>
 
-<button class="nav-item" data-page="wallet.html">
+<button class="nav-item" data-page="/wallet/">
 <span class="nav-icon">₦</span>
 <span>Wallet</span>
 </button>
 
-<button class="nav-item active" data-page="history.html">
+<button class="nav-item active" data-page="/history/">
 <span class="nav-icon">↯</span>
 <span>History</span>
 </button>
 
-<button class="nav-item" data-page="profile.html">
+<button class="nav-item" data-page="/profile/">
 <span class="nav-icon">◉</span>
 <span>Profile</span>
 </button>
@@ -1042,7 +1042,7 @@ document.getElementById("historyModal")
 
 document.getElementById("profileButton")
 .onclick=()=>{
-location.href="profile.html";
+location.href="/profile/";
 };
 
 document.querySelectorAll(".nav-item")

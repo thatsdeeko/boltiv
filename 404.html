@@ -4,12 +4,12 @@
 (async()=>{
   const path=location.pathname.replace(/^\/+|\/+$/g,'');
   const routes={
-    '':'index.html',
-    'login':'login.html','register':'register.html','wallet':'wallet.html','transactions':'transactions.html',
-    'airtime':'airtime.html','data':'data.html','cable':'cable.html','electricity':'electricity.html','profile':'profile.html',
-    'history':'history.html','notifications':'notifications.html','receipt':'receipt.html','contact':'contact.html',
-    'privacy':'privacy.html','terms':'terms.html','security':'security.html','support':'support.html',
-    'forgot-password':'forgot-password.html','reset-password':'reset-password.html','admin':'admin.html'
+    '':'/',
+    'login':'/login/','register':'/register/','wallet':'/wallet/','transactions':'/transactions/',
+    'airtime':'/airtime/','data':'/data/','cable':'/cable/','electricity':'/electricity/','profile':'/profile/',
+    'history':'/history/','notifications':'/notifications/','receipt':'/receipt/','contact':'/contact/',
+    'privacy':'/privacy/','terms':'/terms/','security':'/security/','support':'/support/',
+    'forgot-password':'/forgot-password/','reset-password':'/reset-password/','admin':'/admin/'
   };
   const file=routes[path] || null;
   if(!file){document.body.textContent='Page not found'; return;}

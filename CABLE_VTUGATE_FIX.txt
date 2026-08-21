@@ -1,3 +1,0 @@
-BOLTIV CABLE TV / VTUGATE INTEGRATION
-
-Cable verification now calls BOLTIV backend /api/vtu/cable/verify, which securely calls VTUGATE /api/v1/verifycabletv using the server-side VTU API key. The purchase flow continues through /api/vtu/cable -> /api/v1/buycabletv using application/x-www-form-urlencoded. Customer wallet debit/refund, transaction PIN, idempotency, provider status and revenue calculation are unchanged.

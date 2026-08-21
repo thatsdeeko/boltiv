@@ -495,13 +495,7 @@ async function login(){
         SAVE AUTH SESSION ONLY.
         NEVER SAVE THE PASSWORD.
         */
-
-        // Persist only the server-issued session token in a browser cookie.
-        // No localStorage/sessionStorage is used.
-        if(data.sessionToken){
-            document.cookie = "boltiv_session=" + encodeURIComponent(data.sessionToken) + "; Path=/; Max-Age=2592000; SameSite=Lax; Secure";
-            boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
-        }
+         // Authentication is stored in the HttpOnly cookie set by the backend.
 
 
         if(data.user){
@@ -538,12 +532,7 @@ async function login(){
         );
 
 
-        setTimeout(()=>{
-
-            location.href =
-                "/";
-
-        },500);
+        setTimeout(()=>{ location.replace("/dashboard/"); },500);
 
 
     }catch(error){

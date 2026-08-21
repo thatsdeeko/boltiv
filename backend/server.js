@@ -138,6 +138,57 @@ const row=result.rows[0];
 return {...row,fee:Number(row.fee||0),config:row.config&&typeof row.config==="object"?row.config:{}};
 }
 
+function pricingConfig(service){
+const config=service?.config&&typeof service.config==="object"?service.config:{};
+const adminPricing=config.pricing&&typeof config.pricing==="object"?config.pricing:null;
+
+if(adminPricing){
+  let mode=clean(adminPricing.mode||"discount").toLowerCase();
+  if(mode==="discount"||mode==="provider_discount")mode="provider_discount";
+  else if(mode==="fixed"||mode==="fixed_profit")mode="fixed_profit";
+  else mode="provider_discount";
+  const discountPct=Number(adminPricing.discount_pct??adminPricing.discountPercent??0);
+  const fixedProfit=Number(adminPricing.fixed_profit??adminPricing.fixedProfit??0);
+  const serviceFee=Number(service?.fee||0);
+  return {
+    markup_mode:mode,
+    markup_pct:Number.isFinite(discountPct)?Math.min(100,Math.max(0,discountPct)):0,
+    markup_fixed:Number.isFinite(fixedProfit)?Math.max(0,fixedProfit):0,
+    service_fee:Number.isFinite(serviceFee)?Math.max(0,serviceFee):0
+  };
+}
+
+let mode=clean(config.markup_mode??config.markupMode??config.pricing_mode??config.pricingMode??"none").toLowerCase();
+if(mode==="percent")mode="percentage";
+if(mode==="fixed_amount")mode="fixed";
+if(mode==="cost_plus")mode="percentage_plus_fixed";
+const pct=Number(config.markup_pct??config.markupPercent??config.percentage??0);
+const fixed=Number(config.markup_fixed??config.markupFixed??config.fixed??service?.fee??0);
+return {
+markup_mode:["none","percentage","fixed","percentage_plus_fixed"].includes(mode)?mode:"none",
+markup_pct:Number.isFinite(pct)?Math.max(0,pct):0,
+markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0,
+service_fee:0
+};
+}
+
+function customerPriceFromCost(cost,pricing){
+const n=Number(cost);
+if(!Number.isFinite(n)||n<=0)return null;
+const p=pricing||{};
+let price=n;
+if(p.markup_mode==="provider_discount"){
+  price=n*(1-Number(p.markup_pct||0)/100);
+  price+=Number(p.markup_fixed||0);
+  price+=Number(p.service_fee||0);
+}else if(p.markup_mode==="fixed_profit"){
+  price=n+Number(p.markup_fixed||0)+Number(p.service_fee||0);
+}else if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
+else if(p.markup_mode==="percentage")price+=n*Number(p.markup_pct||0)/100;
+else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)/100+Number(p.markup_fixed||0);
+return Number(price.toFixed(2));
+}
+
 function normalizeDataNetwork(value){
 const n=clean(value).toUpperCase().replace(/\s+/g,"");
 if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE";

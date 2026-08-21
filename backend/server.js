@@ -3135,7 +3135,7 @@ const rl=rateLimit(req,`transaction-pin-change:${user.user_id}`,5,15*60*1000);
 if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=await body(req); const result=await setTransactionPin(user.user_id,b.pin,b.currentPin||""); return send(res,result.success?200:400,result);
 }
-if(req.method==="GET"&&path==="/api/transactions.htmldetail"){
+if(req.method==="GET"&&path==="/api/transactions/detail"){
 const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0];
 let meta=t.metadata; if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}} meta=meta&&typeof meta==="object"?meta:{};
 const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
@@ -3206,10 +3206,10 @@ const r=await db(`SELECT id,title,message,type,read,created_at FROM notification
 const unread=r.rows.filter(n=>!n.read).length;
 return send(res,200,{success:true,notifications:r.rows,unreadCount:unread});
 }
-if(req.method==="POST"&&path==="/api/notifications.htmlread"){
+if(req.method==="POST"&&path==="/api/notifications/read"){
 const b=await body(req); if(b.id) await db(`UPDATE notifications SET read=TRUE WHERE id=$1 AND user_id=$2`,[b.id,user.user_id]); else await db(`UPDATE notifications SET read=TRUE WHERE user_id=$1`,[user.user_id]); return send(res,200,{success:true});
 }
-if(req.method==="POST"&&path==="/api/profile.htmlupdate"){
+if(req.method==="POST"&&path==="/api/profile/update"){
 const b=await body(req); const name=clean(b.name),phone=clean(b.phone),email=clean(b.email).toLowerCase();
 if(name.length<2)return send(res,400,{success:false,message:"Please enter your full name."});
 if(phone && !/^[0-9+()\-\s]{10,20}$/.test(phone))return send(res,400,{success:false,message:"Please enter a valid phone number."});
@@ -3220,7 +3220,7 @@ if(!r.rows.length)return send(res,404,{success:false,message:"User account not f
 return send(res,200,{success:true,user:r.rows[0],message:"Profile updated successfully."});
 }catch(e){if(e.code==="23505")return send(res,409,{success:false,message:"That email address is already in use."}); throw e;}
 }
-if(req.method==="POST"&&path==="/api/support.htmltickets"){
+if(req.method==="POST"&&path==="/api/support/tickets"){
 const b=await body(req); const subject=clean(b.subject),message=clean(b.message),transactionReference=clean(b.transactionReference||b.reference); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."});
 const client=await pool.connect();
 try{
@@ -3232,17 +3232,17 @@ try{await addNotification(user.user_id,"Support request received",`Your support 
 return send(res,201,{success:true,ticket:r.rows[0],message:`Support ticket #${r.rows[0].id} created.`});
 }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
-if(req.method==="GET"&&path==="/api/support.htmltickets"){
+if(req.method==="GET"&&path==="/api/support/tickets"){
 const r=await db(`SELECT id,subject,message,status,transaction_reference,created_at,updated_at FROM support_tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,[user.user_id]); return send(res,200,{success:true,tickets:r.rows});
 }
-if(req.method==="GET"&&path==="/api/support.htmlticket"){
+if(req.method==="GET"&&path==="/api/support/ticket"){
 const id=Number(url.searchParams.get("id")); if(!Number.isInteger(id)||id<1)return send(res,400,{success:false,message:"Invalid ticket."});
 const t=await db(`SELECT id,subject,message,status,transaction_reference,created_at,updated_at FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
 if(!t.rows.length)return send(res,404,{success:false,message:"Support ticket not found."});
 const m=await db(`SELECT id,sender_type,message,created_at FROM support_messages WHERE ticket_id=$1 ORDER BY created_at ASC`,[id]);
 return send(res,200,{success:true,ticket:t.rows[0],messages:m.rows});
 }
-if(req.method==="POST"&&path==="/api/support.htmlticket/reply"){
+if(req.method==="POST"&&path==="/api/support/ticket/reply"){
 const b=await body(req); const id=Number(b.id),message=clean(b.message);
 if(!Number.isInteger(id)||id<1||message.length<2)return send(res,400,{success:false,message:"Please enter a message."});
 const t=await db(`SELECT id,status FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
@@ -3306,7 +3306,7 @@ wallet
 WALLET
 */
 
-if(req.method==="POST"&&path==="/api/wallet.htmlcreate"){
+if(req.method==="POST"&&path==="/api/wallet/create"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 await createWallet(user.user_id);
@@ -3523,7 +3523,7 @@ result
 VTU DATA PLAN CATALOG
 */
 
-if(req.method==="POST"&&path==="/api/vtu/data.htmlplans"){
+if(req.method==="POST"&&path==="/api/vtu/data/plans"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 const b=await body(req);
@@ -3553,7 +3553,7 @@ return send(res,200,{success:true,network,plans});
 EXAM PIN CATALOG
 */
 
-if(req.method==="GET"&&path==="/api/vtu/exam-pin.htmlproducts"){
+if(req.method==="GET"&&path==="/api/vtu/exam-pin/products"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 try{

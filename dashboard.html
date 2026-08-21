@@ -46,7 +46,12 @@ body.modal-open{overflow:hidden!important}
 <header class="header home-header">
   <a class="home-brand" href="/dashboard" aria-label="BOLTIV dashboard"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
   <div class="home-header-actions">
-    <button class="icon-button notification-button" onclick="location.href='/notifications'" aria-label="Notifications"><span>♢</span><b id="notificationBadge" class="notification-badge" hidden>0</b></button>
+    <button class="icon-button notification-button" onclick="location.href='/notifications'" aria-label="Notifications">
+  <svg class="notification-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <b id="notificationBadge" class="notification-badge" hidden>0</b>
+</button>
     <button class="profile-mini" id="profileButton" onclick="location.href='/profile'">U</button>
   </div>
 </header>

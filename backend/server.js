@@ -760,7 +760,8 @@ await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DE
 await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
-for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['exam_pin','Exam PINs','🎓'],['data_pin','Data PIN','🎫'],['recharge_pin','Recharge Card PIN','🧾'],['bulk_sms','Bulk SMS','💬'],['smile_data','Smile Data','📡'],['alpha_topup','Alpha Top-up','📲'],['kirani','Kirani','📱']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['exam_pin','Exam PINs','🎓']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+await db(`UPDATE services SET enabled=FALSE,maintenance=TRUE,updated_at=NOW() WHERE key NOT IN ('airtime','data','electricity','cable','exam_pin')`);
 await db(`DELETE FROM services WHERE key IN ('education','betting','sms')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
@@ -3311,7 +3312,12 @@ const hmacSignature=String(req.headers["flutterwave-signature"]||"");
 let valid=false;
 if(FLW_SECRET_HASH){
 if(directSignature&&directSignature===FLW_SECRET_HASH)valid=true;
-if(hmacSignature){const expected=crypto.createHmac("sha256",FLW_SECRET_HASH).update(rawBody).digest("base64");if(hmacSignature===expected)valid=true;}
+if(hmacSignature){
+const expected=crypto.createHmac("sha256",FLW_SECRET_HASH).update(rawBody).digest("base64");
+const supplied=Buffer.from(hmacSignature,"utf8");
+const expectedBuf=Buffer.from(expected,"utf8");
+if(supplied.length===expectedBuf.length && crypto.timingSafeEqual(supplied,expectedBuf))valid=true;
+}
 }
 if(!valid)return send(res,401,{success:false,message:"Invalid Flutterwave webhook signature."});
 let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{success:false,message:"Invalid JSON payload."});}
@@ -3646,7 +3652,7 @@ if(req.method==='GET'&&path==='/api/pricing'){
   return send(res,200,{success:true,pricing:out});
 }
 
-if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config FROM services ORDER BY key`);return send(res,200,{success:true,services:r.rows});}
+if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin') ORDER BY key`);return send(res,200,{success:true,services:r.rows});}
 if(req.method==='GET'&&path==='/api/platform/settings'){return send(res,200,{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}});}
 
 /*

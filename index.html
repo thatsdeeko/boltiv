@@ -19,7 +19,7 @@
 <meta name="twitter:title" content="BOLTIV — Digital Services & Payments in Nigeria">
 <meta name="twitter:description" content="Everyday digital services, in one simple place.">
 <meta name="twitter:image" content="https://boltiv.ng/assets/boltiv-logo.png">
-<link rel="stylesheet" href="style.css?v=20260821-servicecenter">
+<link rel="stylesheet" href="style.css?v=20260821-homeplus">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Organization","name":"BOLTIV","url":"https://boltiv.ng/","logo":"https://boltiv.ng/assets/boltiv-logo.png","description":"BOLTIV is a Nigerian digital services and payments platform for everyday services such as airtime, data, electricity and cable TV."}
 </script>
@@ -87,6 +87,54 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
  .seo-section{padding-bottom:54px}
 }
 @media(max-width:430px){.seo-steps{grid-template-columns:1fr}.seo-hero-actions{flex-direction:column}.seo-hero-actions .seo-btn{width:100%}.seo-actions .seo-btn{min-width:110px}}
+
+/* Enhanced homepage sections */
+.seo-mini-nav{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:14px}
+.seo-mini-nav a{font-size:12px;font-weight:800;color:#6b675f;text-decoration:none}
+.seo-mini-nav a:hover{color:var(--boltiv-gold-dark)}
+.seo-availability{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
+.seo-availability-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #ebe5d2;border-radius:18px;padding:18px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
+.seo-availability-card .availability-icon{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:#fff9e8;border:1px solid #eadfb9;display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000}
+.seo-availability-card strong{display:block;font-size:15px;margin-bottom:5px}
+.seo-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:900;letter-spacing:.05em}
+.seo-status.live{color:#25824f}
+.seo-status.live::before{content:"";width:7px;height:7px;border-radius:50%;background:#35a66c}
+.seo-status.soon{color:#8b806b}
+.seo-status.soon::before{content:"";width:7px;height:7px;border-radius:50%;background:#c9a22b}
+.seo-wallet{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:stretch}
+.seo-wallet-copy{background:#171717;color:#fff;border-radius:28px;padding:38px}
+.seo-wallet-copy .seo-kicker{color:#d3aa27}
+.seo-wallet-copy h2{text-align:left;color:#fff;margin:12px 0;font-size:34px}
+.seo-wallet-copy p{color:#d3d3d3;line-height:1.7}
+.seo-wallet-points{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+.seo-wallet-point{border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:15px}
+.seo-wallet-point strong{display:block;font-size:14px;margin-bottom:5px}
+.seo-wallet-point span{font-size:12px;color:#bdbdbd;line-height:1.5}
+.seo-wallet-card{background:#fff;border:1px solid var(--boltiv-line);border-radius:28px;padding:28px;box-shadow:0 16px 45px rgba(80,60,10,.07);display:flex;flex-direction:column;justify-content:center}
+.seo-wallet-balance{border-radius:22px;background:#fffaf0;border:1px solid #eadfb9;padding:24px;margin-bottom:18px}
+.seo-wallet-balance small{display:block;color:#817864;font-weight:800;letter-spacing:.08em;margin-bottom:10px}
+.seo-wallet-balance strong{display:block;font-size:38px;letter-spacing:-.03em}
+.seo-wallet-card p{color:#777;line-height:1.6;font-size:13px}
+.seo-faq{max-width:800px;margin:28px auto 0;display:grid;gap:10px}
+.seo-faq details{background:#fff;border:1px solid #ebe5d2;border-radius:16px;padding:18px 20px}
+.seo-faq summary{cursor:pointer;font-weight:900;list-style:none;display:flex;justify-content:space-between;gap:15px}
+.seo-faq summary::-webkit-details-marker{display:none}
+.seo-faq summary::after{content:"+";color:var(--boltiv-gold);font-size:20px;line-height:1}
+.seo-faq details[open] summary::after{content:"−"}
+.seo-faq p{color:#777;line-height:1.65;font-size:13px;margin:14px 0 0}
+.seo-mobile-cta{display:none}
+@media(max-width:760px){
+ .seo-mini-nav{gap:12px}
+ .seo-availability{grid-template-columns:1fr}
+ .seo-wallet{grid-template-columns:1fr}
+ .seo-wallet-copy{padding:28px 22px}
+ .seo-wallet-copy h2{font-size:29px}
+ .seo-wallet-points{grid-template-columns:1fr}
+ .seo-mobile-cta{position:fixed;display:grid;grid-template-columns:1fr 1fr;gap:10px;left:12px;right:12px;bottom:12px;padding:10px;background:rgba(255,255,255,.96);border:1px solid #e7dfc9;border-radius:18px;box-shadow:0 12px 35px rgba(0,0,0,.14);z-index:9999;backdrop-filter:blur(10px)}
+ .seo-mobile-cta .seo-btn{padding:13px 10px}
+ .seo-footer{padding-bottom:105px}
+}
+
 </style>
 </head>
 <body>
@@ -101,6 +149,13 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
     <a class="seo-btn secondary" href="/login.html">Sign in</a>
     <a class="seo-btn primary" href="/register.html">Get started</a>
   </div>
+
+  <nav class="seo-mini-nav" aria-label="Homepage sections">
+    <a href="#services">Services</a>
+    <a href="#wallet">Wallet</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#faq">FAQ</a>
+  </nav>
 </header>
 
 <main>
@@ -122,15 +177,63 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 </section>
 
 <section id="services" class="seo-section">
-  <h2>What you can do with BOLTIV</h2>
-  <p class="seo-section-intro">BOLTIV brings frequently used digital services together so you can handle everyday payments without moving between different platforms.</p>
+  <h2>Everyday services, one simple place</h2>
+  <p class="seo-section-intro">Choose a service, follow a few clear steps and keep your activity together inside your BOLTIV account.</p>
+
   <div class="seo-grid">
-    <div class="seo-service"><div class="icon">₦</div><strong>Airtime</strong><span>Recharge supported networks quickly and keep your phone connected.</span></div>
-    <div class="seo-service"><div class="icon">▣</div><strong>Data</strong><span>Choose available data plans and purchase them from your BOLTIV account.</span></div>
-    <div class="seo-service"><div class="icon">ϟ</div><strong>Electricity</strong><span>Pay supported electricity bills conveniently from one place.</span></div>
-    <div class="seo-service"><div class="icon">TV</div><strong>Cable TV</strong><span>Renew supported cable TV subscriptions without leaving BOLTIV.</span></div>
-    <div class="seo-service"><div class="icon">PIN</div><strong>Exam PINs</strong><span>Access available examination PIN products through the platform.</span></div>
-    <div class="seo-service"><div class="icon">+</div><strong>More services</strong><span>Additional everyday digital services can be added as BOLTIV grows.</span></div>
+    <a class="seo-service" href="/airtime.html" style="text-decoration:none;color:inherit">
+      <div class="icon">₦</div><strong>Airtime</strong><span>Recharge supported networks quickly and keep your phone connected.</span>
+    </a>
+    <a class="seo-service" href="/data.html" style="text-decoration:none;color:inherit">
+      <div class="icon">▣</div><strong>Data</strong><span>Choose available data plans and purchase them from your BOLTIV account.</span>
+    </a>
+    <a class="seo-service" href="/electricity.html" style="text-decoration:none;color:inherit">
+      <div class="icon">ϟ</div><strong>Electricity</strong><span>Pay supported electricity bills conveniently from one place.</span>
+    </a>
+    <a class="seo-service" href="/cable.html" style="text-decoration:none;color:inherit">
+      <div class="icon">TV</div><strong>Cable TV</strong><span>Renew supported cable TV subscriptions without leaving BOLTIV.</span>
+    </a>
+    <a class="seo-service" href="/exam-pin.html" style="text-decoration:none;color:inherit">
+      <div class="icon">PIN</div><strong>Exam PINs</strong><span>Access available examination PIN products through the platform.</span>
+    </a>
+    <a class="seo-service" href="/dashboard.html" style="text-decoration:none;color:inherit">
+      <div class="icon">+</div><strong>More services</strong><span>Explore additional digital services as they become available.</span>
+    </a>
+  </div>
+
+  <h3 style="text-align:center;margin:48px 0 0;font-size:22px">Service availability</h3>
+  <p class="seo-section-intro" style="margin-bottom:0">See what's available now and what's coming next.</p>
+  <div class="seo-availability">
+    <div class="seo-availability-card"><div class="availability-icon">₦</div><div><strong>Airtime</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
+    <div class="seo-availability-card"><div class="availability-icon">▣</div><div><strong>Data</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
+    <div class="seo-availability-card"><div class="availability-icon">ϟ</div><div><strong>Electricity</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
+    <div class="seo-availability-card"><div class="availability-icon">TV</div><div><strong>Cable TV</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
+    <div class="seo-availability-card"><div class="availability-icon">PIN</div><div><strong>Exam PINs</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
+    <div class="seo-availability-card"><div class="availability-icon">+</div><div><strong>More services</strong><span class="seo-status soon">COMING SOON</span></div></div>
+  </div>
+</section>
+
+<section id="wallet" class="seo-section alt">
+  <div class="seo-wallet">
+    <div class="seo-wallet-copy">
+      <div class="seo-kicker">YOUR BOLTIV WALLET</div>
+      <h2>Fund once. Use it across your services.</h2>
+      <p>Keep funds ready in your BOLTIV wallet and use them for supported purchases. Your transactions stay connected to your account so you can review your activity later.</p>
+      <div class="seo-wallet-points">
+        <div class="seo-wallet-point"><strong>One balance</strong><span>Manage your available funds from one place.</span></div>
+        <div class="seo-wallet-point"><strong>Transaction records</strong><span>Keep a clear history of your purchases and funding.</span></div>
+        <div class="seo-wallet-point"><strong>Fast checkout</strong><span>Choose a service and complete supported purchases from your wallet.</span></div>
+        <div class="seo-wallet-point"><strong>Security controls</strong><span>Use your account and transaction PIN protections.</span></div>
+      </div>
+    </div>
+    <div class="seo-wallet-card">
+      <div class="seo-wallet-balance">
+        <small>WALLET BALANCE</small>
+        <strong>₦••••••</strong>
+      </div>
+      <p>Your balance stays private until you sign in. Fund your wallet, choose a service and keep your everyday payments together.</p>
+      <a class="seo-btn primary" href="/login.html">Sign in to your wallet</a>
+    </div>
   </div>
 </section>
 
@@ -147,7 +250,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
   </div>
 </section>
 
-<section class="seo-section">
+<section id="how-it-works" class="seo-section">
   <h2>How BOLTIV works</h2>
   <p class="seo-section-intro">Getting started is designed to be straightforward.</p>
   <div class="seo-steps">
@@ -161,6 +264,20 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <section class="seo-trust">
   <h2>Built for everyday digital payments.</h2>
   <p>BOLTIV brings useful digital services into one platform with a focus on a clean experience, convenient payments and easy access to your transaction activity.</p>
+</section>
+
+
+<section id="faq" class="seo-section alt">
+  <h2>Frequently asked questions</h2>
+  <p class="seo-section-intro">Quick answers to common questions about using BOLTIV.</p>
+  <div class="seo-faq">
+    <details><summary>What is BOLTIV?</summary><p>BOLTIV is a digital services and payments platform that brings everyday services such as airtime, data, electricity and cable TV into one account.</p></details>
+    <details><summary>How do I get started?</summary><p>Create a BOLTIV account, complete the required account setup and then sign in to access the services available to you.</p></details>
+    <details><summary>How does the BOLTIV wallet work?</summary><p>You can fund your wallet using an available payment method and use your available balance for supported services and transactions.</p></details>
+    <details><summary>Can I see my transactions?</summary><p>Yes. Your account includes transaction activity and history so you can review purchases and wallet funding.</p></details>
+    <details><summary>Is BOLTIV secure?</summary><p>BOLTIV includes account authentication and transaction security controls, including a transaction PIN for supported account actions.</p></details>
+    <details><summary>What if I need help?</summary><p>Visit the support or contact section to get assistance with your BOLTIV account or services.</p></details>
+  </div>
 </section>
 
 <section class="seo-final">
@@ -185,5 +302,11 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 </script>
 </div>
 </div>
+
+<div class="seo-mobile-cta" aria-label="Quick account actions">
+  <a class="seo-btn secondary" href="/login.html">Sign in</a>
+  <a class="seo-btn primary" href="/register.html">Create account</a>
+</div>
+
 </body>
 </html>

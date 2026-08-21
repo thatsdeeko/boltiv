@@ -1601,7 +1601,7 @@ tokenHash
 );
 
 const resetUrl=
-`${FRONTEND_URL}/reset-password.html?token=${encodeURIComponent(rawToken)}`;
+`${FRONTEND_URL}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
 const displayName=
 clean(user.name)||

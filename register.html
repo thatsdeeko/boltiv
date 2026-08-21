@@ -1000,7 +1000,7 @@ createTransactionPin.onclick=async()=>{
     createTransactionPin.textContent="CREATING PIN...";
 
     try{
-        const response=await fetch(API_BASE+"/api/security.htmltransaction-pin",{
+        const response=await fetch(API_BASE+"/api/security/transaction-pin",{
             method:"POST",
             headers:{
                 "Content-Type":"application/json",

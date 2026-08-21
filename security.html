@@ -988,7 +988,7 @@ successModal.classList.add("show");
 ========================= */
 const API_BASE="https://boltiv-backend.onrender.com";
 async function pinRequest(pin,currentPin=""){
-const r=await fetch(API_BASE+"/api/security.htmltransaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
+const r=await fetch(API_BASE+"/api/security/transaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
 return r.json();
 }
 

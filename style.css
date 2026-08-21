@@ -4,8 +4,8 @@
 --bg:#ffffff;
 --card:#fff;
 --card2:#fafaf8;
---gold:#7a5b00;
---gold2:#7a5b00;
+--gold:#D4AF37;
+--gold2:#D4AF37;
 --text:#171717;
 --muted:#707070;
 --line:#e5e5e1;
@@ -210,7 +210,7 @@ textarea{resize:vertical;min-height:100px}
              }
 
 /* BOLTIV production UI tokens */
-:root{--boltiv-gold:#7a5b00;--boltiv-gold-soft:#fff9e6;--boltiv-border:#e5e5e1;--boltiv-text:#171717}
+:root{--boltiv-gold:#D4AF37;--boltiv-gold-soft:#fff9e6;--boltiv-border:#e5e5e1;--boltiv-text:#171717}
 body{font-size:15px}
 .brand,.auth-logo,.footer-logo,.footer-logo,.brand-name{color:var(--boltiv-gold)!important}
 button,input,select,textarea{font-size:inherit}
@@ -314,7 +314,7 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
  .container{max-width:1120px!important}.home-header{height:82px}.home-welcome{padding:42px 0 22px}.home-welcome h1{font-size:40px}.home-welcome p{font-size:14px}.home-balance-card{max-width:760px;padding:27px}.balance-value{font-size:43px}.home-service-grid{grid-template-columns:repeat(3,1fr)}.home-service-wide{grid-column:auto;min-height:125px;display:flex;align-items:flex-start}.home-recent-section{max-width:760px}.home-trust-card{max-width:760px}.bottom-nav{max-width:1120px!important}.home-services-section{margin-top:36px}
 }
 
-.notification-button{position:relative}.notification-badge{position:absolute;top:-3px;right:-2px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;background:#7a5b00;color:#fff;font-size:8px;font-weight:1000;display:flex;align-items:center;justify-content:center;border:2px solid #fff}.notification-badge[hidden]{display:none}
+.notification-button{position:relative}.notification-badge{position:absolute;top:-3px;right:-2px;min-width:15px;height:15px;padding:0 4px;border-radius:999px;background:#D4AF37;color:#fff;font-size:8px;font-weight:1000;display:flex;align-items:center;justify-content:center;border:2px solid #fff}.notification-badge[hidden]{display:none}
 
 
 /* BOLTIV HOME AMBIENT ANIMATION — subtle white + gold fintech motion */
@@ -820,7 +820,7 @@ body {
 }
 
 /* Phase 3 accessibility polish */
-:focus-visible{outline:3px solid #7a5b00;outline-offset:3px}
+:focus-visible{outline:3px solid #D4AF37;outline-offset:3px}
 button:disabled,a[aria-disabled="true"]{cursor:not-allowed}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 

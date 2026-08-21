@@ -1,17 +1,61 @@
-<!DOCTYPE html>
-
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta content="width=device-width,initial-scale=1" name="viewport"/>
-<meta content="noindex,nofollow" name="robots"/>
-<title>BOLTIV — Page Not Found</title>
-<link href="/assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<link href="/style.css" rel="stylesheet"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
-<body>
-<main style="min-height:100vh;display:grid;place-items:center;padding:32px;text-align:center">
-<div><img alt="BOLTIV" src="/assets/boltiv-icon.webp" style="width:72px;height:72px;object-fit:contain"/><h1>Page not found</h1><p>The page you requested doesn't exist.</p><a href="/">Return to BOLTIV</a></div>
-</main>
-</body>
+<head><base href="/">
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOLTIV</title>
+<script>
+(function () {
+  const path = location.pathname.replace(/^\/+|\/+$/g, '');
+  const routes = {
+    '': 'index.html',
+    'index': 'index.html',
+    'login': 'login.html',
+    'register': 'register.html',
+    'forgot-password': 'forgot-password.html',
+    'reset-password': 'reset-password.html',
+    'dashboard': 'dashboard.html',
+    'wallet': 'wallet.html',
+    'transactions': 'transactions.html',
+    'history': 'history.html',
+    'receipt': 'receipt.html',
+    'profile': 'profile.html',
+    'notifications': 'notifications.html',
+    'security': 'security.html',
+    'support': 'support.html',
+    'airtime': 'airtime.html',
+    'data': 'data.html',
+    'cable': 'cable.html',
+    'electricity': 'electricity.html',
+    'exam-pin': 'exam-pin.html',
+    'contact': 'contact.html',
+    'privacy': 'privacy.html',
+    'terms': 'terms.html',
+    'admin': 'admin.html'
+  };
+  const target = routes[path];
+  if (target) {
+    fetch('/' + target, {cache:'no-store'})
+      .then(r => { if (!r.ok) throw new Error('not found'); return r.text(); })
+      .then(html => {
+        if (!/<base\s+href=["']\/["']\s*\/?>(?:\s*)/i.test(html)) {
+          html = html.replace(/<head([^>]*)>/i, '<head$1><base href="/">');
+        }
+        document.open();
+        document.write(html);
+        document.close();
+        history.replaceState(null, '', '/' + path + (path ? '/' : ''));
+      })
+      .catch(() => show404());
+  } else {
+    show404();
+  }
+  function show404() {
+    document.body.innerHTML = '<main style="font-family:system-ui;text-align:center;padding:15vh 20px"><h1>404</h1><p>Page not found.</p><a href="/">Return to BOLTIV</a></main>';
+  }
+})();
+</script>
+</head>
+<body><p>Loading…</p></body>
 </html>

@@ -1,1 +1,61 @@
+<!DOCTYPE html>
 
+<html lang="en">
+<head>
+<base href="/"/><meta content="index,follow,max-image-preview:large" name="robots"/><script src="/boltiv-client.js?v=20260820-nostorage"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<meta content="#f7f7f5" name="theme-color"/>
+<meta content="Pay electricity bills securely with BOLTIV." name="description"/>
+<title>BOLTIV — Electricity</title>
+<link href="/style.css?v=20260821-servicecenter" rel="stylesheet"/>
+<script src="/transaction-pin.js?v=20260815-pinfix"></script><script>boltivRequireAuth();</script>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#ffffff;color:#171717;font-family:Arial,Helvetica,sans-serif}body{min-height:100vh}button,input,select{font-family:inherit}button{cursor:pointer}.page{min-height:100vh;padding-bottom:90px}.container{width:min(100% - 30px,480px);margin:auto}.header{display:flex;align-items:center;gap:14px;padding:22px 0}.back{width:40px;height:40px;border:1px solid #e5e5e1;border-radius:13px;background:#ffffff;color:#7a5b00;font-size:22px}.title{font-size:20.9px;font-weight:1000}.subtitle{margin-top:4px;color:#666;font-size:10px}.card{padding:20px;border:1px solid #e5e5e1;border-radius:20px;background:#ffffff}.label{display:block;margin-bottom:8px;color:#777;font-size:10px;font-weight:900}.input,.select{width:100%;height:48px;padding:0 14px;border:1px solid #e5e5e1;border-radius:12px;background:#ffffff;color:#171717;outline:none;font-size:12.1px}.input:focus,.select:focus{border-color:#7a5b00}.field{margin-bottom:17px}.providers{display:grid;grid-template-columns:1fr 1fr;gap:10px}.provider{padding:13px;border:1px solid #e5e5e1;border-radius:13px;background:#fafaf8;color:#171717;text-align:left}.provider.active{border-color:#7a5b00;background:#fffdf4}.provider-name{font-size:11px;font-weight:1000}.provider-text{margin-top:4px;color:#666;font-size:7.7px}.verify{width:100%;height:45px;margin-top:3px;border:1px solid #7a5b00;border-radius:12px;background:#fffdf4;color:#7a5b00;font-size:11px;font-weight:1000}.amount-box{display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;border:1px solid #e5e5e1;border-radius:12px;background:#ffffff}.currency{color:#7a5b00;font-size:14.3px;font-weight:1000}.amount{width:100%;border:0;outline:0;background:transparent;color:#171717;font-size:14.3px}.summary{display:none;margin-top:17px;padding:15px;border:1px solid #e5e5e1;border-radius:14px;background:#fafaf8}.summary-row{display:flex;justify-content:space-between;margin-bottom:8px;color:#777;font-size:10px}.summary-row:last-child{margin-bottom:0}.summary-row strong{color:#fff}.pay{width:100%;height:50px;margin-top:18px;border:0;border-radius:13px;background:#7a5b00;color:#f7f7f5;font-size:11px;font-weight:1000}.pay:disabled{background:#333;color:#777}.message{display:none;margin-top:12px;padding:12px;border-radius:11px;font-size:10px;text-align:center}.error{background:#fff1f1;color:#ff8d8d;border:1px solid #4a2020}.success{background:#122313;color:#8cff9a;border:1px solid #254d29}.bottom-nav{position:fixed;z-index:10;bottom:0;left:0;right:0;height:68px;display:flex;justify-content:center;padding:8px 12px;background:rgba(255,255,255,.97);border-top:1px solid #222}.nav{width:25%;max-width:110px;border:0;background:transparent;color:#555;font-size:7.7px;font-weight:900}.nav.active{color:#7a5b00}.nav-icon{display:block;margin-bottom:4px;font-size:18.7px}
+</style>
+<link href="/assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<link href="https://boltiv.ng/electricity" rel="canonical"/>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<body>
+<div class="page"><div class="container">
+<header class="header"><button class="back" onclick="history.back()">‹</button><div><div class="title">Electricity</div><div class="subtitle">Pay your electricity bill</div></div></header>
+<section class="card">
+<div class="field"><label class="label" id="electricity-provider-label">ELECTRICITY PROVIDER</label><div aria-labelledby="electricity-provider-label" class="providers" role="group">
+<button aria-label="IKEDC Ikeja Electric" class="provider active" data-provider="IKEDC"><div class="provider-name">IKEDC</div><div class="provider-text">Ikeja Electric</div></button>
+<button aria-label="EKEDC Eko Electric" class="provider" data-provider="EKEDC"><div class="provider-name">EKEDC</div><div class="provider-text">Eko Electric</div></button>
+<button aria-label="AEDC Abuja Electric" class="provider" data-provider="AEDC"><div class="provider-name">AEDC</div><div class="provider-text">Abuja Electric</div></button>
+<button aria-label="KEDCO Kano Electric" class="provider" data-provider="KEDCO"><div class="provider-name">KEDCO</div><div class="provider-text">Kano Electric</div></button>
+</div></div>
+<div class="field"><label class="label" id="meter-type-label">METER TYPE</label><select aria-label="Meter type" aria-labelledby="meter-type-label" class="select" id="meterType"><option value="Prepaid">Prepaid</option><option value="Postpaid">Postpaid</option></select></div>
+<div class="field"><label class="label" id="meter-number-label">METER NUMBER</label><input aria-label="Meter number" aria-labelledby="meter-number-label" class="input" id="meter" inputmode="numeric" placeholder="Enter meter number" type="tel"/></div>
+<button class="verify" id="verify">VERIFY METER</button>
+<div class="field" style="margin-top:18px"><label class="label" for="amount">AMOUNT</label><div class="amount-box"><span class="currency">₦</span><input aria-label="Amount" class="amount" id="amount" inputmode="decimal" min="100" placeholder="Enter amount" type="number"/></div></div>
+<div class="summary" id="summary"><div class="summary-row"><span>Provider</span><strong id="sumProvider">-</strong></div><div class="summary-row"><span>Meter</span><strong id="sumMeter">-</strong></div><div class="summary-row"><span>Type</span><strong id="sumType">-</strong></div><div class="summary-row"><span>Amount</span><strong id="sumAmount">₦0.00</strong></div></div>
+<button class="pay" disabled="" id="pay">PAY ELECTRICITY</button><div aria-live="polite" class="message" id="message" role="status"></div>
+</section>
+</div></div>
+<nav class="bottom-nav">
+<button class="nav" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button>
+<button class="nav" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button>
+<button class="nav" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button>
+<button class="nav" onclick="location.href='/profile'"><span class="nav-icon">◉</span>Profile</button>
+</nav>
+<script>
+const $=id=>document.getElementById(id),providers=document.querySelectorAll(".provider");
+let selectedProvider="IKEDC",verified=false;
+const plans={};
+function money(v){return"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function balance(){return Number(boltivMemoryStorage.getItem("boltivWalletBalance")||0)}
+function setBalance(v){boltivMemoryStorage.setItem("boltivWalletBalance",String(Math.max(0,Number(v)||0)))}
+function transactions(){try{let x=JSON.parse(boltivMemoryStorage.getItem("boltivTransactions")||"[]");return Array.isArray(x)?x:[]}catch(e){return[]}}
+function save(t){let x=transactions();x.unshift(t);boltivMemoryStorage.setItem("boltivTransactions",JSON.stringify(x))}
+function msg(t,c){$("message").textContent=t;$("message").className="message "+c;$("message").style.display="block"}
+function check(){let v=Number($("amount").value);$("pay").disabled=!(verified&&v>=100);if(verified&&v>=100)$("sumAmount").textContent=money(v)}
+providers.forEach(b=>b.onclick=()=>{providers.forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedProvider=b.dataset.provider;verified=false;$("summary").style.display="none";$("pay").disabled=true});
+$("verify").onclick=async()=>{let n=$("meter").value.trim(),meterType=$("meterType").value;if(n.length<8)return msg("Enter a valid meter number.","error");$("verify").disabled=true;verified=false;$("pay").disabled=true;msg("Verifying meter with SME API...","success");try{const r=await fetch("https://boltiv-backend.onrender.com/api/vtu/electricity/verify",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({provider:selectedProvider,meterNumber:n,meterType})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to verify electricity meter.");verified=true;$("sumProvider").textContent=selectedProvider;$("sumMeter").textContent=n;$("sumType").textContent=meterType;$("summary").style.display="block";check();msg(d.message||"Meter verified successfully.","success")}catch(e){verified=false;$("summary").style.display="none";msg(e.message||"Electricity meter verification failed.","error")}finally{$("verify").disabled=false}};
+$("meter").addEventListener("input",()=>{verified=false;$("pay").disabled=true;$("summary").style.display="none"});$("meterType").addEventListener("change",()=>{verified=false;$("pay").disabled=true;$("summary").style.display="none"});$("amount").addEventListener("input",check);
+$("pay").onclick=async()=>{let v=Number($("amount").value),n=$("meter").value.trim();if(!verified)return msg("Please verify your meter first.","error");if(v<100)return msg("Minimum electricity payment is ₦100.","error");$("pay").disabled=true;const transactionPin=await boltivGetTransactionPin();if(!transactionPin){$("pay").disabled=false;return;}msg("Processing your electricity payment...","success");try{const r=await fetch("https://boltiv-backend.onrender.com/api/vtu/electricity",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({provider:selectedProvider,meterNumber:n,meterType:$("meterType").value,amount:v,service:"electricity",providerPayload:{service:"electricity",provider:selectedProvider,meterNumber:n,meterType:$("meterType").value,amount:v},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin:transactionPin})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process electricity payment.");msg(`${d.message||"Electricity request received."} Reference: ${d.reference||"-"}`,"success");}catch(e){msg(e.message||"Electricity payment failed.","error");}finally{$("pay").disabled=false}};
+</script>
+</body>
+</html>
+<!-- BOLTIV ELECTRICITY COMPRESSED -->

@@ -137,15 +137,6 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 }
 
 
-.seo-menu-wrap{position:relative}
-.seo-menu-btn{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;border:1px solid #e7dfc9;border-radius:14px;background:#fffdf7;color:#171717;font-size:22px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.06)}
-.seo-menu-btn span{display:block;line-height:1}
-.seo-menu{position:absolute;top:54px;right:0;width:190px;padding:8px;background:#fff;border:1px solid #e7dfc9;border-radius:16px;box-shadow:0 18px 45px rgba(0,0,0,.14);z-index:1000;display:none}
-.seo-menu.open{display:block}
-.seo-menu a{display:block;padding:12px 14px;border-radius:10px;color:#3f3b35;text-decoration:none;font-weight:800;font-size:14px}
-.seo-menu a:hover{background:#faf6e9;color:#a87900}
-@media (max-width:640px){.seo-actions{gap:7px}.seo-actions .seo-btn{padding:11px 12px}.seo-menu-btn{width:44px;height:44px}.seo-menu{right:0}}
-
 </style>
 <style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body>
@@ -159,18 +150,6 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <div class="seo-actions">
 <a class="seo-btn secondary" href="/login">Sign in</a>
 <a class="seo-btn primary" href="/register">Get started</a>
-<div class="seo-menu-wrap">
-<button aria-controls="site-menu" aria-expanded="false" aria-label="Open menu" class="seo-menu-btn" id="site-menu-btn" type="button">
-<span>☰</span>
-</button>
-<nav aria-label="Homepage sections" class="seo-menu" id="site-menu">
-<a href="#services">Services</a>
-<a href="#wallet">Wallet</a>
-<a href="#how-it-works">How it works</a>
-<a href="#faq">FAQ</a>
-</nav>
-</div>
-</div>
 </header>
 <main>
 <section class="seo-hero">
@@ -295,34 +274,6 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <div style="margin-top:10px"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms &amp; Conditions</a><a href="/contact">Contact</a></div>
 <div style="margin-top:12px">© 2026 BOLTIV. All rights reserved.</div>
 </footer>
-<script>
-
-  const menuBtn = document.getElementById("site-menu-btn");
-  const siteMenu = document.getElementById("site-menu");
-  menuBtn?.addEventListener("click", function () {
-    const open = siteMenu?.classList.toggle("open");
-    menuBtn.setAttribute("aria-expanded", String(!!open));
-  });
-  siteMenu?.querySelectorAll("a").forEach(function (link) {
-    link.addEventListener("click", function () {
-      siteMenu.classList.remove("open");
-      menuBtn?.setAttribute("aria-expanded", "false");
-    });
-  });
-  document.addEventListener("click", function (event) {
-    if (!event.target.closest(".seo-menu-wrap")) {
-      siteMenu?.classList.remove("open");
-      menuBtn?.setAttribute("aria-expanded", "false");
-    }
-  });
-
-  // Keep the public homepage URL clean when navigating to the services section.
-  document.getElementById("explore-services")?.addEventListener("click", function (event) {
-    event.preventDefault();
-    document.getElementById("services")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.history.replaceState(null, "", window.location.pathname + window.location.search);
-  });
-</script>
 </div>
 </div>
 <div aria-label="Quick account actions" class="seo-mobile-cta">

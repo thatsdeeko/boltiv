@@ -43,9 +43,9 @@
   }, true);
 
   // Keep bottom navigation visually consistent on pages that already expose data-page buttons.
-  const path = location.pathname.split('/').pop() || '/dashboard.html';
+  const path = location.pathname.replace(/\/$/, '') || '/';
   document.querySelectorAll('.bottom-nav .nav-item[data-page]').forEach(function(item){
     const page = item.dataset.page;
-    if(page === path || (path === '' && page === '/dashboard.html')) item.classList.add('active');
+    if(page === path || (path === '/' && page === '/dashboard')) item.classList.add('active');
   });
 })();

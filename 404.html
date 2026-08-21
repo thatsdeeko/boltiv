@@ -9,15 +9,79 @@
 <body>
 <script>
 (function(){
-  var routes={"/login.html":"login.html","/register.html":"register.html","/dashboard.html":"dashboard.html","/airtime.html":"airtime.html","/data.html":"data.html","/electricity.html":"electricity.html","/cable.html":"cable.html","/wallet.html":"wallet.html","/transactions.html":"transactions.html","/profile.html":"profile.html","/notifications.html":"notifications.html","/support.html":"support.html","/contact.html":"contact.html","/privacy.html":"privacy.html","/terms.html":"terms.html","/security.html":"security.html","/history.html":"history.html","/forgot-password.html":"forgot-password.html","/reset-password.html":"reset-password.html","/exam-pin.html":"exam-pin.html","/betting.html":"betting.html"};
-  var p=window.location.pathname || "/";
-  if(p.length>1 && p.charAt(p.length-1)!="/") p+="/";
-  var target=routes[p];
-  if(target){
-    window.location.replace("/"+target+window.location.search+window.location.hash);
-  }else{
-    document.body.innerHTML='<div style="font-family:system-ui;text-align:center;padding:48px"><h1>BOLTIV</h1><p>Page not found.</p><a href="/">Return home</a></div>';
+  "use strict";
+
+  // GitHub Pages serves this file for unknown clean URLs. We fetch the
+  // matching real HTML file and replace this document without navigating,
+  // so /login, /dashboard, /wallet, etc. stay in the browser address bar.
+  var routes={
+    "/admin":"admin.html",
+    "/airtime":"airtime.html",
+    "/betting":"betting.html",
+    "/cable":"cable.html",
+    "/contact":"contact.html",
+    "/dashboard":"dashboard.html",
+    "/data":"data.html",
+    "/electricity":"electricity.html",
+    "/exam-pin":"exam-pin.html",
+    "/forgot-password":"forgot-password.html",
+    "/history":"history.html",
+    "/login":"login.html",
+    "/notifications":"notifications.html",
+    "/privacy":"privacy.html",
+    "/profile":"profile.html",
+    "/receipt":"receipt.html",
+    "/recharge-pin":"recharge-pin.html",
+    "/register":"register.html",
+    "/reset-password":"reset-password.html",
+    "/security":"security.html",
+    "/sms":"sms.html",
+    "/support":"support.html",
+    "/terms":"terms.html",
+    "/transactions":"transactions.html",
+    "/wallet":"wallet.html"
+  };
+
+  var pathname=window.location.pathname || "/";
+  var clean=pathname.replace(/\/+$/, "") || "/";
+  var target=routes[clean];
+
+  // Keep old .html links/bookmarks working too, but never redirect them.
+  if(!target && /\.html$/.test(clean)){
+    var legacy=clean.slice(1);
+    if(Object.values(routes).indexOf(legacy)!==-1) target=legacy;
   }
+
+  if(!target){
+    document.body.innerHTML=
+      '<div style="font-family:system-ui;text-align:center;padding:48px">'+
+      '<h1>BOLTIV</h1><p>Page not found.</p><a href="/">Return home</a></div>';
+    return;
+  }
+
+  fetch("/"+target+window.location.search,{cache:"no-store"})
+    .then(function(response){
+      if(!response.ok) throw new Error("HTTP "+response.status);
+      return response.text();
+    })
+    .then(function(html){
+      // Keep relative CSS/JS/image URLs rooted at the site even when a user
+      // manually enters a trailing-slash clean URL such as /dashboard/.
+      if(/<head[^>]*>/i.test(html) && !/<base\\s/i.test(html)){
+        html=html.replace(/<head([^>]*)>/i,"<head$1><base href=\"/\">");
+      }
+      // Reparse the fetched page normally so its scripts execute, while the
+      // browser remains on the original clean URL.
+      document.open();
+      document.write(html);
+      document.close();
+    })
+    .catch(function(){
+      document.body.innerHTML=
+        '<div style="font-family:system-ui;text-align:center;padding:48px">'+
+        '<h1>BOLTIV</h1><p>Unable to load this page right now.</p>'+
+        '<a href="/">Return home</a></div>';
+    });
 })();
 </script>
 </body>

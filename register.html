@@ -641,8 +641,8 @@ placeholder="Confirm your password">
 
 <div class="legal-consent">
 By creating an account, you agree to our
-<a href="/terms.html">Terms &amp; Conditions</a> and
-<a href="/privacy.html">Privacy Policy</a>.
+<a href="/terms">Terms &amp; Conditions</a> and
+<a href="/privacy">Privacy Policy</a>.
 </div>
 
 <button
@@ -652,7 +652,7 @@ Create Account
 </button>
 
 <div class="auth-links">
-<a href="/login.html">
+<a href="/login">
 Already have an account? Login
 </a>
 </div>
@@ -1018,7 +1018,7 @@ createTransactionPin.onclick=async()=>{
 
         setTimeout(()=>{
             successModal.classList.remove("show");
-            location.href="/dashboard.html";
+            location.href="/dashboard";
         },700);
     }catch(error){
         pinSetupStatus.textContent=error.message||"Unable to create Transaction PIN.";

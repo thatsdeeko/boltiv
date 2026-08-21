@@ -7,7 +7,7 @@ function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").
 async function mark(id){const r=await fetch(API+"/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({id})});if(r.ok)load()}
 async function load(){
 const user=await window.boltivAuthReady;
-if(!user){location.replace("/login.html");return}
+if(!user){location.replace("/login");return}
 try{
 const r=await fetch(API+"/api/notifications",{headers:{Authorization:"Bearer "+token}}),d=await r.json();
 if(!r.ok||!d.success)throw new Error();

@@ -1,30 +1,23 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,follow">
 <title>BOLTIV</title>
-<style>
-html,body{margin:0;padding:0;background:#fff;color:#111;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-#boltiv-router-error{padding:48px 24px;text-align:center}
-</style>
 </head>
 <body>
-<div id="boltiv-router-error"><h1>BOLTIV</h1><p>Loading page…</p></div>
 <script>
 (function(){
-"use strict";
-var routes={"/login/":"login.html","/register/":"register.html","/dashboard/":"dashboard.html","/airtime/":"airtime.html","/data/":"data.html","/electricity/":"electricity.html","/cable/":"cable.html","/wallet/":"wallet.html","/transactions/":"transactions.html","/profile/":"profile.html","/notifications/":"notifications.html","/support/":"support.html","/contact/":"contact.html","/privacy/":"privacy.html","/terms/":"terms.html","/forgot-password/":"forgot-password.html","/reset-password/":"reset-password.html","/security/":"security.html","/history/":"history.html","/receipt/":"receipt.html","/recharge-pin/":"recharge-pin.html","/sms/":"sms.html","/betting/":"betting.html","/exam-pin/":"exam-pin.html"};
-var path=window.location.pathname || "/";
-var clean=path.replace(/\/+$/,"") || "/";
-var target=routes[path] || routes[clean+"/"] || routes[clean] || null;
-if(target){
-  window.location.replace("/"+target);
-} else {
-  var box=document.getElementById("boltiv-router-error");
-  if(box) box.innerHTML="<h1>BOLTIV</h1><p>Page not found.</p>";
-}
+  var routes={"/login.html":"login.html","/register.html":"register.html","/dashboard.html":"dashboard.html","/airtime.html":"airtime.html","/data.html":"data.html","/electricity.html":"electricity.html","/cable.html":"cable.html","/wallet.html":"wallet.html","/transactions.html":"transactions.html","/profile.html":"profile.html","/notifications.html":"notifications.html","/support.html":"support.html","/contact.html":"contact.html","/privacy.html":"privacy.html","/terms.html":"terms.html","/security.html":"security.html","/history.html":"history.html","/forgot-password.html":"forgot-password.html","/reset-password.html":"reset-password.html","/exam-pin.html":"exam-pin.html","/betting.html":"betting.html"};
+  var p=window.location.pathname || "/";
+  if(p.length>1 && p.charAt(p.length-1)!="/") p+="/";
+  var target=routes[p];
+  if(target){
+    window.location.replace("/"+target+window.location.search+window.location.hash);
+  }else{
+    document.body.innerHTML='<div style="font-family:system-ui;text-align:center;padding:48px"><h1>BOLTIV</h1><p>Page not found.</p><a href="/">Return home</a></div>';
+  }
 })();
 </script>
 </body>

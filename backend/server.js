@@ -2529,20 +2529,59 @@ async function adminTransactionsResponse(req){
 async function adminPaymentsResponse(req){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+
   try{
-    const r=await db(`SELECT p.id,p.reference,p.user_id,COALESCE(NULLIF(p.email,''),'') AS email,
+    // Primary source: the dedicated payments table.
+    const r=await db(`SELECT p.id,p.reference,p.user_id,COALESCE(NULLIF(p.email,''),u.email,'') AS email,
       COALESCE(p.amount,0) AS amount,COALESCE(p.amount_kobo,0) AS amount_kobo,
       COALESCE(p.status,'pending') AS status,COALESCE(p.credited,FALSE) AS credited,
       COALESCE(p.created_at,NOW()) AS created_at,p.credited_at
       FROM payments p
+      LEFT JOIN users u ON u.user_id=p.user_id
       ORDER BY p.created_at DESC NULLS LAST,p.id DESC LIMIT 1000`);
-    return{success:true,payments:r.rows.map(x=>({...x,amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)}))};
+
+    if(r.rows.length){
+      return{success:true,payments:r.rows.map(x=>({...x,
+        amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)
+      }))};
+    }
+
+    // Some deployments record wallet deposits in transactions rather than payments.
+    // Use those records so the admin panel does not appear broken when the payments
+    // table is empty but real wallet funding exists.
+    const fallback=await db(`SELECT t.id,t.reference,t.user_id,COALESCE(u.email,'') AS email,
+      COALESCE(t.amount,0) AS amount,COALESCE(t.amount,0)*100 AS amount_kobo,
+      CASE WHEN t.status='successful' THEN 'success' ELSE t.status END AS status,
+      CASE WHEN t.status='successful' THEN TRUE ELSE FALSE END AS credited,
+      t.date AS created_at,t.completed_at AS credited_at
+      FROM transactions t
+      LEFT JOIN users u ON u.user_id=t.user_id
+      WHERE t.type='credit' AND LOWER(COALESCE(t.service,''))='wallet funding'
+      ORDER BY t.date DESC LIMIT 1000`);
+
+    return{success:true,payments:fallback.rows.map(x=>({...x,
+      amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)
+    }))};
   }catch(e){
     console.error('ADMIN PAYMENTS ERROR',e?.stack||e?.message||e);
-    return{success:false,statusCode:500,message:'Unable to load payment history right now.'};
+    try{
+      const fallback=await db(`SELECT t.id,t.reference,t.user_id,COALESCE(u.email,'') AS email,
+        COALESCE(t.amount,0) AS amount,COALESCE(t.amount,0)*100 AS amount_kobo,
+        CASE WHEN t.status='successful' THEN 'success' ELSE t.status END AS status,
+        CASE WHEN t.status='successful' THEN TRUE ELSE FALSE END AS credited,
+        t.date AS created_at,t.completed_at AS credited_at
+        FROM transactions t LEFT JOIN users u ON u.user_id=t.user_id
+        WHERE t.type='credit' AND LOWER(COALESCE(t.service,''))='wallet funding'
+        ORDER BY t.date DESC LIMIT 1000`);
+      return{success:true,payments:fallback.rows.map(x=>({...x,
+        amount:Number(x.amount||0),amount_kobo:Number(x.amount_kobo||0),credited:Boolean(x.credited)
+      }))};
+    }catch(fallbackError){
+      console.error('ADMIN PAYMENTS FALLBACK ERROR',fallbackError?.stack||fallbackError?.message||fallbackError);
+      return{success:false,statusCode:500,message:'Unable to load payment history right now.'};
+    }
   }
 }
-
 async function adminMonitoring(req){
   const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
   const started=Date.now();let database="connected";try{await db("SELECT 1")}catch{database="unavailable"}
@@ -2864,14 +2903,14 @@ result
 }
 
 
-if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet.htmlfunding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet.htmlfunding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet.htmlfund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet.htmlfund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet.htmlcredit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet.htmldebit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/transactions.htmlpending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
-if(req.method==="POST"&&path==="/api/admin/transactions.htmlrefund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/credit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
+if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/analytics"){const result=await adminAnalytics(req);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -2881,16 +2920,16 @@ if(req.method==="GET"&&path==="/api/admin/alerts"){const result=await adminAlert
 if(req.method==="POST"&&path==="/api/admin/alerts/reconcile"){const result=await adminAlerts(req,"reconcile");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/alerts/resolve"){const result=await adminAlerts(req,"resolve");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupport(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/support.htmlreply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/support.htmlstatus"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/services"){const result=await adminServices(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/services"){const result=await adminServices(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/settings"){const result=await adminSettings(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/settings"){const result=await adminSettings(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/security.htmlevents"){const result=await adminSecurity(req,"events");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/security.htmlsessions"){const result=await adminSecurity(req,"sessions");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/security.htmlrevoke-sessions"){const result=await adminSecurity(req,"revoke");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/security/events"){const result=await adminSecurity(req,"events");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/security/sessions"){const result=await adminSecurity(req,"sessions");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/security/revoke-sessions"){const result=await adminSecurity(req,"revoke");return send(res,result.success?200:(result.statusCode||400),result);}
 
 /*
 ADMIN LOGOUT

@@ -1,10 +1,12 @@
 User-agent: *
 Allow: /
 Disallow: /admin
-Disallow: /login
-Disallow: /register
-Disallow: /forgot-password
-Disallow: /reset-password
+Disallow: /dashboard
+Disallow: /airtime
+Disallow: /data
+Disallow: /electricity
+Disallow: /cable
+Disallow: /exam-pin
 Disallow: /wallet
 Disallow: /transactions
 Disallow: /history
@@ -12,5 +14,7 @@ Disallow: /notifications
 Disallow: /profile
 Disallow: /security
 Disallow: /receipt
+Disallow: /forgot-password
+Disallow: /reset-password
 Disallow: /backend/
 Sitemap: https://boltiv.ng/sitemap.xml

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://boltiv.ng/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://boltiv.ng/contact</loc><changefreq>weekly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://boltiv.ng/privacy</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://boltiv.ng/terms</loc><changefreq>yearly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://boltiv.ng/login</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://boltiv.ng/register</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://boltiv.ng/contact</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://boltiv.ng/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://boltiv.ng/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>

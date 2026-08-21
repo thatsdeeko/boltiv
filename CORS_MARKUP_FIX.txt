@@ -1,8 +1,0 @@
-BOLTIV markup save fix
-
-The admin markup form uses PATCH /api/admin/services. The backend preflight
-response now explicitly allows PATCH, so browsers can complete the CORS
-preflight from the GitHub Pages frontend to the Render backend.
-
-Redeploy the backend after uploading this package, then hard-refresh the admin
-page and try SAVE again.

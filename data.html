@@ -22,6 +22,15 @@ function show(type,t,m,b="GOT IT",d=""){modal.className="boltiv-modal show "+typ
 function close(){modal.classList.remove("show");modalBtn.style.display="block"}
 modalBtn.onclick=close;modal.onclick=e=>{if(e.target===modal)close()};
 function esc(v){return String(v??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]))}
+function formatValidity(value, days){
+  const raw=String(value??"").trim();
+  if(raw){
+    const normalized=raw.replace(/(\d)\s*(day|days)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Day":"Days"));
+    return normalized.replace(/(\d)\s*(hour|hours)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Hour":"Hours"));
+  }
+  const d=Number(days);
+  return d>0 ? d+" "+(d===1?"Day":"Days") : "Validity not available";
+}
 function planLabel(plan){
   // Keep the exact plan name returned by BOLTIV/our live catalog.
   // This is also what the backend persists on the transaction receipt.
@@ -34,7 +43,7 @@ function renderPlans(plans){
   plans.forEach(plan=>{
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
-    const label=planLabel(plan), validity=Number(plan.validity_days)>0?Number(plan.validity_days)+" Days":"Available";
+    const label=planLabel(plan), validity=formatValidity(plan.validity,plan.validity_days);
     b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div>';
     b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;};
     planGrid.appendChild(b);

@@ -129,6 +129,15 @@ return Number.isFinite(amount)&&amount>0;
 
 const SME_API_PLAN_URL=`${SME_API_BASE_URL}/api/dataplans/`;
 
+async function getService(key){
+const serviceKey=clean(key).toLowerCase();
+if(!serviceKey)return null;
+const result=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1 LIMIT 1`,[serviceKey]);
+if(!result.rows.length)return null;
+const row=result.rows[0];
+return {...row,fee:Number(row.fee||0),config:row.config&&typeof row.config==="object"?row.config:{}};
+}
+
 function normalizeDataNetwork(value){
 const n=clean(value).toUpperCase().replace(/\s+/g,"");
 if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE";

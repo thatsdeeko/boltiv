@@ -486,3 +486,70 @@ body {
     min-width: 100vw !important;
   }
 }
+
+
+/* BOLTIV FINAL STATIC NAVIGATION FIX — 2026-08-21 */
+html, body {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+body {
+  padding-bottom: calc(86px + env(safe-area-inset-bottom)) !important;
+}
+
+.page {
+  padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+}
+
+.bottom-nav {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+
+  width: 100vw !important;
+  min-width: 100vw !important;
+  max-width: none !important;
+
+  height: calc(70px + env(safe-area-inset-bottom)) !important;
+  margin: 0 !important;
+  padding: 0 0 env(safe-area-inset-bottom) !important;
+
+  box-sizing: border-box !important;
+  transform: none !important;
+
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+
+  background: rgba(255,255,255,.98) !important;
+  border-top: 1px solid var(--line) !important;
+  box-shadow: 0 -8px 24px rgba(25,25,20,.08) !important;
+
+  z-index: 2147483647 !important;
+  isolation: isolate;
+}
+
+.bottom-nav .nav-item {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 58px !important;
+  margin: 0 !important;
+  padding: 8px 2px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+
+  -webkit-tap-highlight-color: transparent;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .bottom-nav {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px) !important;
+  }
+}

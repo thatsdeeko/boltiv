@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f7f7f5">
 <title>BOLTIV — Security</title>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260821-navfix">
 
 <script>
 boltivRequireAuth();
@@ -670,7 +670,7 @@ the PIN is stored locally on this device.
 
 <button
 class="nav-item"
-data-page="/dashboard/"
+data-page="/dashboard.html"
 type="button">
 
 <span class="nav-icon">⌂</span>
@@ -681,7 +681,7 @@ Home
 
 <button
 class="nav-item"
-data-page="/wallet/"
+data-page="/wallet.html"
 type="button">
 
 <span class="nav-icon">₦</span>
@@ -692,7 +692,7 @@ Wallet
 
 <button
 class="nav-item"
-data-page="/transactions/"
+data-page="/transactions.html"
 type="button">
 
 <span class="nav-icon">↯</span>
@@ -703,7 +703,7 @@ Activity
 
 <button
 class="nav-item active"
-data-page="/profile/"
+data-page="/profile.html"
 type="button">
 
 <span class="nav-icon">◉</span>
@@ -988,7 +988,7 @@ successModal.classList.add("show");
 ========================= */
 const API_BASE="https://boltiv-backend.onrender.com";
 async function pinRequest(pin,currentPin=""){
-const r=await fetch(API_BASE+"/api/security/transaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
+const r=await fetch(API_BASE+"/api/security.htmltransaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
 return r.json();
 }
 

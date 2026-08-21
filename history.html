@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#f7f7f5">
 <title>BOLTIV — History</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260821-navfix">
 
 <script>
 boltivRequireAuth();
@@ -408,11 +408,11 @@ AVAILABLE BALANCE
 
 <div class="balance-actions">
 
-<button class="btn btn-primary" onclick="location.href='/wallet/'">
+<button class="btn btn-primary" onclick="location.href='/wallet.html'">
 ADD MONEY
 </button>
 
-<button class="btn btn-secondary" onclick="location.href='/transactions/'">
+<button class="btn btn-secondary" onclick="location.href='/transactions.html'">
 ACTIVITY
 </button>
 
@@ -490,22 +490,22 @@ DIGITAL PAYMENT HUB
 
 <nav class="bottom-nav">
 
-<button class="nav-item" data-page="/dashboard/">
+<button class="nav-item" data-page="/dashboard.html">
 <span class="nav-icon">⌂</span>
 <span>Home</span>
 </button>
 
-<button class="nav-item" data-page="/wallet/">
+<button class="nav-item" data-page="/wallet.html">
 <span class="nav-icon">₦</span>
 <span>Wallet</span>
 </button>
 
-<button class="nav-item active" data-page="/history/">
+<button class="nav-item active" data-page="/history.html">
 <span class="nav-icon">↯</span>
 <span>History</span>
 </button>
 
-<button class="nav-item" data-page="/profile/">
+<button class="nav-item" data-page="/profile.html">
 <span class="nav-icon">◉</span>
 <span>Profile</span>
 </button>
@@ -598,7 +598,7 @@ const mapped=(d.transactions||[]).map(t=>({
 ...t,
 title:t.service||"Transaction",
 direction:t.type==="credit"?"credit":"debit",
-type:(/airtime/i.test(t.service||""))?"airtime":(/data/i.test(t.service||""))?"data":(/cable/i.test(t.service||""))?"cable":(/electric/i.test(t.service||""))?"electricity":"wallet",
+type:(/airtime.htmli.test(t.service||""))?"airtime":(/data.htmli.test(t.service||""))?"data":(/cable.htmli.test(t.service||""))?"cable":(/electric/i.test(t.service||""))?"electricity":"wallet",
 phone:t.recipient||"",
 id:t.reference||t.id,
 provider:t.provider_reference||""
@@ -1042,7 +1042,7 @@ document.getElementById("historyModal")
 
 document.getElementById("profileButton")
 .onclick=()=>{
-location.href="/profile/";
+location.href="/profile.html";
 };
 
 document.querySelectorAll(".nav-item")

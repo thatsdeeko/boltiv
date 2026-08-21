@@ -46,7 +46,7 @@
   })();
   window.boltivRequireAuth=async function(){
     const u=await window.boltivAuthReady;
-    if(!u){ location.replace('/login/'); return null; }
+    if(!u){ location.replace('/login.html'); return null; }
     return u;
   };
 })();

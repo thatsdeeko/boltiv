@@ -7,7 +7,7 @@
 <meta name="description" content="BOLTIV — fast, simple digital services.">
 <title>BOLTIV Dashboard — Digital Services</title>
 <link rel="icon" type="image/png" href="assets/boltiv-icon.png">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260821-navfix">
 <script>
 boltivRequireAuth();
 </script>
@@ -44,10 +44,10 @@ body.modal-open{overflow:hidden!important}
 <div class="page boltiv-home">
 <div class="container">
 <header class="header home-header">
-  <a class="home-brand" href="/dashboard/" aria-label="BOLTIV dashboard"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
+  <a class="home-brand" href="/dashboard.html" aria-label="BOLTIV dashboard"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
   <div class="home-header-actions">
-    <button class="icon-button notification-button" onclick="location.href='/notifications/'" aria-label="Notifications"><span>♢</span><b id="notificationBadge" class="notification-badge" hidden>0</b></button>
-    <button class="profile-mini" id="profileButton" onclick="location.href='/profile/'">U</button>
+    <button class="icon-button notification-button" onclick="location.href='/notifications.html'" aria-label="Notifications"><span>♢</span><b id="notificationBadge" class="notification-badge" hidden>0</b></button>
+    <button class="profile-mini" id="profileButton" onclick="location.href='/profile.html'">U</button>
   </div>
 </header>
 
@@ -66,20 +66,20 @@ body.modal-open{overflow:hidden!important}
     <div class="balance-mark">₦</div>
   </div>
   <div class="home-balance-actions">
-    <button class="btn btn-primary" onclick="location.href='/wallet/'">+ FUND WALLET</button>
-    <button class="btn btn-light" onclick="location.href='/transactions/'">VIEW ACTIVITY</button>
+    <button class="btn btn-primary" onclick="location.href='/wallet.html'">+ FUND WALLET</button>
+    <button class="btn btn-light" onclick="location.href='/transactions.html'">VIEW ACTIVITY</button>
   </div>
 </section>
 
 <section class="section home-services-section">
-  <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions/">Activity →</a></div>
+  <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions.html">Activity →</a></div>
   <div class="home-service-grid">
-    <a class="home-service-card" href="/airtime/"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
-    <a class="home-service-card" href="/data/"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
-    <a class="home-service-card" href="/cable/"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-    <a class="home-service-card" href="/electricity/"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
+    <a class="home-service-card" href="/airtime.html"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
+    <a class="home-service-card" href="/data.html"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
+    <a class="home-service-card" href="/cable.html"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
+    <a class="home-service-card" href="/electricity.html"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
 
-    <a class="home-service-card" href="/exam-pin/"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
+    <a class="home-service-card" href="/exam-pin.html"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
     <button type="button" class="home-service-card coming-soon" data-service="Betting"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
     <button type="button" class="home-service-card coming-soon" data-service="Recharge PIN"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
     <button type="button" class="home-service-card coming-soon" data-service="SMS"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
@@ -92,7 +92,7 @@ body.modal-open{overflow:hidden!important}
 </section>
 
 <section class="section home-recent-section">
-  <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions/">See all →</a></div>
+  <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions.html">See all →</a></div>
   <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
 </section>
 
@@ -117,10 +117,10 @@ body.modal-open{overflow:hidden!important}
 </div>
 
 <nav class="bottom-nav">
-<button class="nav-item active" data-page="/dashboard/"><span class="nav-icon">⌂</span><span>Home</span></button>
-<button class="nav-item" data-page="/wallet/"><span class="nav-icon">₦</span><span>Wallet</span></button>
-<button class="nav-item" data-page="/transactions/"><span class="nav-icon">↯</span><span>Activity</span></button>
-<button class="nav-item" data-page="/profile/"><span class="nav-icon">◉</span><span>Profile</span></button>
+<button class="nav-item active" data-page="/dashboard.html"><span class="nav-icon">⌂</span><span>Home</span></button>
+<button class="nav-item" data-page="/wallet.html"><span class="nav-icon">₦</span><span>Wallet</span></button>
+<button class="nav-item" data-page="/transactions.html"><span class="nav-icon">↯</span><span>Activity</span></button>
+<button class="nav-item" data-page="/profile.html"><span class="nav-icon">◉</span><span>Profile</span></button>
 </nav>
 
 <script>
@@ -148,11 +148,11 @@ async function loadHome(){
   if(me.user){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();}
   if(wallet.success&&wallet.wallet){const b=Number(wallet.wallet.balance||0);document.getElementById('walletBalance').textContent=money(b);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
   renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
- }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login/');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
+ }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login.html');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
 }
 function renderRecent(items){
  const list=document.getElementById('recentList'); if(!items.length){list.innerHTML='<div class="home-empty"><span>↯</span><strong>No transactions yet</strong><small>Your purchases and wallet funding will appear here.</small></div>';return;}
- list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='/transactions/'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
+ list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='/transactions.html'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
 }
 document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
 const comingModal=document.getElementById('comingModal');

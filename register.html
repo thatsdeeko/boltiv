@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#f7f7f5">
 <title>BOLTIV — Create Account</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260821-navfix">
 
 <style>
 .auth-page{
@@ -641,8 +641,8 @@ placeholder="Confirm your password">
 
 <div class="legal-consent">
 By creating an account, you agree to our
-<a href="/terms/">Terms &amp; Conditions</a> and
-<a href="/privacy/">Privacy Policy</a>.
+<a href="/terms.html">Terms &amp; Conditions</a> and
+<a href="/privacy.html">Privacy Policy</a>.
 </div>
 
 <button
@@ -652,7 +652,7 @@ Create Account
 </button>
 
 <div class="auth-links">
-<a href="/login/">
+<a href="/login.html">
 Already have an account? Login
 </a>
 </div>
@@ -1000,7 +1000,7 @@ createTransactionPin.onclick=async()=>{
     createTransactionPin.textContent="CREATING PIN...";
 
     try{
-        const response=await fetch(API_BASE+"/api/security/transaction-pin",{
+        const response=await fetch(API_BASE+"/api/security.htmltransaction-pin",{
             method:"POST",
             headers:{
                 "Content-Type":"application/json",
@@ -1018,7 +1018,7 @@ createTransactionPin.onclick=async()=>{
 
         setTimeout(()=>{
             successModal.classList.remove("show");
-            location.href="/dashboard/";
+            location.href="/dashboard.html";
         },700);
     }catch(error){
         pinSetupStatus.textContent=error.message||"Unable to create Transaction PIN.";

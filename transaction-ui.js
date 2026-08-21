@@ -37,7 +37,7 @@ const BoltivTransaction={
         overlay.className="boltiv-transaction-overlay";
         overlay.innerHTML=`
             <div class="boltiv-transaction-card">
-                <div class="boltiv-receipt-brand"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"></div>
+                <div class="boltiv-receipt-brand"><img src="assets/boltiv-logo.webp" alt="BOLTIV logo"></div>
                 <div class="boltiv-transaction-icon" id="boltivTransactionIcon"></div>
                 <div class="boltiv-transaction-status" id="boltivTransactionStatus">Processing</div>
                 <div class="boltiv-transaction-title" id="boltivTransactionTitle">Please wait</div>

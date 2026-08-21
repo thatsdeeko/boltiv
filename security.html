@@ -1,17 +1,15 @@
 <!DOCTYPE html>
+
 <html lang="en">
-<head><meta name="robots" content="noindex,nofollow"><script src="boltiv-client.js?v=20260820-nostorage"></script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="theme-color" content="#f7f7f5">
+<head><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<meta content="#f7f7f5" name="theme-color"/>
 <title>BOLTIV — Security</title>
-
-<link rel="stylesheet" href="style.css?v=20260821-servicecenter">
-
+<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
-
 <style>
 *{box-sizing:border-box}
 
@@ -38,7 +36,7 @@ height:40px;
 border:1px solid #e5e5e1;
 border-radius:12px;
 background:#ffffff;
-color:#b8860b;
+color:#7a5b00;
 font-size:22px;
 }
 
@@ -72,7 +70,7 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #403513;
-color:#b8860b;
+color:#7a5b00;
 font-size:22px;
 margin-bottom:14px;
 }
@@ -175,7 +173,7 @@ margin-bottom:15px;
 }
 
 .security-input:focus{
-border-color:#b8860b;
+border-color:#7a5b00;
 box-shadow:0 0 0 2px rgba(212,175,55,.06);
 }
 
@@ -195,7 +193,7 @@ font-weight:900;
 }
 
 .show-pin:active{
-color:#b8860b;
+color:#7a5b00;
 }
 
 .security-button{
@@ -203,7 +201,7 @@ width:100%;
 height:48px;
 border:0;
 border-radius:13px;
-background:linear-gradient(135deg,#f5d76e,#b8860b,#b8860b);
+background:linear-gradient(135deg,#f5d76e,#7a5b00,#7a5b00);
 color:#f7f7f5;
 font-size:11px;
 font-weight:1000;
@@ -287,7 +285,7 @@ font-weight:900;
 }
 
 .nav-item.active{
-color:#b8860b;
+color:#7a5b00;
 }
 
 .nav-icon{
@@ -324,7 +322,7 @@ max-width:370px;
 padding:25px 20px;
 border-radius:24px;
 background:linear-gradient(145deg,#fffdf4,#ffffff);
-border:1px solid #b8860b;
+border:1px solid #7a5b00;
 text-align:center;
 transform:translateY(20px) scale(.96);
 transition:.25s;
@@ -343,8 +341,8 @@ display:flex;
 align-items:center;
 justify-content:center;
 background:#fffdf4;
-border:1px solid #b8860b;
-color:#b8860b;
+border:1px solid #7a5b00;
+color:#7a5b00;
 font-size:23.1px;
 }
 
@@ -382,372 +380,178 @@ color:#777;
 
 .modal-confirm{
 border:0;
-background:#b8860b;
+background:#7a5b00;
 color:#f7f7f5;
 }
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
-</head>
-
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body>
-
 <div class="page security-page">
-
 <div class="container">
-
 <!-- HEADER -->
-
 <header class="security-header">
-
-<button
-class="security-back"
-type="button"
-onclick="history.back()">
+<button class="security-back" onclick="history.back()" type="button">
 ‹
 </button>
-
 <div>
-
 <div class="security-title">
 Security
 </div>
-
 <div class="security-subtitle">
 PROTECT YOUR BOLTIV ACCOUNT
 </div>
-
 </div>
-
 </header>
-
-
 <!-- HERO -->
-
 <div class="security-hero">
-
 <div class="hero-icon">
 ⌾
 </div>
-
 <div class="hero-title">
 Account Security
 </div>
-
 <div class="hero-text">
 Protect your wallet and transactions with a secure Transaction PIN.
 </div>
-
 </div>
-
-
 <!-- SECURITY CARD -->
-
 <div class="security-card">
-
-
 <!-- STATUS -->
-
 <div class="security-status">
-
 <div class="status-left">
-
-<div class="status-icon" id="statusIcon">
+<div aria-live="polite" class="status-icon" id="statusIcon" role="status">
 ✓
 </div>
-
 <div>
-
 <div class="status-title">
 Transaction PIN
 </div>
-
-<div
-class="status-text"
-id="pinStatusText">
+<div aria-live="polite" class="status-text" id="pinStatusText" role="status">
 No PIN configured
 </div>
-
 </div>
-
 </div>
-
-<div
-class="status-badge status-off"
-id="pinStatus">
+<div aria-live="polite" class="status-badge status-off" id="pinStatus" role="status">
 OFF
 </div>
-
 </div>
-
-
 <!-- CREATE PIN -->
-
 <div id="createSection">
-
-<label class="security-label">
+<label class="security-label" id="create-transaction-pin-label">
 CREATE TRANSACTION PIN
 </label>
-
-<div class="pin-wrap">
-
-<input
-id="createPin"
-class="security-input"
-type="password"
-inputmode="numeric"
-maxlength="4"
-autocomplete="new-password"
-placeholder="4-digit PIN">
-
-<button
-class="show-pin"
-data-target="createPin"
-type="button">
+<div aria-labelledby="create-transaction-pin-label" class="pin-wrap" role="group">
+<input aria-label="Createpin" autocomplete="new-password" class="security-input" id="createPin" inputmode="numeric" maxlength="4" placeholder="4-digit PIN" type="password"/>
+<button aria-label="SHOW" class="show-pin" data-target="createPin" type="button">
 SHOW
 </button>
-
 </div>
-
-
-<label class="security-label">
+<label class="security-label" id="confirm-transaction-pin-label">
 CONFIRM TRANSACTION PIN
 </label>
-
-<div class="pin-wrap">
-
-<input
-id="createConfirmPin"
-class="security-input"
-type="password"
-inputmode="numeric"
-maxlength="4"
-autocomplete="new-password"
-placeholder="Repeat new PIN">
-
-<button
-class="show-pin"
-data-target="createConfirmPin"
-type="button">
+<div aria-labelledby="confirm-transaction-pin-label" class="pin-wrap" role="group">
+<input aria-label="Createconfirmpin" autocomplete="new-password" class="security-input" id="createConfirmPin" inputmode="numeric" maxlength="4" placeholder="Repeat new PIN" type="password"/>
+<button aria-label="SHOW" class="show-pin" data-target="createConfirmPin" type="button">
 SHOW
 </button>
-
 </div>
-
-<button
-id="createPinBtn"
-class="security-button"
-type="button">
+<button class="security-button" id="createPinBtn" type="button">
 CREATE TRANSACTION PIN
 </button>
-
 </div>
-
-
 <!-- CHANGE PIN -->
-
-<div
-id="changeSection"
-class="hidden">
-
-<label class="security-label">
+<div class="hidden" id="changeSection">
+<label class="security-label" id="current-pin-label">
 CURRENT PIN
 </label>
-
-<div class="pin-wrap">
-
-<input
-id="currentPin"
-class="security-input"
-type="password"
-inputmode="numeric"
-maxlength="4"
-autocomplete="current-password"
-placeholder="Enter current PIN">
-
-<button
-class="show-pin"
-data-target="currentPin"
-type="button">
+<div aria-labelledby="current-pin-label" class="pin-wrap" role="group">
+<input aria-label="Current transaction PIN" autocomplete="current-password" class="security-input" id="currentPin" inputmode="numeric" maxlength="4" placeholder="Enter current PIN" type="password"/>
+<button aria-label="SHOW" class="show-pin" data-target="currentPin" type="button">
 SHOW
 </button>
-
 </div>
-
-
-<label class="security-label">
+<label class="security-label" id="new-pin-label">
 NEW PIN
 </label>
-
-<div class="pin-wrap">
-
-<input
-id="newPin"
-class="security-input"
-type="password"
-inputmode="numeric"
-maxlength="4"
-autocomplete="new-password"
-placeholder="4-digit PIN">
-
-<button
-class="show-pin"
-data-target="newPin"
-type="button">
+<div aria-labelledby="new-pin-label" class="pin-wrap" role="group">
+<input aria-label="New transaction PIN" autocomplete="new-password" class="security-input" id="newPin" inputmode="numeric" maxlength="4" placeholder="4-digit PIN" type="password"/>
+<button aria-label="SHOW" class="show-pin" data-target="newPin" type="button">
 SHOW
 </button>
-
 </div>
-
-
-<label class="security-label">
+<label class="security-label" for="confirmPin">
 CONFIRM NEW PIN
 </label>
-
 <div class="pin-wrap">
-
-<input
-id="confirmPin"
-class="security-input"
-type="password"
-inputmode="numeric"
-maxlength="4"
-autocomplete="new-password"
-placeholder="Repeat new PIN">
-
-<button
-class="show-pin"
-data-target="confirmPin"
-type="button">
+<input aria-label="Confirm transaction PIN" autocomplete="new-password" class="security-input" id="confirmPin" inputmode="numeric" maxlength="4" placeholder="Repeat new PIN" type="password"/>
+<button class="show-pin" data-target="confirmPin" type="button">
 SHOW
 </button>
-
 </div>
-
-
-<button
-id="changePinBtn"
-class="security-button"
-type="button">
+<button class="security-button" id="changePinBtn" type="button">
 CHANGE TRANSACTION PIN
 </button>
-
 </div>
-
-
 <!-- MESSAGE -->
-
-<div
-id="message"
-class="message">
+<div aria-live="polite" class="message" id="message" role="status">
 </div>
-
-
 <!-- NOTE -->
-
 <div class="security-note">
 
 Your Transaction PIN should be kept private.
 Never share it with anyone.
 
-<br><br>
+<br/><br/>
 
 For this frontend-only version of BOLTIV,
 the PIN is stored locally on this device.
 
 </div>
-
-
 </div>
-
 </div>
-
 </div>
-
-
 <!-- BOTTOM NAV -->
-
 <nav class="bottom-nav">
-
-<button
-class="nav-item"
-data-page="/dashboard"
-type="button">
-
+<button class="nav-item" data-page="/dashboard" type="button">
 <span class="nav-icon">⌂</span>
 Home
 
 </button>
-
-
-<button
-class="nav-item"
-data-page="/wallet"
-type="button">
-
+<button class="nav-item" data-page="/wallet" type="button">
 <span class="nav-icon">₦</span>
 Wallet
 
 </button>
-
-
-<button
-class="nav-item"
-data-page="/transactions"
-type="button">
-
+<button class="nav-item" data-page="/transactions" type="button">
 <span class="nav-icon">↯</span>
 Activity
 
 </button>
-
-
-<button
-class="nav-item active"
-data-page="/profile"
-type="button">
-
+<button class="nav-item active" data-page="/profile" type="button">
 <span class="nav-icon">◉</span>
 Profile
 
 </button>
-
 </nav>
-
-
 <!-- SUCCESS MODAL -->
-
-<div
-class="pin-modal"
-id="successModal">
-
+<div class="pin-modal" id="successModal">
 <div class="pin-modal-box">
-
 <div class="pin-modal-icon">
 ✓
 </div>
-
 <div class="pin-modal-title">
 Transaction PIN Updated
 </div>
-
 <div class="pin-modal-text">
 Your Transaction PIN has been saved successfully.
 You can now use it to protect your BOLTIV payments.
 </div>
-
-<button
-class="modal-btn modal-confirm"
-id="successDone"
-type="button"
-style="width:100%;margin-top:18px;">
+<button class="modal-btn modal-confirm" id="successDone" style="width:100%;margin-top:18px;" type="button">
 DONE
 </button>
-
 </div>
-
 </div>
-
-
 <script>
 
 /* =========================
@@ -1086,8 +890,6 @@ updateStatus
 );
 
 </script>
-
 </body>
 </html>
-
 <!-- BOLTIV SECURITY -->

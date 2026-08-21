@@ -1,16 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
-<head><meta name="robots" content="noindex,nofollow"><script src="boltiv-client.js?v=20260820-nostorage"></script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="theme-color" content="#f7f7f5">
-<title>BOLTIV — History</title>
-<link rel="stylesheet" href="style.css?v=20260821-servicecenter">
 
+<html lang="en">
+<head><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<meta content="#f7f7f5" name="theme-color"/>
+<title>BOLTIV — History</title>
+<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
-
 <style>
 .history-page{
 padding-bottom:100px
@@ -27,7 +26,7 @@ color:#fff
 }
 
 .history-title span{
-color:#b8860b
+color:#7a5b00
 }
 
 .history-subtitle{
@@ -60,7 +59,7 @@ position:absolute;
 left:14px;
 top:50%;
 transform:translateY(-50%);
-color:#b8860b;
+color:#7a5b00;
 font-size:14.3px;
 z-index:2
 }
@@ -71,7 +70,7 @@ height:44px;
 border:1px solid #e5e5e1;
 border-radius:11px;
 background:#ffffff;
-color:#b8860b;
+color:#7a5b00;
 font-size:17.6px
 }
 
@@ -97,7 +96,7 @@ font-weight:900
 
 .history-stat-value{
 font-size:16.5px;
-color:#b8860b;
+color:#7a5b00;
 font-weight:1000;
 margin-top:6px
 }
@@ -147,7 +146,7 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #4b3d16;
-color:#b8860b;
+color:#7a5b00;
 font-size:17.6px
 }
 
@@ -185,7 +184,7 @@ font-weight:1000
 }
 
 .history-amount.credit{
-color:#b8860b
+color:#7a5b00
 }
 
 .history-amount.debit{
@@ -194,7 +193,7 @@ color:#fff
 
 .history-status{
 font-size:6.6px;
-color:#b8860b;
+color:#7a5b00;
 font-weight:900;
 margin-top:4px
 }
@@ -217,7 +216,7 @@ justify-content:center;
 border-radius:50%;
 background:#fffdf4;
 border:1px solid #4b3d16;
-color:#b8860b;
+color:#7a5b00;
 font-size:24.2px
 }
 
@@ -257,7 +256,7 @@ visibility:visible
 width:100%;
 max-width:520px;
 background:linear-gradient(145deg,#151515,#ffffff);
-border:1px solid #b8860b;
+border:1px solid #7a5b00;
 border-bottom:0;
 border-radius:23px 23px 0 0;
 padding:23px;
@@ -292,7 +291,7 @@ align-items:center;
 justify-content:center;
 background:#fffdf4;
 border:1px solid #4b3d16;
-color:#b8860b;
+color:#7a5b00;
 font-size:20.9px
 }
 
@@ -304,7 +303,7 @@ color:#fff
 
 .history-modal-status{
 font-size:10px;
-color:#b8860b;
+color:#7a5b00;
 margin-top:4px
 }
 
@@ -364,194 +363,123 @@ grid-template-columns:1fr
 }
 }
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
-</head>
-
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body>
-
 <div class="page history-page">
-
 <div class="container">
-
 <header class="header">
-
 <div class="brand">
 <div class="brand-name">BOLTIV</div>
 <div class="brand-tagline">DIGITAL PAYMENT HUB</div>
 </div>
-
 <button class="profile-mini" id="profileButton">U</button>
-
 </header>
-
 <section class="history-head">
-
 <div class="history-title">
 FULL <span>HISTORY</span>
 </div>
-
 <div class="history-subtitle">
 A complete record of your BOLTIV wallet and service activity.
 </div>
-
 </section>
-
 <section class="balance-card">
-
 <div class="balance-label">
 AVAILABLE BALANCE
 </div>
-
 <div class="balance-value" id="balance">
 ₦0.00
 </div>
-
 <div class="balance-actions">
-
 <button class="btn btn-primary" onclick="location.href='/wallet'">
 ADD MONEY
 </button>
-
 <button class="btn btn-secondary" onclick="location.href='/transactions'">
 ACTIVITY
 </button>
-
 </div>
-
 </section>
-
 <section class="section">
-
 <div class="history-tools">
-
 <div class="history-search">
-
 <span class="history-search-icon">⌕</span>
-
-<input
-class="input"
-id="search"
-type="search"
-placeholder="Search transactions...">
-
+<input aria-label="Search" class="input" id="search" placeholder="Search transactions..." type="search"/>
 </div>
-
 <button class="history-filter" id="filterButton">
 ≡
 </button>
-
 </div>
-
 <div class="history-summary">
-
 <div class="history-stat">
-
 <div class="history-stat-label">
 TOTAL TRANSACTIONS
 </div>
-
 <div class="history-stat-value" id="totalCount">
 0
 </div>
-
 </div>
-
 <div class="history-stat">
-
 <div class="history-stat-label">
 TOTAL SPENT
 </div>
-
 <div class="history-stat-value" id="totalSpent">
 ₦0.00
 </div>
-
 </div>
-
 </div>
-
 <div id="historyList"></div>
-
 </section>
-
 <footer class="footer">
-
 <div class="footer-logo">BOLTIV</div>
-
 <div class="footer-text">
 DIGITAL PAYMENT HUB
 </div>
-
 </footer>
-
 </div>
-
 </div>
-
 <nav class="bottom-nav">
-
 <button class="nav-item" data-page="/dashboard">
 <span class="nav-icon">⌂</span>
 <span>Home</span>
 </button>
-
 <button class="nav-item" data-page="/wallet">
 <span class="nav-icon">₦</span>
 <span>Wallet</span>
 </button>
-
 <button class="nav-item active" data-page="/history">
 <span class="nav-icon">↯</span>
 <span>History</span>
 </button>
-
 <button class="nav-item" data-page="/profile">
 <span class="nav-icon">◉</span>
 <span>Profile</span>
 </button>
-
 </nav>
-
 <div class="history-modal" id="historyModal">
-
 <div class="history-modal-card">
-
 <div class="history-handle"></div>
-
 <div class="history-modal-top">
-
 <div class="history-modal-icon" id="modalIcon">
 ↯
 </div>
-
 <div>
-
 <div class="history-modal-title" id="modalTitle">
 Transaction
 </div>
-
-<div class="history-modal-status" id="modalStatus">
+<div aria-live="polite" class="history-modal-status" id="modalStatus" role="status">
 Successful
 </div>
-
 </div>
-
 </div>
-
 <div class="history-modal-amount" id="modalAmount">
 ₦0.00
 </div>
-
 <div id="modalDetails"></div>
-
 <button class="history-close" id="closeModal">
 CLOSE
 </button>
-
 </div>
-
 </div>
-
 <script>
 
 const icons={
@@ -598,7 +526,7 @@ const mapped=(d.transactions||[]).map(t=>({
 ...t,
 title:t.service||"Transaction",
 direction:t.type==="credit"?"credit":"debit",
-type:(/airtime.htmli.test(t.service||""))?"airtime":(/data.htmli.test(t.service||""))?"data":(/cable.htmli.test(t.service||""))?"cable":(/electric/i.test(t.service||""))?"electricity":"wallet",
+type:(/airtime/i.test(t.service||""))?"airtime":(/data/i.test(t.service||""))?"data":(/cable/i.test(t.service||""))?"cable":(/electric/i.test(t.service||""))?"electricity":"wallet",
 phone:t.recipient||"",
 id:t.reference||t.id,
 provider:t.provider_reference||""
@@ -1080,6 +1008,5 @@ renderHistory();
 );
 
 </script>
-
 </body>
 </html>

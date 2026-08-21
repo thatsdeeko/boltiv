@@ -1,17 +1,17 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head><script src="boltiv-client.js?v=20260820-nostorage"></script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="theme-color" content="#ffffff">
-<meta name="description" content="BOLTIV — fast, simple digital services.">
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<meta content="#ffffff" name="theme-color"/>
+<meta content="BOLTIV — fast, simple digital services." name="description"/>
 <title>BOLTIV Dashboard — Digital Services</title>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
-<link rel="stylesheet" href="style.css?v=20260821-servicecenter">
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
-
 <style id="boltiv-coming-modal-inline">
 body.modal-open{overflow:hidden!important}
 .coming-modal{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important;visibility:visible!important;pointer-events:none!important}
@@ -28,106 +28,96 @@ body.modal-open{overflow:hidden!important}
 .coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:#716e68!important;font-size:14px!important;line-height:1.55!important}
 .coming-modal-button{width:100%!important;min-height:50px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#e1bf43,#bd920b)!important;color:#fff!important;font-weight:800!important;cursor:pointer!important}
 </style>
-</head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body class="boltiv-animated-home">
-<div class="home-ambient" aria-hidden="true">
-  <span class="ambient-orb ambient-orb-one"></span>
-  <span class="ambient-orb ambient-orb-two"></span>
-  <span class="ambient-orb ambient-orb-three"></span>
-  <span class="ambient-ring ambient-ring-one"></span>
-  <span class="ambient-ring ambient-ring-two"></span>
-  <span class="ambient-spark spark-one">✦</span>
-  <span class="ambient-spark spark-two">·</span>
-  <span class="ambient-spark spark-three">✦</span>
-  <span class="ambient-spark spark-four">·</span>
+<div aria-hidden="true" class="home-ambient">
+<span class="ambient-orb ambient-orb-one"></span>
+<span class="ambient-orb ambient-orb-two"></span>
+<span class="ambient-orb ambient-orb-three"></span>
+<span class="ambient-ring ambient-ring-one"></span>
+<span class="ambient-ring ambient-ring-two"></span>
+<span class="ambient-spark spark-one">✦</span>
+<span class="ambient-spark spark-two">·</span>
+<span class="ambient-spark spark-three">✦</span>
+<span class="ambient-spark spark-four">·</span>
 </div>
 <div class="page boltiv-home">
 <div class="container">
 <header class="header home-header">
-  <a class="home-brand" href="/dashboard" aria-label="BOLTIV dashboard"><img src="assets/boltiv-logo.png" alt="BOLTIV"><span>BOLTIV</span></a>
-  <div class="home-header-actions">
-    <button class="icon-button notification-button" onclick="location.href='/notifications'" aria-label="Notifications">
-  <svg class="notification-icon" viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  <b id="notificationBadge" class="notification-badge" hidden>0</b>
+<a aria-label="BOLTIV dashboard" class="home-brand" href="/dashboard"><img alt="BOLTIV" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></a>
+<div class="home-header-actions">
+<button aria-label="Notifications" class="icon-button notification-button" onclick="location.href='/notifications'">
+<svg aria-hidden="true" class="notification-icon" viewbox="0 0 24 24">
+<path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+<b class="notification-badge" hidden="" id="notificationBadge">0</b>
 </button>
-    <button class="profile-mini" id="profileButton" onclick="location.href='/profile'">U</button>
-  </div>
+<button class="profile-mini" id="profileButton" onclick="location.href='/profile'">U</button>
+</div>
 </header>
-
 <main>
 <section class="home-welcome">
-  <div>
-    <div class="eyebrow">WELCOME BACK</div>
-    <h1>Hello, <span id="userName">User</span></h1>
-    <p>Your everyday digital services, in one place.</p>
-  </div>
+<div>
+<div class="eyebrow">WELCOME BACK</div>
+<h1>Hello, <span id="userName">User</span></h1>
+<p>Your everyday digital services, in one place.</p>
+</div>
 </section>
-
 <section class="home-balance-card">
-  <div class="home-balance-top">
-    <div><div class="balance-label">AVAILABLE BALANCE</div><div class="balance-value" id="walletBalance">₦0.00</div></div>
-    <div class="balance-mark">₦</div>
-  </div>
-  <div class="home-balance-actions">
-    <button class="btn btn-primary" onclick="location.href='/wallet'">+ FUND WALLET</button>
-    <button class="btn btn-light" onclick="location.href='/transactions'">VIEW ACTIVITY</button>
-  </div>
+<div class="home-balance-top">
+<div><div class="balance-label">AVAILABLE BALANCE</div><div class="balance-value" id="walletBalance">₦0.00</div></div>
+<div class="balance-mark">₦</div>
+</div>
+<div class="home-balance-actions">
+<button class="btn btn-primary" onclick="location.href='/wallet'">+ FUND WALLET</button>
+<button class="btn btn-light" onclick="location.href='/transactions'">VIEW ACTIVITY</button>
+</div>
 </section>
-
 <section class="section home-services-section">
-  <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions">Activity →</a></div>
-  <div class="home-service-grid">
-    <a class="home-service-card" href="/airtime"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
-    <a class="home-service-card" href="/data"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
-    <a class="home-service-card" href="/cable"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-    <a class="home-service-card" href="/electricity"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
-
-    <a class="home-service-card" href="/exam-pin"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO & NABTEB</small></a>
-    <button type="button" class="home-service-card coming-soon" data-service="Betting"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="Recharge PIN"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="SMS"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
-
-    <button type="button" class="home-service-card coming-soon" data-service="Bulk SMS"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="Gift Cards"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="Insurance"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></button>
-    <button type="button" class="home-service-card coming-soon" data-service="International Airtime"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
-  </div>
+<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions">Activity →</a></div>
+<div class="home-service-grid">
+<a class="home-service-card" href="/airtime"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
+<a class="home-service-card" href="/data"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
+<a class="home-service-card" href="/cable"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
+<a class="home-service-card" href="/electricity"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
+<a class="home-service-card" href="/exam-pin"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
+<button class="home-service-card coming-soon" data-service="Betting" type="button"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Recharge PIN" type="button"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="SMS" type="button"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Bulk SMS" type="button"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Gift Cards" type="button"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Insurance" type="button"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="International Airtime" type="button"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
+</div>
 </section>
-
 <section class="section home-recent-section">
-  <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
-  <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
+<div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
+<div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
 </section>
-
 <section class="section home-trust-card">
-  <div class="trust-icon">✓</div>
-  <div><strong>Simple, secure payments</strong><p>Fund your wallet once and use it across BOLTIV services. Every purchase gets a transaction reference.</p></div>
+<div class="trust-icon">✓</div>
+<div><strong>Simple, secure payments</strong><p>Fund your wallet once and use it across BOLTIV services. Every purchase gets a transaction reference.</p></div>
 </section>
 </main>
 </div>
 </div>
-
-<div class="coming-modal" id="comingModal" hidden aria-hidden="true">
-  <div class="coming-modal-backdrop" data-close-coming></div>
-  <section class="coming-modal-card" role="dialog" aria-modal="true" aria-labelledby="comingTitle">
-    <button class="coming-modal-close" type="button" data-close-coming aria-label="Close">×</button>
-    <div class="coming-modal-icon" aria-hidden="true"><span>✦</span></div>
-    <div class="coming-modal-kicker">COMING SOON</div>
-    <h2 id="comingTitle">Service is on the way</h2>
-    <p id="comingMessage">We're preparing this service for BOLTIV. You'll be able to use it here once it's ready.</p>
-    <button class="coming-modal-button" type="button" data-close-coming>GOT IT</button>
-  </section>
+<div aria-hidden="true" class="coming-modal" hidden="" id="comingModal">
+<div class="coming-modal-backdrop" data-close-coming=""></div>
+<section aria-labelledby="comingTitle" aria-modal="true" class="coming-modal-card" role="dialog">
+<button aria-label="Close" class="coming-modal-close" data-close-coming="" type="button">×</button>
+<div aria-hidden="true" class="coming-modal-icon"><span>✦</span></div>
+<div class="coming-modal-kicker">COMING SOON</div>
+<h2 id="comingTitle">Service is on the way</h2>
+<p aria-live="polite" id="comingMessage" role="status">We're preparing this service for BOLTIV. You'll be able to use it here once it's ready.</p>
+<button class="coming-modal-button" data-close-coming="" type="button">GOT IT</button>
+</section>
 </div>
-
 <nav class="bottom-nav">
 <button class="nav-item active" data-page="/dashboard"><span class="nav-icon">⌂</span><span>Home</span></button>
 <button class="nav-item" data-page="/wallet"><span class="nav-icon">₦</span><span>Wallet</span></button>
 <button class="nav-item" data-page="/transactions"><span class="nav-icon">↯</span><span>Activity</span></button>
 <button class="nav-item" data-page="/profile"><span class="nav-icon">◉</span><span>Profile</span></button>
 </nav>
-
 <script>
 const API_BASE='https://boltiv-backend.onrender.com';
 const TOKEN_KEY='boltivAuthToken';

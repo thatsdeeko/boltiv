@@ -1,13 +1,14 @@
 <!DOCTYPE html>
+
 <html lang="en">
-<head><meta name="robots" content="noindex,nofollow"><script src="boltiv-client.js?v=20260820-nostorage"></script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#fff">
+<head><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="#fff" name="theme-color"/>
 <title>BOLTIV — Admin Control Center</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--g:#b8860b;--g2:#9b7315;--bg:#f6f6f4;--card:#fff;--text:#171717;--muted:#777;--line:#e7e7e5;--green:#18753b;--red:#b42318;--yellow:#856404;--gbg:#edf9f1;--rbg:#fff1f0;--ybg:#fff9e6}
+:root{--g:#7a5b00;--g2:#7a5b00;--bg:#f6f6f4;--card:#fff;--text:#171717;--muted:#777;--line:#e7e7e5;--green:#18753b;--red:#b42318;--yellow:#856404;--gbg:#edf9f1;--rbg:#fff1f0;--ybg:#fff9e6}
 body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
 button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -59,97 +60,82 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 @media(max-width:900px){.sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}.main{margin-left:0;width:100%}.menu{display:block}.stats{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 @media(max-width:550px){.container{padding:14px}.top{padding:0 14px}.toolbar{flex-wrap:wrap}.toolbar input,.toolbar select{width:100%;max-width:none}.quick{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr}.stat{padding:13px}.stat-value{font-size:18px}}
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
-</head>
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body>
-
-<div id="loginPage" class="login">
+<div class="login" id="loginPage">
 <div class="login-box">
-<div class="logo"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
+<div class="logo"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></div>
 <div class="login-title">ADMIN CONTROL CENTER</div>
 <div class="login-sub">SECURE ADMINISTRATOR ACCESS</div>
-<label>ADMIN EMAIL</label>
-<input id="email" type="email" placeholder="Admin email" autocomplete="username">
-<label>ADMIN PASSWORD</label>
-<input id="password" type="password" placeholder="Admin password" autocomplete="current-password">
-<button id="loginButton" class="login-btn">LOGIN TO ADMIN</button>
-<div id="message" class="message"></div>
+<label id="admin-email-label">ADMIN EMAIL</label>
+<input aria-label="Email address" aria-labelledby="admin-email-label" autocomplete="username" id="email" placeholder="Admin email" type="email"/>
+<label id="admin-password-label">ADMIN PASSWORD</label>
+<input aria-label="Password" aria-labelledby="admin-password-label" autocomplete="current-password" id="password" placeholder="Admin password" type="password"/>
+<button class="login-btn" id="loginButton">LOGIN TO ADMIN</button>
+<div aria-live="polite" class="message" id="message" role="status"></div>
 </div>
 </div>
-
-<div id="app" class="app hidden">
-
-<aside id="sidebar" class="sidebar">
-<div class="brand"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
-
+<div class="app hidden" id="app">
+<aside class="sidebar" id="sidebar">
+<div class="brand"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></div>
 <div class="side-label">OVERVIEW</div>
 <div class="nav">
 <button class="active" data-page="dashboard">▦ Dashboard</button>
 <button data-page="analytics">◫ Analytics</button>
 </div>
-
 <div class="side-label">CUSTOMERS</div>
 <div class="nav">
 <button data-page="users">♙ Users</button>
 <button data-page="wallets">₦ Wallets</button>
 <button data-page="support">☏ Support</button>
 </div>
-
 <div class="side-label">FINANCE</div>
 <div class="nav">
 <button data-page="payments">▣ Payments</button>
 <button data-page="transactions">↔ Transactions</button>
 <button data-page="reconciliation">▤ Reconciliation</button>
 </div>
-
 <div class="side-label">PLATFORM</div>
 <div class="nav">
 <button data-page="services">◈ Services</button>
 <button data-page="notifications">♢ Notifications</button>
 </div>
-
 <div class="side-label">SECURITY</div>
 <div class="nav">
 <button data-page="security">◇ Security</button>
 <button data-page="audit">◷ Audit Logs</button>
 <button data-page="alerts">⚠ Alerts</button>
 </div>
-
 <div class="side-label">SYSTEM</div>
 <div class="nav">
 <button data-page="settings">⚙ Settings</button>
 </div>
 </aside>
-
 <main class="main">
 <header class="top">
 <div style="display:flex;align-items:center;gap:10px">
-<button id="menu" class="menu">☰</button>
-<div><div id="topTitle" class="top-title">Dashboard</div><div class="top-sub">BOLTIV Administration</div></div>
+<button class="menu" id="menu">☰</button>
+<div><div class="top-title" id="topTitle">Dashboard</div><div class="top-sub">BOLTIV Administration</div></div>
 </div>
-<button id="logout" class="logout">LOGOUT</button>
+<button class="logout" id="logout">LOGOUT</button>
 </header>
-
 <div class="container">
-
-<section id="page-dashboard" class="page active">
+<section class="page active" id="page-dashboard">
 <div class="heading"><h1>Dashboard</h1><p>Complete overview of your BOLTIV platform.</p></div>
-
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="sUsers" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">CUSTOMER FUNDS</div><div id="sWallet" class="stat-value">₦0.00</div></div><div class="stat"><div class="stat-label">ADMIN WALLET</div><div id="sAdminWallet" class="stat-value">₦0.00</div></div><div class="stat"><div class="stat-label">BOLTIV REVENUE</div><div id="sRevenue" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="sTransactions" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PAYMENTS</div><div id="sPayments" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">GROSS PROFIT</div><div id="sProfit" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">TOTAL USERS</div><div class="stat-value" id="sUsers">0</div></div>
+<div class="stat"><div class="stat-label">CUSTOMER FUNDS</div><div class="stat-value" id="sWallet">₦0.00</div></div><div class="stat"><div class="stat-label">ADMIN WALLET</div><div class="stat-value" id="sAdminWallet">₦0.00</div></div><div class="stat"><div class="stat-label">BOLTIV REVENUE</div><div class="stat-value" id="sRevenue">₦0.00</div></div>
+<div class="stat"><div class="stat-label">TRANSACTIONS</div><div class="stat-value" id="sTransactions">0</div></div>
+<div class="stat"><div class="stat-label">PAYMENTS</div><div class="stat-value" id="sPayments">0</div></div>
+<div class="stat"><div class="stat-label">GROSS PROFIT</div><div class="stat-value" id="sProfit">₦0.00</div></div>
 </div>
-
 <div class="stats">
-<div class="stat"><div class="stat-label">SUCCESSFUL</div><div id="sSuccessful" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PENDING</div><div id="sPending" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">FAILED</div><div id="sFailed" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">ACTIVE USERS</div><div id="sActive" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">SUCCESSFUL</div><div class="stat-value" id="sSuccessful">0</div></div>
+<div class="stat"><div class="stat-label">PENDING</div><div class="stat-value" id="sPending">0</div></div>
+<div class="stat"><div class="stat-label">FAILED</div><div class="stat-value" id="sFailed">0</div></div>
+<div class="stat"><div class="stat-label">ACTIVE USERS</div><div class="stat-value" id="sActive">0</div></div>
 </div>
-
 <div class="grid2">
 <div class="section">
 <div class="section-head"><h2>REVENUE / ACTIVITY</h2><button class="btn" onclick="loadAll()">REFRESH</button></div>
@@ -163,7 +149,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="bar" style="height:65%"><span>SUN</span></div>
 </div>
 </div>
-
 <div class="section">
 <div class="section-head"><h2>QUICK ACTIONS</h2></div>
 <div class="section-body">
@@ -178,156 +163,137 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 </div>
 </div>
 </div>
-
-<div class="section" style="margin-bottom:14px"><div class="section-head"><h2>PLATFORM HEALTH</h2><button class="btn" onclick="loadMonitoring()">CHECK NOW</button></div><div id="monitoringArea" class="section-body"><div class="loading">Checking system health...</div></div></div>
-
+<div class="section" style="margin-bottom:14px"><div class="section-head"><h2>PLATFORM HEALTH</h2><button class="btn" onclick="loadMonitoring()">CHECK NOW</button></div><div class="section-body" id="monitoringArea"><div class="loading">Checking system health...</div></div></div>
 <div class="section">
 <div class="section-head"><h2>RECENT ACTIVITY</h2></div>
-<div id="recent" class="section-body"><div class="loading">Loading...</div></div>
+<div class="section-body" id="recent"><div class="loading">Loading...</div></div>
 </div>
 </section>
-
-<section id="page-analytics" class="page">
+<section class="page" id="page-analytics">
 <div class="heading"><h1>Analytics</h1><p>Monitor growth, financial activity and platform performance.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">USERS</div><div id="aUsers" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">TRANSACTIONS</div><div id="aTransactions" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PAYMENTS</div><div id="aPayments" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">WALLET VALUE</div><div id="aWallet" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">GROSS PROFIT</div><div id="aProfit" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">USERS</div><div class="stat-value" id="aUsers">0</div></div>
+<div class="stat"><div class="stat-label">TRANSACTIONS</div><div class="stat-value" id="aTransactions">0</div></div>
+<div class="stat"><div class="stat-label">PAYMENTS</div><div class="stat-value" id="aPayments">0</div></div>
+<div class="stat"><div class="stat-label">WALLET VALUE</div><div class="stat-value" id="aWallet">₦0.00</div></div>
+<div class="stat"><div class="stat-label">GROSS PROFIT</div><div class="stat-value" id="aProfit">₦0.00</div></div>
 </div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>14-DAY USER GROWTH</h2></div><div id="analyticsUsersChart" class="chart"><div class="loading">Loading...</div></div></div>
-<div class="section"><div class="section-head"><h2>14-DAY SALES</h2></div><div id="analyticsSalesChart" class="chart"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>14-DAY USER GROWTH</h2></div><div class="chart" id="analyticsUsersChart"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>14-DAY SALES</h2></div><div class="chart" id="analyticsSalesChart"><div class="loading">Loading...</div></div></div>
 </div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>SERVICE PERFORMANCE · 30 DAYS</h2></div><div id="analyticsServices" class="section-body"><div class="loading">Loading...</div></div></div>
-<div class="section"><div class="section-head"><h2>TOP CUSTOMERS · 30 DAYS</h2></div><div id="analyticsTopUsers" class="section-body"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>SERVICE PERFORMANCE · 30 DAYS</h2></div><div class="section-body" id="analyticsServices"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>TOP CUSTOMERS · 30 DAYS</h2></div><div class="section-body" id="analyticsTopUsers"><div class="loading">Loading...</div></div></div>
 </div>
 </section>
-
-<section id="page-reconciliation" class="page">
+<section class="page" id="page-reconciliation">
 <div class="heading"><h1>Financial Reconciliation</h1><p>Compare live wallet balances against BOLTIV's immutable financial ledger.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">CUSTOMER WALLET</div><div id="recCustomer" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">ADMIN WALLET</div><div id="recAdmin" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">REVENUE WALLET</div><div id="recRevenue" class="stat-value">₦0.00</div></div>
-<div class="stat"><div class="stat-label">PENDING VALUE</div><div id="recPending" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">CUSTOMER WALLET</div><div class="stat-value" id="recCustomer">₦0.00</div></div>
+<div class="stat"><div class="stat-label">ADMIN WALLET</div><div class="stat-value" id="recAdmin">₦0.00</div></div>
+<div class="stat"><div class="stat-label">REVENUE WALLET</div><div class="stat-value" id="recRevenue">₦0.00</div></div>
+<div class="stat"><div class="stat-label">PENDING VALUE</div><div class="stat-value" id="recPending">₦0.00</div></div>
 </div>
-<div class="section"><div class="section-head"><h2>LEDGER CHECK</h2><button class="btn primary" onclick="runReconciliation()">RUN CHECK</button></div><div id="reconciliationArea" class="section-body"><div class="loading">Loading...</div></div></div>
-<div class="section"><div class="section-head"><h2>RECENT FINANCIAL LEDGER</h2><button class="btn" onclick="loadLedger()">REFRESH</button></div><div id="ledgerArea" class="section-body"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>LEDGER CHECK</h2><button class="btn primary" onclick="runReconciliation()">RUN CHECK</button></div><div class="section-body" id="reconciliationArea"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>RECENT FINANCIAL LEDGER</h2><button class="btn" onclick="loadLedger()">REFRESH</button></div><div class="section-body" id="ledgerArea"><div class="loading">Loading...</div></div></div>
 </section>
-
-<section id="page-alerts" class="page">
+<section class="page" id="page-alerts">
 <div class="heading"><h1>Platform Alerts</h1><p>Automated financial, provider and operational warnings.</p></div>
 <div class="toolbar"><button class="btn primary" onclick="runAlertsCheck()">RUN CHECK NOW</button><button class="btn" onclick="loadAlerts()">REFRESH</button></div>
-<div class="section"><div class="section-head"><h2>OPEN & RECENT ALERTS</h2></div><div id="alertsArea" class="section-body"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>OPEN &amp; RECENT ALERTS</h2></div><div class="section-body" id="alertsArea"><div class="loading">Loading...</div></div></div>
 </section>
-
-<section id="page-users" class="page">
+<section class="page" id="page-users">
 <div class="heading"><h1>Users</h1><p>Manage all BOLTIV customer accounts.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL USERS</div><div id="uTotal" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">ACTIVE</div><div id="uActive" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">SUSPENDED</div><div id="uSuspended" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">TOTAL BALANCE</div><div id="uBalance" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">TOTAL USERS</div><div class="stat-value" id="uTotal">0</div></div>
+<div class="stat"><div class="stat-label">ACTIVE</div><div class="stat-value" id="uActive">0</div></div>
+<div class="stat"><div class="stat-label">SUSPENDED</div><div class="stat-value" id="uSuspended">0</div></div>
+<div class="stat"><div class="stat-label">TOTAL BALANCE</div><div class="stat-value" id="uBalance">₦0.00</div></div>
 </div>
-<div class="toolbar"><input id="userSearch" placeholder="Search name, email, phone..." oninput="filterUsers()"><select id="userFilter" onchange="filterUsers()"><option value="">All Users</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="btn" onclick="loadUsers()">REFRESH</button></div>
+<div class="toolbar"><input aria-label="Search users" id="userSearch" oninput="filterUsers()" placeholder="Search name, email, phone..."/><select aria-label="Filter users" id="userFilter" onchange="filterUsers()"><option value="">All Users</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="btn" onclick="loadUsers()">REFRESH</button></div>
 <div class="section"><div class="section-head"><h2>USER DIRECTORY</h2></div><div id="usersArea"><div class="loading">Loading users...</div></div></div>
 </section>
-
-<section id="page-wallets" class="page">
+<section class="page" id="page-wallets">
 <div class="heading"><h1>Wallets</h1><p>Control and monitor customer wallet balances.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL FUNDS</div><div id="wTotal" class="stat-value">₦0.00</div></div>
+<div class="stat"><div class="stat-label">TOTAL FUNDS</div><div class="stat-value" id="wTotal">₦0.00</div></div>
 <div class="stat"><div class="stat-label">CREDITS</div><div class="stat-value">—</div></div>
 <div class="stat"><div class="stat-label">DEBITS</div><div class="stat-value">—</div></div>
 <div class="stat"><div class="stat-label">ADJUSTMENTS</div><div class="stat-value">—</div></div>
 </div>
 <div class="grid2">
-<div class="section"><div class="section-head"><h2>ADMIN OPERATING WALLET</h2></div><div class="section-body"><div class="notice">Fund this wallet with real money through Flutterwave bank transfer. Customer credits and debits move money between this admin wallet and customer wallets.</div><div id="adminWalletBalance" class="amount" style="font-size:22px;margin:8px 0 14px">₦0.00</div><button class="btn primary" onclick="openAdminFunding()">FUND ADMIN WALLET</button></div></div><div class="section"><div class="section-head"><h2>CREDIT / DEBIT USER</h2></div><div class="section-body"><div class="notice">Credits now require enough money in the admin operating wallet. This prevents creating customer wallet money from nowhere.</div><button class="btn primary" onclick="openWalletCredit()">CREDIT USER</button> <button class="btn danger" onclick="openWalletDebit()">DEBIT USER</button></div></div>
+<div class="section"><div class="section-head"><h2>ADMIN OPERATING WALLET</h2></div><div class="section-body"><div class="notice">Fund this wallet with real money through Flutterwave bank transfer. Customer credits and debits move money between this admin wallet and customer wallets.</div><div class="amount" id="adminWalletBalance" style="font-size:22px;margin:8px 0 14px">₦0.00</div><button class="btn primary" onclick="openAdminFunding()">FUND ADMIN WALLET</button></div></div><div class="section"><div class="section-head"><h2>CREDIT / DEBIT USER</h2></div><div class="section-body"><div class="notice">Credits now require enough money in the admin operating wallet. This prevents creating customer wallet money from nowhere.</div><button class="btn primary" onclick="openWalletCredit()">CREDIT USER</button> <button class="btn danger" onclick="openWalletDebit()">DEBIT USER</button></div></div>
 <div class="section"><div class="section-head"><h2>WALLET HISTORY</h2></div><div class="section-body"><div class="empty">Wallet adjustment history will appear here.</div></div></div>
 </div>
 </section>
-
-<section id="page-payments" class="page">
+<section class="page" id="page-payments">
 <div class="heading"><h1>Payments</h1><p>Monitor deposits and payment processing.</p></div>
 <div class="stats">
-<div class="stat"><div class="stat-label">TOTAL</div><div id="pTotal" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">SUCCESSFUL</div><div id="pSuccess" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">PENDING</div><div id="pPending" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">FAILED</div><div id="pFailed" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">TOTAL</div><div class="stat-value" id="pTotal">0</div></div>
+<div class="stat"><div class="stat-label">SUCCESSFUL</div><div class="stat-value" id="pSuccess">0</div></div>
+<div class="stat"><div class="stat-label">PENDING</div><div class="stat-value" id="pPending">0</div></div>
+<div class="stat"><div class="stat-label">FAILED</div><div class="stat-value" id="pFailed">0</div></div>
 </div>
-<div class="toolbar"><input id="paymentSearch" placeholder="Search reference or email..." oninput="filterPayments()"><button class="btn" onclick="loadPayments()">REFRESH</button></div>
+<div class="toolbar"><input aria-label="Search payments" id="paymentSearch" oninput="filterPayments()" placeholder="Search reference or email..."/><button class="btn" onclick="loadPayments()">REFRESH</button></div>
 <div class="section"><div class="section-head"><h2>PAYMENT HISTORY</h2></div><div id="paymentsArea"><div class="loading">Loading...</div></div></div>
 </section>
-
-<section id="page-transactions" class="page">
+<section class="page" id="page-transactions">
 <div class="heading"><h1>Transactions</h1><p>Track every service transaction.</p></div>
-<div class="toolbar"><input id="transactionSearch" placeholder="Search reference, service or user..." oninput="filterTransactions()"><select id="transactionFilter" onchange="filterTransactions()"><option value="">All Status</option><option value="successful">Successful</option><option value="processing">Processing</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select><button class="btn" onclick="loadTransactions()">REFRESH</button><button class="btn" onclick="loadPending()">CHECK PENDING</button></div>
-<div id="pendingBox" class="section" style="display:none;margin-top:12px"><div class="section-head"><h2>PENDING MONITOR</h2><span id="pendingCount" class="badge pending">0</span></div><div id="pendingArea"></div></div>
+<div class="toolbar"><input aria-label="Search transactions" id="transactionSearch" oninput="filterTransactions()" placeholder="Search reference, service or user..."/><select aria-label="Filter transactions" id="transactionFilter" onchange="filterTransactions()"><option value="">All Status</option><option value="successful">Successful</option><option value="processing">Processing</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select><button class="btn" onclick="loadTransactions()">REFRESH</button><button class="btn" onclick="loadPending()">CHECK PENDING</button></div>
+<div class="section" id="pendingBox" style="display:none;margin-top:12px"><div class="section-head"><h2>PENDING MONITOR</h2><span class="badge pending" id="pendingCount">0</span></div><div id="pendingArea"></div></div>
 <div class="section"><div class="section-head"><h2>TRANSACTION HISTORY</h2></div><div id="transactionsArea"><div class="loading">Loading...</div></div></div>
 </section>
-
-<section id="page-services" class="page">
+<section class="page" id="page-services">
 <div class="heading"><h1>Services</h1><p>Manage the services offered through BOLTIV.</p></div>
 <div class="toolbar"><button class="btn" onclick="loadServices()">REFRESH</button></div>
-<div id="servicesArea" class="grid3"><div class="loading">Loading...</div></div>
+<div class="grid3" id="servicesArea"><div class="loading">Loading...</div></div>
 </section>
-<section id="page-notifications" class="page">
+<section class="page" id="page-notifications">
 <div class="heading">
 <h1>Notifications</h1>
 <p>Send announcements, alerts and important messages to BOLTIV users.</p>
 </div>
-
 <div class="stats">
 <div class="stat">
 <div class="stat-label">TOTAL SENT</div>
-<div id="nTotal" class="stat-value">0</div>
+<div class="stat-value" id="nTotal">0</div>
 </div>
 <div class="stat">
 <div class="stat-label">TODAY</div>
-<div id="nToday" class="stat-value">0</div>
+<div class="stat-value" id="nToday">0</div>
 </div>
 <div class="stat">
 <div class="stat-label">READ</div>
-<div id="nRead" class="stat-value">0</div>
+<div class="stat-value" id="nRead">0</div>
 </div>
 <div class="stat">
 <div class="stat-label">UNREAD</div>
-<div id="nUnread" class="stat-value">0</div>
+<div class="stat-value" id="nUnread">0</div>
 </div>
 </div>
-
 <div class="grid2">
-
 <div class="section">
 <div class="section-head">
 <h2>CREATE NOTIFICATION</h2>
 </div>
-
 <div class="section-body">
-
-<label>RECIPIENT</label>
-<select id="notifyRecipient">
+<label id="recipient-label">RECIPIENT</label>
+<select aria-label="Notification recipient" aria-labelledby="recipient-label" id="notifyRecipient">
 <option value="all">ALL USERS</option>
 <option value="active">ACTIVE USERS</option>
 <option value="selected">SELECTED USER</option>
 </select>
-
-<div id="selectedUserBox" class="hidden">
-<label>USER EMAIL / ID</label>
-<input id="notifyUser" placeholder="Enter user email or ID">
+<div class="hidden" id="selectedUserBox">
+<label id="user-email-id-label">USER EMAIL / ID</label>
+<input aria-label="User" aria-labelledby="user-email-id-label" id="notifyUser" placeholder="Enter user email or ID"/>
 </div>
-
-<label>TITLE</label>
-<input id="notifyTitle" placeholder="Notification title">
-
-<label>MESSAGE</label>
-<textarea id="notifyMessage" placeholder="Write your notification message..."></textarea>
-
-<label>TYPE</label>
-<select id="notifyType">
+<label id="title-label">TITLE</label>
+<input aria-label="Notification title" aria-labelledby="title-label" id="notifyTitle" placeholder="Notification title"/>
+<label id="message-label">MESSAGE</label>
+<textarea aria-label="Notification message" aria-labelledby="message-label" id="notifyMessage" placeholder="Write your notification message..."></textarea>
+<label id="type-label">TYPE</label>
+<select aria-label="Notification type" aria-labelledby="type-label" id="notifyType">
 <option value="general">GENERAL</option>
 <option value="announcement">ANNOUNCEMENT</option>
 <option value="payment">PAYMENT</option>
@@ -335,165 +301,118 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <option value="maintenance">MAINTENANCE</option>
 <option value="promotion">PROMOTION</option>
 </select>
-
-<label>PRIORITY</label>
-<select id="notifyPriority">
+<label id="priority-label">PRIORITY</label>
+<select aria-label="Notification priority" aria-labelledby="priority-label" id="notifyPriority">
 <option value="normal">NORMAL</option>
 <option value="high">HIGH</option>
 <option value="urgent">URGENT</option>
 </select>
-
 <div class="actions">
 <button class="btn" onclick="clearNotificationForm()">CLEAR</button>
 <button class="btn primary" onclick="sendNotification()">SEND NOTIFICATION</button>
 </div>
-
 </div>
 </div>
-
 <div class="section">
 <div class="section-head">
 <h2>NOTIFICATION PREVIEW</h2>
 </div>
-
 <div class="section-body">
-
 <div id="notificationPreview" style="border:1px solid var(--line);border-radius:12px;padding:16px;background:#fafafa">
-
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
 <div style="width:40px;height:40px;border-radius:50%;background:var(--ybg);display:flex;align-items:center;justify-content:center;color:var(--g2);font-weight:1000">
 B
 </div>
-
 <div>
 <div id="previewTitle" style="font-size:11px;font-weight:1000">
 Notification title
 </div>
-
 <div id="previewType" style="font-size:8px;color:#999;margin-top:3px">
 GENERAL
 </div>
 </div>
 </div>
-
-<div id="previewMessage" style="font-size:10px;color:#555;line-height:1.6">
+<div aria-live="polite" id="previewMessage" role="status" style="font-size:10px;color:#555;line-height:1.6">
 Your notification message will appear here.
 </div>
-
 <div style="margin-top:12px;padding-top:10px;border-top:1px solid #eee;font-size:8px;color:#999">
 BOLTIV • Just now
 </div>
-
 </div>
-
-<div style="margin-top:15px" class="notice">
+<div class="notice" style="margin-top:15px">
 Notifications sent from this panel should be recorded in the admin audit log.
 </div>
-
 </div>
 </div>
-
 </div>
-
 <div class="section">
-
 <div class="section-head">
 <h2>NOTIFICATION HISTORY</h2>
-
 <div style="display:flex;gap:6px">
 <button class="btn" onclick="filterNotificationHistory('all')">ALL</button>
 <button class="btn" onclick="filterNotificationHistory('announcement')">ANNOUNCEMENTS</button>
 <button class="btn" onclick="filterNotificationHistory('security')">SECURITY</button>
 </div>
-
 </div>
-
 <div id="notificationHistory">
-
 <div class="empty">
 No notification history loaded yet.
 </div>
-
 </div>
-
 </div>
 </section>
-
-<section id="page-support" class="page">
-
+<section class="page" id="page-support">
 <div class="heading">
 <h1>Support</h1>
 <p>Manage customer complaints, questions and support requests.</p>
 </div>
-
 <div class="stats">
-
 <div class="stat">
 <div class="stat-label">OPEN TICKETS</div>
 <div class="stat-value">0</div>
 </div>
-
 <div class="stat">
 <div class="stat-label">PENDING</div>
 <div class="stat-value">0</div>
 </div>
-
 <div class="stat">
 <div class="stat-label">RESOLVED</div>
 <div class="stat-value">0</div>
 </div>
-
 <div class="stat">
 <div class="stat-label">TODAY</div>
 <div class="stat-value">0</div>
 </div>
-
 </div>
-
 <div class="toolbar">
-
-<input
-id="supportSearch"
-placeholder="Search ticket, user or subject..."
->
-
-<select id="supportFilter">
+<input aria-label="Search support tickets" id="supportSearch" placeholder="Search ticket, user or subject..."/>
+<select aria-label="Filter support tickets" id="supportFilter">
 <option value="">All Tickets</option>
 <option value="open">Open</option>
 <option value="pending">Pending</option>
 <option value="resolved">Resolved</option>
 </select>
-
 <button class="btn" onclick="loadSupport()">
 REFRESH
 </button>
-
 </div>
-
 <div class="section">
-
 <div class="section-head">
 <h2>SUPPORT TICKETS</h2>
 </div>
-
 <div id="supportTickets">
-
 <div class="empty">
 No support tickets available.
 </div>
-
 </div>
-
 </div>
-
 </section>
-
-<section id="page-security" class="page">
+<section class="page" id="page-security">
 <div class="heading"><h1>Security</h1><p>Monitor administrator access and platform security.</p></div>
 <div class="stats">
 <div class="stat"><div class="stat-label">SESSION</div><div class="stat-value" style="font-size:14px">ACTIVE</div></div>
-<div class="stat"><div class="stat-label">ACTIVE SESSIONS</div><div id="activeSessionsCount" class="stat-value">0</div></div>
-<div class="stat"><div class="stat-label">SECURITY EVENTS</div><div id="securityEventsCount" class="stat-value">0</div></div>
+<div class="stat"><div class="stat-label">ACTIVE SESSIONS</div><div class="stat-value" id="activeSessionsCount">0</div></div>
+<div class="stat"><div class="stat-label">SECURITY EVENTS</div><div class="stat-value" id="securityEventsCount">0</div></div>
 </div>
 <div class="grid2">
 <div class="section"><div class="section-head"><h2>ADMIN SESSION</h2></div><div class="section-body">
@@ -508,46 +427,32 @@ No support tickets available.
 </div>
 <div class="section"><div class="section-head"><h2>SECURITY EVENTS</h2><button class="btn" onclick="loadSecurity()">REFRESH</button></div><div id="securityEvents"><div class="empty">Loading...</div></div></div>
 </section>
-
-<section id="page-audit" class="page">
-
+<section class="page" id="page-audit">
 <div class="heading">
 <h1>Audit Logs</h1>
 <p>Every important administrator action should be recorded here.</p>
 </div>
-
 <div class="stats">
-
 <div class="stat">
 <div class="stat-label">TOTAL EVENTS</div>
 <div class="stat-value">0</div>
 </div>
-
 <div class="stat">
 <div class="stat-label">TODAY</div>
 <div class="stat-value">0</div>
 </div>
-
 <div class="stat">
 <div class="stat-label">ADMIN ACTIONS</div>
 <div class="stat-value">0</div>
 </div>
-
 <div class="stat">
 <div class="stat-label">SECURITY EVENTS</div>
 <div class="stat-value">0</div>
 </div>
-
 </div>
-
 <div class="toolbar">
-
-<input
-id="auditSearch"
-placeholder="Search audit logs..."
->
-
-<select id="auditType">
+<input aria-label="Search audit logs" id="auditSearch" placeholder="Search audit logs..."/>
+<select aria-label="Audit event type" id="auditType">
 <option value="">All Actions</option>
 <option value="login">Login</option>
 <option value="logout">Logout</option>
@@ -556,200 +461,138 @@ placeholder="Search audit logs..."
 <option value="payment">Payment</option>
 <option value="security">Security</option>
 </select>
-
 <button class="btn" onclick="loadAudit()">REFRESH</button>
-
 </div>
-
 <div class="section">
-
 <div class="section-head">
 <h2>ADMIN ACTIVITY</h2>
 </div>
-
 <div id="auditArea">
-
 <div class="empty">
 No audit logs available.
 </div>
-
 </div>
-
 </div>
-
 </section>
-
-<section id="page-settings" class="page">
-
+<section class="page" id="page-settings">
 <div class="heading">
 <h1>Settings</h1>
 <p>Manage your administrator account and BOLTIV platform configuration.</p>
 </div>
-
 <div class="grid2">
-
 <div class="section">
-
 <div class="section-head">
 <h2>ADMIN PROFILE</h2>
 </div>
-
 <div class="section-body">
-
-<label>ADMIN EMAIL</label>
-<input id="settingsEmail" readonly>
-
-<label>ROLE</label>
-<input value="SUPER ADMINISTRATOR" readonly>
-
-<label>ACCOUNT STATUS</label>
-<input value="ACTIVE" readonly>
-
+<label id="admin-email-label-2">ADMIN EMAIL</label>
+<input aria-label="Settings email" aria-labelledby="admin-email-label-2" id="settingsEmail" readonly=""/>
+<label id="role-label">ROLE</label>
+<input aria-label="Input" aria-labelledby="role-label" readonly="" value="SUPER ADMINISTRATOR"/>
+<label for="account-status">ACCOUNT STATUS</label>
+<input aria-label="Input" id="account-status" readonly="" value="ACTIVE"/>
 </div>
-
 </div>
-
 <div class="section">
-
 <div class="section-head">
 <h2>SECURITY SETTINGS</h2>
 </div>
-
 <div class="section-body">
-
 <div class="activity">
 <span>Two-Factor Authentication</span>
 <strong style="color:var(--yellow)">
 NOT ENABLED
 </strong>
 </div>
-
 <div class="activity">
 <span>Session Protection</span>
 <strong style="color:var(--green)">
 ACTIVE
 </strong>
 </div>
-
 <div class="activity">
 <span>Admin Authentication</span>
 <strong style="color:var(--green)">
 ACTIVE
 </strong>
 </div>
-
 <div style="margin-top:15px;font-size:10px;line-height:1.6">Admin password is controlled by the <code>ADMIN_PASSWORD</code> environment variable on the backend. Two-factor authentication is not enabled in this release.
 </div>
-
 </div>
-
 </div>
-
 </div>
-
 <div class="section">
-
 <div class="section-head">
 <h2>PLATFORM SETTINGS</h2>
 </div>
-
 <div class="section-body">
-
 <div class="activity">
 <div>
 <strong>Maintenance Mode</strong>
-<br>
+<br/>
 <small>Temporarily disable customer transactions.</small>
 </div>
-
-<button id="maintenanceBtn" class="btn" onclick="toggleMaintenance()">LOADING</button>
-
+<button class="btn" id="maintenanceBtn" onclick="toggleMaintenance()">LOADING</button>
 </div>
-
 <div class="activity">
-
 <div>
 <strong>New User Registration</strong>
-<br>
+<br/>
 <small>Allow new customers to create accounts.</small>
 </div>
-
-<button id="registrationBtn" class="btn" onclick="toggleRegistration()">LOADING</button>
-
+<button class="btn" id="registrationBtn" onclick="toggleRegistration()">LOADING</button>
 </div>
-
 <div class="activity">
-
 <div>
 <strong>Wallet Transactions</strong>
-<br>
+<br/>
 <small>Allow users to fund and spend wallet balance.</small>
 </div>
-
 <button class="btn">
 ENABLED
 </button>
-
 </div>
-
 <div class="activity">
-
 <div>
 <strong>Payment Processing</strong>
-<br>
+<br/>
 <small>Use Flutterwave payments and virtual accounts.</small>
 </div>
-
 <button class="btn">
 ENABLED
 </button>
-
 </div>
-
 </div>
-
 </div>
-
 <div class="section">
-
 <div class="section-head">
 <h2>SYSTEM INFORMATION</h2>
 </div>
-
 <div class="section-body">
-
 <div class="activity">
 <span>Application</span>
 <strong>BOLTIV</strong>
 </div>
-
 <div class="activity">
 <span>Admin Panel</span>
 <strong>Control Center</strong>
 </div>
-
 <div class="activity">
 <span>Backend</span>
 <strong>Render</strong>
 </div>
-
 <div class="activity">
 <span>Payment Gateway</span>
 <strong>Flutterwave</strong>
 </div>
-
 <div class="activity">
 <span>Environment</span>
 <strong>Production</strong>
 </div>
-
 </div>
-
 </div>
-
 </section>
-
-<div id="adminModal" class="modal"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle">ADMIN ACTION</h2><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
+<div class="modal" id="adminModal"><div class="modal-box"><div class="modal-head"><h2 id="modalTitle">ADMIN ACTION</h2><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
 <script>
 
 const API="https://boltiv-backend.onrender.com";
@@ -917,6 +760,5 @@ api("/api/admin/me")
   .catch(()=>showLogin());
 
 </script>
-</body>
+</div></main></div></body>
 </html>
-

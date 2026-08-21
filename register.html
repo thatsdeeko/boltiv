@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
-<head><meta name="robots" content="noindex,nofollow"><script src="boltiv-client.js?v=20260820-nostorage"></script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f7f7f5">
-<title>BOLTIV — Create Account</title>
-<link rel="stylesheet" href="style.css?v=20260821-servicecenter">
 
+<html lang="en">
+<head><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="#f7f7f5" name="theme-color"/>
+<title>BOLTIV — Create Account</title>
+<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
 <style>
 .auth-page{
     min-height:100vh;
@@ -16,7 +16,7 @@
 .auth-logo img{width:70px;height:80px;object-fit:contain;display:block}
 .auth-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
     text-align:center;
-    color:#b8860b;
+    color:#7a5b00;
     font-size:33px;
     font-weight:1000;
     letter-spacing:4px;
@@ -76,7 +76,7 @@
 }
 
 .auth-links a:first-child{
-    color:#b8860b;
+    color:#7a5b00;
 }
 
 /* STATUS */
@@ -100,7 +100,7 @@
 }
 
 .status-message.success{
-    color:#b8860b;
+    color:#7a5b00;
     background:#fffdf4;
     border:1px solid #ead99b;
 }
@@ -151,7 +151,7 @@ body{
 
 .auth-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
     text-align:center;
-    color:#b8860b;
+    color:#7a5b00;
     font-size:39.6px;
     font-weight:1000;
     letter-spacing:5px;
@@ -227,7 +227,7 @@ body{
 }
 
 .input:focus{
-    border-color:#b8860b;
+    border-color:#7a5b00;
     box-shadow:
         0 0 0 3px
         rgba(196,154,37,.12);
@@ -241,7 +241,7 @@ body{
     border:none;
     border-radius:11px;
 
-    background:#b8860b;
+    background:#7a5b00;
     color:#171717;
 
     font-size:16.5px;
@@ -358,7 +358,7 @@ body{
 
     padding:32px 24px 25px;
 
-    border:1px solid #b8860b;
+    border:1px solid #7a5b00;
     border-radius:24px;
 
     background:#ffffff;
@@ -397,7 +397,7 @@ body{
 
     border-radius:50%;
 
-    border:2px solid #b8860b;
+    border:2px solid #7a5b00;
 
     background:#fffaf0;
 
@@ -474,7 +474,7 @@ body{
 
     border-radius:11px;
 
-    background:#b8860b;
+    background:#7a5b00;
 
     color:#171717;
 
@@ -565,142 +565,81 @@ body{
 }
 
 </style>
-<link rel="icon" type="image/png" href="assets/boltiv-icon.png">
-</head>
-
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #7a5b00;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body>
-
 <div class="page">
 <div class="container">
-
 <div class="auth-page">
-
-<div class="auth-logo"><img src="assets/boltiv-logo.png" alt="BOLTIV logo"><span>BOLTIV</span></div>
+<div class="auth-logo"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></div>
 <div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
-
 <div class="auth-card">
-
 <h1>Create Account</h1>
-
 <p class="auth-subtitle">
 Join BOLTIV and manage your digital services
 </p>
-
-<div class="status-message" id="statusMessage"></div>
-
+<div aria-live="polite" class="status-message" id="statusMessage" role="status"></div>
 <div class="form-group">
-<label class="label">FULL NAME</label>
-<input
-class="input"
-id="nameInput"
-type="text"
-autocomplete="name"
-placeholder="Enter your full name">
+<label class="label" id="full-name-label">FULL NAME</label>
+<input aria-label="Full name" aria-labelledby="full-name-label" autocomplete="name" class="input" id="nameInput" placeholder="Enter your full name" type="text"/>
 </div>
-
 <div class="form-group">
-<label class="label">PHONE NUMBER</label>
-<input
-class="input"
-id="phoneInput"
-type="tel"
-inputmode="tel"
-autocomplete="tel"
-placeholder="Enter phone number">
+<label class="label" id="phone-number-label">PHONE NUMBER</label>
+<input aria-label="Phone number" aria-labelledby="phone-number-label" autocomplete="tel" class="input" id="phoneInput" inputmode="tel" placeholder="Enter phone number" type="tel"/>
 </div>
-
 <div class="form-group">
-<label class="label">EMAIL ADDRESS</label>
-<input
-class="input"
-id="emailInput"
-type="email"
-autocomplete="email"
-placeholder="you@example.com">
+<label class="label" id="email-address-label">EMAIL ADDRESS</label>
+<input aria-label="Email address" aria-labelledby="email-address-label" autocomplete="email" class="input" id="emailInput" placeholder="you@example.com" type="email"/>
 </div>
-
 <div class="form-group">
-<label class="label">PASSWORD</label>
-<input
-class="input"
-id="passwordInput"
-type="password"
-autocomplete="new-password"
-placeholder="Create a password">
+<label class="label" id="password-label">PASSWORD</label>
+<input aria-label="Password" aria-labelledby="password-label" autocomplete="new-password" class="input" id="passwordInput" placeholder="Create a password" type="password"/>
 </div>
-
 <div class="form-group">
-<label class="label">CONFIRM PASSWORD</label>
-<input
-class="input"
-id="confirmPasswordInput"
-type="password"
-autocomplete="new-password"
-placeholder="Confirm your password">
+<label class="label" id="confirm-password-label">CONFIRM PASSWORD</label>
+<input aria-label="Confirm password" aria-labelledby="confirm-password-label" autocomplete="new-password" class="input" id="confirmPasswordInput" placeholder="Confirm your password" type="password"/>
 </div>
-
 <div class="legal-consent">
 By creating an account, you agree to our
 <a href="/terms">Terms &amp; Conditions</a> and
 <a href="/privacy">Privacy Policy</a>.
 </div>
-
-<button
-class="btn btn-primary auth-btn"
-id="registerButton">
+<button class="btn btn-primary auth-btn" id="registerButton">
 Create Account
 </button>
-
 <div class="auth-links">
 <a href="/login">
 Already have an account? Login
 </a>
 </div>
-
 </div>
 </div>
 </div>
 </div>
-
-
 <!-- TRANSACTION PIN SETUP MODAL -->
-
 <div class="boltiv-success-overlay" id="successModal">
-
 <div class="boltiv-success-card pin-setup-card">
-
 <div class="success-ring">✓</div>
-
 <div class="success-label">ACCOUNT CREATED</div>
-
 <h2>Welcome to BOLTIV</h2>
-
 <p class="success-message">
 Your account has been created successfully.
 Before you continue, create your 4-digit Transaction PIN.
 This PIN protects airtime, data, cable TV, electricity and other transactions.
 </p>
-
 <div class="success-user" id="successUser">Welcome, User</div>
-
 <div class="pin-setup-fields">
-<label class="label">TRANSACTION PIN</label>
-<input class="input" id="newTransactionPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Enter 4-digit PIN">
-
-<label class="label">CONFIRM TRANSACTION PIN</label>
-<input class="input" id="confirmTransactionPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="Confirm 4-digit PIN">
-
-<div class="pin-setup-status" id="pinSetupStatus"></div>
-
+<label class="label" id="transaction-pin-label">TRANSACTION PIN</label>
+<input aria-label="New transaction PIN" aria-labelledby="transaction-pin-label" autocomplete="off" class="input" id="newTransactionPin" inputmode="numeric" maxlength="4" placeholder="Enter 4-digit PIN" type="password"/>
+<label class="label" for="confirmTransactionPin">CONFIRM TRANSACTION PIN</label>
+<input aria-label="Confirm transaction PIN" autocomplete="off" class="input" id="confirmTransactionPin" inputmode="numeric" maxlength="4" placeholder="Confirm 4-digit PIN" type="password"/>
+<div aria-live="polite" class="pin-setup-status" id="pinSetupStatus" role="status"></div>
 <button class="boltiv-success-btn" id="createTransactionPin">
 CREATE TRANSACTION PIN
 </button>
 </div>
-
 </div>
 </div>
-
-
 <script>
 
 const API_BASE="https://boltiv-backend.onrender.com";
@@ -1029,6 +968,5 @@ createTransactionPin.onclick=async()=>{
 };
 
 </script>
-
 </body>
 </html>

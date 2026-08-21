@@ -25,15 +25,14 @@ function esc(v){return String(v??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&l
 function formatValidity(value, days){
   const raw=String(value??"").trim();
   if(raw && !/^undefined|null|n\/a$/i.test(raw)){
+    // SME sometimes returns numeric validity (for example 30) instead of
+    // the text form (30days). Treat a bare positive number as days.
     if(/^\d+(?:\.\d+)?$/.test(raw)){
       const n=Number(raw);
-      return n>0 ? n+" "+(n===1?"Day":"Days") : "Validity not available";
+      if(n>0)return n+" "+(n===1?"Day":"Days");
     }
-    const normalized=raw
-      .replace(/(\d+(?:\.\d+)?)\s*(day|days)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Day":"Days"))
-      .replace(/(\d+(?:\.\d+)?)\s*(hour|hours)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Hour":"Hours"))
-      .replace(/(\d+(?:\.\d+)?)\s*(minute|minutes)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Minute":"Minutes"));
-    return normalized;
+    const normalized=raw.replace(/(\d+(?:\.\d+)?)\s*(day|days)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Day":"Days"));
+    return normalized.replace(/(\d+(?:\.\d+)?)\s*(hour|hours)\b/ig,(m,n)=>n+" "+(Number(n)===1?"Hour":"Hours"));
   }
   const d=Number(days);
   return d>0 ? d+" "+(d===1?"Day":"Days") : "Validity not available";
@@ -50,7 +49,7 @@ function renderPlans(plans){
   plans.forEach(plan=>{
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
-    const label=planLabel(plan), validity=formatValidity(plan.validity??plan.validity_period??plan.validityPeriod??plan.duration??plan.validity_days??plan.validityDays,plan.validity_days??plan.validityDays);
+    const label=planLabel(plan), validity=formatValidity(plan.validity??plan.validity_period??plan.duration,plan.validity_days);
     b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div>';
     b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;};
     planGrid.appendChild(b);

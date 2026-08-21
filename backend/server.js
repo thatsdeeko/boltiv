@@ -110,6 +110,37 @@ function clean(value){
 return String(value??"").trim();
 }
 
+// SME API has used slightly different casing/nesting for catalogue fields.
+// Read catalogue values case-insensitively so fields such as Validity/validity
+// are never lost when the provider changes response casing.
+function findCatalogField(value, names, depth=0){
+  if(value==null || depth>4) return undefined;
+  const wanted=new Set(names.map(x=>String(x).replace(/[^a-z0-9]/gi,"").toLowerCase()));
+  if(Array.isArray(value)){
+    for(const item of value){ const found=findCatalogField(item,names,depth+1); if(found!==undefined) return found; }
+    return undefined;
+  }
+  if(typeof value!=="object") return undefined;
+  for(const [key,val] of Object.entries(value)){
+    const normalized=String(key).replace(/[^a-z0-9]/gi,"").toLowerCase();
+    if(wanted.has(normalized) && val!==undefined && val!==null && String(val).trim()!=="") return val;
+  }
+  for(const val of Object.values(value)){
+    if(val && typeof val==="object"){ const found=findCatalogField(val,names,depth+1); if(found!==undefined) return found; }
+  }
+  return undefined;
+}
+
+function normalizeCatalogValidity(plan){
+  const value=findCatalogField(plan,[
+    "validity","validity_period","validityPeriod","validityDuration",
+    "duration","duration_text","expiry","expiry_period","expiryPeriod",
+    "validity_days","validityDays","days","validity_in_days"
+  ]);
+  if(value!==undefined && value!==null && String(value).trim()!=="") return clean(value);
+  return "";
+}
+
 function validEmail(email){
 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -228,60 +259,22 @@ const timeoutMs=Number(options.timeoutMs||10000); const controller=new AbortCont
 try{const response=await fetch(`${SME_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}`,{headers:{Authorization:`Token ${SME_API_KEY}`,Accept:"application/json"},signal:controller.signal});let data={};try{data=await response.json();}catch{};return {success:response.ok,outcome:response.ok?"successful":"failed",statusCode:response.status,data,message:data.message||data.detail||(!response.ok?`SME API request failed (${response.status}).`:"Request successful.")};}
 catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,message:"SME API request could not be completed."};}finally{clearTimeout(timer);}}
 
-
-function extractSMEPlanValidity(plan){
-  const candidates = [
-    plan?.validity,
-    plan?.validity_period,
-    plan?.validityPeriod,
-    plan?.validity_days,
-    plan?.validityDays,
-    plan?.duration,
-    plan?.duration_days,
-    plan?.durationDays,
-    plan?.expiry,
-    plan?.expiry_period,
-    plan?.expiryPeriod
-  ];
-  for(const value of candidates){
-    if(value===null||value===undefined)continue;
-    if(typeof value==="object"){
-      const nested=value.value??value.label??value.name??value.text??value.days??value.hours;
-      if(nested!==null&&nested!==undefined&&String(nested).trim()!=="")return String(nested).trim();
-      continue;
-    }
-    const text=String(value).trim();
-    if(text && !/^undefined|null|n\/a$/i.test(text))return text;
-  }
-  return "";
-}
-
-function normalizeSMEPlanValidity(value){
-  const raw=String(value??"").trim();
-  if(!raw)return {label:"",days:0};
-  const match=raw.match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
-  if(match){
-    const n=Number(match[1]), unit=match[2].toLowerCase();
-    const isDay=/day/.test(unit);
-    return {
-      label:`${n} ${unit.replace(/s$/,"")}${n===1?"":"s"}`,
-      days:isDay?n:0
-    };
-  }
-  // SME's catalogue also contains numeric validity values such as "30";
-  // these are day values in the published catalogue.
-  if(/^\d+(?:\.\d+)?$/.test(raw)){
-    const n=Number(raw);
-    return {label:`${n} ${n===1?"Day":"Days"}`,days:n};
-  }
-  return {label:raw,days:0};
-}
-
 async function fetchSMEDataPlans(network){
 const selected=normalizeDataNetwork(network); if(!selected)throw new Error("Unsupported network.");
 const response=await smeApiGet("api/dataplans/"); if(!response.success)throw new Error(response.message||"Unable to load SME API data plans.");
 const raw=Array.isArray(response.data?.data)?response.data.data:(Array.isArray(response.data?.plans)?response.data.plans:(Array.isArray(response.data)?response.data:[]));
-return raw.map(p=>{const name=clean(p.plan_name??p.name??p.plan??"");const networkName=normalizeDataNetwork(p.network??p.network_name??p.networkName??"");const id=Number(p.id??p.plan_id??p.planId??0);const price=Number(p.vendor_price??p.agent_price??p.user_price??p.price??p.amount??0);const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;const rawValidity=extractSMEPlanValidity(p); const normalizedValidity=normalizeSMEPlanValidity(rawValidity); const validityDays=normalizedValidity.days>0?normalizedValidity.days:(Number(p.validity_days)>0?Number(p.validity_days):0); return {network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity||normalizedValidity.label,validity_period:rawValidity||normalizedValidity.label,duration:rawValidity||normalizedValidity.label,type:clean(p.type??"")};}).filter(p=>p.network_name===selected&&p.plan_id>0&&p.price>0&&p.name);}
+return raw.map(p=>{
+const name=clean(findCatalogField(p,["plan_name","name","plan"])??"");
+const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName"])??"");
+const id=Number(findCatalogField(p,["id","plan_id","planId"])??0);
+const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","price","amount"])??0);
+const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
+const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;
+const rawValidity=normalizeCatalogValidity(p);
+const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):(Number(findCatalogField(p,["validity_days","validityDays"])||0)>0?Number(findCatalogField(p,["validity_days","validityDays"])):0);
+return {network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,type:clean(findCatalogField(p,["type"])??"")};
+}).filter(p=>p.network_name===selected&&p.plan_id>0&&p.price>0&&p.name);}
 
 const smePlanCache=new Map();
 async function getAuthoritativeSMEDataPlan(network,planId){const selected=normalizeDataNetwork(network);const id=Number(planId);if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");let entry=smePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchSMEDataPlans(selected)};smePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>Number(x.plan_id)===id);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};}
@@ -3447,7 +3440,7 @@ const bundleId=Number(plan.plan_id||0), providerPrice=Number(plan.price||0);
 if(!Number.isInteger(bundleId)||bundleId<=0||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
-const validity=clean(plan.validity||plan.validity_period||plan.duration||""); const validityInfo=normalizeSMEPlanValidity(validity); const validityDays=Number(plan.validity_days||validityInfo.days||0); byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||String(bundleId)),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:null,size_mb:Number(plan.size_mb||0),validity_days:validityDays,validity:validity||validityInfo.label,validity_period:validity||validityInfo.label,duration:validity||validityInfo.label,type:clean(plan.type||"")});
+byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||String(bundleId)),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:null,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});

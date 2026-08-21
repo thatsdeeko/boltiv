@@ -16,9 +16,9 @@ html,body{margin:0;padding:0;background:#fff;color:#111;font-family:system-ui,-a
 (function(){
 "use strict";
 var routes={"/login/":"login.html","/register/":"register.html","/dashboard/":"dashboard.html","/airtime/":"airtime.html","/data/":"data.html","/electricity/":"electricity.html","/cable/":"cable.html","/wallet/":"wallet.html","/transactions/":"transactions.html","/profile/":"profile.html","/notifications/":"notifications.html","/support/":"support.html","/contact/":"contact.html","/privacy/":"privacy.html","/terms/":"terms.html","/forgot-password/":"forgot-password.html","/reset-password/":"reset-password.html","/security/":"security.html","/history/":"history.html","/receipt/":"receipt.html","/recharge-pin/":"recharge-pin.html","/sms/":"sms.html","/betting/":"betting.html","/exam-pin/":"exam-pin.html"};
-var path=window.location.pathname;
-if(path.length>1 && path.charAt(path.length-1)!=="/") path+="/";
-var target=routes[path];
+var path=window.location.pathname || "/";
+var clean=path.replace(/\/+$/,"") || "/";
+var target=routes[path] || routes[clean+"/"] || routes[clean] || null;
 if(target){
   window.location.replace("/"+target);
 } else {

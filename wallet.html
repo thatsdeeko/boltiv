@@ -172,7 +172,7 @@ function showFundingResult(account){
     };
   }
 }
-async function createWallet(){return API.request("/api/wallet.htmlcreate",{method:"POST",body:JSON.stringify({userId:uid()})})}
+async function createWallet(){return API.request("/api/wallet/create",{method:"POST",body:JSON.stringify({userId:uid()})})}
 async function loadWallet(){let r=await API.request("/api/wallet");if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);boltivMemoryStorage.setItem("boltivBalance",String(b));boltivMemoryStorage.setItem("boltivWalletBalance",String(b));return r}if(r.message==="Wallet not found"){r=await createWallet();if(r.success){const b=Number(r.wallet?.balance||0);balance.textContent=money(b);boltivMemoryStorage.setItem("boltivBalance",String(b));boltivMemoryStorage.setItem("boltivWalletBalance",String(b));return r}}toast("error","Wallet Error",r.message||"Unable to load wallet")}
 function updateSummary(){const v=Number(amount.value);fundSummary.style.display=v>=100?"block":"none";if(v>=100)summaryAmount.textContent=money(v)}
 function setFundingChoice(type){selectedAccountType=type;const staticMode=type==="static";identityFields.style.display=staticMode?"block":"none";dynamicFields.style.display=staticMode?"none":"block";staticChoice.className=staticMode?"wallet-modal-btn wallet-modal-confirm":"wallet-modal-btn wallet-modal-cancel";dynamicChoice.className=!staticMode?"wallet-modal-btn wallet-modal-confirm":"wallet-modal-btn wallet-modal-cancel";confirmFunding.textContent=staticMode?"Create permanent account":"Create one-time account";if(staticMode)identityNumber.placeholder=identityType.value.toUpperCase()==="NIN"?"Enter 11-digit NIN":"Enter 11-digit BVN";fundingResult.style.display="none";}

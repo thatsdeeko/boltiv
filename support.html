@@ -631,7 +631,7 @@ Message:
 ${text}`;
 
 try{
-const r=await fetch("https://boltiv-backend.onrender.com/api/support.htmltickets",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({subject:selectedIssue,message:text})});
+const r=await fetch("https://boltiv-backend.onrender.com/api/support/tickets",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({subject:selectedIssue,message:text})});
 const d=await r.json();
 if(!r.ok||!d.success)throw new Error(d.message||"Unable to create support ticket.");
 alert(d.message+" You can also continue with WhatsApp support.");
@@ -646,7 +646,7 @@ const ticketList=document.getElementById("ticketList");
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;")}
 async function loadTickets(){
 try{
-const r=await fetch(API+"/api/support.htmltickets",{headers:auth()}),d=await r.json();
+const r=await fetch(API+"/api/support/tickets",{headers:auth()}),d=await r.json();
 if(!r.ok||!d.success)throw new Error();
 if(!d.tickets.length){ticketList.innerHTML='<div style="font-size:10px;color:#777">No support tickets yet.</div>';return}
 ticketList.innerHTML=d.tickets.map(t=>`<article class="ticket-card"><div class="ticket-head"><div class="ticket-subject">#${Number(t.id)} · ${esc(t.subject)}</div><div class="ticket-status">${esc(t.status)}</div></div><div class="ticket-meta">Updated ${new Date(t.updated_at||t.created_at).toLocaleString("en-NG")}</div><button type="button" onclick="toggleTicket(${Number(t.id)},this)" style="margin-top:9px;border:1px solid #e5e5e1;background:#fff;border-radius:9px;padding:8px 10px;font-size:8px;font-weight:900">VIEW CONVERSATION</button><div id="thread-${Number(t.id)}" class="ticket-thread"></div></article>`).join("");
@@ -654,11 +654,11 @@ ticketList.innerHTML=d.tickets.map(t=>`<article class="ticket-card"><div class="
 }
 async function toggleTicket(id,button){
 const box=document.getElementById("thread-"+id);if(box.classList.contains("show")){box.classList.remove("show");button.textContent="VIEW CONVERSATION";return}
-try{const r=await fetch(API+"/api/support.htmlticket?id="+id,{headers:auth()}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to load ticket.");let html=d.messages.length?d.messages.map(m=>'<div class="ticket-message '+(m.sender_type==='admin'?'admin':'')+'"><strong>'+(m.sender_type==='admin'?'BOLTIV Support':'You')+'</strong><div style="margin-top:4px">'+esc(m.message)+'</div><div style="margin-top:4px;color:#999;font-size:7px">'+new Date(m.created_at).toLocaleString("en-NG")+'</div></div>').join(""):'<div class="ticket-message">No replies yet.</div>';if(d.ticket.status!=="closed")html+='<textarea id="reply-'+id+'" class="ticket-reply" placeholder="Reply to support..."></textarea><button type="button" class="ticket-send" onclick="replyTicket('+id+')">SEND REPLY</button>';else html+='<div style="font-size:8px;color:#777">This ticket is closed.</div>';box.innerHTML=html;box.classList.add("show");button.textContent="HIDE CONVERSATION"}catch(e){box.innerHTML='<div style="font-size:9px;color:#c55">Unable to load conversation.</div>';box.classList.add("show")}
+try{const r=await fetch(API+"/api/support/ticket?id="+id,{headers:auth()}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to load ticket.");let html=d.messages.length?d.messages.map(m=>'<div class="ticket-message '+(m.sender_type==='admin'?'admin':'')+'"><strong>'+(m.sender_type==='admin'?'BOLTIV Support':'You')+'</strong><div style="margin-top:4px">'+esc(m.message)+'</div><div style="margin-top:4px;color:#999;font-size:7px">'+new Date(m.created_at).toLocaleString("en-NG")+'</div></div>').join(""):'<div class="ticket-message">No replies yet.</div>';if(d.ticket.status!=="closed")html+='<textarea id="reply-'+id+'" class="ticket-reply" placeholder="Reply to support..."></textarea><button type="button" class="ticket-send" onclick="replyTicket('+id+')">SEND REPLY</button>';else html+='<div style="font-size:8px;color:#777">This ticket is closed.</div>';box.innerHTML=html;box.classList.add("show");button.textContent="HIDE CONVERSATION"}catch(e){box.innerHTML='<div style="font-size:9px;color:#c55">Unable to load conversation.</div>';box.classList.add("show")}
 }
 async function replyTicket(id){
 const input=document.getElementById("reply-"+id),message=input?.value.trim();if(!message)return;
-try{const r=await fetch(API+"/api/support.htmlticket/reply",{method:"POST",headers:{"Content-Type":"application/json",...auth()},body:JSON.stringify({id,message})}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to send reply.");await loadTickets();}catch(e){alert(e.message)}
+try{const r=await fetch(API+"/api/support/ticket/reply",{method:"POST",headers:{"Content-Type":"application/json",...auth()},body:JSON.stringify({id,message})}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to send reply.");await loadTickets();}catch(e){alert(e.message)}
 }
 document.getElementById("refreshTickets").onclick=loadTickets;
 loadTickets();

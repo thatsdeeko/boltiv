@@ -635,7 +635,7 @@ const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
 saveBtn.disabled=true;
 saveBtn.textContent="SAVING...";
 try{
-const r=await fetch("https://boltiv-backend.onrender.com/api/profile.htmlupdate",{
+const r=await fetch("https://boltiv-backend.onrender.com/api/profile/update",{
 method:"POST",
 headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},
 body:JSON.stringify({name,phone,email})

@@ -4,7 +4,7 @@ const API="https://boltiv-backend.onrender.com";
 let token="cookie-session";
 const list=document.getElementById("list");
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;")}
-async function mark(id){const r=await fetch(API+"/api/notifications.htmlread",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({id})});if(r.ok)load()}
+async function mark(id){const r=await fetch(API+"/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({id})});if(r.ok)load()}
 async function load(){
 const user=await window.boltivAuthReady;
 if(!user){location.replace("/login.html");return}
@@ -19,6 +19,6 @@ return '<article class="item '+(n.read?"":"unread")+'"><div style="display:flex;
 }).join("");
 }catch(e){list.innerHTML='<div class="item">Unable to load notifications. Please try again.</div>'}
 }
-document.getElementById("markAll").onclick=async()=>{const r=await fetch(API+"/api/notifications.htmlread",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({})});if(r.ok)load()};
+document.getElementById("markAll").onclick=async()=>{const r=await fetch(API+"/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({})});if(r.ok)load()};
 load();
 </script></body></html>

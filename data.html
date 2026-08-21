@@ -45,7 +45,7 @@ async function loadPlans(network){
   planGrid.innerHTML='<div class="plan-loading">Loading '+esc(network)+' data plans…</div>';
   planHint.textContent="";
   try{
-    const r=await fetch(API+"/api/vtu/data.htmlplans",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({network})});
+    const r=await fetch(API+"/api/vtu/data/plans",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({network})});
     const d=await r.json();
     if(!r.ok||!d.success)throw new Error(d.message||"Unable to load data plans.");
     renderPlans(d.plans);

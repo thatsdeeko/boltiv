@@ -2,7 +2,7 @@
 (function(){
   const mem=new Map();
   function readCookie(name){ const m=document.cookie.match(new RegExp('(?:^|; )'+name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'=([^;]*)')); return m?decodeURIComponent(m[1]):null; }
-  const sessionCookie=readCookie('boltiv_user_session');
+  const sessionCookie=readCookie('boltiv_session');
   if(sessionCookie) mem.set('boltivAuthToken',sessionCookie);
   window.boltivMemoryStorage={
     getItem(k){ return mem.has(k)?mem.get(k):null; },

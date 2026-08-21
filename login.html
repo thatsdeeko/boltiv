@@ -445,6 +445,7 @@ async function login(){
                 "/api/auth/login",
                 {
                     method:"POST",
+                    credentials:"include",
 
                     headers:{
                         "Content-Type":
@@ -495,7 +496,13 @@ async function login(){
         SAVE AUTH SESSION ONLY.
         NEVER SAVE THE PASSWORD.
         */
-         // Authentication is stored in the HttpOnly cookie set by the backend.
+
+        // The backend sets the HttpOnly boltiv_user_session cookie.
+        // Keep the returned token only in memory as a same-page fallback;
+        // never create a client-readable auth cookie.
+        if(data.sessionToken){
+            boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
+        }
 
 
         if(data.user){
@@ -532,7 +539,12 @@ async function login(){
         );
 
 
-        setTimeout(()=>{ location.replace("/dashboard/"); },500);
+        setTimeout(()=>{
+
+            location.href =
+                "/dashboard/";
+
+        },500);
 
 
     }catch(error){

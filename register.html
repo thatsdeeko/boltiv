@@ -859,6 +859,7 @@ registerButton.onclick=async()=>{
             API_BASE+"/api/auth/register",
             {
                 method:"POST",
+                credentials:"include",
 
                 headers:{
                     "Content-Type":
@@ -920,7 +921,6 @@ registerButton.onclick=async()=>{
         // user can create their Transaction PIN immediately.
         // Authentication is stored only in the HttpOnly cookie set by the backend.
         if(data.sessionToken){
-            document.cookie = "boltiv_session=" + encodeURIComponent(data.sessionToken) + "; Path=/; Max-Age=2592000; SameSite=Lax; Secure";
             boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
         }
 

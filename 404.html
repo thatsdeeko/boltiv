@@ -1,196 +1,75 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="robots" content="noindex,follow">
-  <title>BOLTIV</title>
-  <style>
-    html,body{margin:0;padding:0;background:#fff;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111}
-    #boltiv-router-error{padding:48px 24px;text-align:center}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow">
+<title>BOLTIV</title>
+<style>html,body{margin:0;padding:0;background:#fff;color:#111;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}#boltiv-router-error{padding:48px 24px;text-align:center}</style>
 </head>
 <body>
-<div id="boltiv-router-error">
-  <h1>BOLTIV</h1>
-  <p>Page not found.</p>
-</div>
-
+<div id="boltiv-router-error"><h1>BOLTIV</h1><p>Page not found.</p></div>
 <script>
-(function () {
+(function(){
   "use strict";
-
-  var routes = {
-    "/login/":"login.html",
-    "/register/":"register.html",
-    "/dashboard/":"dashboard.html",
-    "/airtime/":"airtime.html",
-    "/data/":"data.html",
-    "/electricity/":"electricity.html",
-    "/cable/":"cable.html",
-    "/wallet/":"wallet.html",
-    "/transactions/":"transactions.html",
-    "/profile/":"profile.html",
-    "/notifications/":"notifications.html",
-    "/support/":"support.html",
-    "/contact/":"contact.html",
-    "/privacy/":"privacy.html",
-    "/terms/":"terms.html",
-    "/forgot-password/":"forgot-password.html",
-    "/reset-password/":"reset-password.html",
-    "/security/":"security.html",
-    "/history/":"history.html"
-  };
-
-  function normalisePath(path) {
-    path = path || "/";
-    path = path.split("?")[0].split("#")[0];
-    if (path.length > 1 && path.charAt(path.length - 1) !== "/") path += "/";
-    return path;
+  var routes={"/login/":"login.html","/register/":"register.html","/dashboard/":"dashboard.html","/airtime/":"airtime.html","/data/":"data.html","/electricity/":"electricity.html","/cable/":"cable.html","/wallet/":"wallet.html","/transactions/":"transactions.html","/profile/":"profile.html","/notifications/":"notifications.html","/support/":"support.html","/contact/":"contact.html","/privacy/":"privacy.html","/terms/":"terms.html","/forgot-password/":"forgot-password.html","/reset-password/":"reset-password.html","/security/":"security.html","/history/":"history.html"};
+  function normalise(path){path=(path||"/").split("?")[0].split("#")[0];if(path.length>1&&path.charAt(path.length-1)!=="/")path+="/";return path;}
+  function external(v){return /^(?:[a-z]+:|\/\/|data:|blob:|mailto:|tel:|javascript:|#)/i.test(v||"");}
+  function resolve(v,base){try{return new URL(v,base).href}catch(e){return v;}}
+  function copyAttr(node,attr,base){var v=node.getAttribute(attr);if(v&&!external(v))node.setAttribute(attr,resolve(v,base));}
+  function makeScript(old,base){
+    var s=document.createElement("script");
+    Array.prototype.slice.call(old.attributes).forEach(function(a){s.setAttribute(a.name,a.value);});
+    if(old.src){s.async=false;s.src=resolve(old.getAttribute("src"),base);}
+    else s.textContent=old.textContent||"";
+    return s;
   }
-
-  function isExternal(value) {
-    return /^(?:[a-z]+:|\/\/|data:|blob:|mailto:|tel:|javascript:|#)/i.test(value || "");
+  function runScripts(nodes,base,i){
+    if(i>=nodes.length)return Promise.resolve();
+    var old=nodes[i],s=makeScript(old,base);
+    return new Promise(function(ok){
+      if(s.src){s.onload=function(){ok();};s.onerror=function(){ok();};document.head.appendChild(s);}
+      else {document.head.appendChild(s);ok();}
+    }).then(function(){return runScripts(nodes,base,i+1);});
   }
-
-  function resolveUrl(value, base) {
-    try { return new URL(value, base).href; }
-    catch (e) { return value; }
-  }
-
-  var path = normalisePath(window.location.pathname);
-  var target = routes[path];
-
-  if (!target) return;
-
-  var targetBase = window.location.origin + "/" + target;
-
-  fetch("/" + target, {
-    credentials: "same-origin",
-    cache: "no-cache"
-  })
-  .then(function (response) {
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    return response.text();
-  })
-  .then(function (html) {
-    var parser = new DOMParser();
-    var doc = parser.parseFromString(html, "text/html");
-
-    /*
-     * IMPORTANT:
-     * The clean-URL router must carry over the target page's HEAD.
-     * Previously only body/meta were copied, so /login/ and /register/
-     * lost style.css, inline <style> blocks and head scripts.
-     */
-
-    var newHeadNodes = Array.prototype.slice.call(doc.head.children);
-    var headStylesAndMetadata = [];
-    var headScripts = [];
-
-    newHeadNodes.forEach(function (node) {
-      var clone = node.cloneNode(true);
-
-      if (clone.hasAttribute("href") && !isExternal(clone.getAttribute("href"))) {
-        clone.setAttribute(
-          "href",
-          resolveUrl(clone.getAttribute("href"), targetBase)
-        );
-      }
-
-      if (clone.hasAttribute("src") && !isExternal(clone.getAttribute("src"))) {
-        clone.setAttribute(
-          "src",
-          resolveUrl(clone.getAttribute("src"), targetBase)
-        );
-      }
-
-      if (clone.tagName.toLowerCase() === "script") {
-        headScripts.push(clone);
-      } else {
-        headStylesAndMetadata.push(clone);
-      }
-    });
-
-    document.head.innerHTML = "";
-    headStylesAndMetadata.forEach(function (node) {
-      document.head.appendChild(node);
-    });
-
-    document.title = doc.title || "BOLTIV";
-
-    document.body.innerHTML = doc.body ? doc.body.innerHTML : html;
-
-    window.history.replaceState({ boltivRoute: target }, "", path);
-
-    /*
-     * Resolve assets/links against the original flat HTML file.
-     */
-    document.querySelectorAll("[src]").forEach(function (el) {
-      var src = el.getAttribute("src");
-      if (src && !isExternal(src)) {
-        el.setAttribute("src", resolveUrl(src, targetBase));
-      }
-    });
-
-    document.querySelectorAll("[href]").forEach(function (el) {
-      var href = el.getAttribute("href");
-      if (!href || isExternal(href)) return;
-
-      var clean = normalisePath(href);
-      if (routes[clean]) {
-        el.setAttribute("href", clean);
-      } else {
-        el.setAttribute("href", resolveUrl(href, targetBase));
-      }
-    });
-
-    /*
-     * Run head scripts after the target body exists.
-     */
-    headScripts.forEach(function (oldScript) {
-      var s = document.createElement("script");
-
-      Array.prototype.slice.call(oldScript.attributes).forEach(function (a) {
-        s.setAttribute(a.name, a.value);
+  var path=normalise(window.location.pathname),target=routes[path];
+  if(!target)return;
+  var base=window.location.origin+"/"+target;
+  fetch("/"+target,{credentials:"same-origin",cache:"no-cache"})
+    .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text();})
+    .then(function(html){
+      var doc=new DOMParser().parseFromString(html,"text/html");
+      var headScripts=[];
+      Array.prototype.slice.call(doc.head.children).forEach(function(node){
+        if(node.tagName.toLowerCase()==="script"){headScripts.push(node);return;}
+        var clone=node.cloneNode(true);
+        if(clone.hasAttribute("href"))copyAttr(clone,"href",base);
+        if(clone.hasAttribute("src"))copyAttr(clone,"src",base);
+        document.head.appendChild(clone);
       });
-
-      if (oldScript.src) {
-        s.src = oldScript.src;
-      } else {
-        s.textContent = oldScript.textContent;
-      }
-
-      document.head.appendChild(s);
-    });
-
-    /*
-     * Re-execute body scripts because innerHTML does not execute them.
-     */
-    var scripts = Array.prototype.slice.call(document.body.querySelectorAll("script"));
-    scripts.forEach(function (oldScript) {
-      var s = document.createElement("script");
-
-      Array.prototype.slice.call(oldScript.attributes).forEach(function (a) {
-        s.setAttribute(a.name, a.value);
+      document.title=doc.title||"BOLTIV";
+      document.body.innerHTML=doc.body?doc.body.innerHTML:"";
+      window.history.replaceState({boltivRoute:target},"",path);
+      document.querySelectorAll("[src]").forEach(function(el){copyAttr(el,"src",base);});
+      document.querySelectorAll("[href]").forEach(function(el){
+        var href=el.getAttribute("href");
+        if(!href||external(href))return;
+        var clean=normalise(href);
+        el.setAttribute("href",routes[clean]?clean:resolve(href,base));
       });
-
-      if (oldScript.src) {
-        s.src = resolveUrl(oldScript.getAttribute("src"), targetBase);
-      } else {
-        s.textContent = oldScript.textContent;
-      }
-
-      oldScript.parentNode.replaceChild(s, oldScript);
-    });
-  })
-  .catch(function () {
-    var box = document.getElementById("boltiv-router-error");
-    if (box) {
-      box.innerHTML =
-        "<h1>BOLTIV</h1><p>Unable to load this page. Please try again.</p>";
-    }
-  });
+      return runScripts(headScripts,base,0).then(function(){
+        var bodyScripts=Array.prototype.slice.call(document.body.querySelectorAll("script"));
+        return runBodyScripts(bodyScripts,base,0);
+      });
+    })
+    .catch(function(){var box=document.getElementById("boltiv-router-error");if(box)box.innerHTML="<h1>BOLTIV</h1><p>Unable to load this page. Please try again.</p>";});
+  function runBodyScripts(nodes,base,i){
+    if(i>=nodes.length)return Promise.resolve();
+    var old=nodes[i],s=makeScript(old,base);
+    return new Promise(function(ok){
+      if(s.src){s.onload=function(){ok();};s.onerror=function(){ok();};old.parentNode.replaceChild(s,old);}else{old.parentNode.replaceChild(s,old);ok();}
+    }).then(function(){return runBodyScripts(nodes,base,i+1);});
+  }
 })();
 </script>
 </body>

@@ -125,26 +125,27 @@ body.modal-open{overflow:hidden!important}
 
 <script>
 const API_BASE='https://boltiv-backend.onrender.com';
+const TOKEN_KEY='boltivAuthToken';
 const USER_KEY='boltivUser';
 const money=v=>'₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const typeInfo=t=>{const s=String(t.service||'').toLowerCase();if(s.includes('airtime'))return['airtime','Airtime','☎'];if(s.includes('data'))return['data','Data','⌁'];if(s.includes('electric'))return['electricity','Electricity','ϟ'];if(s.includes('cable')||s.includes('tv'))return['cable','Cable TV','▣'];if(s.includes('wallet')||s.includes('fund'))return['wallet','Wallet Funding','₦'];return['other','Transaction','•']};
 const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDateString('en-NG',{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})};
 async function loadHome(){
-  const authenticatedUser=await window.boltivAuthReady;
-  if(!authenticatedUser){location.replace('/login/');return;}
-  try{
-   const requestOptions={credentials:'include'};
-   const noCacheOptions={credentials:'include',cache:'no-store'};
-   const [meRes,walletRes,txRes,noteRes]=await Promise.all([
-    fetch(API_BASE+'/api/me',requestOptions),
-    fetch(API_BASE+'/api/wallet',requestOptions),
-    fetch(API_BASE+'/api/transactions',noCacheOptions),
-    fetch(API_BASE+'/api/notifications',noCacheOptions)
-   ]);
+ await window.boltivAuthReady;
+ const token=boltivMemoryStorage.getItem(TOKEN_KEY);
+ try{
+  const authInit={credentials:'include'};
+  if(token) authInit.headers={Authorization:'Bearer '+token};
+  const [meRes,walletRes,txRes,noteRes]=await Promise.all([
+   fetch(API_BASE+'/api/me',authInit),
+   fetch(API_BASE+'/api/wallet',authInit),
+   fetch(API_BASE+'/api/transactions',Object.assign({},authInit,{cache:'no-store'})),
+   fetch(API_BASE+'/api/notifications',Object.assign({},authInit,{cache:'no-store'}))
+  ]);
   if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
   const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0};
-  const currentUser=me.user||authenticatedUser; if(currentUser){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(currentUser));document.getElementById('userName').textContent=(currentUser.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(currentUser.name||'U').trim().charAt(0).toUpperCase();}
+  if(me.user){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();}
   if(wallet.success&&wallet.wallet){const b=Number(wallet.wallet.balance||0);document.getElementById('walletBalance').textContent=money(b);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
   renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
  }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login/');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}

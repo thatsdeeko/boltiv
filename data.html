@@ -65,7 +65,7 @@ function renderPlans(plans){
     b.type="button";b.className="plan-button";
     const label=planLabel(plan), validity=formatValidity(plan.validity??plan.validity_period??plan.duration,plan.validity_days);
     b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div>';
-    b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;openDataPurchasePreview();};
+    b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;};
     planGrid.appendChild(b);
   });
 }
@@ -85,7 +85,7 @@ async function loadPlans(network){
 }
 function info(p,id="",bal=""){let h='<div class="modal-detail"><span>Service</span><strong>Data</strong></div><div class="modal-detail"><span>Network</span><strong>'+esc(selectedNetwork)+'</strong></div><div class="modal-detail"><span>Phone</span><strong>'+esc(p)+'</strong></div><div class="modal-detail"><span>Data Plan</span><strong>'+esc(planLabel(selectedPlan))+'</strong></div><div class="modal-detail"><span>Amount</span><strong>'+money(selectedPlan.customer_price)+'</strong></div>';if(id)h+='<div class="modal-detail"><span>Reference</span><strong>'+esc(id)+'</strong></div>';if(bal!=="")h+='<div class="modal-detail"><span>Wallet Balance</span><strong>'+money(bal)+'</strong></div>';return h}
 document.querySelectorAll(".network-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".network-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedNetwork=b.dataset.network;loadPlans(selectedNetwork)});
-async function purchaseData(){
+$("purchaseButton").onclick=async()=>{
   const p=phone.value.trim();
   if(!p)return show("warning","Phone Number Required","Enter the 11-digit phone number you want to recharge.");
   if(p.length!==11||!/^[0-9]{11}$/.test(p))return show("warning","Check Your Number","Please enter a valid 11-digit Nigerian phone number.");
@@ -99,17 +99,8 @@ async function purchaseData(){
     const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process data purchase.");
     show(d.status==="pending"?"processing":"success",d.status==="pending"?"Processing":"Data Purchased",d.message||"Your data request has been received.","DONE",info(p,d.reference,d.balance));
   }catch(e){show("failed","Data Purchase Failed",e.message||"Unable to process your data purchase.","DONE",info(p));}
-  finally{modalBtn.style.display="block";modalBtn.onclick=close}
+  finally{modalBtn.style.display="block"}
 };
-function openDataPurchasePreview(){
-  const p=phone.value.trim();
-  if(!p)return show("warning","Phone Number Required","Enter the phone number first, then choose your data plan.");
-  if(p.length!==11||!/^[0-9]{11}$/.test(p))return show("warning","Check Your Number","Please enter a valid 11-digit Nigerian phone number.");
-  if(!selectedNetwork||!selectedPlan)return;
-  show("warning","Buy Data","Review your data purchase before confirming.","CONFIRM & BUY DATA",info(p));
-  modalBtn.onclick=async()=>{modalBtn.style.display="none";await purchaseData();};
-}
-$("purchaseButton").onclick=purchaseData;
 document.querySelectorAll(".nav-item").forEach(i=>i.onclick=()=>location.href=i.dataset.page);
 </script></body></html>
 <!-- BOLTIV DATA PAGE COMPRESSED -->

@@ -15,10 +15,11 @@ const FRONTEND_URL=process.env.FRONTEND_URL||"https://boltiv.ng";
 const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
-const VTU_API_BASE_URL=process.env.VTU_API_BASE_URL||process.env.VTU_API_URL||"https://api.vtugate.com";
-const VTU_API_KEY=process.env.VTU_API_KEY||"";
-const CHEAPDATAHUB_API_BASE_URL=(process.env.CHEAPDATAHUB_API_BASE_URL||"https://www.cheapdatahub.ng/api/v1/resellers").replace(/\/+$/,"");
-const CHEAPDATAHUB_API_KEY=process.env.CHEAPDATAHUB_API_KEY||"";
+const SME_API_BASE_URL=(process.env.SME_API_BASE_URL||"https://smeapi.com.ng").replace(/\/+$/,"");
+const SME_API_KEY=process.env.SME_API_KEY||"";
+const SME_API_CABLE_PROVIDER_MAP=JSON.parse(process.env.SME_API_CABLE_PROVIDER_MAP||'{"DSTV":1,"GOTV":2,"STARTIMES":3}');
+const SME_API_ELECTRICITY_PROVIDER_MAP=JSON.parse(process.env.SME_API_ELECTRICITY_PROVIDER_MAP||'{}');
+const SME_API_CABLE_PLAN_MAP=JSON.parse(process.env.SME_API_CABLE_PLAN_MAP||'{}');
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -123,10 +124,10 @@ return Number.isFinite(amount)&&amount>0;
 
 
 /* =========================================================
-   CHEAPDATAHUB DATA CATALOG + SERVICE PRICING
+   SME API DATA CATALOG + SERVICE PRICING
    ========================================================= */
 
-const CHEAPDATAHUB_PLAN_IDS_URL="https://www.cheapdatahub.ng/api/plan-ids/";
+const SME_API_PLAN_URL=`${SME_API_BASE_URL}/api/dataplans/`;
 
 function normalizeDataNetwork(value){
 const n=clean(value).toUpperCase().replace(/\s+/g,"");
@@ -134,234 +135,97 @@ if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE";
 return ["MTN","AIRTEL","GLO"].includes(n)?n:"";
 }
 
-async function getService(key){
-const serviceKey=clean(key).toLowerCase();
-if(!serviceKey)return null;
-const result=await db(`SELECT key,name,icon,enabled,fee,maintenance,config,updated_at FROM services WHERE key=$1 LIMIT 1`,[serviceKey]);
-if(!result.rows.length)return null;
-const row=result.rows[0];
-return {...row,fee:Number(row.fee||0),config:row.config&&typeof row.config==="object"?row.config:{}};
+function smeNetworkId(value){
+const n=normalizeDataNetwork(value);
+return {MTN:1,AIRTEL:2,GLO:3,"9MOBILE":4}[n]||null;
 }
 
-function pricingConfig(service){
-const config=service?.config&&typeof service.config==="object"?service.config:{};
-const adminPricing=config.pricing&&typeof config.pricing==="object"?config.pricing:null;
+function findTransactionField(value,keys,depth=0){if(depth>6||value==null)return "";if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}if(typeof value!=="object")return "";for(const key of keys){const v=value[key];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}for(const key of Object.keys(value)){const found=findTransactionField(value[key],keys,depth+1);if(found)return found;}return "";}
 
-/*
-   ADMIN DASHBOARD PRICING FORMAT
-   { pricing: { mode: "discount"|"fixed", discount_pct, fixed_profit } }
-
-   Keep support for the older markup format too, so existing services do not
-   break when their configuration was saved by an older dashboard.
-*/
-if(adminPricing){
-  let mode=clean(adminPricing.mode||"discount").toLowerCase();
-  if(mode==="discount"||mode==="provider_discount")mode="provider_discount";
-  else if(mode==="fixed"||mode==="fixed_profit")mode="fixed_profit";
-  else mode="provider_discount";
-
-  const discountPct=Number(adminPricing.discount_pct??adminPricing.discountPercent??0);
-  const fixedProfit=Number(adminPricing.fixed_profit??adminPricing.fixedProfit??0);
-  const serviceFee=Number(service?.fee||0);
-
-  return {
-    markup_mode:mode,
-    markup_pct:Number.isFinite(discountPct)?Math.min(100,Math.max(0,discountPct)):0,
-    markup_fixed:Number.isFinite(fixedProfit)?Math.max(0,fixedProfit):0,
-    service_fee:Number.isFinite(serviceFee)?Math.max(0,serviceFee):0
-  };
-}
-
-/* Legacy pricing configuration */
-let mode=clean(config.markup_mode??config.markupMode??config.pricing_mode??config.pricingMode??"none").toLowerCase();
-if(mode==="percent")mode="percentage";
-if(mode==="fixed_amount")mode="fixed";
-if(mode==="cost_plus")mode="percentage_plus_fixed";
-const pct=Number(config.markup_pct??config.markupPercent??config.percentage??0);
-const fixed=Number(config.markup_fixed??config.markupFixed??config.fixed??service?.fee??0);
-return {
-markup_mode:["none","percentage","fixed","percentage_plus_fixed"].includes(mode)?mode:"none",
-markup_pct:Number.isFinite(pct)?Math.max(0,pct):0,
-markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0,
-service_fee:0
-};
-}
-
-function customerPriceFromCost(cost,pricing){
-const n=Number(cost);
-if(!Number.isFinite(n)||n<=0)return null;
-const p=pricing||{};
-let price=n;
-
-/* Current Admin Dashboard pricing */
-if(p.markup_mode==="provider_discount"){
-  price=n*(1-Number(p.markup_pct||0)/100);
-  price+=Number(p.markup_fixed||0);
-  price+=Number(p.service_fee||0);
-}
-else if(p.markup_mode==="fixed_profit"){
-  price=n+Number(p.markup_fixed||0)+Number(p.service_fee||0);
-}
-/* Legacy pricing */
-else if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
-else if(p.markup_mode==="percentage")price+=n*Number(p.markup_pct||0)/100;
-else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)/100+Number(p.markup_fixed||0);
-
-return Number(price.toFixed(2));
-}
-
-function decodeHtml(value){
-return String(value??"")
-.replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"')
-.replace(/&#39;|&apos;/gi,"'").replace(/&lt;/gi,"<").replace(/&gt;/gi,">")
-.replace(/&#(\d+);/g,(_,n)=>{try{return String.fromCodePoint(Number(n));}catch{return "";}})
-.replace(/&#x([0-9a-f]+);/gi,(_,n)=>{try{return String.fromCodePoint(parseInt(n,16));}catch{return "";}});
-}
-
-function htmlCellText(value){
-return decodeHtml(String(value??"").replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"").replace(/<[^>]+>/g," ").replace(/\s+/g," ")).trim();
-}
-
-function parseCheapDataHubPlanTable(html){
-const plans=[];
-const rows=String(html||"").match(/<tr\b[^>]*>[\s\S]*?<\/tr>/gi)||[];
-for(const row of rows){
-const cells=[...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m=>htmlCellText(m[1]));
-if(cells.length<5)continue;
-const network=normalizeDataNetwork(cells[0]);
-const service=clean(cells[1]).toUpperCase();
-const name=clean(cells[2]);
-const bundleId=Number(cells[3].replace(/[^0-9]/g,""));
-const price=Number(cells[4].replace(/[^0-9.]/g,""));
-if(!network||service!=="DATA"||!Number.isInteger(bundleId)||bundleId<=0||!Number.isFinite(price)||price<=0)continue;
-if(!name||/\(UNAVAILABLE\)/i.test(name))continue;
-const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
-let sizeMb=0;
-if(sizeMatch){const v=Number(sizeMatch[1]);sizeMb=sizeMatch[2].toUpperCase()==="GB"?Math.round(v*1024):Math.round(v);}
-const validityMatch=name.match(/\b(\d+)\s*(?:day|days)\b/i);
-plans.push({network_name:network,name,bundle_id:bundleId,price,size_mb:sizeMb,validity_days:validityMatch?Number(validityMatch[1]):0});
-}
-return plans;
-}
-
-async function fetchCheapDataHubDataPlans(network){
-const selected=normalizeDataNetwork(network);
-if(!selected)throw new Error("Unsupported network.");
-const controller=new AbortController();
-const timer=setTimeout(()=>controller.abort(),10000);
-try{
-const response=await fetch(CHEAPDATAHUB_PLAN_IDS_URL,{headers:{Accept:"text/html,application/xhtml+xml"},signal:controller.signal});
-if(!response.ok)throw new Error(`CheapDataHub plan page returned HTTP ${response.status}`);
-const html=await response.text();
-return parseCheapDataHubPlanTable(html).filter(p=>p.network_name===selected);
-}finally{clearTimeout(timer);}
-}
-
-const cheapDataHubPlanCache=new Map();
-async function getAuthoritativeCheapDataHubDataPlan(network,bundleId){
-const selected=normalizeDataNetwork(network);
-const id=Number(bundleId);
-if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");
-const key=selected;
-let entry=cheapDataHubPlanCache.get(key);
-if(!entry||Date.now()-entry.at>60000){
-  entry={at:Date.now(),plans:await fetchCheapDataHubDataPlans(selected)};
-  cheapDataHubPlanCache.set(key,entry);
-}
-const plan=entry.plans.find(x=>Number(x.bundle_id)===id);
-if(!plan)throw new Error("The selected data plan is no longer available.");
-const service=await getService("data");
-if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");
-const customerPrice=customerPriceFromCost(Number(plan.price),pricingConfig(service));
-if(!Number.isFinite(customerPrice)||customerPrice<=0)throw new Error("Unable to determine the current data price.");
-return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};
-}
-
-function findTransactionField(value, keys, depth=0){
-  if(depth>6||value==null)return "";
-  if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}
-  if(typeof value!=="object")return "";
-  for(const key of keys){
-    const v=value[key];
-    if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();
-  }
-  for(const key of Object.keys(value)){
-    const found=findTransactionField(value[key],keys,depth+1);
-    if(found)return found;
-  }
-  return "";
-}
-
-async function resolveDataPlanName(network,bundleId){
-  const selected=normalizeDataNetwork(network);
-  const id=Number(bundleId);
-  if(!selected||!Number.isInteger(id)||id<=0)return "";
-  try{
-    const plans=await fetchCheapDataHubDataPlans(selected);
-    const plan=plans.find(x=>Number(x.bundle_id)===id);
-    return clean(plan?.name||"");
-  }catch(error){
-    console.error("DATA PLAN NAME LOOKUP ERROR:",error?.message||error);
-    return "";
-  }
-}
-
-async function getAuthoritativeCheapDataHubExamProduct(productId){
-const id=Number(productId);
-if(!Number.isInteger(id)||id<=0)throw new Error("Invalid exam PIN product.");
-const provider=await cheapDataHubGet("exam-pin/products");
-if(!provider.success)throw new Error(provider.message||"Unable to verify exam PIN pricing.");
-const service=await getService("exam_pin");
-if(!service||service.enabled===false||service.maintenance===true)throw new Error("Exam PIN service is currently unavailable.");
-const raw=Array.isArray(provider.data?.data)?provider.data.data:(Array.isArray(provider.data?.products)?provider.data.products:(Array.isArray(provider.data)?provider.data:[]));
-const found=raw.find(p=>Number(p.product_id??p.id)===id);
-if(!found)throw new Error("The selected exam PIN product is no longer available.");
-const providerPrice=Number(found.price??found.amount??found.cost??0);
-const customerPrice=customerPriceFromCost(providerPrice,pricingConfig(service));
-if(!Number.isFinite(providerPrice)||providerPrice<=0||!Number.isFinite(customerPrice)||customerPrice<=0)throw new Error("Unable to determine the current exam PIN price.");
-return {product_id:id,provider_price:providerPrice,customer_price:customerPrice,name:clean(found.name??found.exam_name??found.title??"Exam PIN")};
-}
-
-async function cheapDataHubRequest(endpoint,payload,options={}){
-if(!CHEAPDATAHUB_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"CheapDataHub is not configured on the server."};
+async function smeApiRequest(endpoint,payload,options={}){
+if(!SME_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"SME API is not configured on the server."};
 const timeoutMs=Number(options.timeoutMs||15000);
-const controller=new AbortController();
-const timer=setTimeout(()=>controller.abort(),timeoutMs);
+const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
 try{
-const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{
-method:"POST",
-headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,"Content-Type":"application/json",Accept:"application/json"},
-body:JSON.stringify(payload),signal:controller.signal
-});
+const response=await fetch(`${SME_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}`,{method:"POST",headers:{Authorization:`Token ${SME_API_KEY}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(payload),signal:controller.signal});
 let data={};try{data=await response.json();}catch{}
-const statusValue=String(data.status??data.success??data.data?.status??"").toLowerCase();
-const providerReference=data.reference||data.transaction_id||data.data?.reference||data.data?.transaction_id||null;
-if(["true","success","successful"].includes(statusValue))return {success:true,outcome:"successful",statusCode:response.status,data,providerReference,message:data.message||"Transaction successful."};
-if(["pending","processing","initiated"].includes(statusValue))return {success:true,outcome:"pending",statusCode:response.status,data,providerReference,message:data.message||"Transaction is being processed."};
-if(statusValue==="failed")return {success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:data.message||"Transaction failed."};
-if(statusValue==="refunded")return {success:false,outcome:"refunded",statusCode:response.status,data,providerReference,message:data.message||"Transaction was refunded by the provider."};
-if(response.status===409)return {success:false,outcome:"duplicate_unknown",statusCode:409,data,providerReference,message:data.message||"Provider reports an existing transaction; status verification is required."};
-if(response.status>=500)return {success:false,outcome:"unknown",statusCode:response.status,data,providerReference,message:data.message||`CheapDataHub server error (${response.status}); transaction status must be verified.`};
-return {success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:data.message||`CheapDataHub request failed (${response.status}).`};
-}catch(e){
-if(e.name==="AbortError")return {success:false,outcome:"unknown",statusCode:504,data:{},providerReference:null,message:"CheapDataHub did not respond in time. Your transaction is being verified."};
-return {success:false,outcome:"unknown",statusCode:502,data:{},providerReference:null,message:"CheapDataHub connection could not be confirmed. Your transaction is being verified."};
-}finally{clearTimeout(timer);}
+const statusValue=String(findTransactionField(data,["status","Status","state","result"])||"").toLowerCase();
+const providerReference=findTransactionField(data,["reference","transaction_id","transactionId","id","request_id","requestId"] )||null;
+const message=data.message||data.msg||data.error||data.detail||"";
+if(response.ok && ["true","success","successful","completed","complete","delivered"].includes(statusValue))return {success:true,outcome:"successful",statusCode:response.status,data,providerReference,message:message||"Transaction successful."};
+if(["pending","processing","initiated","queued","in progress"].includes(statusValue))return {success:true,outcome:"pending",statusCode:response.status,data,providerReference,message:message||"Transaction is being processed."};
+if(["failed","failure","error","declined","rejected"].includes(statusValue))return {success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:message||"Transaction failed."};
+if(["refunded","refund"].includes(statusValue))return {success:false,outcome:"refunded",statusCode:response.status,data,providerReference,message:message||"Transaction was refunded by the provider."};
+if(response.status>=500||response.status===408||response.status===409)return {success:false,outcome:"unknown",statusCode:response.status,data,providerReference,message:message||"SME API could not confirm the transaction. Status verification is required."};
+return {success:false,outcome:response.ok?"successful":"failed",statusCode:response.status,data,providerReference,message:message||(response.ok?"Transaction successful.":`SME API request failed (${response.status}).`)};
+}catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,data:{},providerReference:null,message:e.name==="AbortError"?"SME API did not respond in time. Your transaction is being verified.":"SME API connection could not be confirmed. Your transaction is being verified."};}
+finally{clearTimeout(timer);}
 }
 
-async function cheapDataHubGet(endpoint,options={}){
-if(!CHEAPDATAHUB_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"CheapDataHub is not configured on the server."};
-const timeoutMs=Number(options.timeoutMs||10000);
-const controller=new AbortController();
-const timer=setTimeout(()=>controller.abort(),timeoutMs);
-try{
-const response=await fetch(`${CHEAPDATAHUB_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}/`,{method:"GET",headers:{Authorization:`Bearer ${CHEAPDATAHUB_API_KEY}`,Accept:"application/json"},signal:controller.signal});
-let data={};try{data=await response.json();}catch{}
-const statusValue=String(data.status??data.success??data.data?.status??data.transaction?.status??"").toLowerCase();
-const success=["true","success","successful"].includes(statusValue);
-return {success,outcome:success?"successful":(["pending","processing","initiated"].includes(statusValue)?"pending":(statusValue==="failed"?"failed":(statusValue==="refunded"?"refunded":"unknown"))),statusCode:response.status,data,message:data.message||data.error||(!response.ok?`CheapDataHub request failed (${response.status}).`:success?"Request successful.":"Request status is unknown.")};
-}catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,message:"CheapDataHub status could not be verified."};}finally{clearTimeout(timer);}
+async function smeApiGet(endpoint,options={}){
+if(!SME_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"SME API is not configured on the server."};
+const timeoutMs=Number(options.timeoutMs||10000); const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
+try{const response=await fetch(`${SME_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}`,{headers:{Authorization:`Token ${SME_API_KEY}`,Accept:"application/json"},signal:controller.signal});let data={};try{data=await response.json();}catch{};return {success:response.ok,outcome:response.ok?"successful":"failed",statusCode:response.status,data,message:data.message||data.detail||(!response.ok?`SME API request failed (${response.status}).`:"Request successful.")};}
+catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,message:"SME API request could not be completed."};}finally{clearTimeout(timer);}}
+
+async function fetchSMEDataPlans(network){
+const selected=normalizeDataNetwork(network); if(!selected)throw new Error("Unsupported network.");
+const response=await smeApiGet("api/dataplans/"); if(!response.success)throw new Error(response.message||"Unable to load SME API data plans.");
+const raw=Array.isArray(response.data?.data)?response.data.data:(Array.isArray(response.data?.plans)?response.data.plans:(Array.isArray(response.data)?response.data:[]));
+return raw.map(p=>{const name=clean(p.plan_name??p.name??p.plan??"");const networkName=normalizeDataNetwork(p.network??p.network_name??p.networkName??"");const id=Number(p.id??p.plan_id??p.planId??0);const price=Number(p.vendor_price??p.agent_price??p.user_price??p.price??p.amount??0);const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;const validityMatch=String(p.validity??p.duration??"").match(/(\d+)\s*day/i);return {network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityMatch?Number(validityMatch[1]):0,type:clean(p.type??"")};}).filter(p=>p.network_name===selected&&p.plan_id>0&&p.price>0&&p.name);}
+
+const smePlanCache=new Map();
+async function getAuthoritativeSMEDataPlan(network,planId){const selected=normalizeDataNetwork(network);const id=Number(planId);if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");let entry=smePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchSMEDataPlans(selected)};smePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>Number(x.plan_id)===id);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};}
+
+async function getAuthoritativeSMEExamProduct(productId){
+const id=Number(productId); if(!Number.isInteger(id)||id<=0)throw new Error("Invalid exam PIN product.");
+const provider=await smeApiGet("api/exam/");
+const raw=Array.isArray(provider.data?.data)?provider.data.data:(Array.isArray(provider.data?.products)?provider.data.products:(Array.isArray(provider.data)?provider.data:[]));
+const found=raw.find(p=>Number(p.product_id??p.id??p.provider)===id); if(!found)throw new Error("The selected exam PIN product is no longer available.");
+const providerPrice=Number(found.price??found.amount??found.cost??found.user_price??found.vendor_price??0); const service=await getService("exam_pin"); if(!service||service.enabled===false||service.maintenance===true)throw new Error("Exam PIN service is currently unavailable."); const customerPrice=customerPriceFromCost(providerPrice,pricingConfig(service)); if(providerPrice<=0||customerPrice<=0)throw new Error("Unable to determine the current exam PIN price."); return {product_id:id,provider_price:providerPrice,customer_price:customerPrice,name:clean(found.name??found.exam_name??found.title??"Exam PIN")};
 }
+
+async function resolveDataPlanName(network,planId){try{const plans=await fetchSMEDataPlans(network);return clean(plans.find(x=>Number(x.plan_id)===Number(planId))?.name||"");}catch{return "";}}
+
+async function getSMETransaction(providerReference){
+if(!providerReference)return {success:false,outcome:"unknown",message:"Missing provider reference."};
+// SME API documents unique refs for purchase requests but does not expose a public
+// transaction-status endpoint in the public docs, so reconciliation is conservative.
+return {success:false,outcome:"unknown",message:"SME API transaction status lookup is not exposed in the public documentation."};
+}
+
+async function reconcileSMETransactions(){
+let rows=[];try{rows=(await db(`SELECT id,provider_reference FROM transactions WHERE status IN ('processing','pending') AND provider_reference IS NOT NULL AND date>NOW()-INTERVAL '48 hours' ORDER BY date ASC LIMIT 100`)).rows;}catch(e){console.error("SME API RECONCILIATION QUERY ERROR:",e);return {success:false,error:e.message};}
+return {success:true,checked:rows.length,finalized:0,unverified:rows.length};
+}
+async function reconcilePendingTransactions(){return reconcileSMETransactions();}
+
+async function processVTUTransaction(user,data){
+const userId=clean(user.user_id); const service=clean(data.service||data.providerPayload?.service).toLowerCase(); const amount=Number(data.amount);
+if(!userId)return {success:false,statusCode:401,message:"Unauthorized."};
+if(!["airtime","data","exam_pin","cable","electricity"].includes(service))return {success:false,statusCode:400,message:"This service is not currently wired to SME API."};
+if(!validAmount(amount))return {success:false,statusCode:400,message:"Invalid amount."};
+if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test(clean(data.phone||data.providerPayload?.phone||"08000000000")))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
+const idem=clean(data.idempotencyKey||data.idempotency_key); const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]); if(!security.rows[0]?.transaction_pin_hash)return {success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."}; const suppliedPin=String(data.transactionPin||""); if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return {success:false,statusCode:400,message:"Incorrect Transaction PIN."};
+let providerPayload,recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
+if(service==="data"){
+const planId=Number(data.bundle_id??data.plan_id??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??0); const network=normalizeDataNetwork(data.network||data.providerPayload?.network); let authoritative; try{authoritative=await getAuthoritativeSMEDataPlan(network,planId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};} if(Math.abs(amount-Number(authoritative.customer_price))>.009)return {success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."}; pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name}; providerPayload={network:smeNetworkId(network),data_plan:planId,phone:recipient,ref:null,ported_number:"false"};
+}else if(service==="exam_pin"){
+const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1); if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."}; if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."}; let authoritative;try{authoritative=await getAuthoritativeSMEExamProduct(productId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current exam PIN price."};} const expectedTotal=Number((authoritative.customer_price*quantity).toFixed(2)); if(Math.abs(amount-expectedTotal)>.009)return {success:false,statusCode:400,message:"The selected exam PIN price has changed. Please refresh the products and try again."}; pricingMeta={providerCost:Number((authoritative.provider_price*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-authoritative.provider_price*quantity).toFixed(2)),plan:authoritative.name}; providerPayload={provider:productId,quantity,ref:null}; recipient=null;
+}else if(service==="airtime"){
+const network=normalizeDataNetwork(data.network||data.providerPayload?.network); if(!smeNetworkId(network))return {success:false,statusCode:400,message:"Unsupported network."}; providerPayload={network:smeNetworkId(network),amount,phone:recipient,ref:null,ported_number:"false"}; pricingMeta.network=network;
+}else if(service==="cable"){
+const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase(); const provider=Number(SME_API_CABLE_PROVIDER_MAP[providerName]||0); if(!provider)return {success:false,statusCode:400,message:`SME API cable provider ID for ${providerName||"this provider"} is not configured.`}; const plan=clean(data.plan||data.providerPayload?.plan); if(!plan)return {success:false,statusCode:400,message:"Cable TV plan is required."}; const mappedPlan=Number((SME_API_CABLE_PLAN_MAP[providerName]||{})[plan]||plan||0); if(!mappedPlan)return {success:false,statusCode:400,message:`SME API cable plan ID for ${providerName} / ${plan} is not configured.`}; providerPayload={provider,iucnumber:clean(data.smartcard||data.providerPayload?.smartcard),phone:recipient,plan:mappedPlan,ref:null}; pricingMeta.network=providerName; pricingMeta.plan=plan;
+}else if(service==="electricity"){
+const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase(); const provider=Number(SME_API_ELECTRICITY_PROVIDER_MAP[providerName]||0); if(!provider)return {success:false,statusCode:400,message:`SME API electricity provider ID for ${providerName||"this provider"} is not configured.`}; const meterType=clean(data.meterType||data.providerPayload?.meterType||"Prepaid").toLowerCase(); providerPayload={provider,metertype:meterType,meternumber:clean(data.meterNumber||data.providerPayload?.meterNumber),amount,phone:recipient||"08000000000",ref:null}; pricingMeta.network=providerName; pricingMeta.plan=meterType;
+}
+const referenceValue=reference("BOLTIV-TX"); providerPayload.ref=referenceValue; const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"smeapi",request:providerPayload,pricing:pricingMeta}}); if(!reserved.success)return {success:false,statusCode:400,message:reserved.message,balance:0}; if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return {success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
+let providerResult;try{providerResult=await smeApiRequest(service==="airtime"?"api/airtime/":service==="data"?"api/data/":service==="exam_pin"?"api/exam/":service==="cable"?"api/cabletv/":"api/electricity/",providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"SME API connection could not be confirmed. Your transaction is being verified."};}
+const providerData=providerResult.data||{}; const providerReference=providerResult.providerReference||findTransactionField(providerData,["reference","transaction_id","transactionId","id"])||referenceValue; const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference); const wallet=await getWallet(userId); if(finalized.status==="refunded")return {success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"}; return {success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery:providerData?.data?.delivery||providerData?.delivery||null,pins:providerData?.data?.delivery?.pins||providerData?.delivery?.pins||[]};
+}
+
+async function verifySMECable(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();const provider=Number(SME_API_CABLE_PROVIDER_MAP[providerName]||0);const iucnumber=clean(b.smartcard||b.iucnumber);if(!provider)return {success:false,statusCode:400,message:"SME API cable provider ID is not configured."};if(!/^\d{8,20}$/.test(iucnumber))return {success:false,statusCode:400,message:"Invalid smartcard/IUC number."};return smeApiRequest("api/cabletv/verify/",{provider,iucnumber,phone:clean(b.phone||"08000000000")});}
+async function verifySMEElectricity(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();const provider=Number(SME_API_ELECTRICITY_PROVIDER_MAP[providerName]||0);const meternumber=clean(b.meterNumber||b.meternumber);if(!provider)return {success:false,statusCode:400,message:"SME API electricity provider ID is not configured."};if(meternumber.length<8)return {success:false,statusCode:400,message:"Invalid meter number."};return smeApiRequest("api/electricity/verify/",{provider,metertype:clean(b.meterType||b.metertype||"Prepaid").toLowerCase(),meternumber,phone:clean(b.phone||"08000000000")});}
 
 async function debitWallet(userId,amount){
 const client=await pool.connect();
@@ -446,80 +310,12 @@ async function insertVTUTransaction(data){
 await db(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference,completed_at,refunded_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12) ON CONFLICT(reference) DO NOTHING`,[data.userId,data.type||"debit",data.service,data.amount,data.reference,data.status,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null,data.status==="successful"?new Date():null,data.status==="failed"?new Date():null]);
 }
 
-async function getCheapDataHubTransaction(providerReference){
-if(!providerReference)return {success:false,outcome:"unknown",message:"Missing provider reference."};
-return cheapDataHubGet(`transactions/${encodeURIComponent(providerReference)}`);
-}
-
-async function reconcileCheapDataHubTransactions(){
-let rows=[];
-try{rows=(await db(`SELECT id,provider_reference FROM transactions WHERE service IN ('airtime','data','exam_pin') AND status IN ('processing','pending') AND provider_reference IS NOT NULL AND date>NOW()-INTERVAL '48 hours' ORDER BY date ASC LIMIT 100`)).rows;}catch(e){console.error("CHEAPDATAHUB RECONCILIATION QUERY ERROR:",e);return {success:false,error:e.message};}
-let checked=0,finalized=0;
-for(const tx of rows){
-try{const result=await getCheapDataHubTransaction(tx.provider_reference);checked++;if(["successful","failed","refunded"].includes(result.outcome)){await finalizeVTUTransaction(tx.id,result.outcome,result.data||{},tx.provider_reference);finalized++;}}catch(e){console.error("CHEAPDATAHUB RECONCILIATION ERROR:",tx.id,e);}}
-return {success:true,checked,finalized};
-}
-
-async function reconcilePendingTransactions(){return reconcileCheapDataHubTransactions();}
-
 async function adminRefund(req){
 const check=await requireAdminCsrf(req);if(!check.success)return check;
 const b=await body(req);const ref=clean(b.reference);const reason=clean(b.reason)||"Admin approved refund";
 if(!ref)return {success:false,statusCode:400,message:"Transaction reference is required."};
 const client=await pool.connect();
 try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(tx.amount),tx.user_id]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:Number(tx.amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-ADMIN-REFUND-${tx.reference}`,transactionId:tx.id,category:"admin_refund",description:`Admin refund for ${tx.service}`,metadata:{reason,admin_id:check.admin.id}});await recordRevenueRefund(client,tx);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
-}
-
-async function processVTUTransaction(user,data){
-const userId=clean(user.user_id);
-const service=clean(data.service||data.providerPayload?.service).toLowerCase();
-const amount=Number(data.amount);
-if(!userId)return {success:false,statusCode:401,message:"Unauthorized."};
-if(!["airtime","data","exam_pin"].includes(service))return {success:false,statusCode:400,message:"This service is not available through CheapDataHub yet."};
-if(!validAmount(amount))return {success:false,statusCode:400,message:"Invalid amount."};
-if(service!=="exam_pin"&&!/^0\d{10}$/.test(clean(data.phone)))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
-const idem=clean(data.idempotencyKey||data.idempotency_key);
-const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);
-if(!security.rows[0]?.transaction_pin_hash)return {success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
-const suppliedPin=String(data.transactionPin||"");
-if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return {success:false,statusCode:400,message:"Incorrect Transaction PIN."};
-let providerPayload,recipient=clean(data.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
-if(service==="data"){
-const bundleId=Number(data.bundle_id||data.providerPayload?.bundle_id||0);if(!Number.isInteger(bundleId)||bundleId<=0)return {success:false,statusCode:400,message:"Invalid data plan."};
-let authoritative;try{authoritative=await getAuthoritativeCheapDataHubDataPlan(data.network||data.providerPayload?.network,bundleId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}
-if(Math.abs(Number(amount)-Number(authoritative.customer_price))>0.009)return {success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};
-pricingMeta={providerCost:Number(authoritative.provider_price),customerPrice:Number(authoritative.customer_price),grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2))};
-providerPayload={bundle_id:bundleId,phone_number:recipient};
-// Persist human-readable purchase details so receipts, transaction history,
-// and notifications can render the same information returned to the customer.
-pricingMeta.network=authoritative.network_name||normalizeDataNetwork(data.network||data.providerPayload?.network);
-pricingMeta.plan=clean(authoritative.name||data.plan_name||data.providerPayload?.plan_name||data.plan||data.providerPayload?.plan||String(bundleId));
-
-}else if(service==="exam_pin"){
-const productId=Number(data.product_id||data.providerPayload?.product_id||0);const quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."};if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."};
-let authoritative;try{authoritative=await getAuthoritativeCheapDataHubExamProduct(productId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current exam PIN price."};}
-const expectedTotal=Number((authoritative.customer_price*quantity).toFixed(2));
-if(Math.abs(Number(amount)-expectedTotal)>0.009)return {success:false,statusCode:400,message:"The selected exam PIN price has changed. Please refresh the products and try again."};
-pricingMeta={providerCost:Number((authoritative.provider_price*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-authoritative.provider_price*quantity).toFixed(2))};
-providerPayload={product_id:productId,quantity};recipient=null;
-}else{
-const network=normalizeDataNetwork(data.network||data.providerPayload?.network);const providerIds={MTN:1,GLO:2,AIRTEL:3,"9MOBILE":4};const providerId=providerIds[network];if(!providerId)return {success:false,statusCode:400,message:"Unsupported network."};providerPayload={provider_id:providerId,phone_number:recipient,amount};
-// Keep the airtime network in transaction metadata so activity/receipts
-// remain complete even after the purchase has left the service page.
-pricingMeta.network=network;
-pricingMeta.plan=null;
-}
-const referenceValue=reference("BOLTIV-TX");
-const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"cheapdatahub",request:providerPayload,pricing:pricingMeta}});
-if(!reserved.success)return {success:false,statusCode:400,message:reserved.message,balance:0};
-if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return {success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
-let providerResult;
-try{providerResult=await cheapDataHubRequest(service==="data"?"data/purchase":service==="exam_pin"?"exam-pin/purchase":"airtime/purchase",providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"CheapDataHub connection could not be confirmed. Your transaction is being verified."};}
-const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||providerData.reference||providerData.transaction_id||providerData.data?.reference||providerData.data?.transaction_id||null;
-const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);
-const wallet=await getWallet(userId);
-if(finalized.status==="refunded")return {success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};
-return {success:true,status:finalized.status,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,providerData,delivery:providerData?.data?.delivery||providerData?.delivery||null,pins:providerData?.data?.delivery?.pins||providerData?.delivery?.pins||[]};
 }
 
 function token(){
@@ -862,8 +658,8 @@ await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DE
 await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
-for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['exam_pin','Exam PINs','🎓']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
-await db(`DELETE FROM services WHERE key IN ('education','betting','sms','recharge_pin')`);
+for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['exam_pin','Exam PINs','🎓'],['data_pin','Data PIN','🎫'],['recharge_pin','Recharge Card PIN','🧾'],['bulk_sms','Bulk SMS','💬'],['smile_data','Smile Data','📡'],['alpha_topup','Alpha Top-up','📲'],['kirani','Kirani','📱']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
+await db(`DELETE FROM services WHERE key IN ('education','betting','sms')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
 await db(`
@@ -2447,7 +2243,7 @@ if(!last||Date.now()-last>3600000){try{await sendEmail({to:ADMIN_EMAIL,subject:`
 return true;
 }
 async function resolvePlatformAlert(key){await db(`UPDATE platform_alerts SET status='resolved',resolved_at=COALESCE(resolved_at,NOW()) WHERE alert_key=$1 AND status='open'`,[key]);}
-async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['cheapdatahub_config',!CHEAPDATAHUB_API_KEY,'critical','CheapDataHub is not configured','The CheapDataHub API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
+async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['smeapi_config',!SME_API_KEY,'critical','SME API is not configured','The SME API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
 async function adminAlerts(req,action){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
@@ -2587,7 +2383,7 @@ async function adminMonitoring(req){
   const started=Date.now();let database="connected";try{await db("SELECT 1")}catch{database="unavailable"}
   let d={};try{d=(await db(`SELECT COUNT(*) FILTER (WHERE status IN ('processing','pending'))::int pending,COUNT(*) FILTER (WHERE status IN ('processing','pending') AND date<NOW()-INTERVAL '10 minutes')::int stale_pending,COUNT(*) FILTER (WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed_last_hour,COUNT(*) FILTER (WHERE status='successful' AND date>=NOW()-INTERVAL '24 hours')::int successful_last_24h,COUNT(*) FILTER (WHERE status IN ('failed','refunded') AND date>=NOW()-INTERVAL '24 hours')::int unsuccessful_last_24h,MAX(date) FILTER (WHERE status='successful') last_successful FROM transactions`)).rows[0]||{}}catch{return{success:false,statusCode:500,message:"Unable to load monitoring metrics."}}
   const total=Number(d.successful_last_24h||0)+Number(d.unsuccessful_last_24h||0);const rate=total?Math.round(Number(d.successful_last_24h||0)/total*1000)/10:100;
-  return{success:true,monitoring:{database,cheapdatahub:Boolean(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL),pending:Number(d.pending||0),stalePending:Number(d.stale_pending||0),failedLastHour:Number(d.failed_last_hour||0),successfulLast24h:Number(d.successful_last_24h||0),unsuccessfulLast24h:Number(d.unsuccessful_last_24h||0),successRate:rate,lastSuccessful:d.last_successful||null,responseMs:Date.now()-started,timestamp:new Date().toISOString()}};
+  return{success:true,monitoring:{database,smeapi:Boolean(SME_API_KEY&&SME_API_BASE_URL),pending:Number(d.pending||0),stalePending:Number(d.stale_pending||0),failedLastHour:Number(d.failed_last_hour||0),successfulLast24h:Number(d.successful_last_24h||0),unsuccessfulLast24h:Number(d.unsuccessful_last_24h||0),successRate:rate,lastSuccessful:d.last_successful||null,responseMs:Date.now()-started,timestamp:new Date().toISOString()}};
 }
 
 async function adminSupport(req,action){
@@ -3530,7 +3326,7 @@ const b=await body(req);
 const network=normalizeDataNetwork(b.network);
 if(!network)return send(res,400,{success:false,message:"Unsupported network."});
 try{
-const rawPlans=await fetchCheapDataHubDataPlans(network);
+const rawPlans=await fetchSMEDataPlans(network);
 const service=await getService("data");
 if(!service)return send(res,503,{success:false,message:"Data service is not configured."});
 if(service.enabled===false)return send(res,503,{success:false,message:"Data service is currently unavailable."});
@@ -3538,7 +3334,7 @@ if(service.maintenance===true)return send(res,503,{success:false,message:"Data s
 const pricing=pricingConfig(service);
 const byPlan=new Map();
 for(const plan of rawPlans){
-const bundleId=Number(plan.bundle_id||0), providerPrice=Number(plan.price||0);
+const bundleId=Number(plan.plan_id||0), providerPrice=Number(plan.price||0);
 if(!Number.isInteger(bundleId)||bundleId<=0||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
@@ -3546,7 +3342,7 @@ byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean
 }
 const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});
-}catch(error){console.error("CHEAPDATAHUB DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load CheapDataHub data plans right now."});}
+}catch(error){console.error("SME_API DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load SME API data plans right now."});}
 }
 
 /*
@@ -3557,7 +3353,7 @@ if(req.method==="GET"&&path==="/api/vtu/exam-pin/products"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 try{
-const provider=await cheapDataHubGet("exam-pin/products");
+const provider=await smeApiGet("api/exam/products/");
 if(!provider.success)return send(res,provider.statusCode>=500?502:400,{success:false,message:provider.message||"Unable to load exam PIN products."});
 const service=await getService("exam_pin");
 if(!service)return send(res,503,{success:false,message:"Exam PIN service is not configured."});
@@ -3569,6 +3365,9 @@ const products=raw.map(p=>{const cost=Number(p.price??p.amount??p.cost??0);const
 return send(res,200,{success:true,products});
 }catch(error){console.error("EXAM PIN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load exam PIN products right now."});}
 }
+
+if(req.method==="POST"&&path==="/api/vtu/cable/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifySMECable(req);return send(res,r.success?200:(r.statusCode||400),r);}
+if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifySMEElectricity(req);return send(res,r.success?200:(r.statusCode||400),r);}
 
 /*
 VTU TRANSACTION
@@ -3691,8 +3490,8 @@ status:ready?"online":"degraded",
 database,
 configuration:{
 flutterwave:Boolean(FLW_SECRET_KEY),
-vtu:Boolean((VTU_API_KEY&&VTU_API_BASE_URL)||(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL)),
-cheapdatahub:Boolean(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL),
+vtu:Boolean(SME_API_KEY&&SME_API_BASE_URL),
+smeapi:Boolean(SME_API_KEY&&SME_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()
@@ -3849,9 +3648,9 @@ console.log(
 
 // Reconcile provider-pending transactions every 5 minutes.
 const reconcileIntervalMs=Math.max(30000,Number(process.env.PENDING_RECONCILE_INTERVAL_MS||300000));
-setTimeout(()=>reconcileCheapDataHubTransactions().catch(error=>console.error("INITIAL CHEAPDATAHUB RECONCILIATION ERROR:",error)),15000).unref();
+setTimeout(()=>reconcileSMETransactions().catch(error=>console.error("INITIAL SME_API RECONCILIATION ERROR:",error)),15000).unref();
 setInterval(()=>{
-  reconcileCheapDataHubTransactions().catch(error=>console.error("AUTOMATIC CHEAPDATAHUB RECONCILIATION ERROR:",error));
+  reconcileSMETransactions().catch(error=>console.error("AUTOMATIC SME_API RECONCILIATION ERROR:",error));
 },reconcileIntervalMs).unref();
 
 console.log(
@@ -3872,7 +3671,7 @@ FLW_SECRET_KEY?
 
 console.log(
 `VTU configured: ${
-(VTU_API_KEY&&VTU_API_BASE_URL)||(CHEAPDATAHUB_API_KEY&&CHEAPDATAHUB_API_BASE_URL)?
+SME_API_KEY&&SME_API_BASE_URL?
 "YES":
 "NO"
 }`

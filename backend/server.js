@@ -2335,7 +2335,7 @@ async function createCustomerFlutterwaveDynamicAccount(user,amount){return creat
 async function creditFlutterwaveVirtualAccount(payload){
 const data=payload?.data||payload||{};const accountNumber=clean(data?.account?.account_number||data?.account_number||data?.transfer_account||payload?.meta_data?.account_number||payload?.meta?.account_number);const amount=Number(data?.amount||data?.amount_settled||data?.charged_amount||0);const txId=clean(data?.id||data?.flw_ref||data?.tx_ref||payload?.id);const txRef=clean(data?.tx_ref||data?.reference||"");if(!Number.isFinite(amount)||amount<=0)throw new Error("Flutterwave webhook has an invalid amount.");if(!txId&&!txRef&&!accountNumber)throw new Error("Flutterwave webhook is missing a transaction identifier.");let va=null;if(txRef)va=(await db(`SELECT * FROM flutterwave_virtual_accounts WHERE tx_ref=$1 LIMIT 1`,[txRef])).rows[0]||null;if(!va&&accountNumber)va=(await db(`SELECT * FROM flutterwave_virtual_accounts WHERE account_number=$1 LIMIT 1`,[accountNumber])).rows[0]||null;if(!va)throw new Error("No BOLTIV owner is mapped to this Flutterwave virtual-account payment.");
 if(txId || txRef){
-const verified=/^\d+$/.test(txId)?await flutterwaveRequest(`/transactions/${encodeURIComponent(txId)}/verify`):await flutterwaveRequest(`/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`);
+const verified=/^\d+$/.test(txId)?await flutterwaveRequest(`/transactions.html${encodeURIComponent(txId)}/verify`):await flutterwaveRequest(`/transactions.htmlverify_by_reference?tx_ref=${encodeURIComponent(txRef)}`);
 const vd=verified.data?.data||{};
 if(!verified.success||String(vd.status||"").toLowerCase()!=="successful")throw new Error(flutterwaveError(verified,"Flutterwave transaction verification failed."));
 if(String(vd.currency||"").toUpperCase()!=="NGN")throw new Error("Flutterwave transaction currency is not NGN.");
@@ -2864,14 +2864,14 @@ result
 }
 
 
-if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet.htmlfunding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet.htmlfunding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet.htmlfund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet.htmlfund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet/credit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
-if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet.htmlcredit"){const result=await adminWalletAdjust(req,"credit");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/wallet.htmldebit"){const result=await adminWalletAdjust(req,"debit");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/transactions.htmlpending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
+if(req.method==="POST"&&path==="/api/admin/transactions.htmlrefund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/analytics"){const result=await adminAnalytics(req);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -2881,16 +2881,16 @@ if(req.method==="GET"&&path==="/api/admin/alerts"){const result=await adminAlert
 if(req.method==="POST"&&path==="/api/admin/alerts/reconcile"){const result=await adminAlerts(req,"reconcile");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/alerts/resolve"){const result=await adminAlerts(req,"resolve");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupport(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/support.htmlreply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/support.htmlstatus"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/services"){const result=await adminServices(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/services"){const result=await adminServices(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/settings"){const result=await adminSettings(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/settings"){const result=await adminSettings(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/security/events"){const result=await adminSecurity(req,"events");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/security/sessions"){const result=await adminSecurity(req,"sessions");return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="POST"&&path==="/api/admin/security/revoke-sessions"){const result=await adminSecurity(req,"revoke");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/security.htmlevents"){const result=await adminSecurity(req,"events");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/security.htmlsessions"){const result=await adminSecurity(req,"sessions");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/security.htmlrevoke-sessions"){const result=await adminSecurity(req,"revoke");return send(res,result.success?200:(result.statusCode||400),result);}
 
 /*
 ADMIN LOGOUT
@@ -3096,7 +3096,7 @@ const rl=rateLimit(req,`transaction-pin-change:${user.user_id}`,5,15*60*1000);
 if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=await body(req); const result=await setTransactionPin(user.user_id,b.pin,b.currentPin||""); return send(res,result.success?200:400,result);
 }
-if(req.method==="GET"&&path==="/api/transactions/detail"){
+if(req.method==="GET"&&path==="/api/transactions.htmldetail"){
 const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0];
 let meta=t.metadata; if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}} meta=meta&&typeof meta==="object"?meta:{};
 const requestMeta=meta.request&&typeof meta.request==="object"?meta.request:{};
@@ -3167,10 +3167,10 @@ const r=await db(`SELECT id,title,message,type,read,created_at FROM notification
 const unread=r.rows.filter(n=>!n.read).length;
 return send(res,200,{success:true,notifications:r.rows,unreadCount:unread});
 }
-if(req.method==="POST"&&path==="/api/notifications/read"){
+if(req.method==="POST"&&path==="/api/notifications.htmlread"){
 const b=await body(req); if(b.id) await db(`UPDATE notifications SET read=TRUE WHERE id=$1 AND user_id=$2`,[b.id,user.user_id]); else await db(`UPDATE notifications SET read=TRUE WHERE user_id=$1`,[user.user_id]); return send(res,200,{success:true});
 }
-if(req.method==="POST"&&path==="/api/profile/update"){
+if(req.method==="POST"&&path==="/api/profile.htmlupdate"){
 const b=await body(req); const name=clean(b.name),phone=clean(b.phone),email=clean(b.email).toLowerCase();
 if(name.length<2)return send(res,400,{success:false,message:"Please enter your full name."});
 if(phone && !/^[0-9+()\-\s]{10,20}$/.test(phone))return send(res,400,{success:false,message:"Please enter a valid phone number."});
@@ -3181,7 +3181,7 @@ if(!r.rows.length)return send(res,404,{success:false,message:"User account not f
 return send(res,200,{success:true,user:r.rows[0],message:"Profile updated successfully."});
 }catch(e){if(e.code==="23505")return send(res,409,{success:false,message:"That email address is already in use."}); throw e;}
 }
-if(req.method==="POST"&&path==="/api/support/tickets"){
+if(req.method==="POST"&&path==="/api/support.htmltickets"){
 const b=await body(req); const subject=clean(b.subject),message=clean(b.message),transactionReference=clean(b.transactionReference||b.reference); if(subject.length<3||message.length<5)return send(res,400,{success:false,message:"Please provide a subject and more details."});
 const client=await pool.connect();
 try{
@@ -3193,17 +3193,17 @@ try{await addNotification(user.user_id,"Support request received",`Your support 
 return send(res,201,{success:true,ticket:r.rows[0],message:`Support ticket #${r.rows[0].id} created.`});
 }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
 }
-if(req.method==="GET"&&path==="/api/support/tickets"){
+if(req.method==="GET"&&path==="/api/support.htmltickets"){
 const r=await db(`SELECT id,subject,message,status,transaction_reference,created_at,updated_at FROM support_tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`,[user.user_id]); return send(res,200,{success:true,tickets:r.rows});
 }
-if(req.method==="GET"&&path==="/api/support/ticket"){
+if(req.method==="GET"&&path==="/api/support.htmlticket"){
 const id=Number(url.searchParams.get("id")); if(!Number.isInteger(id)||id<1)return send(res,400,{success:false,message:"Invalid ticket."});
 const t=await db(`SELECT id,subject,message,status,transaction_reference,created_at,updated_at FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
 if(!t.rows.length)return send(res,404,{success:false,message:"Support ticket not found."});
 const m=await db(`SELECT id,sender_type,message,created_at FROM support_messages WHERE ticket_id=$1 ORDER BY created_at ASC`,[id]);
 return send(res,200,{success:true,ticket:t.rows[0],messages:m.rows});
 }
-if(req.method==="POST"&&path==="/api/support/ticket/reply"){
+if(req.method==="POST"&&path==="/api/support.htmlticket/reply"){
 const b=await body(req); const id=Number(b.id),message=clean(b.message);
 if(!Number.isInteger(id)||id<1||message.length<2)return send(res,400,{success:false,message:"Please enter a message."});
 const t=await db(`SELECT id,status FROM support_tickets WHERE id=$1 AND user_id=$2 LIMIT 1`,[id,user.user_id]);
@@ -3267,7 +3267,7 @@ wallet
 WALLET
 */
 
-if(req.method==="POST"&&path==="/api/wallet/create"){
+if(req.method==="POST"&&path==="/api/wallet.htmlcreate"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 await createWallet(user.user_id);
@@ -3484,7 +3484,7 @@ result
 VTU DATA PLAN CATALOG
 */
 
-if(req.method==="POST"&&path==="/api/vtu/data/plans"){
+if(req.method==="POST"&&path==="/api/vtu/data.htmlplans"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 const b=await body(req);
@@ -3514,7 +3514,7 @@ return send(res,200,{success:true,network,plans});
 EXAM PIN CATALOG
 */
 
-if(req.method==="GET"&&path==="/api/vtu/exam-pin/products"){
+if(req.method==="GET"&&path==="/api/vtu/exam-pin.htmlproducts"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 try{

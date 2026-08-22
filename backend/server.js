@@ -386,6 +386,7 @@ try{
   }
   await addNotificationOnce(fresh.user_id,"Transaction successful",detail,"transaction",`tx-success-${fresh.id}`);
 }catch(error){console.error("TRANSACTION NOTIFICATION ERROR:",error?.stack||error?.message||error);}
+try{ await sendTransactionEmail(fresh.user_id,fresh,"successful"); }catch(error){ console.error("TRANSACTION EMAIL HOOK ERROR:",error?.stack||error?.message||error); }
 return {success:true,status:"successful"};
 }
 if(outcome==="failed"||outcome==="refunded"){
@@ -397,7 +398,9 @@ await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_i
 await client.query(`UPDATE transactions SET status='refunded',provider_reference=COALESCE(provider_reference,$2),refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),last_provider_status=$4,refund_reason=$5,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData,refund_reason:outcome}),outcome,outcome]);
 const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
 if(!tx.refunded_at)await recordRevenueRefund(client,fresh);
-await client.query("COMMIT");if(!tx.refunded_at){try{await addNotificationOnce(tx.user_id,"Transaction refunded",`Your ${String(tx.service||"service")} transaction of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} could not be completed. The amount has been returned to your wallet.` ,"transaction",`tx-refund-${tx.id}`);}catch{}}return {success:true,status:"refunded",refunded:!tx.refunded_at};
+await client.query("COMMIT");if(!tx.refunded_at){try{await addNotificationOnce(tx.user_id,"Transaction refunded",`Your ${String(tx.service||"service")} transaction of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} could not be completed. The amount has been returned to your wallet.` ,"transaction",`tx-refund-${tx.id}`);}catch{}}
+if(!tx.refunded_at){try{await sendTransactionEmail(tx.user_id,fresh,"refunded");}catch(error){console.error("REFUND EMAIL HOOK ERROR:",error?.stack||error?.message||error);}}
+return {success:true,status:"refunded",refunded:!tx.refunded_at};
 }
 await client.query(`UPDATE transactions SET status='pending',provider_reference=COALESCE(provider_reference,$2),last_provider_status='pending',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
 await client.query("COMMIT");return {success:true,status:"pending"};
@@ -542,7 +545,19 @@ await db(
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`
 );
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE`);
 await db(`CREATE INDEX IF NOT EXISTS users_status_idx ON users(status)`);
+await db(`
+CREATE TABLE IF NOT EXISTS email_verification_tokens(
+id BIGSERIAL PRIMARY KEY,
+user_id BIGINT NOT NULL,
+token_hash TEXT UNIQUE NOT NULL,
+expires_at TIMESTAMPTZ NOT NULL,
+used BOOLEAN NOT NULL DEFAULT FALSE,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS email_verification_tokens_user_idx ON email_verification_tokens(user_id)`);
+await db(`CREATE INDEX IF NOT EXISTS email_verification_tokens_expiry_idx ON email_verification_tokens(expires_at)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS user_sessions(
@@ -1141,11 +1156,12 @@ name,
 phone,
 email,
 password_hash,
+email_verified,
 created_at,
 updated_at
 )
 VALUES(
-$1,$2,$3,$4,$5,NOW(),NOW()
+$1,$2,$3,$4,$5,FALSE,NOW(),NOW()
 )
 RETURNING
 id,
@@ -1169,6 +1185,16 @@ await createWallet(
 user.user_id
 );
 
+let verificationEmailSent=true;
+try{
+  const verificationResult=await sendVerificationEmail(user);
+  verificationEmailSent=Boolean(verificationResult.success);
+  if(!verificationEmailSent)console.error("REGISTRATION VERIFICATION EMAIL FAILED:",verificationResult.message);
+}catch(error){
+  verificationEmailSent=false;
+  console.error("REGISTRATION VERIFICATION EMAIL ERROR:",error?.stack||error?.message||error);
+}
+
 // Create an authenticated session immediately after registration so the
 // new user can set the mandatory Transaction PIN before entering BOLTIV.
 const sessionToken=token();
@@ -1181,9 +1207,12 @@ VALUES($1,$2,NOW()+INTERVAL '30 days')`,
 return{
 success:true,
 message:
-"Account created successfully. Please create your Transaction PIN.",
+verificationEmailSent
+? "Account created successfully. A verification email has been sent. Please create your Transaction PIN."
+: "Account created successfully, but the verification email could not be sent. Please request another verification email.",
 _sessionToken:sessionToken,
 transactionPinSet:false,
+verificationEmailSent,
 user:{
 id:user.user_id,
 userId:user.user_id,
@@ -1678,6 +1707,108 @@ return String(value??"")
 .replace(/"/g,"&quot;")
 .replace(/'/g,"&#039;");
 
+}
+
+
+async function createEmailVerificationToken(userId){
+  await db(`UPDATE email_verification_tokens SET used=TRUE WHERE user_id=$1 AND used=FALSE`,[userId]);
+  const rawToken=crypto.randomBytes(32).toString("hex");
+  const tokenHash=hashResetToken(rawToken);
+  await db(`INSERT INTO email_verification_tokens(user_id,token_hash,expires_at,used,created_at)
+    VALUES($1,$2,NOW()+INTERVAL '24 hours',FALSE,NOW())`,[userId,tokenHash]);
+  return rawToken;
+}
+
+async function sendVerificationEmail(user){
+  const rawToken=await createEmailVerificationToken(user.id);
+  const verifyUrl=`${FRONTEND_URL}/verify-email?token=${encodeURIComponent(rawToken)}`;
+  const displayName=clean(user.name)||"BOLTIV User";
+  const result=await sendEmail({
+    to:user.email,
+    subject:"Verify your BOLTIV email",
+    html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717">
+<div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7">
+<div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div>
+<h2 style="text-align:center;margin-top:28px">Verify your email</h2>
+<p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(displayName)},</p>
+<p style="font-size:15px;line-height:1.7;color:#555">Please verify your email address to keep your BOLTIV account secure.</p>
+<p style="text-align:center;margin:30px 0"><a href="${verifyUrl}" style="display:inline-block;background:#c49a25;color:#fff;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700">VERIFY EMAIL</a></p>
+<p style="font-size:13px;line-height:1.6;color:#777">This verification link expires in 24 hours.</p>
+</div></body></html>`
+  });
+  if(!result.success){
+    try{ await db(`DELETE FROM email_verification_tokens WHERE user_id=$1 AND token_hash=$2`,[user.id,hashResetToken(rawToken)]); }catch{}
+  }
+  return result;
+}
+
+async function verifyEmailToken(rawToken){
+  rawToken=clean(rawToken);
+  if(!rawToken)return{success:false,message:"Verification token is required."};
+  const tokenHash=hashResetToken(rawToken);
+  const r=await db(`SELECT id,user_id FROM email_verification_tokens WHERE token_hash=$1 AND used=FALSE AND expires_at>NOW() LIMIT 1`,[tokenHash]);
+  if(!r.rows.length)return{success:false,message:"This verification link is invalid or has expired."};
+  const token=r.rows[0];
+  await db(`UPDATE users SET email_verified=TRUE,updated_at=NOW() WHERE id=$1`,[token.user_id]);
+  await db(`UPDATE email_verification_tokens SET used=TRUE WHERE id=$1`,[token.id]);
+  return{success:true,message:"Your email has been verified successfully."};
+}
+
+async function sendTransactionEmail(userId, tx, status){
+  try{
+    const r=await db(`SELECT name,email FROM users WHERE user_id=$1 LIMIT 1`,[String(userId)]);
+    const user=r.rows[0];
+    if(!user?.email)return{success:false,message:"Customer email is unavailable."};
+    const amount=Number(tx.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+    const service=escapeHtmlEmail(String(tx.service||"BOLTIV service"));
+    const recipient=tx.recipient?`<p style="font-size:14px;color:#666">Recipient: ${escapeHtmlEmail(tx.recipient)}</p>`:"";
+    const title=status==="successful"?"Transaction successful":"Transaction refunded";
+    const body=status==="successful"
+      ?`Your ${service} purchase of ₦${amount} was successful.`
+      :`Your ${service} transaction of ₦${amount} was refunded to your BOLTIV wallet.`;
+    return await sendEmail({
+      to:user.email,
+      subject:`BOLTIV ${title}`,
+      html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717">
+<div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7">
+<div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div>
+<h2 style="text-align:center;margin-top:28px">${title}</h2>
+<p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(user.name||"BOLTIV User")},</p>
+<p style="font-size:15px;line-height:1.7;color:#555">${body}</p>
+${recipient}
+<p style="font-size:13px;line-height:1.6;color:#777">Reference: ${escapeHtmlEmail(tx.reference||"N/A")}</p>
+</div></body></html>`
+    });
+  }catch(error){
+    console.error("TRANSACTION EMAIL ERROR:",error?.stack||error?.message||error);
+    return{success:false,message:"Unable to send transaction email."};
+  }
+}
+
+async function sendWalletFundingEmail(userId, amount, reference){
+  try{
+    const r=await db(`SELECT name,email FROM users WHERE user_id=$1 LIMIT 1`,[String(userId)]);
+    const user=r.rows[0];
+    if(!user?.email)return{success:false,message:"Customer email is unavailable."};
+    const formatted=Number(amount||0).toLocaleString("en-NG",{minimumFractionDigits:2});
+    return await sendEmail({
+      to:user.email,
+      subject:"BOLTIV Wallet Funding Successful",
+      html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717">
+<div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7">
+<div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div>
+<h2 style="text-align:center;margin-top:28px">Wallet funded</h2>
+<p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(user.name||"BOLTIV User")}, your BOLTIV wallet was credited with <strong>₦${formatted}</strong> via Flutterwave.</p>
+<p style="font-size:13px;line-height:1.6;color:#777">Reference: ${escapeHtmlEmail(reference||"N/A")}</p>
+</div></body></html>`
+    });
+  }catch(error){
+    console.error("WALLET FUNDING EMAIL ERROR:",error?.stack||error?.message||error);
+    return{success:false,message:"Unable to send wallet funding email."};
+  }
 }
 
 
@@ -2242,7 +2373,9 @@ if(Number(vd.amount||0)<=0)throw new Error("Flutterwave transaction amount is in
 }
 const client=await pool.connect();try{await client.query("BEGIN");const eventId=txId||txRef||accountNumber;const existing=await client.query(`SELECT processed FROM flutterwave_webhook_events WHERE event_id=$1 FOR UPDATE`,[eventId]);if(existing.rows.length&&existing.rows[0].processed){await client.query("COMMIT");return{success:true,duplicate:true};}await client.query(`INSERT INTO flutterwave_webhook_events(event_id,event_type,payload,processed) VALUES($1,$2,$3,FALSE) ON CONFLICT(event_id) DO NOTHING`,[eventId,String(payload?.event||payload?.type||"charge.completed"),JSON.stringify(payload)]);
 if(va.owner_type==="admin"){const adminId=Number(va.owner_id);await ensureAdminWallet(client,adminId);const wr=await client.query(`UPDATE admin_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,adminId]);if(!wr.rows.length)throw new Error("Admin wallet could not be credited.");await addAdminLedger(client,adminId,"funding",amount,Number(wr.rows[0].balance),"Flutterwave virtual-account funding",`FLW-ADMIN-${eventId}`);await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");return{success:true,duplicate:false,amount,ownerType:"admin",adminId};}
-const userId=String(va.owner_id);await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,userId]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");const referenceValue=`FUND-${eventId}`;const tr=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING RETURNING id`,[userId,amount,referenceValue,txRef||txId,JSON.stringify({provider:"flutterwave",account_number:accountNumber||va.account_number,account_type:va.account_type,payload})]);await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:userId,direction:"credit",amount:Number(amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-FUND-${eventId}`,transactionId:tr.rows[0]?.id||null,category:"wallet_funding",description:"Flutterwave wallet funding",metadata:{provider_reference:txRef||txId}});await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} via Flutterwave bank transfer.` ,"payment");}catch{}return{success:true,duplicate:false,amount,userId};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
+const userId=String(va.owner_id);await client.query(`INSERT INTO wallets(user_id,balance) VALUES($1,0) ON CONFLICT(user_id) DO NOTHING`,[userId]);const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amount,userId]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");const referenceValue=`FUND-${eventId}`;const tr=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,date,provider_reference,metadata) VALUES($1,'credit','Wallet Funding',$2,$3,'successful',NOW(),$4,$5) ON CONFLICT(reference) DO NOTHING RETURNING id`,[userId,amount,referenceValue,txRef||txId,JSON.stringify({provider:"flutterwave",account_number:accountNumber||va.account_number,account_type:va.account_type,payload})]);await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:userId,direction:"credit",amount:Number(amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-FUND-${eventId}`,transactionId:tr.rows[0]?.id||null,category:"wallet_funding",description:"Flutterwave wallet funding",metadata:{provider_reference:txRef||txId}});await client.query(`UPDATE flutterwave_webhook_events SET processed=TRUE,processed_at=NOW() WHERE event_id=$1`,[eventId]);await client.query("COMMIT");try{await addNotification(userId,"Wallet credited",`Your wallet was credited with ₦${amount.toLocaleString("en-NG",{minimumFractionDigits:2})} via Flutterwave bank transfer.` ,"payment");}catch{}
+try{await sendWalletFundingEmail(userId,amount,txRef||txId||referenceValue);}catch(error){console.error("WALLET FUNDING EMAIL HOOK ERROR:",error?.stack||error?.message||error);}
+return{success:true,duplicate:false,amount,userId};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
 }
 async function getAdminFlutterwaveFundingAccount(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const r=await db(`SELECT * FROM flutterwave_virtual_accounts WHERE owner_type='admin' AND owner_id=$1 AND account_type='dynamic' AND status='active' AND (expiry_date IS NULL OR expiry_date>NOW()) ORDER BY created_at DESC LIMIT 1`,[String(admin.id)]);return{success:true,account:r.rows[0]||null};}
 async function createAdminFlutterwaveFundingAccount(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};const b=await body(req),amount=Number(b.amount);if(!validAmount(amount)||amount<100)return{success:false,statusCode:400,message:"Enter an amount of at least ₦100."};try{return await createFlutterwaveVirtualAccount({ownerType:"admin",ownerId:String(admin.id),user:{name:"BOLTIV TECHNOLOGIES LIMITED",email:admin.email,phone:process.env.ADMIN_PHONE||"08000000000"},accountType:"dynamic",amount});}catch(e){return{success:false,statusCode:400,message:e.message||"Unable to create Flutterwave admin funding account."};}
@@ -2959,6 +3092,26 @@ result
 
 }
 
+
+/*
+EMAIL VERIFICATION
+*/
+if(req.method==="GET"&&path==="/api/auth/verify-email"){
+  const result=await verifyEmailToken(url.searchParams.get("token"));
+  return send(res,result.success?200:400,result);
+}
+
+if(req.method==="POST"&&path==="/api/auth/resend-verification"){
+  const rl=rateLimit(req,"resend-verification",3,15*60*1000);
+  if(!rl.allowed)return rateLimitedResponse(res,rl);
+  const b=await body(req);
+  const email=clean(b.email).toLowerCase();
+  if(!validEmail(email))return send(res,400,{success:false,message:"Please enter a valid email address."});
+  const r=await db(`SELECT id,user_id,name,email,email_verified FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1`,[email]);
+  if(!r.rows.length||r.rows[0].email_verified)return send(res,200,{success:true,message:"If the account requires verification, a new verification email has been sent."});
+  const result=await sendVerificationEmail(r.rows[0]);
+  return send(res,result.success?200:503,{success:result.success,message:result.success?"A new verification email has been sent.":"Unable to send the verification email right now. Please try again later."});
+}
 
 /*
 LOGIN

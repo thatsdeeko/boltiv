@@ -46,3 +46,15 @@ Admin → Wallets → Fund Admin Wallet → enter amount → create Flutterwave 
 ## Revenue withdrawal
 
 BOLTIV does not initiate revenue withdrawals. Withdrawals are performed directly in the Flutterwave dashboard. BOLTIV keeps revenue/ledger records for accounting and reconciliation.
+
+
+## Resend email configuration
+
+Set these backend environment variables in production:
+
+```text
+RESEND_API_KEY=your_resend_api_key
+MAIL_FROM=BOLTIV <support@boltiv.ng>
+```
+
+Verify `boltiv.ng` in Resend before using `support@boltiv.ng`. The backend uses Resend for password reset, email verification, wallet-funding receipts, successful transaction emails, and refund emails. The test sender `onboarding@resend.dev` can be used only where Resend permits testing.

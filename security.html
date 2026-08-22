@@ -601,72 +601,57 @@ message.className=
 
 
 /* =========================
-   GET PIN
+   PIN STATUS (SERVER-SIDE)
 ========================= */
 
-function getPin(){
+const API_BASE="https://boltiv-backend.onrender.com";
 
-return boltivMemoryStorage.getItem(
-"boltivTransactionPin"
-);
-
+// New users without a Transaction PIN are sent here as a mandatory setup step.
+const setupRequired=new URLSearchParams(location.search).get("setup")==="required";
+if(setupRequired){
+  setTimeout(()=>showMessage("Create your 4-digit Transaction PIN before you can continue using BOLTIV.","error"),250);
 }
 
+async function getPinStatus(){
+  try{
+    const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
+    const r=await fetch(API_BASE+"/api/security/transaction-pin",{
+      method:"GET",
+      headers:{"Authorization":"Bearer "+token}
+    });
+    const data=await r.json();
+    return Boolean(data && data.success && data.transactionPinSet);
+  }catch(e){
+    return false;
+  }
+}
 
 /* =========================
    STATUS
 ========================= */
 
-function updateStatus(){
+async function updateStatus(){
+  const pinSet=await getPinStatus();
+  const status=document.getElementById("pinStatus");
+  const statusText=document.getElementById("pinStatusText");
+  const statusIcon=document.getElementById("statusIcon");
 
-const pin=getPin();
-
-const status=
-document.getElementById("pinStatus");
-
-const statusText=
-document.getElementById("pinStatusText");
-
-const statusIcon=
-document.getElementById("statusIcon");
-
-
-if(pin){
-
-status.textContent="ON";
-
-status.className=
-"status-badge status-on";
-
-statusText.textContent=
-"Transaction PIN is active";
-
-statusIcon.textContent="✓";
-
-createSection.classList.add("hidden");
-
-changeSection.classList.remove("hidden");
-
-}else{
-
-status.textContent="OFF";
-
-status.className=
-"status-badge status-off";
-
-statusText.textContent=
-"No PIN configured";
-
-statusIcon.textContent="+";
-
-createSection.classList.remove("hidden");
-
-changeSection.classList.add("hidden");
-
+  if(pinSet){
+    status.textContent="ON";
+    status.className="status-badge status-on";
+    statusText.textContent="Transaction PIN is active";
+    statusIcon.textContent="✓";
+    createSection.classList.add("hidden");
+    changeSection.classList.remove("hidden");
+  }else{
+    status.textContent="OFF";
+    status.className="status-badge status-off";
+    statusText.textContent="No PIN configured";
+    statusIcon.textContent="+";
+    createSection.classList.remove("hidden");
+    changeSection.classList.add("hidden");
+  }
 }
-
-}
-
 
 /* =========================
    DIGIT ONLY INPUT
@@ -725,72 +710,8 @@ button.textContent="SHOW";
 
 
 /* =========================
-   CREATE PIN
-========================= */
-
-document
-.getElementById("createPinBtn")
-.onclick=()=>{
-
-const pin=
-createPin.value.trim();
-
-const confirm=
-createConfirmPin.value.trim();
-
-
-if(!/^\d{4}$/.test(pin)){
-
-showMessage(
-"Your Transaction PIN must contain exactly 4 digits.",
-"error"
-);
-
-createPin.focus();
-
-return;
-
-}
-
-
-if(pin!==confirm){
-
-showMessage(
-"Your PINs do not match.",
-"error"
-);
-
-createConfirmPin.focus();
-
-return;
-
-}
-
-
-boltivMemoryStorage.setItem(
-"boltivTransactionPin",
-pin
-);
-
-createPin.value="";
-createConfirmPin.value="";
-
-updateStatus();
-
-showMessage(
-"Transaction PIN created successfully.",
-"success"
-);
-
-successModal.classList.add("show");
-
-};
-
-
-/* =========================
    CREATE / CHANGE PIN
 ========================= */
-const API_BASE="https://boltiv-backend.onrender.com";
 async function pinRequest(pin,currentPin=""){
 const r=await fetch(API_BASE+"/api/security/transaction-pin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({pin,currentPin})});
 return r.json();
@@ -811,6 +732,8 @@ if(pin!==confirm)return showMessage("New PINs do not match.","error");
 const result=await pinRequest(pin,current);if(!result.success)return showMessage(result.message||"Unable to change PIN.","error");
 currentPin.value="";newPin.value="";confirmPin.value="";updateStatus();showMessage(result.message,"success");successModal.classList.add("show");
 };
+
+updateStatus();
 
 /* =========================
    SUCCESS MODAL
@@ -865,11 +788,15 @@ document
 .querySelectorAll(".nav-item")
 .forEach(item=>{
 
-item.onclick=()=>{
-
-location.href=
-item.dataset.page;
-
+item.onclick=async()=>{
+  if(setupRequired){
+    const pinSet=await getPinStatus();
+    if(!pinSet){
+      showMessage("Please create your Transaction PIN before continuing to use BOLTIV.","error");
+      return;
+    }
+  }
+  location.href=item.dataset.page;
 };
 
 });

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BOLTIV — Verify Email</title>
+<style>
+body{margin:0;background:#faf9f4;font-family:Arial,sans-serif;color:#171717;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{width:min(92%,520px);background:#fff;border:1px solid #e7e2d1;border-radius:22px;padding:36px;box-sizing:border-box;text-align:center;box-shadow:0 10px 35px rgba(0,0,0,.06)}
+.logo{font-size:30px;font-weight:900;letter-spacing:5px;color:#c49a25}
+h1{margin:26px 0 12px;font-size:28px}
+p{color:#666;line-height:1.6}
+button{border:0;border-radius:12px;background:#c49a25;color:#fff;padding:14px 22px;font-weight:700;cursor:pointer}
+.status{margin-top:20px;font-weight:700}
+a{color:#a77d0b}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="logo">BOLTIV</div>
+<h1 id="title">Verifying your email…</h1>
+<p id="message">Please wait while we confirm your email address.</p>
+<div id="action"></div>
+</div>
+<script>
+const API_BASE="https://boltiv-backend.onrender.com";
+(async()=>{
+  const token=new URLSearchParams(location.search).get("token");
+  const title=document.getElementById("title");
+  const message=document.getElementById("message");
+  const action=document.getElementById("action");
+  if(!token){
+    title.textContent="Verification link missing";
+    message.textContent="Please open the verification link from your BOLTIV email.";
+    return;
+  }
+  try{
+    const response=await fetch(API_BASE+"/api/auth/verify-email?token="+encodeURIComponent(token),{credentials:"include"});
+    const data=await response.json();
+    if(response.ok&&data.success){
+      title.textContent="Email verified";
+      message.textContent="Your BOLTIV email address has been verified successfully.";
+      action.innerHTML='<p><a href="/login.html">Continue to login</a></p>';
+    }else{
+      title.textContent="Verification failed";
+      message.textContent=data.message||"This verification link is invalid or has expired.";
+      action.innerHTML='<p><a href="/register.html">Return to registration</a></p>';
+    }
+  }catch(error){
+    title.textContent="Unable to verify";
+    message.textContent="We could not reach the BOLTIV server. Please try again.";
+  }
+})();
+</script>
+</body>
+</html>

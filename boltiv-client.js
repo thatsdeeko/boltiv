@@ -47,6 +47,25 @@
   window.boltivRequireAuth=async function(){
     const u=await window.boltivAuthReady;
     if(!u){ location.replace('/login'); return null; }
+
+    // Every authenticated area except Security requires a Transaction PIN.
+    // New users are sent to Security to create one before they can use BOLTIV.
+    const path=(location.pathname||'/').replace(/\/$/,'')||'/';
+    const exemptPaths=['/security','/login','/register','/forgot-password','/reset-password','/verify-email'];
+    if(!exemptPaths.includes(path)){
+      try{
+        const api=window.BOLTIV_API_BASE || 'https://boltiv-backend.onrender.com';
+        const r=await nativeFetch(api+'/api/security',{credentials:'include',cache:'no-store'});
+        const d=await r.json().catch(()=>({}));
+        if(r.ok && d.success && !d.transactionPinSet){
+          location.replace('/security?setup=required');
+          return null;
+        }
+      }catch(e){
+        // Do not block access solely because the status check failed.
+        // Purchase endpoints independently require a valid Transaction PIN.
+      }
+    }
     return u;
   };
 })();

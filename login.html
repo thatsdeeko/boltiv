@@ -240,7 +240,39 @@ body{
 
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* PASSWORD VISIBILITY */
+.password-field{
+    position:relative;
+}
+.password-field .input{
+    padding-right:72px;
+}
+.password-toggle{
+    position:absolute;
+    right:10px;
+    top:50%;
+    transform:translateY(-50%);
+    min-width:52px;
+    height:34px;
+    padding:0 8px;
+    border:1px solid #e5d79d;
+    border-radius:8px;
+    background:#fffdf4;
+    color:#9b760c;
+    font-size:12px;
+    font-weight:800;
+    cursor:pointer;
+    line-height:1;
+}
+.password-toggle:hover{
+    background:#f8f0d2;
+}
+.password-toggle:focus-visible{
+    outline:3px solid #D4AF37;
+    outline-offset:2px;
+}
+</style></head>
 <body>
 <div class="page">
 <div class="container">
@@ -272,7 +304,10 @@ EMAIL
 PASSWORD
 
 </label>
+<div class="password-field">
 <input aria-label="Password" autocomplete="current-password" class="input" id="passwordInput" placeholder="Enter your password" type="password"/>
+<button aria-controls="passwordInput" aria-label="Show password" class="password-toggle" id="passwordToggle" type="button">SHOW</button>
+</div>
 </div>
 <button class="auth-btn" id="loginButton">
 
@@ -536,6 +571,22 @@ document
     }
 );
 
+
+// Password visibility controls: this only changes the field type locally.
+function setupPasswordToggle(toggleId,inputId){
+    const toggle=document.getElementById(toggleId);
+    const input=document.getElementById(inputId);
+    if(!toggle||!input)return;
+    toggle.addEventListener("click",()=>{
+        const showing=input.type==="text";
+        input.type=showing?"password":"text";
+        toggle.textContent=showing?"SHOW":"HIDE";
+        toggle.setAttribute("aria-label",showing?"Show password":"Hide password");
+        input.focus({preventScroll:true});
+    });
+}
+
+setupPasswordToggle("passwordToggle","passwordInput");
 </script>
 </body>
 </html>

@@ -231,37 +231,43 @@ finally{clearTimeout(timer);}}
 async function fetchVTUGATEServices(all=true){return vtugateRequest(all?"api/v1/fetchallservices":"api/v1/fetchservices",{});}
 async function getVTUGATEAccountDetails(){return vtugateRequest("api/v1/accountdetails",{});}
 const vtugateServiceCache={at:0,data:[]};
-function extractVTUGATEServiceRecords(value,depth=0){
-  if(value==null||depth>6)return [];
-  if(Array.isArray(value)){
-    const direct=value.filter(x=>x&&typeof x==="object"&&!Array.isArray(x));
-    if(direct.some(x=>x.service_id!=null||x.serviceId!=null||x.service_code!=null||x.code!=null||x.slug!=null||x.name!=null||x.service_name!=null)) return direct;
-    return value.flatMap(x=>extractVTUGATEServiceRecords(x,depth+1));
-  }
-  if(typeof value!=="object")return [];
-  const own=[value];
-  const nested=Object.values(value).flatMap(v=>extractVTUGATEServiceRecords(v,depth+1));
-  return own.some(x=>x.service_id!=null||x.serviceId!=null||x.service_code!=null||x.code!=null||x.slug!=null||x.name!=null||x.service_name!=null)?own.concat(nested):nested;
+function collectVTUGATEServiceRecords(value,out=[],depth=0){
+if(value==null||depth>8)return out;
+if(Array.isArray(value)){for(const item of value)collectVTUGATEServiceRecords(item,out,depth+1);return out;}
+if(typeof value!=="object")return out;
+const id=value.service_id??value.serviceId??value.id??value.serviceID;
+const label=[value.name,value.service_name,value.serviceName,value.title,value.label,value.code,value.service_code,value.serviceCode,value.slug,value.type,value.category,value.service].filter(v=>v!==undefined&&v!==null&&String(v).trim()!=="");
+if(id!==undefined&&label.length)out.push(value);
+for(const key of Object.keys(value))collectVTUGATEServiceRecords(value[key],out,depth+1);
+return out;
 }
-function normalizeServiceText(value){return clean(value).toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ").trim();}
+async function loadVTUGATEServiceRecords(){
+if(Date.now()-vtugateServiceCache.at<=300000&&vtugateServiceCache.data.length)return vtugateServiceCache.data;
+let r=await fetchVTUGATEServices(true);
+let records=r.success?collectVTUGATEServiceRecords(r.data):[];
+// Some VTUGATE accounts expose the catalogue through fetchservices rather than
+// returning the full list shape from fetchallservices. Try the documented
+// alternate endpoint before failing.
+if(!records.length){r=await fetchVTUGATEServices(false);records=r.success?collectVTUGATEServiceRecords(r.data):[];}
+if(!records.length){throw new Error(r.message||"Unable to load VTUGATE services.");}
+vtugateServiceCache.data=records;vtugateServiceCache.at=Date.now();return records;
+}
 async function getVTUGATEServiceId(category,provider=""){
 const explicit=VTUGATE_SERVICE_MAP?.[provider]??VTUGATE_SERVICE_MAP?.[String(provider).toUpperCase()]??VTUGATE_SERVICE_MAP?.[category];
 if(Number(explicit)>0)return Number(explicit);
-if(Date.now()-vtugateServiceCache.at>300000){
-  const r=await fetchVTUGATEServices(true);
-  if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");
-  const raw=extractVTUGATEServiceRecords(r.data);
-  vtugateServiceCache.data=raw;
-  vtugateServiceCache.at=Date.now();
-}
-const aliases={airtime:["airtime","airtime recharge","mobile airtime"],data:["data","mobile data","data bundle","data bundles","internet data","mobile internet"],cable:["cable","cable tv","television","dstv","gotv","startimes","showmax"],electricity:["electricity","electricity bill","power"],education:["education","education pin","education pins","exam pin","exam pins"]};
-const wanted=[...(aliases[category]||[category]),clean(provider)].map(normalizeServiceText).filter(Boolean);
-const item=vtugateServiceCache.data.find(x=>{
-  const fields=[x.name,x.service_name,x.serviceName,x.code,x.service_code,x.serviceCode,x.slug,x.type,x.category,x.provider,x.network,x.title,x.description].filter(v=>v!=null).map(normalizeServiceText);
-  return wanted.some(w=>fields.some(h=>h===w||h.includes(w)||w.includes(h)));
-});
-const id=Number(item?.service_id??item?.serviceId??item?.id??item?.service?.id??item?.service?.service_id);
-if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`); return id;
+const records=await loadVTUGATEServiceRecords();
+const aliases={airtime:["airtime"],data:["data","mobile data","internet data","data bundle","data bundles"],cable:["cable","cable tv","dstv","gotv","startimes","showmax"],electricity:["electricity","power"],education:["education","education pin","exam pin"]};
+const wanted=[...(aliases[category]||[category]),clean(provider).toLowerCase()].filter(Boolean);
+const score=(x)=>{
+const fields=[x.name,x.service_name,x.serviceName,x.title,x.label,x.code,x.service_code,x.serviceCode,x.slug,x.type,x.category,x.service,x.provider,x.network].filter(Boolean).map(v=>clean(v).toLowerCase());
+let best=0;for(const w of wanted){for(const f of fields){if(f===w)best=Math.max(best,100);else if(f.includes(w))best=Math.max(best,60);else if(w.includes(f)&&f.length>2)best=Math.max(best,40);}}
+if(category==="data"&&fields.some(f=>f.includes("airtime")))best=0;
+return best;
+};
+const item=records.map(x=>({x,s:score(x)})).filter(v=>v.s>0).sort((a,b)=>b.s-a.s)[0]?.x;
+const id=Number(item?.service_id??item?.serviceId??item?.serviceID??item?.id??0);
+if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`);
+return id;
 }
 
 async function fetchVTUGATEDataPlans(network){

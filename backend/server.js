@@ -415,17 +415,13 @@ const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await
 let providerPayload={},recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
 if(service==="data"){
 const planId=Number(data.bundle_id??data.plan_id??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??0);const network=normalizeDataNetwork(data.network||data.providerPayload?.network);let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};const planCode=clean(data.plan_code||data.providerPayload?.plan_code||authoritative.plan_code||planId);
+// VTUGATE buydata requires exactly: service_id, phone_number, amount, plan_code
+// amount must match the catalog plan price (provider cost), not the customer markup price.
 providerPayload={
-  service_id:Number(authoritative.service_id),
+  service_id:String(Number(authoritative.service_id)),
   phone_number:recipient,
-  phone:recipient,
-  amount,
-  plan_code:planCode,
-  plan_id:planId,
-  bundle_id:planId,
-  network,
-  customer_external_ref:clean(data.idempotencyKey||data.idempotency_key||""),
-  ref:null
+  amount:Number(authoritative.provider_price),
+  plan_code:String(planCode)
 };
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return{success:false,statusCode:400,message:"Invalid education PIN product."};if(![1,2,5].includes(quantity))return{success:false,statusCode:400,message:"Education PIN quantity must be 1, 2, or 5."};const serviceId=productId;let unitPrice;try{unitPrice=await getVTUGATEEducationPrice(serviceId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current education PIN price."};}const productCode=clean(data.product_code||data.providerPayload?.product_code||data.exam||"waec");const expectedTotal=Number((unitPrice*quantity).toFixed(2));if(Math.abs(amount-expectedTotal)>.009)return{success:false,statusCode:400,message:"The selected education PIN price has changed. Please refresh the products and try again."};pricingMeta={providerCost:Number((unitPrice*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-unitPrice*quantity).toFixed(2)),plan:productCode.toUpperCase()};providerPayload={service_id:serviceId,phone:recipient||user.phone||"08000000000",quantity,product_code:productCode,ref:null};

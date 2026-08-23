@@ -266,30 +266,31 @@ function parseCatalogNumber(value){
   return Number.isFinite(n)?n:NaN;
 }
 
-function collectVTUGATEPlanCandidates(value,inheritedNetwork='',out=[],seen=new Set(),depth=0){
-  if(value==null||depth>10)return out;
-  if(Array.isArray(value)){for(const item of value)collectVTUGATEPlanCandidates(item,inheritedNetwork,out,seen,depth+1);return out;}
+function collectVTUGATEPlanCandidates(value,inheritedNetwork='',out=[],seen=new Set(),depth=0,inheritedPlanId=''){
+  if(value==null||depth>12)return out;
+  if(Array.isArray(value)){for(const item of value)collectVTUGATEPlanCandidates(item,inheritedNetwork,out,seen,depth+1,inheritedPlanId);return out;}
   if(typeof value!=='object')return out;
 
   const ownNetwork=normalizeDataNetwork(findCatalogField(value,[
-    'network','network_name','networkName','network_code','networkCode','operator','operator_name','provider','provider_name'
+    'network','network_name','networkName','network_code','networkCode','operator','operator_name','operatorName','provider','provider_name','providerName','carrier'
   ])||inheritedNetwork)||inheritedNetwork;
 
   const idValue=findCatalogField(value,[
-    'plan_id','planId','bundle_id','bundleId','id','product_id','productId','code','product_code','productCode','bundle_code','bundleCode','plan_code','planCode'
-  ]);
+    'plan_id','planId','planID','bundle_id','bundleId','bundleID','id','product_id','productId','productID','code','product_code','productCode','bundle_code','bundleCode','plan_code','planCode','service_id','serviceId'
+  ]) ?? inheritedPlanId;
   const nameValue=findCatalogField(value,[
-    'plan_name','planName','name','plan','bundle_name','bundleName','product_name','productName','description','title','label'
+    'plan_name','planName','name','plan','data_plan','dataPlan','bundle_name','bundleName','bundle','product_name','productName','description','title','label'
   ]);
   const priceValue=findCatalogField(value,[
-    'vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','selling_price','sellingPrice','price','amount','cost','plan_price','planPrice'
+    'vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','merchant_price','merchantPrice','retail_price','retailPrice','selling_price','sellingPrice','sell_price','sellPrice','price','amount','cost','plan_price','planPrice','amount_to_charge','amountToCharge'
   ]);
   const id=parseCatalogNumber(idValue);
   const price=parseCatalogNumber(priceValue);
-  const hasPlanSignals=(id>0||clean(idValue)!=='')&&(price>0||clean(priceValue)!=='')&&(clean(nameValue)!=='');
+  const name=clean(nameValue);
+  const hasPlanSignals=(id>0||clean(idValue)!=='')&&(price>0||clean(priceValue)!=='')&&name!=='';
   if(hasPlanSignals){
-    const candidate={...value,__network:ownNetwork};
-    const key=JSON.stringify([clean(idValue),clean(nameValue),price,ownNetwork]);
+    const candidate={...value,__network:ownNetwork,__plan_id_fallback:clean(idValue)};
+    const key=JSON.stringify([clean(idValue),name,price,ownNetwork]);
     if(!seen.has(key)){seen.add(key);out.push(candidate);}
   }
 
@@ -298,7 +299,9 @@ function collectVTUGATEPlanCandidates(value,inheritedNetwork='',out=[],seen=new 
     let childNetwork=ownNetwork;
     const keyNetwork=normalizeDataNetwork(key);
     if(keyNetwork)childNetwork=keyNetwork;
-    collectVTUGATEPlanCandidates(child,childNetwork,out,seen,depth+1);
+    let childPlanId=inheritedPlanId;
+    if(/^(?:\d+)(?:\.0+)?$/.test(String(key).trim())) childPlanId=String(key).trim().replace(/\.0+$/,'');
+    collectVTUGATEPlanCandidates(child,childNetwork,out,seen,depth+1,childPlanId);
   }
   return out;
 }

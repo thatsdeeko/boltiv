@@ -243,12 +243,51 @@ if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provid
 }
 
 async function fetchVTUGATEDataPlans(network){
-const selected=normalizeDataNetwork(network); if(!selected)throw new Error("Unsupported network.");
-const serviceId=await getVTUGATEServiceId("data",selected);
-const response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
+const selected=normalizeDataNetwork(network);
+if(!selected)throw new Error("Unsupported network.");
+
+// VTUGATE can expose either one generic Data service or separate network
+// services. Resolve the most specific service first, then fall back to the
+// generic Data service. Do not require the network name to be part of the
+// service record.
+let serviceId;
+try{
+  serviceId=await getVTUGATEServiceId("data",selected);
+}catch(firstError){
+  serviceId=await getVTUGATEServiceId("data");
+}
+
+// Different VTUGATE account/catalogue configurations may accept the network
+// as a filter or infer it from the selected data service. Try the documented
+// service ID request first, then retry without the network filter when the
+// provider rejects that shape.
+let response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
+if(!response.success){
+  const retry=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId});
+  if(retry.success)response=retry;
+  else if(response.message)throw new Error(response.message);
+}
 if(!response.success)throw new Error(response.message||"Unable to load VTUGATE data plans.");
-const raw=Array.isArray(response.data?.data)?response.data.data:(Array.isArray(response.data?.plans)?response.data.plans:(Array.isArray(response.data)?response.data:[]));
-return raw.map(p=>{const name=clean(findCatalogField(p,["plan_name","name","plan","bundle_name","description"])??"");const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName"])??selected)||selected;const id=Number(findCatalogField(p,["id","plan_id","planId","bundle_id","bundleId","code"])??0);const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","price","amount","cost"])??0);const rawValidity=normalizeCatalogValidity(p);const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):Number(findCatalogField(p,["validity_days","validityDays"])||0);return{...p,network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number(p.service_id??p.serviceId??serviceId)};}).filter(p=>p.plan_id>0&&p.price>0&&p.name&&p.network_name===selected);
+
+const raw=Array.isArray(response.data?.data)?response.data.data:(Array.isArray(response.data?.plans)?response.data.plans:(Array.isArray(response.data?.data?.plans)?response.data.data.plans:(Array.isArray(response.data)?response.data:[])));
+const normalized=raw.map(p=>{
+  const name=clean(findCatalogField(p,["plan_name","name","plan","bundle_name","description"])??"");
+  const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName","network_code","networkCode"])??selected)||selected;
+  const id=Number(findCatalogField(p,["id","plan_id","planId","bundle_id","bundleId","code","product_code","productCode"])??0);
+  const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","price","amount","cost"])??0);
+  const rawValidity=normalizeCatalogValidity(p);
+  const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
+  const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;
+  const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+  const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):Number(findCatalogField(p,["validity_days","validityDays"])||0);
+  return{...p,network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number(p.service_id??p.serviceId??serviceId)};
+});
+
+// If VTUGATE returned plans without a network field, they belong to the
+// selected service/filter and should not be discarded. If it did return
+// network labels, keep only the selected network.
+const hasNetworkLabels=normalized.some(p=>p.network_name && p.network_name!==selected);
+return normalized.filter(p=>p.plan_id>0&&p.price>0&&p.name&&(!hasNetworkLabels||p.network_name===selected));
 }
 const vtugatePlanCache=new Map();
 async function getAuthoritativeVTUGATEDataPlan(network,planId){const selected=normalizeDataNetwork(network);const id=Number(planId);if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>Number(x.plan_id)===id);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,provider_price:Number(plan.price),customer_price:customerPrice};}

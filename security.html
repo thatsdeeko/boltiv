@@ -499,13 +499,11 @@ CHANGE TRANSACTION PIN
 <!-- NOTE -->
 <div class="security-note">
 
-Your Transaction PIN should be kept private.
-Never share it with anyone.
+Keep your Transaction PIN confidential. Never share it with anyone.
 
 <br/><br/>
 
-For this frontend-only version of BOLTIV,
-the PIN is stored locally on this device.
+Your Transaction PIN is securely protected and used to authorize your transactions.
 
 </div>
 </div>
@@ -615,7 +613,7 @@ if(setupRequired){
 async function getPinStatus(){
   try{
     const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
-    const r=await fetch(API_BASE+"/api/security/transaction-pin",{
+    const r=await fetch(API_BASE+"/api/security",{
       method:"GET",
       headers:{"Authorization":"Bearer "+token}
     });

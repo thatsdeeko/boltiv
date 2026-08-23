@@ -231,43 +231,30 @@ finally{clearTimeout(timer);}}
 async function fetchVTUGATEServices(all=true){return vtugateRequest(all?"api/v1/fetchallservices":"api/v1/fetchservices",{});}
 async function getVTUGATEAccountDetails(){return vtugateRequest("api/v1/accountdetails",{});}
 const vtugateServiceCache={at:0,data:[]};
-function collectVTUGATEServiceRecords(value,out=[],depth=0){
-if(value==null||depth>8)return out;
-if(Array.isArray(value)){for(const item of value)collectVTUGATEServiceRecords(item,out,depth+1);return out;}
-if(typeof value!=="object")return out;
-const id=value.service_id??value.serviceId??value.id??value.serviceID;
-const label=[value.name,value.service_name,value.serviceName,value.title,value.label,value.code,value.service_code,value.serviceCode,value.slug,value.type,value.category,value.service].filter(v=>v!==undefined&&v!==null&&String(v).trim()!=="");
-if(id!==undefined&&label.length)out.push(value);
-for(const key of Object.keys(value))collectVTUGATEServiceRecords(value[key],out,depth+1);
-return out;
-}
-async function loadVTUGATEServiceRecords(){
-if(Date.now()-vtugateServiceCache.at<=300000&&vtugateServiceCache.data.length)return vtugateServiceCache.data;
-let r=await fetchVTUGATEServices(true);
-let records=r.success?collectVTUGATEServiceRecords(r.data):[];
-// Some VTUGATE accounts expose the catalogue through fetchservices rather than
-// returning the full list shape from fetchallservices. Try the documented
-// alternate endpoint before failing.
-if(!records.length){r=await fetchVTUGATEServices(false);records=r.success?collectVTUGATEServiceRecords(r.data):[];}
-if(!records.length){throw new Error(r.message||"Unable to load VTUGATE services.");}
-vtugateServiceCache.data=records;vtugateServiceCache.at=Date.now();return records;
-}
 async function getVTUGATEServiceId(category,provider=""){
-const explicit=VTUGATE_SERVICE_MAP?.[provider]??VTUGATE_SERVICE_MAP?.[String(provider).toUpperCase()]??VTUGATE_SERVICE_MAP?.[category];
-if(Number(explicit)>0)return Number(explicit);
-const records=await loadVTUGATEServiceRecords();
-const aliases={airtime:["airtime"],data:["data","mobile data","internet data","data bundle","data bundles"],cable:["cable","cable tv","dstv","gotv","startimes","showmax"],electricity:["electricity","power"],education:["education","education pin","exam pin"]};
-const wanted=[...(aliases[category]||[category]),clean(provider).toLowerCase()].filter(Boolean);
-const score=(x)=>{
-const fields=[x.name,x.service_name,x.serviceName,x.title,x.label,x.code,x.service_code,x.serviceCode,x.slug,x.type,x.category,x.service,x.provider,x.network].filter(Boolean).map(v=>clean(v).toLowerCase());
-let best=0;for(const w of wanted){for(const f of fields){if(f===w)best=Math.max(best,100);else if(f.includes(w))best=Math.max(best,60);else if(w.includes(f)&&f.length>2)best=Math.max(best,40);}}
-if(category==="data"&&fields.some(f=>f.includes("airtime")))best=0;
-return best;
-};
-const item=records.map(x=>({x,s:score(x)})).filter(v=>v.s>0).sort((a,b)=>b.s-a.s)[0]?.x;
-const id=Number(item?.service_id??item?.serviceId??item?.serviceID??item?.id??0);
-if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`);
-return id;
+const keys=[provider,String(provider).toUpperCase(),String(provider).toLowerCase(),category,String(category).toUpperCase(),String(category).toLowerCase()];
+for(const key of keys){const explicit=VTUGATE_SERVICE_MAP?.[key];if(Number(explicit)>0)return Number(explicit);}
+const envKeys={data:["VTUGATE_DATA_SERVICE_ID"],airtime:["VTUGATE_AIRTIME_SERVICE_ID"],cable:["VTUGATE_CABLE_SERVICE_ID"],electricity:["VTUGATE_ELECTRICITY_SERVICE_ID"],education:["VTUGATE_EDUCATION_SERVICE_ID"]};
+for(const key of (envKeys[category]||[])){if(Number(process.env[key])>0)return Number(process.env[key]);}
+if(Date.now()-vtugateServiceCache.at>300000){const r=await fetchVTUGATEServices(true);if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");
+ const root=r.data?.data??r.data;
+ const records=[];
+ const visit=(value,depth=0)=>{if(!value||depth>8)return;if(Array.isArray(value)){for(const item of value)visit(item,depth+1);return;}if(typeof value!=="object")return;
+   const id=Number(value.service_id??value.serviceId??value.serviceID??value.id??value.service?.id??value.service?.service_id??value.service?.serviceId??0);
+   const hay=[value.name,value.service_name,value.serviceName,value.service_title,value.title,value.label,value.code,value.service_code,value.serviceCode,value.slug,value.type,value.category,value.service_type,value.serviceType,value.provider,value.network,value.description,value.service?.name,value.service?.service_name,value.service?.code].filter(v=>v!==undefined&&v!==null).join(" ").toLowerCase();
+   if(id>0&&hay)records.push({id,hay,raw:value});
+   for(const [k,v] of Object.entries(value)){if(["raw","meta","pagination"].includes(k))continue;visit(v,depth+1);}
+ };
+ visit(root);
+ vtugateServiceCache.data=records;vtugateServiceCache.at=Date.now();}
+const aliases={airtime:["airtime","mobile airtime"],data:["data","mobile data","internet data","data bundle","data bundles","data plan","data plans","mobile data bundle"],cable:["cable","cable tv","cable television","dstv","gotv","startimes","showmax"],electricity:["electricity","electric","power","power bill","electricity bill"],education:["education","education pin","education pins","exam pin","exam pins"]};
+const p=clean(provider).toLowerCase();
+const wanted=[...(aliases[category]||[category]),p].filter(Boolean);
+const providerHit=p?vtugateServiceCache.data.find(x=>wanted.some(w=>x.hay===w||x.hay.includes(` ${w} `)||x.hay.startsWith(`${w} `)||x.hay.endsWith(` ${w}`))):null;
+const categoryHit=vtugateServiceCache.data.find(x=>aliases[category]?.some(w=>x.hay===w||x.hay.includes(` ${w} `)||x.hay.startsWith(`${w} `)||x.hay.endsWith(` ${w}`)));
+const item=providerHit||categoryHit;
+if(!item)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`);
+return item.id;
 }
 
 async function fetchVTUGATEDataPlans(network){
@@ -278,22 +265,30 @@ if(!selected)throw new Error("Unsupported network.");
 // services. Resolve the most specific service first, then fall back to the
 // generic Data service. Do not require the network name to be part of the
 // service record.
-let serviceId;
-try{
-  serviceId=await getVTUGATEServiceId("data",selected);
-}catch(firstError){
-  serviceId=await getVTUGATEServiceId("data");
+let serviceId=null;
+// Some VTUGATE account configurations can infer the data service from the
+// network. Try the documented catalogue endpoint without a service ID first;
+// if the account requires service_id, resolve it from the service catalogue.
+let response=await vtugateRequest("api/v1/fetchdataplans",{network:selected});
+if(!response.success){
+  try{
+    serviceId=await getVTUGATEServiceId("data",selected);
+  }catch(firstError){
+    serviceId=await getVTUGATEServiceId("data");
+  }
 }
 
 // Different VTUGATE account/catalogue configurations may accept the network
 // as a filter or infer it from the selected data service. Try the documented
 // service ID request first, then retry without the network filter when the
 // provider rejects that shape.
-let response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
-if(!response.success){
-  const retry=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId});
-  if(retry.success)response=retry;
-  else if(response.message)throw new Error(response.message);
+if(!response?.success){
+  response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
+  if(!response.success){
+    const retry=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId});
+    if(retry.success)response=retry;
+    else if(response.message)throw new Error(response.message);
+  }
 }
 if(!response.success)throw new Error(response.message||"Unable to load VTUGATE data plans.");
 

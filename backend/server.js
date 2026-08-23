@@ -1011,6 +1011,13 @@ async function getPlatformSetting(key, fallback=null){
   }
 }
 
+async function getSecurity(userId){
+  const id=clean(userId);
+  if(!id)return null;
+  const result=await db(`SELECT transaction_pin_hash,updated_at FROM user_security WHERE user_id=$1 LIMIT 1`,[id]);
+  return result.rows[0]||null;
+}
+
 async function setTransactionPin(userId,pin,currentPin=""){
   const id=clean(userId);
   const nextPin=String(pin||"").trim();

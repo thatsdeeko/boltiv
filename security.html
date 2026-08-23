@@ -612,14 +612,21 @@ if(setupRequired){
 
 async function getPinStatus(){
   try{
+    if(window.boltivAuthReady) await window.boltivAuthReady;
     const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
+    const headers={"Accept":"application/json"};
+    if(token) headers.Authorization="Bearer "+token;
     const r=await fetch(API_BASE+"/api/security",{
       method:"GET",
-      headers:{"Authorization":"Bearer "+token}
+      credentials:"include",
+      cache:"no-store",
+      headers
     });
-    const data=await r.json();
-    return Boolean(data && data.success && data.transactionPinSet);
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok || !data.success) return false;
+    return data.transactionPinSet===true;
   }catch(e){
+    console.error("TRANSACTION PIN STATUS ERROR:",e);
     return false;
   }
 }

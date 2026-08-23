@@ -58,8 +58,8 @@ function isOneDayPlan(plan){
 function renderPlans(plans){
   selectedPlan=null;
   planGrid.innerHTML="";
-  const filtered=Array.isArray(plans)?plans.filter(plan=>!isOneDayPlan(plan)):[];
-  if(!filtered.length){planGrid.innerHTML='<div class="plan-loading">No data plans longer than 1 day are currently available for this network.</div>';return;}
+  const filtered=Array.isArray(plans)?plans:[];
+  if(!filtered.length){planGrid.innerHTML='<div class="plan-loading">No data plans are currently available for this network.</div>';return;}
   filtered.forEach(plan=>{
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";

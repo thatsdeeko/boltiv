@@ -58,3 +58,14 @@ MAIL_FROM=BOLTIV <support@boltiv.ng>
 ```
 
 Verify `boltiv.ng` in Resend before using `support@boltiv.ng`. The backend uses Resend for password reset, email verification, wallet-funding receipts, successful transaction emails, and refund emails. The test sender `onboarding@resend.dev` can be used only where Resend permits testing.
+
+
+### Resend troubleshooting
+
+If `/forgot-password` says it could not send the email, check the Render backend service environment variables first:
+
+- `RESEND_API_KEY` must be present and valid.
+- `MAIL_FROM` should be `BOLTIV <support@boltiv.ng>` (or another address on the verified `boltiv.ng` domain).
+- After changing either variable, redeploy/restart the backend service.
+
+The backend now logs whether the Resend key is configured and returns the non-secret Resend error message when Resend rejects a request, which makes sender/API-key problems diagnosable instead of showing only a generic failure.

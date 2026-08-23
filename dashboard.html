@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><base href="/"><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<head><base href="/"><script>document.documentElement.classList.add("boltiv-service-pending");</script><style>html.boltiv-service-pending body{visibility:hidden}</style><script src="boltiv-service-availability.js?v=20260823-provider-gate"></script><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#ffffff" name="theme-color"/>
@@ -76,11 +76,11 @@ body.modal-open{overflow:hidden!important}
 <section class="section home-services-section">
 <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions">Activity →</a></div>
 <div class="home-service-grid">
-<a class="home-service-card" href="/airtime"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
-<a class="home-service-card" href="/data"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
-<a class="home-service-card" href="/cable"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-<a class="home-service-card" href="/electricity"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
-<a class="home-service-card" href="/exam-pin"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
+<a class="home-service-card" data-boltiv-service="airtime" href="/airtime"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
+<a class="home-service-card" data-boltiv-service="data" href="/data"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
+<a class="home-service-card" data-boltiv-service="cable" href="/cable"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
+<a class="home-service-card" data-boltiv-service="electricity" href="/electricity"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
+<a class="home-service-card" data-boltiv-service="exam_pin" href="/exam-pin"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
 <button class="home-service-card coming-soon" data-service="Betting" type="button"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
 <button class="home-service-card coming-soon" data-service="Recharge PIN" type="button"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
 <button class="home-service-card coming-soon" data-service="SMS" type="button"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>

@@ -21,10 +21,10 @@ const SME_API_CABLE_PROVIDER_MAP=JSON.parse(process.env.SME_API_CABLE_PROVIDER_M
 const SME_API_ELECTRICITY_PROVIDER_MAP=JSON.parse(process.env.SME_API_ELECTRICITY_PROVIDER_MAP||'{}');
 const SME_API_CABLE_PLAN_MAP=JSON.parse(process.env.SME_API_CABLE_PLAN_MAP||'{}');
 
-const RESEND_API_KEY=String(process.env.RESEND_API_KEY||"").trim();
-// Production sender. boltiv.ng must be verified in Resend before this address is used.
-// Keep MAIL_FROM configurable so the same backend can be used across environments.
-const MAIL_FROM=(process.env.MAIL_FROM||"BOLTIV <support@boltiv.ng>").trim();
+const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
+// Use a Resend-safe sender for testing when MAIL_FROM is not configured.
+// For production, set MAIL_FROM to an address on a domain verified in Resend.
+const MAIL_FROM=(process.env.MAIL_FROM||"BOLTIV <onboarding@resend.dev>").trim();
 const FRONTEND_ORIGINS=String(process.env.FRONTEND_ORIGIN||(()=>{try{return new URL(FRONTEND_URL).origin}catch{return FRONTEND_URL}})())
 .split(",")
 .map(v=>v.trim())
@@ -790,6 +790,19 @@ used BOOLEAN NOT NULL DEFAULT FALSE,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
 
+await db(`
+CREATE TABLE IF NOT EXISTS transaction_pin_reset_tokens(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+code_hash TEXT NOT NULL,
+expires_at TIMESTAMPTZ NOT NULL,
+attempts INTEGER NOT NULL DEFAULT 0,
+used BOOLEAN NOT NULL DEFAULT FALSE,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS transaction_pin_reset_tokens_user_idx ON transaction_pin_reset_tokens(user_id)`);
+await db(`CREATE INDEX IF NOT EXISTS transaction_pin_reset_tokens_expiry_idx ON transaction_pin_reset_tokens(expires_at)`);
+
 await db(
 `UPDATE users
 SET user_id=COALESCE(
@@ -1359,24 +1372,14 @@ html
 
 if(!RESEND_API_KEY){
 
-console.error("RESEND EMAIL CONFIG ERROR: RESEND_API_KEY is missing.");
+console.log(
+"RESEND_API_KEY is not configured."
+);
 
 return{
 success:false,
 message:
-"Email service is not configured on the BOLTIV server. Please set RESEND_API_KEY in Render."
-};
-
-}
-
-if(!MAIL_FROM){
-
-console.error("RESEND EMAIL CONFIG ERROR: MAIL_FROM is empty.");
-
-return{
-success:false,
-message:
-"Email sender is not configured on the BOLTIV server. Please set MAIL_FROM in Render."
+"Email service is not configured."
 };
 
 }
@@ -1408,22 +1411,15 @@ await response.json();
 
 if(!response.ok){
 
-const providerMessage=String(
-(data&&typeof data.message==="string"&&data.message)||
-(data&&typeof data.error==="string"&&data.error)||
-"Resend rejected the email request."
-).trim();
-
-console.error("RESEND EMAIL ERROR:",{
-status:response.status,
-message:providerMessage,
-from:MAIL_FROM,
-to:String(to||"")
-});
+console.error(
+"EMAIL ERROR:",
+data
+);
 
 return{
 success:false,
-message:`Email delivery failed: ${providerMessage}`
+message:
+"Unable to send email."
 };
 
 }
@@ -1981,6 +1977,11 @@ client.release();
 
 }
 
+
+async function cleanupTransactionPinResetTokens(){
+  if(!DATABASE_URL)return;
+  try{await db(`DELETE FROM transaction_pin_reset_tokens WHERE expires_at<NOW() OR used=TRUE`);}catch(error){console.error("TRANSACTION PIN RESET TOKEN CLEANUP ERROR:",error?.message||error);}
+}
 
 async function cleanupPasswordResetTokens(){
 
@@ -3012,11 +3013,107 @@ return null;
 }
 
 
+async function requestTransactionPinReset(email){
+  email=clean(email).toLowerCase();
+  const genericMessage="If an account exists for that email, a Transaction PIN reset code has been sent.";
+  if(!validEmail(email)) return {success:true,message:genericMessage};
+
+  const result=await db(`SELECT user_id,name,email FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1`,[email]);
+  if(!result.rows.length) return {success:true,message:genericMessage};
+  const user=result.rows[0];
+
+  await db(`UPDATE transaction_pin_reset_tokens SET used=TRUE WHERE user_id=$1 AND used=FALSE`,[user.user_id]);
+
+  const code=String(crypto.randomInt(0,1000000)).padStart(6,"0");
+  const codeHash=hashResetToken(code);
+  await db(`INSERT INTO transaction_pin_reset_tokens(user_id,code_hash,expires_at,attempts,used,created_at) VALUES($1,$2,NOW()+INTERVAL '10 minutes',0,FALSE,NOW())`,[user.user_id,codeHash]);
+
+  const displayName=clean(user.name)||"BOLTIV User";
+  const emailResult=await sendEmail({
+    to:user.email,
+    subject:"BOLTIV Transaction PIN Reset Code",
+    html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717"><div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7"><div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div><h2 style="text-align:center;margin-top:28px">Reset your Transaction PIN</h2><p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(displayName)},</p><p style="font-size:15px;line-height:1.7;color:#555">We received a request to reset the Transaction PIN on your BOLTIV account. Enter the verification code below to create a new 4-digit Transaction PIN.</p><div style="margin:28px 0;text-align:center"><div style="display:inline-block;padding:16px 26px;border-radius:12px;background:#fff9e6;border:1px solid #d4af37;font-size:30px;letter-spacing:8px;font-weight:900;color:#171717">${code}</div></div><p style="font-size:13px;line-height:1.6;color:#777">This code expires in 10 minutes and can only be used once. You have a limited number of verification attempts.</p><p style="font-size:13px;line-height:1.6;color:#777">If you did not request this change, secure your account and contact BOLTIV support.</p></div></body></html>`
+  });
+
+  if(!emailResult.success){
+    console.error("TRANSACTION PIN RESET EMAIL FAILED:",emailResult.message);
+    await db(`DELETE FROM transaction_pin_reset_tokens WHERE user_id=$1 AND code_hash=$2`,[user.user_id,codeHash]).catch(e=>console.error("TRANSACTION PIN RESET TOKEN CLEANUP FAILED:",e));
+    return {success:false,message:"We couldn't send the Transaction PIN reset code right now. Please try again later."};
+  }
+  return {success:true,message:genericMessage};
+}
+
+async function resetTransactionPin(email,code,newPin){
+  email=clean(email).toLowerCase();
+  code=String(code||"").trim();
+  newPin=String(newPin||"").trim();
+  if(!validEmail(email)||!/^[0-9]{6}$/.test(code)||!/^[0-9]{4}$/.test(newPin)) return {success:false,message:"Enter a valid email, 6-digit verification code, and 4-digit Transaction PIN."};
+
+  const userResult=await db(`SELECT user_id,name,email FROM users WHERE LOWER(email)=LOWER($1) LIMIT 1`,[email]);
+  if(!userResult.rows.length) return {success:false,message:"The verification code is invalid or has expired."};
+  const user=userResult.rows[0];
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const tokenResult=await client.query(`SELECT id,code_hash,expires_at,attempts FROM transaction_pin_reset_tokens WHERE user_id=$1 AND used=FALSE AND expires_at>NOW() ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,[user.user_id]);
+    if(!tokenResult.rows.length){await client.query("ROLLBACK");return {success:false,message:"The verification code is invalid or has expired."};}
+    const token=tokenResult.rows[0];
+    if(Number(token.attempts)>=5){await client.query(`UPDATE transaction_pin_reset_tokens SET used=TRUE WHERE id=$1`,[token.id]);await client.query("COMMIT");return {success:false,message:"Too many verification attempts. Please request a new code."};}
+    if(hashResetToken(code)!==token.code_hash){
+      const attempts=Number(token.attempts)+1;
+      await client.query(`UPDATE transaction_pin_reset_tokens SET attempts=$1,used=CASE WHEN $1>=5 THEN TRUE ELSE used END WHERE id=$2`,[attempts,token.id]);
+      await client.query("COMMIT");
+      return {success:false,message:attempts>=5?"Too many verification attempts. Please request a new code.":"Incorrect verification code."};
+    }
+    const pinHash=hashPassword(newPin);
+    await client.query(`INSERT INTO user_security(user_id,transaction_pin_hash,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id) DO UPDATE SET transaction_pin_hash=EXCLUDED.transaction_pin_hash,updated_at=NOW()`,[user.user_id,pinHash]);
+    await client.query(`UPDATE transaction_pin_reset_tokens SET used=TRUE WHERE id=$1`,[token.id]);
+    await client.query(`UPDATE transaction_pin_reset_tokens SET used=TRUE WHERE user_id=$1 AND used=FALSE`,[user.user_id]);
+    await client.query("COMMIT");
+  }catch(error){
+    await client.query("ROLLBACK");
+    console.error("TRANSACTION PIN RESET ERROR:",error?.stack||error?.message||error);
+    return {success:false,message:"Unable to reset your Transaction PIN right now."};
+  }finally{client.release();}
+
+  const notice=await sendEmail({
+    to:user.email,
+    subject:"BOLTIV Transaction PIN Changed",
+    html:`<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717"><div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7"><div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div><h2 style="text-align:center;margin-top:28px">Transaction PIN changed</h2><p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(user.name||"BOLTIV User")}, your BOLTIV Transaction PIN was successfully changed.</p><p style="font-size:13px;line-height:1.6;color:#777">If you did not make this change, contact BOLTIV support immediately and secure your account.</p></div></body></html>`
+  });
+  if(!notice.success) console.error("TRANSACTION PIN CHANGE NOTICE FAILED:",notice.message);
+  return {success:true,message:"Transaction PIN reset successfully. Your new PIN is now active."};
+}
+
 async function handlePasswordRoutes(
 req,
 res,
 path
 ){
+
+/*
+FORGOT TRANSACTION PIN
+*/
+if(req.method==="POST"&&path==="/api/auth/forgot-transaction-pin"){
+  const b=await body(req);
+  const email=clean(b.email).toLowerCase();
+  const rl=rateLimit(req,`forgot-transaction-pin:${email||"unknown"}`,3,15*60*1000);
+  if(!rl.allowed)return rateLimitedResponse(res,rl);
+  const result=await requestTransactionPinReset(email);
+  return send(res,result.success?200:400,result);
+}
+
+/*
+RESET TRANSACTION PIN
+*/
+if(req.method==="POST"&&path==="/api/auth/reset-transaction-pin"){
+  const b=await body(req);
+  const email=clean(b.email).toLowerCase();
+  const rl=rateLimit(req,`reset-transaction-pin:${email||"unknown"}`,10,15*60*1000);
+  if(!rl.allowed)return rateLimitedResponse(res,rl);
+  const result=await resetTransactionPin(email,b.code,b.pin);
+  return send(res,result.success?200:400,result);
+}
 
 /*
 FORGOT PASSWORD
@@ -3906,6 +4003,7 @@ setTimeout(()=>runPlatformAlerts().catch(e=>console.error("INITIAL ALERT CHECK E
 setInterval(()=>runPlatformAlerts().catch(e=>console.error("ALERT CHECK ERROR",e)),300000).unref();
 
 await cleanupPasswordResetTokens();
+cleanupTransactionPinResetTokens();
 
 /*
 Clean expired reset tokens every hour.
@@ -3929,10 +4027,6 @@ console.log(
 
 console.log(
 `Frontend: ${FRONTEND_URL}`
-);
-
-console.log(
-`Resend email: ${RESEND_API_KEY?"configured":"MISSING"}; sender: ${MAIL_FROM}`
 );
 
 // Reconcile provider-pending transactions every 5 minutes.

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base href="/">
+<meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>BOLTIV — Reset Transaction PIN</title>
+<link href="style.css?v=20260823-pinreset" rel="stylesheet">
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png">
+<style>
+*{box-sizing:border-box}
+body{background:#fff;color:#171717}
+.auth-page{min-height:100vh;padding:45px 0 40px;background:#fff}
+.auth-logo img{width:70px;height:80px;object-fit:contain;display:block}
+.auth-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;color:#D4AF37;font-size:33px;font-weight:1000;letter-spacing:4px}
+.auth-tagline{text-align:center;color:#777;font-size:7.7px;letter-spacing:2px;margin-top:5px}
+.auth-card{margin-top:28px;padding:24px;border:1px solid #e5e5e5;border-radius:22px;background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.08)}
+.auth-card h1{margin:0;color:#171717;font-size:24px;font-weight:1000}
+.auth-subtitle{margin:7px 0 23px;color:#777;font-size:11px;line-height:1.6}
+.form-group{margin-bottom:17px}
+.auth-btn{width:100%;height:48px;margin-top:5px}
+.auth-links{display:flex;justify-content:center;margin-top:19px;font-size:11px}
+.auth-links a{color:#D4AF37;font-weight:800;text-decoration:none}
+.status-message{display:none;margin-bottom:16px;padding:12px;border-radius:11px;font-size:11px;line-height:1.6}
+.status-message.show{display:block}
+.status-message.error{color:#b42318;background:#fff1f0;border:1px solid #f3c7c3}
+.status-message.success{color:#856404;background:#fff9e6;border:1px solid #ead58a}
+.step{display:none}.step.active{display:block}
+.code-input{text-align:center;letter-spacing:7px;font-weight:900;font-size:22px}
+.pin-input{text-align:center;letter-spacing:8px;font-weight:900;font-size:22px}
+.helper{font-size:10px;color:#888;line-height:1.6;margin:-7px 0 17px}
+.success{text-align:center;display:none}.success.show{display:block}
+.success-icon{width:68px;height:68px;margin:0 auto 17px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#fff9e6;border:1px solid #D4AF37;color:#D4AF37;font-size:33px;font-weight:1000}
+.success h2{margin:0;font-size:23px;font-weight:1000}.success p{margin:9px auto 0;max-width:300px;color:#777;font-size:11px;line-height:1.7}
+.back-btn{display:block;width:100%;margin-top:20px;padding:14px;border-radius:12px;background:#D4AF37;color:#171717;text-align:center;text-decoration:none;font-size:11px;font-weight:1000}
+.resend{display:block;width:100%;margin-top:10px;border:0;background:transparent;color:#b8860b;font-size:11px;font-weight:900;cursor:pointer}
+@media (max-width:480px){.auth-card{padding:22px}.code-input,.pin-input{letter-spacing:5px}}
+</style>
+</head>
+<body>
+<div class="page"><div class="container"><div class="auth-page">
+<div class="auth-logo"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"><span>BOLTIV</span></div>
+<div class="auth-tagline">FAST. SIMPLE. POWERFUL.</div>
+<div class="auth-card">
+<div id="formArea">
+<h1>Reset Transaction PIN</h1>
+<p class="auth-subtitle">Use the email address on your BOLTIV account. We'll send a verification code so you can create a new 4-digit Transaction PIN.</p>
+<div aria-live="polite" class="status-message" id="statusMessage" role="status"></div>
+<div class="step active" id="stepEmail">
+<div class="form-group"><label class="label" for="emailInput">EMAIL ADDRESS</label><input class="input" id="emailInput" autocomplete="email" type="email" placeholder="you@example.com"></div>
+<button class="btn btn-primary auth-btn" id="sendCodeBtn" type="button">SEND VERIFICATION CODE</button>
+</div>
+<div class="step" id="stepCode">
+<div class="form-group"><label class="label" for="codeInput">VERIFICATION CODE</label><input class="input code-input" id="codeInput" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>
+<div class="form-group"><label class="label" for="newPinInput">NEW TRANSACTION PIN</label><input class="input pin-input" id="newPinInput" inputmode="numeric" autocomplete="new-password" maxlength="4" type="password" placeholder="••••"></div>
+<div class="form-group"><label class="label" for="confirmPinInput">CONFIRM NEW PIN</label><input class="input pin-input" id="confirmPinInput" inputmode="numeric" autocomplete="new-password" maxlength="4" type="password" placeholder="••••"></div>
+<p class="helper">Your Transaction PIN must be exactly 4 digits. Never share it with anyone.</p>
+<button class="btn btn-primary auth-btn" id="resetPinBtn" type="button">RESET TRANSACTION PIN</button>
+<button class="resend" id="resendBtn" type="button">SEND A NEW CODE</button>
+</div>
+<div class="auth-links"><a href="/login">← Back to Login</a></div>
+</div>
+<div class="success" id="successArea">
+<div class="success-icon">✓</div><h2>Transaction PIN Reset</h2>
+<p>Your Transaction PIN has been changed successfully. Your new PIN is now active.</p>
+<a class="back-btn" href="/login">BACK TO LOGIN</a>
+</div>
+</div></div></div></div>
+<script>
+const API_BASE="https://boltiv-backend.onrender.com";
+const emailInput=document.getElementById("emailInput"),codeInput=document.getElementById("codeInput"),newPinInput=document.getElementById("newPinInput"),confirmPinInput=document.getElementById("confirmPinInput");
+const statusMessage=document.getElementById("statusMessage"),stepEmail=document.getElementById("stepEmail"),stepCode=document.getElementById("stepCode"),successArea=document.getElementById("successArea"),formArea=document.getElementById("formArea");
+let sending=false;
+function showStatus(message,type="error"){statusMessage.textContent=message;statusMessage.className="status-message show "+type}
+function clearStatus(){statusMessage.textContent="";statusMessage.className="status-message"}
+[codeInput,newPinInput,confirmPinInput].forEach(input=>input.addEventListener("input",()=>{input.value=input.value.replace(/\D/g,"").slice(0,input===codeInput?6:4)}));
+async function requestCode(){
+ if(sending)return; clearStatus(); const email=emailInput.value.trim().toLowerCase(); if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return showStatus("Enter a valid email address.");
+ sending=true; document.getElementById("sendCodeBtn").disabled=true;
+ try{const r=await fetch(API_BASE+"/api/auth/forgot-transaction-pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});const data=await r.json().catch(()=>({}));if(!r.ok||!data.success)return showStatus(data.message||"Unable to send the verification code.");stepEmail.classList.remove("active");stepCode.classList.add("active");showStatus("If an account exists for that email, a verification code has been sent. The code expires in 10 minutes.","success");codeInput.focus();}catch(e){showStatus("Unable to contact BOLTIV right now. Please try again later.");}finally{sending=false;document.getElementById("sendCodeBtn").disabled=false;}
+}
+async function resetPin(){clearStatus();const email=emailInput.value.trim().toLowerCase(),code=codeInput.value.trim(),pin=newPinInput.value.trim(),confirm=confirmPinInput.value.trim();if(!/^[0-9]{6}$/.test(code))return showStatus("Enter the 6-digit verification code.");if(!/^[0-9]{4}$/.test(pin))return showStatus("Transaction PIN must contain exactly 4 digits.");if(pin!==confirm)return showStatus("The new PINs do not match.");const btn=document.getElementById("resetPinBtn");btn.disabled=true;try{const r=await fetch(API_BASE+"/api/auth/reset-transaction-pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code,pin})});const data=await r.json().catch(()=>({}));if(!r.ok||!data.success)return showStatus(data.message||"Unable to reset your Transaction PIN.");formArea.style.display="none";successArea.classList.add("show");}catch(e){showStatus("Unable to contact BOLTIV right now. Please try again later.");}finally{btn.disabled=false;}}
+document.getElementById("sendCodeBtn").onclick=requestCode;document.getElementById("resetPinBtn").onclick=resetPin;document.getElementById("resendBtn").onclick=requestCode;
+</script>
+</body></html>

@@ -230,25 +230,139 @@ finally{clearTimeout(timer);}}
 
 async function fetchVTUGATEServices(all=true){return vtugateRequest(all?"api/v1/fetchallservices":"api/v1/fetchservices",{});}
 async function getVTUGATEAccountDetails(){return vtugateRequest("api/v1/accountdetails",{});}
+
+const BOLTIV_PROVIDER_SERVICES=[
+  {key:"airtime",name:"Airtime",icon:"☎",aliases:["airtime","air time"]},
+  {key:"data",name:"Data",icon:"⌁",aliases:["data","mobile data","internet data","data bundle","data bundles"]},
+  {key:"cable",name:"Cable TV",icon:"▣",aliases:["cable tv","cable","dstv","gotv","startimes","showmax"]},
+  {key:"electricity",name:"Electricity",icon:"ϟ",aliases:["electricity","power","disco","ibedc","ekedc","ikedc","aedc","phed","kaedco","jed","kedco","eedc","yedc","bedc","apledc","aple"]},
+  {key:"exam_pin",name:"Exam PINs",icon:"◆",aliases:["education","education pin","exam pin","exam pins","waec","neco","jamb","nabteb"]}
+];
+const vtugateAvailabilityCache={at:0,services:[],error:null};
+function providerServiceEnabled(item){
+  if(!item || typeof item!=="object") return true;
+  const flags=[item.enabled,item.active,item.available,item.is_active,item.isActive,item.is_available,item.isAvailable];
+  const explicit=flags.find(v=>typeof v==='boolean');
+  if(explicit!==undefined) return explicit;
+  const status=clean(item.status??item.service_status??item.serviceStatus??'').toLowerCase();
+  if(status) return !['inactive','disabled','unavailable','offline','closed','suspended','maintenance','down','false','0'].includes(status);
+  return true;
+}
+function providerServiceText(item){return [item?.name,item?.service_name,item?.serviceName,item?.code,item?.service_code,item?.serviceCode,item?.slug,item?.type,item?.category,item?.service,item?.provider,item?.network,item?.network_name,item?.networkName,item?.product,item?.product_name,item?.productName].filter(v=>v!==undefined&&v!==null).join(' ').toLowerCase();}
+function providerHasCategory(items, definition){
+  return items.some(item=>{
+    if(!providerServiceEnabled(item)) return false;
+    const text=providerServiceText(item);
+    return definition.aliases.some(alias=>text===alias || text.includes(alias));
+  });
+}
+async function getVTUGATEAvailability(force=false){
+  const ttl=60000;
+  if(!force && vtugateAvailabilityCache.at && Date.now()-vtugateAvailabilityCache.at<ttl){
+    return vtugateAvailabilityCache.services;
+  }
+  try{
+    const r=await fetchVTUGATEServices(true);
+    if(!r.success) throw new Error(r.message||"Unable to load VTUGATE services.");
+    const items=extractProviderArray(r.data,["services","data","items","results"]);
+    if(!items.length) throw new Error("VTUGATE returned no service records.");
+    vtugateAvailabilityCache.services=BOLTIV_PROVIDER_SERVICES.map(def=>({
+      key:def.key,name:def.name,icon:def.icon,available:providerHasCategory(items,def)
+    }));
+    vtugateAvailabilityCache.at=Date.now();
+    vtugateAvailabilityCache.error=null;
+    return vtugateAvailabilityCache.services;
+  }catch(error){
+    vtugateAvailabilityCache.error=error.message;
+    // Fail closed: if VTUGATE cannot confirm availability, BOLTIV does not advertise the service.
+    vtugateAvailabilityCache.services=BOLTIV_PROVIDER_SERVICES.map(def=>({key:def.key,name:def.name,icon:def.icon,available:false}));
+    vtugateAvailabilityCache.at=Date.now();
+    return vtugateAvailabilityCache.services;
+  }
+}
+async function getPublicServiceAvailability(){
+  const provider=await getVTUGATEAvailability();
+  let local=[];
+  try{local=(await db(`SELECT key,enabled,maintenance,fee,config FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin')`)).rows;}catch{}
+  const localMap=new Map(local.map(x=>[x.key,x]));
+  return provider.map(x=>{
+    const dbService=localMap.get(x.key);
+    const locallyEnabled=dbService ? dbService.enabled!==false && dbService.maintenance!==true : true;
+    return {...x,available:Boolean(x.available && locallyEnabled)};
+  });
+}
+async function isVTUGATEServiceAvailable(key){
+  const list=await getPublicServiceAvailability();
+  return Boolean(list.find(x=>x.key===key)?.available);
+}
 const vtugateServiceCache={at:0,data:[]};
+function extractProviderArray(payload, preferredKeys=[]){
+  const seen=new Set();
+  function walk(value, depth=0){
+    if(value==null||depth>6)return null;
+    if(Array.isArray(value))return value;
+    if(typeof value!=="object"||seen.has(value))return null;
+    seen.add(value);
+    for(const key of preferredKeys){if(Array.isArray(value[key]))return value[key];}
+    for(const key of Object.keys(value)){const found=walk(value[key],depth+1);if(found)return found;}
+    return null;
+  }
+  return walk(payload)||[];
+}
+function serviceText(item){return [item?.name,item?.service_name,item?.serviceName,item?.code,item?.service_code,item?.serviceCode,item?.slug,item?.type,item?.provider,item?.network,item?.network_name,item?.networkName,item?.category].filter(v=>v!==undefined&&v!==null).join(" ").toLowerCase();}
+async function refreshVTUGATEServices(){
+  const r=await fetchVTUGATEServices(true);
+  if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");
+  vtugateServiceCache.data=extractProviderArray(r.data,["services","data","items","results"]);
+  vtugateServiceCache.at=Date.now();
+  if(!vtugateServiceCache.data.length)throw new Error("VTUGATE returned no service records.");
+  return vtugateServiceCache.data;
+}
 async function getVTUGATEServiceId(category,provider=""){
-const explicit=VTUGATE_SERVICE_MAP?.[provider]??VTUGATE_SERVICE_MAP?.[String(provider).toUpperCase()]??VTUGATE_SERVICE_MAP?.[category];
-if(Number(explicit)>0)return Number(explicit);
-if(Date.now()-vtugateServiceCache.at>300000){const r=await fetchVTUGATEServices(true);if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");const raw=Array.isArray(r.data?.data)?r.data.data:(Array.isArray(r.data?.services)?r.data.services:(Array.isArray(r.data)?r.data:[]));vtugateServiceCache.data=raw;vtugateServiceCache.at=Date.now();}
-const aliases={airtime:["airtime"],data:["data","mobile data","internet data"],cable:["cable","cable tv","dstv","gotv","startimes","showmax"],electricity:["electricity","power"],education:["education","education pin","exam pin"]};
-const wanted=[...(aliases[category]||[category]),clean(provider).toLowerCase()].filter(Boolean);
-const item=vtugateServiceCache.data.find(x=>{const hay=[x.name,x.service_name,x.code,x.service_code,x.slug,x.type,x.provider,x.network].filter(Boolean).join(" ").toLowerCase();return wanted.some(w=>hay===w||hay.includes(w));});
-const id=Number(item?.service_id??item?.serviceId??item?.id??item?.code);
-if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`); return id;
+  const providerKey=clean(provider).toLowerCase();
+  const explicit=VTUGATE_SERVICE_MAP?.[provider]??VTUGATE_SERVICE_MAP?.[String(provider).toUpperCase()]??VTUGATE_SERVICE_MAP?.[providerKey]??VTUGATE_SERVICE_MAP?.[category];
+  if(Number(explicit)>0)return Number(explicit);
+  if(Date.now()-vtugateServiceCache.at>300000||!vtugateServiceCache.data.length)await refreshVTUGATEServices();
+  const aliases={airtime:["airtime","air time"],data:["data","mobile data","internet data"],cable:["cable","cable tv","dstv","gotv","startimes","showmax"],electricity:["electricity","power"],education:["education","education pin","exam pin"]};
+  const categoryTerms=aliases[category]||[category];
+  const candidates=vtugateServiceCache.data.map((item,index)=>({item,index,text:serviceText(item)})).filter(x=>categoryTerms.some(term=>x.text.includes(term)));
+  const ranked=candidates.sort((a,b)=>{
+    const score=x=>{let n=0;if(providerKey&&x.text.includes(providerKey))n+=100;if(categoryTerms.some(t=>x.text===t))n+=20;if(x.text.includes(category))n+=10;if(x.item?.enabled===true||x.item?.status==="active")n+=2;return n;};
+    return score(b)-score(a);
+  });
+  const item=ranked[0]?.item;
+  const id=Number(item?.service_id??item?.serviceId??item?.id??item?.code);
+  if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provider||category} is not available from fetchallservices.`);
+  return id;
 }
 
 async function fetchVTUGATEDataPlans(network){
-const selected=normalizeDataNetwork(network); if(!selected)throw new Error("Unsupported network.");
-const serviceId=await getVTUGATEServiceId("data",selected);
-const response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
-if(!response.success)throw new Error(response.message||"Unable to load VTUGATE data plans.");
-const raw=Array.isArray(response.data?.data)?response.data.data:(Array.isArray(response.data?.plans)?response.data.plans:(Array.isArray(response.data)?response.data:[]));
-return raw.map(p=>{const name=clean(findCatalogField(p,["plan_name","name","plan","bundle_name","description"])??"");const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName"])??selected)||selected;const id=Number(findCatalogField(p,["id","plan_id","planId","bundle_id","bundleId","code"])??0);const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","price","amount","cost"])??0);const rawValidity=normalizeCatalogValidity(p);const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):Number(findCatalogField(p,["validity_days","validityDays"])||0);return{...p,network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number(p.service_id??p.serviceId??serviceId)};}).filter(p=>p.plan_id>0&&p.price>0&&p.name&&p.network_name===selected);
+  const selected=normalizeDataNetwork(network);
+  if(!selected)throw new Error("Unsupported network.");
+  let serviceId=await getVTUGATEServiceId("data",selected);
+  let response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
+  // Some VTUGATE service configurations use one shared Data service ID and
+  // ignore the network field; retry with the shared Data service if the
+  // network-specific lookup was rejected.
+  if(!response.success){
+    const sharedId=await getVTUGATEServiceId("data");
+    if(sharedId!==serviceId)response=await vtugateRequest("api/v1/fetchdataplans",{service_id:sharedId,network:selected});
+  }
+  if(!response.success)throw new Error(response.message||"Unable to load VTUGATE data plans.");
+  const raw=extractProviderArray(response.data,["plans","data","items","results"]);
+  if(!raw.length)throw new Error("VTUGATE returned no data plans for this network.");
+  return raw.map(p=>{
+    const name=clean(findCatalogField(p,["plan_name","planName","name","plan","bundle_name","bundleName","description"])??"");
+    const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName","network_code","networkCode"])??selected)||selected;
+    const id=Number(findCatalogField(p,["id","plan_id","planId","bundle_id","bundleId","code","plan_code","planCode"])??0);
+    const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","selling_price","sellingPrice","price","amount","cost"])??0);
+    const rawValidity=normalizeCatalogValidity(p);
+    const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
+    const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;
+    const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+    const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):Number(findCatalogField(p,["validity_days","validityDays","days"])||0);
+    return{...p,network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number(findCatalogField(p,["service_id","serviceId"])||serviceId)};
+  }).filter(p=>p.plan_id>0&&p.price>0&&p.name&&(!findCatalogField(p,["network","network_name","networkName","network_code","networkCode"])||p.network_name===selected));
 }
 const vtugatePlanCache=new Map();
 async function getAuthoritativeVTUGATEDataPlan(network,planId){const selected=normalizeDataNetwork(network);const id=Number(planId);if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>Number(x.plan_id)===id);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,provider_price:Number(plan.price),customer_price:customerPrice};}
@@ -3704,7 +3818,7 @@ byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean
 }
 const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});
-}catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}
+}catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:error?.message||"Unable to load VTUGATE data plans right now."});}
 }
 
 /*
@@ -3903,7 +4017,7 @@ if(req.method==='GET'&&path==='/api/pricing'){
   return send(res,200,{success:true,pricing:out});
 }
 
-if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin') ORDER BY key`);return send(res,200,{success:true,services:r.rows});}
+if(req.method==='GET'&&path==='/api/services'){const services=await getPublicServiceAvailability();return send(res,200,{success:true,services,provider:"vtugate",checked_at:new Date().toISOString()});}
 if(req.method==='GET'&&path==='/api/platform/settings'){return send(res,200,{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true))}});}
 
 /*

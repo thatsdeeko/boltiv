@@ -1,15 +1,14 @@
-# Pending transaction reconciliation
+# BOLTIV VTUGATE transaction reconciliation
 
-BOLTIV rechecks CheapDataHub Airtime, Data, and Exam PIN debit transactions that are `processing` or `pending` through the CheapDataHub Transactions API.
+BOLTIV rechecks VTUGATE transactions that are `processing` or `pending` through `POST /api/v1/transactionstatus`.
 
-- `successful` finalizes the transaction.
-- `failed` or `refunded` refunds the customer exactly once and marks the BOLTIV transaction `refunded`.
-- Provider timeouts, HTTP 409 duplicate responses, 5xx errors, and unavailable status checks are treated as unknown/pending; they are never auto-refunded solely because the provider could not be reached.
-- The reconciliation worker uses the CheapDataHub transaction ID/reference stored on the BOLTIV transaction.
-- Transactions older than 48 hours are left for admin review rather than automatically refunded.
+- `successful` finalizes the BOLTIV transaction.
+- `failed` or `refunded` refunds the customer exactly once and marks the BOLTIV transaction accordingly.
+- Provider timeouts and unavailable status checks remain pending/unknown; BOLTIV never refunds solely because a network request timed out.
+- The VTUGATE transaction ID/external reference is stored as `provider_reference`.
+- Transactions older than 48 hours remain available for admin review.
 - The reconciliation job runs every 5 minutes by default.
 
-CheapDataHub webhook integration is intentionally not required. The BOLTIV deployment should rely on the documented Transactions API for polling/reconciliation unless CheapDataHub explicitly enables and documents webhook delivery for the reseller account.
+Environment variable:
 
-Environment variables:
-- `PENDING_RECONCILE_INTERVAL_MS=300000`
+`PENDING_RECONCILE_INTERVAL_MS=300000`

@@ -15,11 +15,9 @@ const FRONTEND_URL=process.env.FRONTEND_URL||"https://boltiv.ng";
 const ADMIN_EMAIL=process.env.ADMIN_EMAIL||"";
 const ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||"";
 
-const SME_API_BASE_URL=(process.env.SME_API_BASE_URL||"https://smeapi.com.ng").replace(/\/+$/,"");
-const SME_API_KEY=process.env.SME_API_KEY||"";
-const SME_API_CABLE_PROVIDER_MAP=JSON.parse(process.env.SME_API_CABLE_PROVIDER_MAP||'{"DSTV":1,"GOTV":2,"STARTIMES":3}');
-const SME_API_ELECTRICITY_PROVIDER_MAP=JSON.parse(process.env.SME_API_ELECTRICITY_PROVIDER_MAP||'{}');
-const SME_API_CABLE_PLAN_MAP=JSON.parse(process.env.SME_API_CABLE_PLAN_MAP||'{}');
+const VTUGATE_API_BASE_URL=(process.env.VTUGATE_API_BASE_URL||"https://api.vtugate.com").replace(/\/+$/,"");
+const VTUGATE_API_KEY=process.env.VTUGATE_API_KEY||"";
+const VTUGATE_SERVICE_MAP=JSON.parse(process.env.VTUGATE_SERVICE_MAP||'{}');
 
 const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
 // Use a Resend-safe sender for testing when MAIL_FROM is not configured.
@@ -110,7 +108,7 @@ function clean(value){
 return String(value??"").trim();
 }
 
-// SME API has used slightly different casing/nesting for catalogue fields.
+// VTUGATE has used slightly different casing/nesting for catalogue fields.
 // Read catalogue values case-insensitively so fields such as Validity/validity
 // are never lost when the provider changes response casing.
 function findCatalogField(value, names, depth=0){
@@ -155,10 +153,8 @@ return Number.isFinite(amount)&&amount>0;
 
 
 /* =========================================================
-   SME API DATA CATALOG + SERVICE PRICING
+   VTUGATE DATA CATALOG + SERVICE PRICING
    ========================================================= */
-
-const SME_API_PLAN_URL=`${SME_API_BASE_URL}/api/dataplans/`;
 
 async function getService(key){
 const serviceKey=clean(key).toLowerCase();
@@ -172,7 +168,6 @@ return {...row,fee:Number(row.fee||0),config:row.config&&typeof row.config==="ob
 function pricingConfig(service){
 const config=service?.config&&typeof service.config==="object"?service.config:{};
 const adminPricing=config.pricing&&typeof config.pricing==="object"?config.pricing:null;
-
 if(adminPricing){
   let mode=clean(adminPricing.mode||"discount").toLowerCase();
   if(mode==="discount"||mode==="provider_discount")mode="provider_discount";
@@ -181,153 +176,131 @@ if(adminPricing){
   const discountPct=Number(adminPricing.discount_pct??adminPricing.discountPercent??0);
   const fixedProfit=Number(adminPricing.fixed_profit??adminPricing.fixedProfit??0);
   const serviceFee=Number(service?.fee||0);
-  return {
-    markup_mode:mode,
-    markup_pct:Number.isFinite(discountPct)?Math.min(100,Math.max(0,discountPct)):0,
-    markup_fixed:Number.isFinite(fixedProfit)?Math.max(0,fixedProfit):0,
-    service_fee:Number.isFinite(serviceFee)?Math.max(0,serviceFee):0
-  };
+  return {markup_mode:mode,markup_pct:Number.isFinite(discountPct)?Math.min(100,Math.max(0,discountPct)):0,markup_fixed:Number.isFinite(fixedProfit)?Math.max(0,fixedProfit):0,service_fee:Number.isFinite(serviceFee)?Math.max(0,serviceFee):0};
 }
-
 let mode=clean(config.markup_mode??config.markupMode??config.pricing_mode??config.pricingMode??"none").toLowerCase();
-if(mode==="percent")mode="percentage";
-if(mode==="fixed_amount")mode="fixed";
-if(mode==="cost_plus")mode="percentage_plus_fixed";
+if(mode==="percent")mode="percentage"; if(mode==="fixed_amount")mode="fixed"; if(mode==="cost_plus")mode="percentage_plus_fixed";
 const pct=Number(config.markup_pct??config.markupPercent??config.percentage??0);
 const fixed=Number(config.markup_fixed??config.markupFixed??config.fixed??service?.fee??0);
-return {
-markup_mode:["none","percentage","fixed","percentage_plus_fixed"].includes(mode)?mode:"none",
-markup_pct:Number.isFinite(pct)?Math.max(0,pct):0,
-markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0,
-service_fee:0
-};
+return {markup_mode:["none","percentage","fixed","percentage_plus_fixed"].includes(mode)?mode:"none",markup_pct:Number.isFinite(pct)?Math.max(0,pct):0,markup_fixed:Number.isFinite(fixed)?Math.max(0,fixed):0,service_fee:0};
 }
 
 function customerPriceFromCost(cost,pricing){
-const n=Number(cost);
-if(!Number.isFinite(n)||n<=0)return null;
-const p=pricing||{};
-let price=n;
-if(p.markup_mode==="provider_discount"){
-  price=n*(1-Number(p.markup_pct||0)/100);
-  price+=Number(p.markup_fixed||0);
-  price+=Number(p.service_fee||0);
-}else if(p.markup_mode==="fixed_profit"){
-  price=n+Number(p.markup_fixed||0)+Number(p.service_fee||0);
-}else if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
+const n=Number(cost); if(!Number.isFinite(n)||n<=0)return null; const p=pricing||{}; let price=n;
+if(p.markup_mode==="provider_discount"){price=n*(1-Number(p.markup_pct||0)/100)+Number(p.markup_fixed||0)+Number(p.service_fee||0);}
+else if(p.markup_mode==="fixed_profit"){price=n+Number(p.markup_fixed||0)+Number(p.service_fee||0);}
+else if(p.markup_mode==="fixed")price+=Number(p.markup_fixed||0);
 else if(p.markup_mode==="percentage")price+=n*Number(p.markup_pct||0)/100;
 else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)/100+Number(p.markup_fixed||0);
 return Number(price.toFixed(2));
 }
 
-function normalizeDataNetwork(value){
-const n=clean(value).toUpperCase().replace(/\s+/g,"");
-if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE";
-return ["MTN","AIRTEL","GLO"].includes(n)?n:"";
-}
-
-function smeNetworkId(value){
-const n=normalizeDataNetwork(value);
-return {MTN:1,AIRTEL:2,GLO:3,"9MOBILE":4}[n]||null;
-}
-
+function normalizeDataNetwork(value){const n=clean(value).toUpperCase().replace(/\s+/g,""); if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE"; return ["MTN","AIRTEL","GLO"].includes(n)?n:"";}
 function findTransactionField(value,keys,depth=0){if(depth>6||value==null)return "";if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}if(typeof value!=="object")return "";for(const key of keys){const v=value[key];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}for(const key of Object.keys(value)){const found=findTransactionField(value[key],keys,depth+1);if(found)return found;}return "";}
 
-async function smeApiRequest(endpoint,payload,options={}){
-if(!SME_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"SME API is not configured on the server."};
-const timeoutMs=Number(options.timeoutMs||15000);
-const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
+function vtugateStatus(data,responseOk=true){
+const raw=data?.data?.provider_status!==undefined?data.data.provider_status:(data?.status??data?.data?.status??data?.state??data?.result);
+const value=typeof raw==="boolean"?(raw?"successful":"failed"):String(raw??"").trim().toLowerCase();
+if(["pending","processing","initiated","queued","in progress"].includes(value))return "pending";
+if(["failed","failure","error","declined","rejected","false"].includes(value))return "failed";
+if(["refunded","refund"].includes(value))return "refunded";
+if(["success","successful","completed","complete","delivered","true"].includes(value))return "successful";
+if(data?.status===true||data?.data?.provider_status===true)return "successful";
+if(data?.status===false||data?.data?.provider_status===false)return "failed";
+return responseOk?"successful":"failed";
+}
+
+async function vtugateRequest(endpoint,payload={},options={}){
+if(!VTUGATE_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"VTUGATE API is not configured on the server."};
+const timeoutMs=Number(options.timeoutMs||20000); const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
 try{
-const response=await fetch(`${SME_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}`,{method:"POST",headers:{Authorization:`Token ${SME_API_KEY}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(payload),signal:controller.signal});
+const form=new URLSearchParams(); for(const [key,value] of Object.entries(payload||{})){if(value!==undefined&&value!==null)form.set(key,String(value));}
+const response=await fetch(`${VTUGATE_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}`,{method:"POST",headers:{Authorization:`Bearer ${VTUGATE_API_KEY}`,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:form.toString(),signal:controller.signal});
 let data={};try{data=await response.json();}catch{}
-const statusValue=String(findTransactionField(data,["status","Status","state","result"])||"").toLowerCase();
-const providerReference=findTransactionField(data,["reference","transaction_id","transactionId","id","request_id","requestId"] )||null;
-const message=data.message||data.msg||data.error||data.detail||"";
-if(response.ok && ["true","success","successful","completed","complete","delivered"].includes(statusValue))return {success:true,outcome:"successful",statusCode:response.status,data,providerReference,message:message||"Transaction successful."};
-if(["pending","processing","initiated","queued","in progress"].includes(statusValue))return {success:true,outcome:"pending",statusCode:response.status,data,providerReference,message:message||"Transaction is being processed."};
-if(["failed","failure","error","declined","rejected"].includes(statusValue))return {success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:message||"Transaction failed."};
-if(["refunded","refund"].includes(statusValue))return {success:false,outcome:"refunded",statusCode:response.status,data,providerReference,message:message||"Transaction was refunded by the provider."};
-if(response.status>=500||response.status===408||response.status===409)return {success:false,outcome:"unknown",statusCode:response.status,data,providerReference,message:message||"SME API could not confirm the transaction. Status verification is required."};
-return {success:false,outcome:response.ok?"successful":"failed",statusCode:response.status,data,providerReference,message:message||(response.ok?"Transaction successful.":`SME API request failed (${response.status}).`)};
-}catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,data:{},providerReference:null,message:e.name==="AbortError"?"SME API did not respond in time. Your transaction is being verified.":"SME API connection could not be confirmed. Your transaction is being verified."};}
-finally{clearTimeout(timer);}
+const outcome=vtugateStatus(data,response.ok);
+const providerReference=findTransactionField(data,["transaction_id","external_reference","reference","transactionId","id","request_id","requestId"])||null;
+const message=data?.message||data?.data?.provider_message||data?.data?.description||data?.error||data?.detail||"";
+if(response.ok&&outcome==="successful")return{success:true,outcome,statusCode:response.status,data,providerReference,message:message||"Transaction successful."};
+if(outcome==="pending")return{success:true,outcome,statusCode:response.status,data,providerReference,message:message||"Transaction is being processed."};
+if(outcome==="refunded")return{success:false,outcome,statusCode:response.status,data,providerReference,message:message||"Transaction was refunded by the provider."};
+if(response.status>=500||response.status===408||response.status===409)return{success:false,outcome:"unknown",statusCode:response.status,data,providerReference,message:message||"VTUGATE could not confirm the transaction. Status verification is required."};
+return{success:false,outcome:"failed",statusCode:response.status,data,providerReference,message:message||`VTUGATE request failed (${response.status}).`};
+}catch(e){return{success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,data:{},providerReference:null,message:e.name==="AbortError"?"VTUGATE did not respond in time. Your transaction is being verified.":"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
+finally{clearTimeout(timer);}}
+
+async function fetchVTUGATEServices(all=true){return vtugateRequest(all?"api/v1/fetchallservices":"api/v1/fetchservices",{});}
+async function getVTUGATEAccountDetails(){return vtugateRequest("api/v1/accountdetails",{});}
+const vtugateServiceCache={at:0,data:[]};
+async function getVTUGATEServiceId(category,provider=""){
+const explicit=VTUGATE_SERVICE_MAP?.[provider]??VTUGATE_SERVICE_MAP?.[String(provider).toUpperCase()]??VTUGATE_SERVICE_MAP?.[category];
+if(Number(explicit)>0)return Number(explicit);
+if(Date.now()-vtugateServiceCache.at>300000){const r=await fetchVTUGATEServices(true);if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");const raw=Array.isArray(r.data?.data)?r.data.data:(Array.isArray(r.data?.services)?r.data.services:(Array.isArray(r.data)?r.data:[]));vtugateServiceCache.data=raw;vtugateServiceCache.at=Date.now();}
+const aliases={airtime:["airtime"],data:["data","mobile data","internet data"],cable:["cable","cable tv","dstv","gotv","startimes","showmax"],electricity:["electricity","power"],education:["education","education pin","exam pin"]};
+const wanted=[...(aliases[category]||[category]),clean(provider).toLowerCase()].filter(Boolean);
+const item=vtugateServiceCache.data.find(x=>{const hay=[x.name,x.service_name,x.code,x.service_code,x.slug,x.type,x.provider,x.network].filter(Boolean).join(" ").toLowerCase();return wanted.some(w=>hay===w||hay.includes(w));});
+const id=Number(item?.service_id??item?.serviceId??item?.id??item?.code);
+if(!Number.isInteger(id)||id<=0)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`); return id;
 }
 
-async function smeApiGet(endpoint,options={}){
-if(!SME_API_KEY)return {success:false,outcome:"unavailable",statusCode:503,message:"SME API is not configured on the server."};
-const timeoutMs=Number(options.timeoutMs||10000); const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
-try{const response=await fetch(`${SME_API_BASE_URL}/${endpoint.replace(/^\/+/,"")}`,{headers:{Authorization:`Token ${SME_API_KEY}`,Accept:"application/json"},signal:controller.signal});let data={};try{data=await response.json();}catch{};return {success:response.ok,outcome:response.ok?"successful":"failed",statusCode:response.status,data,message:data.message||data.detail||(!response.ok?`SME API request failed (${response.status}).`:"Request successful.")};}
-catch(e){return {success:false,outcome:"unknown",statusCode:e.name==="AbortError"?504:502,message:"SME API request could not be completed."};}finally{clearTimeout(timer);}}
-
-async function fetchSMEDataPlans(network){
+async function fetchVTUGATEDataPlans(network){
 const selected=normalizeDataNetwork(network); if(!selected)throw new Error("Unsupported network.");
-const response=await smeApiGet("api/dataplans/"); if(!response.success)throw new Error(response.message||"Unable to load SME API data plans.");
+const serviceId=await getVTUGATEServiceId("data",selected);
+const response=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId,network:selected});
+if(!response.success)throw new Error(response.message||"Unable to load VTUGATE data plans.");
 const raw=Array.isArray(response.data?.data)?response.data.data:(Array.isArray(response.data?.plans)?response.data.plans:(Array.isArray(response.data)?response.data:[]));
-return raw.map(p=>{
-const name=clean(findCatalogField(p,["plan_name","name","plan"])??"");
-const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName"])??"");
-const id=Number(findCatalogField(p,["id","plan_id","planId"])??0);
-const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","price","amount"])??0);
-const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
-const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;
-const rawValidity=normalizeCatalogValidity(p);
-const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
-const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):(Number(findCatalogField(p,["validity_days","validityDays"])||0)>0?Number(findCatalogField(p,["validity_days","validityDays"])):0);
-return {network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,type:clean(findCatalogField(p,["type"])??"")};
-}).filter(p=>p.network_name===selected&&p.plan_id>0&&p.price>0&&p.name);}
-
-const smePlanCache=new Map();
-async function getAuthoritativeSMEDataPlan(network,planId){const selected=normalizeDataNetwork(network);const id=Number(planId);if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");let entry=smePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchSMEDataPlans(selected)};smePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>Number(x.plan_id)===id);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return {...plan,provider_price:Number(plan.price),customer_price:customerPrice};}
-
-async function getAuthoritativeSMEExamProduct(productId){
-const id=Number(productId); if(!Number.isInteger(id)||id<=0)throw new Error("Invalid exam PIN product.");
-const provider=await smeApiGet("api/exam/");
-const raw=Array.isArray(provider.data?.data)?provider.data.data:(Array.isArray(provider.data?.products)?provider.data.products:(Array.isArray(provider.data)?provider.data:[]));
-const found=raw.find(p=>Number(p.product_id??p.id??p.provider)===id); if(!found)throw new Error("The selected exam PIN product is no longer available.");
-const providerPrice=Number(found.price??found.amount??found.cost??found.user_price??found.vendor_price??0); const service=await getService("exam_pin"); if(!service||service.enabled===false||service.maintenance===true)throw new Error("Exam PIN service is currently unavailable."); const customerPrice=customerPriceFromCost(providerPrice,pricingConfig(service)); if(providerPrice<=0||customerPrice<=0)throw new Error("Unable to determine the current exam PIN price."); return {product_id:id,provider_price:providerPrice,customer_price:customerPrice,name:clean(found.name??found.exam_name??found.title??"Exam PIN")};
+return raw.map(p=>{const name=clean(findCatalogField(p,["plan_name","name","plan","bundle_name","description"])??"");const networkName=normalizeDataNetwork(findCatalogField(p,["network","network_name","networkName"])??selected)||selected;const id=Number(findCatalogField(p,["id","plan_id","planId","bundle_id","bundleId","code"])??0);const price=Number(findCatalogField(p,["vendor_price","agent_price","user_price","price","amount","cost"])??0);const rawValidity=normalizeCatalogValidity(p);const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);const sizeMb=sizeMatch?(sizeMatch[2].toUpperCase()==="GB"?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0;const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);const validityDays=validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):Number(findCatalogField(p,["validity_days","validityDays"])||0);return{...p,network_name:networkName,name,plan_id:id,price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number(p.service_id??p.serviceId??serviceId)};}).filter(p=>p.plan_id>0&&p.price>0&&p.name&&p.network_name===selected);
 }
+const vtugatePlanCache=new Map();
+async function getAuthoritativeVTUGATEDataPlan(network,planId){const selected=normalizeDataNetwork(network);const id=Number(planId);if(!selected||!Number.isInteger(id)||id<=0)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>Number(x.plan_id)===id);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,provider_price:Number(plan.price),customer_price:customerPrice};}
+async function resolveDataPlanName(network,planId){try{const plans=await fetchVTUGATEDataPlans(network);return clean(plans.find(x=>Number(x.plan_id)===Number(planId))?.name||"");}catch{return "";}}
 
-async function resolveDataPlanName(network,planId){try{const plans=await fetchSMEDataPlans(network);return clean(plans.find(x=>Number(x.plan_id)===Number(planId))?.name||"");}catch{return "";}}
-
-async function getSMETransaction(providerReference){
-if(!providerReference)return {success:false,outcome:"unknown",message:"Missing provider reference."};
-// SME API documents unique refs for purchase requests but does not expose a public
-// transaction-status endpoint in the public docs, so reconciliation is conservative.
-return {success:false,outcome:"unknown",message:"SME API transaction status lookup is not exposed in the public documentation."};
+async function getVTUGATEEducationPrice(serviceId){const r=await vtugateRequest("api/v1/geteducationtypeprice",{service_id:serviceId});if(!r.success)throw new Error(r.message||"Unable to load education PIN price.");return Number(r.data?.data?.price??r.data?.price??0);}
+async function getVTUGATEEducationProducts(){
+if(Date.now()-vtugateServiceCache.at>300000){const r=await fetchVTUGATEServices(true);if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");const raw=Array.isArray(r.data?.data)?r.data.data:(Array.isArray(r.data?.services)?r.data.services:(Array.isArray(r.data)?r.data:[]));vtugateServiceCache.data=raw;vtugateServiceCache.at=Date.now();}
+const wanted={waec:"WAEC",neco:"NECO",jamb:"JAMB",nabteb:"NABTEB"};const products=[];
+for(const [code,label] of Object.entries(wanted)){
+ const item=vtugateServiceCache.data.find(x=>{const hay=[x.name,x.service_name,x.code,x.service_code,x.slug,x.type,x.product_code,x.product].filter(Boolean).join(" ").toLowerCase();return hay.includes(code)||hay.includes(label.toLowerCase());});
+ const serviceId=Number(item?.service_id??item?.serviceId??item?.id??0);if(serviceId>0)products.push({service_id:serviceId,product_id:serviceId,product_code:code,name:label,exam_name:label});
 }
-
-async function reconcileSMETransactions(){
-let rows=[];try{rows=(await db(`SELECT id,provider_reference FROM transactions WHERE status IN ('processing','pending') AND provider_reference IS NOT NULL AND date>NOW()-INTERVAL '48 hours' ORDER BY date ASC LIMIT 100`)).rows;}catch(e){console.error("SME API RECONCILIATION QUERY ERROR:",e);return {success:false,error:e.message};}
-return {success:true,checked:rows.length,finalized:0,unverified:rows.length};
+if(!products.length){const fallback=await getVTUGATEServiceId("education");products.push({service_id:fallback,product_id:fallback,product_code:"waec",name:"WAEC",exam_name:"WAEC"});}
+return products;
 }
-async function reconcilePendingTransactions(){return reconcileSMETransactions();}
+async function getVTUGATETransaction(providerReference){if(!providerReference)return{success:false,outcome:"unknown",message:"Missing provider reference."};const r=await vtugateRequest("api/v1/transactionstatus",{transaction_id:providerReference,reference:providerReference});if(r.outcome==="successful")return{success:true,outcome:"successful",data:r.data,providerReference:r.providerReference||providerReference,message:r.message};if(r.outcome==="failed"||r.outcome==="refunded")return{success:false,outcome:r.outcome,data:r.data,providerReference:r.providerReference||providerReference,message:r.message};return{success:false,outcome:"unknown",data:r.data,providerReference:r.providerReference||providerReference,message:r.message||"VTUGATE transaction status is still unavailable."};}
+
+async function reconcileVTUGATETransactions(){
+let rows=[];try{rows=(await db(`SELECT id,provider_reference FROM transactions WHERE status IN ('processing','pending') AND provider_reference IS NOT NULL AND date>NOW()-INTERVAL '48 hours' ORDER BY date ASC LIMIT 100`)).rows;}catch(e){console.error("VTUGATE RECONCILIATION QUERY ERROR:",e);return{success:false,error:e.message};}
+let finalized=0,unverified=0;for(const row of rows){try{const r=await getVTUGATETransaction(row.provider_reference);if(r.outcome==="successful"||r.outcome==="failed"||r.outcome==="refunded"){await finalizeVTUTransaction(row.id,r.outcome,r.data||{},r.providerReference||row.provider_reference);finalized++;}else unverified++;}catch(e){unverified++;}}
+return{success:true,checked:rows.length,finalized,unverified};
+}
+async function reconcilePendingTransactions(){return reconcileVTUGATETransactions();}
 
 async function processVTUTransaction(user,data){
-const userId=clean(user.user_id); const service=clean(data.service||data.providerPayload?.service).toLowerCase(); const amount=Number(data.amount);
-if(!userId)return {success:false,statusCode:401,message:"Unauthorized."};
-if(!["airtime","data","exam_pin","cable","electricity"].includes(service))return {success:false,statusCode:400,message:"This service is not currently wired to SME API."};
-if(!validAmount(amount))return {success:false,statusCode:400,message:"Invalid amount."};
-if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test(clean(data.phone||data.providerPayload?.phone||"08000000000")))return {success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
-const idem=clean(data.idempotencyKey||data.idempotency_key); const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]); if(!security.rows[0]?.transaction_pin_hash)return {success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."}; const suppliedPin=String(data.transactionPin||""); if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return {success:false,statusCode:400,message:"Incorrect Transaction PIN."};
-let providerPayload,recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
+const userId=clean(user.user_id);const service=clean(data.service||data.providerPayload?.service).toLowerCase();const amount=Number(data.amount);
+if(!userId)return{success:false,statusCode:401,message:"Unauthorized."};
+if(!["airtime","data","exam_pin","cable","electricity"].includes(service))return{success:false,statusCode:400,message:"This service is not currently wired to VTUGATE."};
+if(!validAmount(amount))return{success:false,statusCode:400,message:"Invalid amount."};
+if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test(clean(data.phone||data.providerPayload?.phone||"08000000000")))return{success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
+const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};const suppliedPin=String(data.transactionPin||"");if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
+let providerPayload={},recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
 if(service==="data"){
-const planId=Number(data.bundle_id??data.plan_id??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??0); const network=normalizeDataNetwork(data.network||data.providerPayload?.network); let authoritative; try{authoritative=await getAuthoritativeSMEDataPlan(network,planId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};} if(Math.abs(amount-Number(authoritative.customer_price))>.009)return {success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."}; pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name}; providerPayload={network:smeNetworkId(network),data_plan:planId,phone:recipient,ref:null,ported_number:"false"};
+const planId=Number(data.bundle_id??data.plan_id??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??0);const network=normalizeDataNetwork(data.network||data.providerPayload?.network);let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};providerPayload={service_id:Number(authoritative.service_id),network,phone:recipient,plan_id:planId,plan_code:clean(data.plan_code||data.providerPayload?.plan_code||planId),bundle_id:planId,amount,ref:null};
 }else if(service==="exam_pin"){
-const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1); if(!Number.isInteger(productId)||productId<=0)return {success:false,statusCode:400,message:"Invalid exam PIN product."}; if(![1,2,5].includes(quantity))return {success:false,statusCode:400,message:"Exam PIN quantity must be 1, 2, or 5."}; let authoritative;try{authoritative=await getAuthoritativeSMEExamProduct(productId);}catch(e){return {success:false,statusCode:503,message:e.message||"Unable to verify the current exam PIN price."};} const expectedTotal=Number((authoritative.customer_price*quantity).toFixed(2)); if(Math.abs(amount-expectedTotal)>.009)return {success:false,statusCode:400,message:"The selected exam PIN price has changed. Please refresh the products and try again."}; pricingMeta={providerCost:Number((authoritative.provider_price*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-authoritative.provider_price*quantity).toFixed(2)),plan:authoritative.name}; providerPayload={provider:productId,quantity,ref:null}; recipient=null;
+const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return{success:false,statusCode:400,message:"Invalid education PIN product."};if(![1,2,5].includes(quantity))return{success:false,statusCode:400,message:"Education PIN quantity must be 1, 2, or 5."};const serviceId=productId;let unitPrice;try{unitPrice=await getVTUGATEEducationPrice(serviceId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current education PIN price."};}const productCode=clean(data.product_code||data.providerPayload?.product_code||data.exam||"waec");const expectedTotal=Number((unitPrice*quantity).toFixed(2));if(Math.abs(amount-expectedTotal)>.009)return{success:false,statusCode:400,message:"The selected education PIN price has changed. Please refresh the products and try again."};pricingMeta={providerCost:Number((unitPrice*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-unitPrice*quantity).toFixed(2)),plan:productCode.toUpperCase()};providerPayload={service_id:serviceId,phone:recipient||user.phone||"08000000000",quantity,product_code:productCode,ref:null};
 }else if(service==="airtime"){
-const network=normalizeDataNetwork(data.network||data.providerPayload?.network); if(!smeNetworkId(network))return {success:false,statusCode:400,message:"Unsupported network."}; providerPayload={network:smeNetworkId(network),amount,phone:recipient,ref:null,ported_number:"false"}; pricingMeta.network=network;
+const network=normalizeDataNetwork(data.network||data.providerPayload?.network);if(!network)return{success:false,statusCode:400,message:"Unsupported network."};const serviceId=await getVTUGATEServiceId("airtime",network);providerPayload={service_id:serviceId,network,amount,phone:recipient,airtime_amount:amount,ref:null};pricingMeta.network=network;
 }else if(service==="cable"){
-const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase(); const provider=Number(SME_API_CABLE_PROVIDER_MAP[providerName]||0); if(!provider)return {success:false,statusCode:400,message:`SME API cable provider ID for ${providerName||"this provider"} is not configured.`}; const plan=clean(data.plan||data.providerPayload?.plan); if(!plan)return {success:false,statusCode:400,message:"Cable TV plan is required."}; const mappedPlan=Number((SME_API_CABLE_PLAN_MAP[providerName]||{})[plan]||plan||0); if(!mappedPlan)return {success:false,statusCode:400,message:`SME API cable plan ID for ${providerName} / ${plan} is not configured.`}; providerPayload={provider,iucnumber:clean(data.smartcard||data.providerPayload?.smartcard),phone:recipient,plan:mappedPlan,ref:null}; pricingMeta.network=providerName; pricingMeta.plan=plan;
+const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("cable",providerName);const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,plan,package:plan,amount,ref:null};pricingMeta.network=providerName;pricingMeta.plan=plan;
 }else if(service==="electricity"){
-const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase(); const provider=Number(SME_API_ELECTRICITY_PROVIDER_MAP[providerName]||0); if(!provider)return {success:false,statusCode:400,message:`SME API electricity provider ID for ${providerName||"this provider"} is not configured.`}; const meterType=clean(data.meterType||data.providerPayload?.meterType||"Prepaid").toLowerCase(); providerPayload={provider,metertype:meterType,meternumber:clean(data.meterNumber||data.providerPayload?.meterNumber),amount,phone:recipient||"08000000000",ref:null}; pricingMeta.network=providerName; pricingMeta.plan=meterType;
+const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("electricity",providerName);const meterType=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meternumber=clean(data.meterNumber||data.providerPayload?.meterNumber);if(meternumber.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,provider:providerName,metertype:meterType.toLowerCase(),meter_type:meterType,meternumber,phone:recipient||"08000000000",amount,ref:null};pricingMeta.network=providerName;pricingMeta.plan=meterType;
 }
-const referenceValue=reference("BOLTIV-TX"); providerPayload.ref=referenceValue; const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"smeapi",request:providerPayload,pricing:pricingMeta}}); if(!reserved.success)return {success:false,statusCode:400,message:reserved.message,balance:0}; if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return {success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
-let providerResult;try{providerResult=await smeApiRequest(service==="airtime"?"api/airtime/":service==="data"?"api/data/":service==="exam_pin"?"api/exam/":service==="cable"?"api/cabletv/":"api/electricity/",providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"SME API connection could not be confirmed. Your transaction is being verified."};}
-const providerData=providerResult.data||{}; const providerReference=providerResult.providerReference||findTransactionField(providerData,["reference","transaction_id","transactionId","id"])||referenceValue; const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference); const wallet=await getWallet(userId); if(finalized.status==="refunded")return {success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"}; return {success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery:providerData?.data?.delivery||providerData?.delivery||null,pins:providerData?.data?.delivery?.pins||providerData?.delivery?.pins||[]};
+const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
+let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
+let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
+const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||findTransactionField(providerData,["transaction_id","external_reference","reference","transactionId","id"])||referenceValue;const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);const wallet=await getWallet(userId);if(finalized.status==="refunded")return{success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};const delivery=providerData?.data?.delivery||providerData?.delivery||null;const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];return{success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery,pins};
 }
 
-async function verifySMECable(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();const provider=Number(SME_API_CABLE_PROVIDER_MAP[providerName]||0);const iucnumber=clean(b.smartcard||b.iucnumber);if(!provider)return {success:false,statusCode:400,message:"SME API cable provider ID is not configured."};if(!/^\d{8,20}$/.test(iucnumber))return {success:false,statusCode:400,message:"Invalid smartcard/IUC number."};return smeApiRequest("api/cabletv/verify/",{provider,iucnumber,phone:clean(b.phone||"08000000000")});}
-async function verifySMEElectricity(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();const provider=Number(SME_API_ELECTRICITY_PROVIDER_MAP[providerName]||0);const meternumber=clean(b.meterNumber||b.meternumber);if(!provider)return {success:false,statusCode:400,message:"SME API electricity provider ID is not configured."};if(meternumber.length<8)return {success:false,statusCode:400,message:"Invalid meter number."};return smeApiRequest("api/electricity/verify/",{provider,metertype:clean(b.meterType||b.metertype||"Prepaid").toLowerCase(),meternumber,phone:clean(b.phone||"08000000000")});}
+async function verifyVTUGATECable(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("cable",providerName);const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};return vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:clean(b.phone||"08000000000")});}
+async function verifyVTUGATEElectricity(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("electricity",providerName);const meternumber=clean(b.meterNumber||b.meternumber);if(meternumber.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};const meterType=clean(b.meterType||b.metertype||"Prepaid");return vtugateRequest("api/v1/verifyelectricity",{service_id:serviceId,provider:providerName,metertype:meterType.toLowerCase(),meter_type:meterType,meternumber,phone:clean(b.phone||"08000000000")});}
 
 async function debitWallet(userId,amount){
 const client=await pool.connect();
@@ -2504,7 +2477,7 @@ if(!last||Date.now()-last>3600000){try{await sendEmail({to:ADMIN_EMAIL,subject:`
 return true;
 }
 async function resolvePlatformAlert(key){await db(`UPDATE platform_alerts SET status='resolved',resolved_at=COALESCE(resolved_at,NOW()) WHERE alert_key=$1 AND status='open'`,[key]);}
-async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['smeapi_config',!SME_API_KEY,'critical','SME API is not configured','The SME API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
+async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['vtugate_config',!VTUGATE_API_KEY,'critical','VTUGATE is not configured','The VTUGATE API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
 async function adminAlerts(req,action){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
@@ -2644,7 +2617,14 @@ async function adminMonitoring(req){
   const started=Date.now();let database="connected";try{await db("SELECT 1")}catch{database="unavailable"}
   let d={};try{d=(await db(`SELECT COUNT(*) FILTER (WHERE status IN ('processing','pending'))::int pending,COUNT(*) FILTER (WHERE status IN ('processing','pending') AND date<NOW()-INTERVAL '10 minutes')::int stale_pending,COUNT(*) FILTER (WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed_last_hour,COUNT(*) FILTER (WHERE status='successful' AND date>=NOW()-INTERVAL '24 hours')::int successful_last_24h,COUNT(*) FILTER (WHERE status IN ('failed','refunded') AND date>=NOW()-INTERVAL '24 hours')::int unsuccessful_last_24h,MAX(date) FILTER (WHERE status='successful') last_successful FROM transactions`)).rows[0]||{}}catch{return{success:false,statusCode:500,message:"Unable to load monitoring metrics."}}
   const total=Number(d.successful_last_24h||0)+Number(d.unsuccessful_last_24h||0);const rate=total?Math.round(Number(d.successful_last_24h||0)/total*1000)/10:100;
-  return{success:true,monitoring:{database,smeapi:Boolean(SME_API_KEY&&SME_API_BASE_URL),pending:Number(d.pending||0),stalePending:Number(d.stale_pending||0),failedLastHour:Number(d.failed_last_hour||0),successfulLast24h:Number(d.successful_last_24h||0),unsuccessfulLast24h:Number(d.unsuccessful_last_24h||0),successRate:rate,lastSuccessful:d.last_successful||null,responseMs:Date.now()-started,timestamp:new Date().toISOString()}};
+  return{success:true,monitoring:{database,vtugate:Boolean(VTUGATE_API_KEY&&VTUGATE_API_BASE_URL),pending:Number(d.pending||0),stalePending:Number(d.stale_pending||0),failedLastHour:Number(d.failed_last_hour||0),successfulLast24h:Number(d.successful_last_24h||0),unsuccessfulLast24h:Number(d.unsuccessful_last_24h||0),successRate:rate,lastSuccessful:d.last_successful||null,responseMs:Date.now()-started,timestamp:new Date().toISOString()}};
+}
+
+async function adminVTUGATEProvider(req,action){
+const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+if(action==="account"){const r=await getVTUGATEAccountDetails();return{success:r.success,statusCode:r.statusCode,message:r.message||"",account:r.data?.data||r.data||null};}
+if(action==="services"){const r=await fetchVTUGATEServices(true);return{success:r.success,statusCode:r.statusCode,message:r.message||"",services:r.data?.data||r.data?.services||r.data||[]};}
+return{success:false,statusCode:400,message:"Unsupported VTUGATE provider action."};
 }
 
 async function adminSupport(req,action){
@@ -2969,7 +2949,7 @@ if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adm
 if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
 if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
-if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/vtugate/account"){const result=await adminVTUGATEProvider(req,"account");return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/vtugate/services"){const result=await adminVTUGATEProvider(req,"services");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/analytics"){const result=await adminAnalytics(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/reconciliation"){const admin=await adminFromToken(req);if(!admin)return;const result=await getFinancialReconciliation();return send(res,200,{success:true,reconciliation:result});}
 if(req.method==="GET"&&path==="/api/admin/ledger"){const admin=await adminFromToken(req);if(!admin)return;const r=await db(`SELECT id,account_type,owner_id,direction,amount,balance_after,reference,transaction_id,category,description,created_at FROM financial_ledger ORDER BY created_at DESC LIMIT 300`);return send(res,200,{success:true,ledger:r.rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}))});}
@@ -3708,7 +3688,7 @@ const b=await body(req);
 const network=normalizeDataNetwork(b.network);
 if(!network)return send(res,400,{success:false,message:"Unsupported network."});
 try{
-const rawPlans=await fetchSMEDataPlans(network);
+const rawPlans=await fetchVTUGATEDataPlans(network);
 const service=await getService("data");
 if(!service)return send(res,503,{success:false,message:"Data service is not configured."});
 if(service.enabled===false)return send(res,503,{success:false,message:"Data service is currently unavailable."});
@@ -3720,36 +3700,33 @@ const bundleId=Number(plan.plan_id||0), providerPrice=Number(plan.price||0);
 if(!Number.isInteger(bundleId)||bundleId<=0||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
-byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||String(bundleId)),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:null,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
+byPlan.set(String(bundleId),{code:String(bundleId),bundle_id:bundleId,name:clean(plan.name||String(bundleId)),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:Number(plan.service_id||0),size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});
-}catch(error){console.error("SME_API DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load SME API data plans right now."});}
+}catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}
 }
 
 /*
-EXAM PIN CATALOG
+EDUCATION PIN CATALOG
+
+VTUGATE exposes current education pricing through geteducationtypeprice.
+The BOLTIV UI already supports a product selector, so we return the configured
+education product codes with their live per-pin price. Product codes can be
+customized with VTUGATE_EDUCATION_PRODUCTS.
 */
 
 if(req.method==="GET"&&path==="/api/vtu/exam-pin/products"){
-const user=await userFromToken(req);
-if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 try{
-const provider=await smeApiGet("api/exam/products/");
-if(!provider.success)return send(res,provider.statusCode>=500?502:400,{success:false,message:provider.message||"Unable to load exam PIN products."});
-const service=await getService("exam_pin");
-if(!service)return send(res,503,{success:false,message:"Exam PIN service is not configured."});
-if(service.enabled===false)return send(res,503,{success:false,message:"Exam PIN service is currently unavailable."});
-if(service.maintenance===true)return send(res,503,{success:false,message:"Exam PIN service is currently under maintenance."});
-const pricing=pricingConfig(service);
-const raw=Array.isArray(provider.data?.data)?provider.data.data:(Array.isArray(provider.data?.products)?provider.data.products:(Array.isArray(provider.data)?provider.data:[]));
-const products=raw.map(p=>{const cost=Number(p.price??p.amount??p.cost??0);const price=customerPriceFromCost(cost,pricing);return {product_id:Number(p.product_id??p.id??0),name:clean(p.name??p.exam_name??p.title??"Exam PIN"),exam_name:clean(p.exam_name??p.name??""),provider_price:cost,customer_price:price};}).filter(p=>Number.isInteger(p.product_id)&&p.product_id>0&&p.provider_price>0&&p.customer_price>0&&p.name);
+const service=await getService("exam_pin");if(!service)return send(res,503,{success:false,message:"Exam PIN service is not configured."});if(service.enabled===false)return send(res,503,{success:false,message:"Exam PIN service is currently unavailable."});if(service.maintenance===true)return send(res,503,{success:false,message:"Exam PIN service is currently under maintenance."});
+const baseProducts=await getVTUGATEEducationProducts();const pricing=pricingConfig(service);const products=[];for(const product of baseProducts){try{const price=await getVTUGATEEducationPrice(product.service_id);const customerPrice=customerPriceFromCost(price,pricing);if(price>0&&customerPrice>0)products.push({...product,provider_price:price,customer_price:customerPrice});}catch{}}
 return send(res,200,{success:true,products});
-}catch(error){console.error("EXAM PIN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load exam PIN products right now."});}
+}catch(error){console.error("VTUGATE EDUCATION CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:error.message||"Unable to load education PIN products right now."});}
 }
 
-if(req.method==="POST"&&path==="/api/vtu/cable/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifySMECable(req);return send(res,r.success?200:(r.statusCode||400),r);}
-if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifySMEElectricity(req);return send(res,r.success?200:(r.statusCode||400),r);}
+if(req.method==="POST"&&path==="/api/vtu/cable/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifyVTUGATECable(req);return send(res,r.success?200:(r.statusCode||400),r);}
+if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifyVTUGATEElectricity(req);return send(res,r.success?200:(r.statusCode||400),r);}
 
 /*
 VTU TRANSACTION
@@ -3872,8 +3849,8 @@ status:ready?"online":"degraded",
 database,
 configuration:{
 flutterwave:Boolean(FLW_SECRET_KEY),
-vtu:Boolean(SME_API_KEY&&SME_API_BASE_URL),
-smeapi:Boolean(SME_API_KEY&&SME_API_BASE_URL),
+vtu:Boolean(VTUGATE_API_KEY&&VTUGATE_API_BASE_URL),
+vtugate:Boolean(VTUGATE_API_KEY&&VTUGATE_API_BASE_URL),
 mail:Boolean(RESEND_API_KEY)
 },
 timestamp:new Date().toISOString()
@@ -4031,9 +4008,9 @@ console.log(
 
 // Reconcile provider-pending transactions every 5 minutes.
 const reconcileIntervalMs=Math.max(30000,Number(process.env.PENDING_RECONCILE_INTERVAL_MS||300000));
-setTimeout(()=>reconcileSMETransactions().catch(error=>console.error("INITIAL SME_API RECONCILIATION ERROR:",error)),15000).unref();
+setTimeout(()=>reconcileVTUGATETransactions().catch(error=>console.error("INITIAL VTUGATE RECONCILIATION ERROR:",error)),15000).unref();
 setInterval(()=>{
-  reconcileSMETransactions().catch(error=>console.error("AUTOMATIC SME_API RECONCILIATION ERROR:",error));
+  reconcileVTUGATETransactions().catch(error=>console.error("AUTOMATIC VTUGATE RECONCILIATION ERROR:",error));
 },reconcileIntervalMs).unref();
 
 console.log(
@@ -4054,7 +4031,7 @@ FLW_SECRET_KEY?
 
 console.log(
 `VTU configured: ${
-SME_API_KEY&&SME_API_BASE_URL?
+VTUGATE_API_KEY&&VTUGATE_API_BASE_URL?
 "YES":
 "NO"
 }`

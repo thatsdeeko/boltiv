@@ -21,10 +21,10 @@ const SME_API_CABLE_PROVIDER_MAP=JSON.parse(process.env.SME_API_CABLE_PROVIDER_M
 const SME_API_ELECTRICITY_PROVIDER_MAP=JSON.parse(process.env.SME_API_ELECTRICITY_PROVIDER_MAP||'{}');
 const SME_API_CABLE_PLAN_MAP=JSON.parse(process.env.SME_API_CABLE_PLAN_MAP||'{}');
 
-const RESEND_API_KEY=process.env.RESEND_API_KEY||"";
-// Use a Resend-safe sender for testing when MAIL_FROM is not configured.
-// For production, set MAIL_FROM to an address on a domain verified in Resend.
-const MAIL_FROM=(process.env.MAIL_FROM||"BOLTIV <onboarding@resend.dev>").trim();
+const RESEND_API_KEY=String(process.env.RESEND_API_KEY||"").trim();
+// Production sender. boltiv.ng must be verified in Resend before this address is used.
+// Keep MAIL_FROM configurable so the same backend can be used across environments.
+const MAIL_FROM=(process.env.MAIL_FROM||"BOLTIV <support@boltiv.ng>").trim();
 const FRONTEND_ORIGINS=String(process.env.FRONTEND_ORIGIN||(()=>{try{return new URL(FRONTEND_URL).origin}catch{return FRONTEND_URL}})())
 .split(",")
 .map(v=>v.trim())
@@ -1359,14 +1359,24 @@ html
 
 if(!RESEND_API_KEY){
 
-console.log(
-"RESEND_API_KEY is not configured."
-);
+console.error("RESEND EMAIL CONFIG ERROR: RESEND_API_KEY is missing.");
 
 return{
 success:false,
 message:
-"Email service is not configured."
+"Email service is not configured on the BOLTIV server. Please set RESEND_API_KEY in Render."
+};
+
+}
+
+if(!MAIL_FROM){
+
+console.error("RESEND EMAIL CONFIG ERROR: MAIL_FROM is empty.");
+
+return{
+success:false,
+message:
+"Email sender is not configured on the BOLTIV server. Please set MAIL_FROM in Render."
 };
 
 }
@@ -1398,15 +1408,22 @@ await response.json();
 
 if(!response.ok){
 
-console.error(
-"EMAIL ERROR:",
-data
-);
+const providerMessage=String(
+(data&&typeof data.message==="string"&&data.message)||
+(data&&typeof data.error==="string"&&data.error)||
+"Resend rejected the email request."
+).trim();
+
+console.error("RESEND EMAIL ERROR:",{
+status:response.status,
+message:providerMessage,
+from:MAIL_FROM,
+to:String(to||"")
+});
 
 return{
 success:false,
-message:
-"Unable to send email."
+message:`Email delivery failed: ${providerMessage}`
 };
 
 }
@@ -3912,6 +3929,10 @@ console.log(
 
 console.log(
 `Frontend: ${FRONTEND_URL}`
+);
+
+console.log(
+`Resend email: ${RESEND_API_KEY?"configured":"MISSING"}; sender: ${MAIL_FROM}`
 );
 
 // Reconcile provider-pending transactions every 5 minutes.

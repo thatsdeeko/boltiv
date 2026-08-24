@@ -526,3 +526,289 @@ html[data-theme="dark"] .status-badge,
 html[data-theme="dark"] .badge{
   color:#FFFFFF !important;
 }
+
+/* =========================================================
+   BOLTIV FINAL DARK THEME — BLACK / GOLD / PURE WHITE
+   This block is intentionally last so page-specific legacy
+   styles cannot break the global theme.
+   ========================================================= */
+html[data-theme="dark"] body,
+html[data-theme="dark"] body * {
+  color:#FFFFFF !important;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .page,
+html[data-theme="dark"] main,
+html[data-theme="dark"] section,
+html[data-theme="dark"] article,
+html[data-theme="dark"] header,
+html[data-theme="dark"] footer,
+html[data-theme="dark"] nav,
+html[data-theme="dark"] .container,
+html[data-theme="dark"] .content,
+html[data-theme="dark"] .main,
+html[data-theme="dark"] .app,
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .section,
+html[data-theme="dark"] .home-services-section,
+html[data-theme="dark"] .boltiv-home {
+  background:#000000 !important;
+  color:#FFFFFF !important;
+}
+
+/* Every real card/panel/surface is gold — never the page background. */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] [class*="-card"],
+html[data-theme="dark"] [class*="_card"],
+html[data-theme="dark"] .service-card,
+html[data-theme="dark"] .product,
+html[data-theme="dark"] .hero,
+html[data-theme="dark"] .box,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .content-card,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .modal-card,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .receipt,
+html[data-theme="dark"] .notice,
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .transaction-item,
+html[data-theme="dark"] .history-item,
+html[data-theme="dark"] .stat,
+html[data-theme="dark"] .form-card,
+html[data-theme="dark"] .security-card,
+html[data-theme="dark"] .support-card,
+html[data-theme="dark"] .profile-card,
+html[data-theme="dark"] .wallet-action,
+html[data-theme="dark"] .summary-card,
+html[data-theme="dark"] .admin-card,
+html[data-theme="dark"] .admin-panel,
+html[data-theme="dark"] .admin-stat,
+html[data-theme="dark"] .auth-card,
+html[data-theme="dark"] .login-card,
+html[data-theme="dark"] .airtime-card,
+html[data-theme="dark"] .data-card,
+html[data-theme="dark"] .home-balance-card,
+html[data-theme="dark"] .home-service-card,
+html[data-theme="dark"] .home-transaction,
+html[data-theme="dark"] .home-trust-card,
+html[data-theme="dark"] .coming-modal-card,
+html[data-theme="dark"] .wallet-modal-card,
+html[data-theme="dark"] .pin-modal-box,
+html[data-theme="dark"] .receipt-card,
+html[data-theme="dark"] .contact-card,
+html[data-theme="dark"] .policy-card,
+html[data-theme="dark"] .faq-item,
+html[data-theme="dark"] .seo-card,
+html[data-theme="dark"] .seo-service,
+html[data-theme="dark"] .seo-benefit,
+html[data-theme="dark"] .seo-step,
+html[data-theme="dark"] .seo-trust,
+html[data-theme="dark"] .seo-wallet-card,
+html[data-theme="dark"] .seo-availability-card,
+html[data-theme="dark"] .seo-faq details {
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#D4AF37 !important;
+  background-image:none !important;
+}
+
+/* Child elements inherit white text and do not create surprise white/gray blocks. */
+html[data-theme="dark"] .card *,
+html[data-theme="dark"] [class*="-card"] *,
+html[data-theme="dark"] [class*="_card"] *,
+html[data-theme="dark"] .service-card *,
+html[data-theme="dark"] .product *,
+html[data-theme="dark"] .hero *,
+html[data-theme="dark"] .box *,
+html[data-theme="dark"] .panel *,
+html[data-theme="dark"] .content-card *,
+html[data-theme="dark"] .modal-content *,
+html[data-theme="dark"] .modal-card *,
+html[data-theme="dark"] .form-card *,
+html[data-theme="dark"] .profile-card *,
+html[data-theme="dark"] .wallet-action *,
+html[data-theme="dark"] .summary-card *,
+html[data-theme="dark"] .admin-card *,
+html[data-theme="dark"] .admin-panel *,
+html[data-theme="dark"] .auth-card *,
+html[data-theme="dark"] .login-card *,
+html[data-theme="dark"] .home-balance-card *,
+html[data-theme="dark"] .home-service-card *,
+html[data-theme="dark"] .home-transaction *,
+html[data-theme="dark"] .home-trust-card * {
+  color:#FFFFFF !important;
+}
+
+/* Never turn structural containers gold. */
+html[data-theme="dark"] .container,
+html[data-theme="dark"] .content,
+html[data-theme="dark"] .main,
+html[data-theme="dark"] .app,
+html[data-theme="dark"] .page,
+html[data-theme="dark"] .section,
+html[data-theme="dark"] .home-services-section,
+html[data-theme="dark"] .provider-grid,
+html[data-theme="dark"] .grid2,
+html[data-theme="dark"] .grid3,
+html[data-theme="dark"] .table-wrap,
+html[data-theme="dark"] .toolbar,
+html[data-theme="dark"] .actions,
+html[data-theme="dark"] .form-group,
+html[data-theme="dark"] .detail-row,
+html[data-theme="dark"] .summary-row,
+html[data-theme="dark"] .row,
+html[data-theme="dark"] .bar,
+html[data-theme="dark"] .providers {
+  background:#000000 !important;
+}
+
+/* Form controls are black with pure-white text and gold edges. */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] input[type="text"],
+html[data-theme="dark"] input[type="email"],
+html[data-theme="dark"] input[type="tel"],
+html[data-theme="dark"] input[type="number"],
+html[data-theme="dark"] input[type="password"],
+html[data-theme="dark"] .input,
+html[data-theme="dark"] .search-box {
+  background:#000000 !important;
+  color:#FFFFFF !important;
+  border:1px solid #D4AF37 !important;
+  opacity:1 !important;
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color:#FFFFFF !important;
+  opacity:1 !important;
+}
+
+/* Buttons: gold primary, black secondary. */
+html[data-theme="dark"] button,
+html[data-theme="dark"] .btn,
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .auth-btn,
+html[data-theme="dark"] .purchase-button,
+html[data-theme="dark"] .wallet-modal-confirm,
+html[data-theme="dark"] .coming-modal-button {
+  color:#FFFFFF !important;
+  border-color:#D4AF37 !important;
+}
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .auth-btn,
+html[data-theme="dark"] .purchase-button,
+html[data-theme="dark"] .wallet-modal-confirm,
+html[data-theme="dark"] .coming-modal-button,
+html[data-theme="dark"] .filter-btn.active,
+html[data-theme="dark"] .filter-button.active,
+html[data-theme="dark"] .network-button.active,
+html[data-theme="dark"] .amount-button.active,
+html[data-theme="dark"] .plan-button.active {
+  background:#D4AF37 !important;
+}
+html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .btn-light,
+html[data-theme="dark"] .filter-btn,
+html[data-theme="dark"] .filter-button,
+html[data-theme="dark"] .network-button,
+html[data-theme="dark"] .amount-button,
+html[data-theme="dark"] .plan-button,
+html[data-theme="dark"] .back-button,
+html[data-theme="dark"] .wallet-modal-cancel,
+html[data-theme="dark"] .coming-modal-close {
+  background:#000000 !important;
+  color:#FFFFFF !important;
+}
+
+/* Gold brand/accent text remains gold; everything else is white. */
+html[data-theme="dark"] .brand,
+html[data-theme="dark"] .brand-name,
+html[data-theme="dark"] .home-brand,
+html[data-theme="dark"] .auth-logo,
+html[data-theme="dark"] .footer-logo,
+html[data-theme="dark"] .welcome-title span,
+html[data-theme="dark"] .home-welcome h1 span,
+html[data-theme="dark"] .section-link,
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .balance-value,
+html[data-theme="dark"] .balance-mark,
+html[data-theme="dark"] .admin-gold,
+html[data-theme="dark"] .nav-item.active,
+html[data-theme="dark"] .nav-item.active .nav-icon {
+  color:#D4AF37 !important;
+}
+
+/* Icons and avatars: black/white/gold, never gray. */
+html[data-theme="dark"] .service-icon,
+html[data-theme="dark"] .transaction-icon,
+html[data-theme="dark"] .wallet-modal-icon,
+html[data-theme="dark"] .success-ring {
+  background:#000000 !important;
+  color:#FFFFFF !important;
+  border-color:#FFFFFF !important;
+}
+html[data-theme="dark"] .profile-avatar {
+  background:#FFFFFF !important;
+  color:#D4AF37 !important;
+  border-color:#D4AF37 !important;
+}
+
+/* Bottom navigation stays black. */
+html[data-theme="dark"] .bottom-nav {
+  background:#000000 !important;
+  border-top:1px solid #D4AF37 !important;
+}
+html[data-theme="dark"] .nav-item,
+html[data-theme="dark"] .nav-item .nav-icon {
+  background:transparent !important;
+  color:#FFFFFF !important;
+}
+
+/* Tables use gold surfaces with white content. */
+html[data-theme="dark"] table,
+html[data-theme="dark"] .admin-table,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td {
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#FFFFFF !important;
+}
+
+/* Remove legacy gray text/opacity in dark mode. */
+html[data-theme="dark"] [style*="#777"],
+html[data-theme="dark"] [style*="#666"],
+html[data-theme="dark"] [style*="#555"],
+html[data-theme="dark"] [style*="#888"],
+html[data-theme="dark"] [style*="#999"],
+html[data-theme="dark"] [style*="#333"],
+html[data-theme="dark"] [style*="#222"],
+html[data-theme="dark"] [style*="#171717"] {
+  color:#FFFFFF !important;
+}
+html[data-theme="dark"] a,
+html[data-theme="dark"] p,
+html[data-theme="dark"] span,
+html[data-theme="dark"] label,
+html[data-theme="dark"] small,
+html[data-theme="dark"] strong,
+html[data-theme="dark"] b,
+html[data-theme="dark"] li,
+html[data-theme="dark"] td,
+html[data-theme="dark"] th {
+  opacity:1 !important;
+}
+
+/* Toggle: gold/black/white only. */
+html[data-theme="dark"] .boltiv-theme-toggle {
+  background:#000000 !important;
+  color:#FFFFFF !important;
+  border:1px solid #D4AF37 !important;
+}
+html[data-theme="light"] .boltiv-theme-toggle {
+  background:#FFFFFF !important;
+  color:#D4AF37 !important;
+  border:1px solid #D4AF37 !important;
+}

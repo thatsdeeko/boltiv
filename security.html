@@ -385,7 +385,8 @@ color:#f7f7f5;
 }
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="stylesheet" href="../boltiv-theme.css">
+</head>
 <body>
 <div class="page security-page">
 <div class="container">
@@ -823,6 +824,8 @@ updateStatus
 );
 
 </script>
+<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
+<script src="../boltiv-theme.js"></script>
 </body>
 </html>
 <!-- BOLTIV SECURITY -->

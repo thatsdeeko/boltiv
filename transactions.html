@@ -14,7 +14,8 @@
 @media (min-width:700px){.transactions-page{padding-bottom:120px}.filter-box{gap:10px}.filter-button{padding:11px 8px}}
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="stylesheet" href="../boltiv-theme.css">
+</head>
 <body>
 <div class="page transactions-page"><div class="container">
 <div class="transactions-header"><button class="back-button" onclick="history.back()">‹</button><div><div class="transactions-title">Transactions</div><div class="transactions-subtitle">YOUR PAYMENT ACTIVITY</div></div></div>
@@ -115,6 +116,8 @@ document.querySelectorAll(".nav-item").forEach(i=>i.onclick=()=>location.href=i.
 window.addEventListener("pageshow",async()=>{await syncTransactions();render()});
 setInterval(async()=>{const hasPending=getTransactions().some(t=>["pending","processing","initiated"].includes(String(t.status||"").toLowerCase()));if(hasPending){await syncTransactions();render();}},15000);
 </script>
+<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
+<script src="../boltiv-theme.js"></script>
 </body>
 </html>
 <!-- END OF BOLTIV TRANSACTIONS -->

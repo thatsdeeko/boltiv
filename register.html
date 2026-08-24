@@ -598,7 +598,8 @@ body{
     outline:3px solid #D4AF37;
     outline-offset:2px;
 }
-</style></head>
+</style><link rel="stylesheet" href="../boltiv-theme.css">
+</head>
 <body>
 <div class="page">
 <div class="container">
@@ -637,10 +638,11 @@ Join BOLTIV and manage your digital services
 <button aria-controls="confirmPasswordInput" aria-label="Show password" class="password-toggle" id="confirmPasswordToggle" type="button">SHOW</button>
 </div>
 </div>
-<div class="legal-consent">
-By creating an account, you agree to our
-<a href="/terms">Terms &amp; Conditions</a> and
-<a href="/privacy">Privacy Policy</a>.
+<div class="legal-consent" style="text-align:left">
+<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:#555">
+<input id="termsAgreement" type="checkbox" style="margin-top:3px;accent-color:#D4AF37">
+<span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>, including that BOLTIV wallet balances are non-transferable and redeemable only for supported BOLTIV services.</span>
+</label>
 </div>
 <button class="btn btn-primary auth-btn" id="registerButton">
 Create Account
@@ -823,6 +825,16 @@ registerButton.onclick=async()=>{
         return;
     }
 
+    const termsAgreement =
+        document.getElementById("termsAgreement").checked;
+
+    if(!termsAgreement){
+        showStatus(
+            "You must agree to the Terms & Conditions and Privacy Policy before creating your account."
+        );
+        return;
+    }
+
 
     registerButton.disabled=true;
 
@@ -855,7 +867,9 @@ registerButton.onclick=async()=>{
 
                     email:email,
 
-                    password:password
+                    password:password,
+
+                    termsAccepted:true
 
                 })
             }
@@ -894,29 +908,23 @@ registerButton.onclick=async()=>{
          We do NOT store the password.
          */
 
-        // Registration now returns a fresh authenticated session so the
-        // user can create their Transaction PIN immediately.
-        // Authentication is stored only in the HttpOnly cookie set by the backend.
-        if(data.sessionToken){
-            boltivMemoryStorage.setItem("boltivAuthToken", data.sessionToken);
-        }
-
-        if(data.user){
-            boltivMemoryStorage.setItem("boltivUser",JSON.stringify(data.user));
-            if(data.user.email) boltivMemoryStorage.setItem("boltivUserEmail",data.user.email);
-        }
-
-        boltivMemoryStorage.setItem("boltivLoggedIn","true");
+        // Registration does NOT create a login session.
+        // The customer must verify the email address first, then sign in.
+        boltivMemoryStorage.removeItem("boltivAuthToken");
+        boltivMemoryStorage.removeItem("boltivLoggedIn");
+        boltivMemoryStorage.removeItem("boltivUser");
+        boltivMemoryStorage.removeItem("boltivUserEmail");
         boltivMemoryStorage.removeItem("boltivBalance");
         boltivMemoryStorage.removeItem("boltivTransactions");
 
-        successUser.textContent=
-            "Welcome, "+name;
+        showStatus(
+            data.message || "Account created. Please check your email and verify your address before signing in.",
+            "success"
+        );
 
-        // Account creation succeeds first; the user is then sent to the
-        // mandatory Transaction PIN setup page. No authenticated BOLTIV
-        // area is opened until the PIN has been created.
-        location.replace("/security?setup=required");
+        setTimeout(()=>{
+            location.replace("/login?verification=pending");
+        },1800);
 
 
     }catch(error){
@@ -1021,5 +1029,7 @@ function setupPasswordToggle(toggleId,inputId){
 setupPasswordToggle("passwordToggle","passwordInput");
 setupPasswordToggle("confirmPasswordToggle","confirmPasswordInput");
 </script>
+<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
+<script src="../boltiv-theme.js"></script>
 </body>
 </html>

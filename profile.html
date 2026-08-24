@@ -43,7 +43,8 @@ boltivRequireAuth();
 @media(prefers-reduced-motion:reduce){.profile-page:before,.profile-page:after,.section,.identity-card{animation:none!important}.action{transition:none}}
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="stylesheet" href="../boltiv-theme.css">
+</head>
 <body>
 <div class="page profile-page">
 <div class="container">
@@ -706,6 +707,8 @@ window.addEventListener("pageshow",()=>{
 });
 
 </script>
+<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
+<script src="../boltiv-theme.js"></script>
 </body>
 </html>
 

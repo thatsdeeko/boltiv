@@ -272,7 +272,8 @@ body{
     outline:3px solid #D4AF37;
     outline-offset:2px;
 }
-</style></head>
+</style><link rel="stylesheet" href="../boltiv-theme.css">
+</head>
 <body>
 <div class="page">
 <div class="container">
@@ -290,6 +291,9 @@ Login to your BOLTIV account
 </p>
 <div aria-live="polite" class="status-message" id="statusMessage" role="status">
 </div>
+<button id="resendVerificationButton" type="button" style="display:none;width:100%;margin:-4px 0 16px;padding:11px;border:1px solid #e1cf91;border-radius:10px;background:#fffaf0;color:#9b760c;font-weight:800;cursor:pointer;">
+RESEND VERIFICATION EMAIL
+</button>
 <div class="form-group">
 <label class="label" for="emailInput">
 
@@ -337,6 +341,9 @@ document.getElementById("loginButton");
 
 const statusMessage =
 document.getElementById("statusMessage");
+
+const resendVerificationButton =
+document.getElementById("resendVerificationButton");
 
 
 function showStatus(
@@ -464,10 +471,12 @@ async function login(){
             !data.success
         ){
 
-            throw new Error(
+            const authError = new Error(
                 data.message ||
                 "Invalid email or password."
             );
+            authError.code = data.code || "";
+            throw authError;
 
         }
 
@@ -539,6 +548,10 @@ async function login(){
             "Unable to connect to BOLTIV."
         );
 
+        if(error.code === "EMAIL_NOT_VERIFIED"){
+            resendVerificationButton.style.display = "block";
+        }
+
 
     }finally{
 
@@ -552,6 +565,36 @@ async function login(){
 
 }
 
+
+resendVerificationButton.onclick = async()=>{
+    const email = document.getElementById("emailInput").value.trim().toLowerCase();
+    if(!/^\S+@\S+\.\S+$/.test(email)){
+        showStatus("Enter the email address you used to register.");
+        return;
+    }
+    resendVerificationButton.disabled=true;
+    resendVerificationButton.textContent="SENDING...";
+    try{
+        const response=await fetch(API_BASE+"/api/auth/resend-verification",{
+            method:"POST",
+            credentials:"include",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({email})
+        });
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok||!data.success) throw new Error(data.message||"Unable to resend verification email.");
+        showStatus(data.message||"A new verification email has been sent.","success");
+    }catch(error){
+        showStatus(error.message||"Unable to resend verification email.");
+    }finally{
+        resendVerificationButton.disabled=false;
+        resendVerificationButton.textContent="RESEND VERIFICATION EMAIL";
+    }
+};
+
+if(new URLSearchParams(location.search).get("verification")==="pending"){
+    showStatus("Account created. Check your email and verify your address before signing in.","success");
+}
 
 loginButton.onclick = login;
 
@@ -588,5 +631,7 @@ function setupPasswordToggle(toggleId,inputId){
 
 setupPasswordToggle("passwordToggle","passwordInput");
 </script>
+<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
+<script src="../boltiv-theme.js"></script>
 </body>
 </html>

@@ -1,0 +1,60 @@
+
+/* BOLTIV theme system */
+:root {
+  --boltiv-bg: #ffffff;
+  --boltiv-surface: #ffffff;
+  --boltiv-surface-2: #f5f7fa;
+  --boltiv-text: #111827;
+  --boltiv-muted: #667085;
+  --boltiv-border: #e5e7eb;
+  --boltiv-shadow: 0 8px 30px rgba(16, 24, 40, .08);
+}
+html[data-theme="dark"] {
+  --boltiv-bg: #0b0f14;
+  --boltiv-surface: #121821;
+  --boltiv-surface-2: #19212c;
+  --boltiv-text: #f3f4f6;
+  --boltiv-muted: #aab4c2;
+  --boltiv-border: #293442;
+  --boltiv-shadow: 0 10px 35px rgba(0, 0, 0, .35);
+}
+html[data-theme="dark"] body {
+  background-color: var(--boltiv-bg);
+  color: var(--boltiv-text);
+}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background-color: var(--boltiv-surface);
+  color: var(--boltiv-text);
+  border-color: var(--boltiv-border);
+}
+html[data-theme="dark"] a { color: inherit; }
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .container,
+html[data-theme="dark"] .dashboard-card,
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .form-card {
+  background-color: var(--boltiv-surface);
+  border-color: var(--boltiv-border);
+  box-shadow: var(--boltiv-shadow);
+}
+.boltiv-theme-toggle {
+  border: 1px solid var(--boltiv-border);
+  background: var(--boltiv-surface);
+  color: var(--boltiv-text);
+  border-radius: 999px;
+  min-width: 42px;
+  height: 40px;
+  padding: 0 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  transition: transform .15s ease, background .2s ease;
+}
+.boltiv-theme-toggle:hover { transform: translateY(-1px); }

@@ -298,3 +298,31 @@ html[data-theme="dark"] .boltiv-theme-toggle {
 @media (max-width: 480px) {
   .boltiv-theme-toggle { width: 36px; height: 36px; min-width: 36px; font-size: 16px; }
 }
+
+
+/* Universal BOLTIV theme toggle placement */
+html:not([data-theme="dark"]) .boltiv-theme-toggle,
+html[data-theme="dark"] .boltiv-theme-toggle {
+  font-family: inherit;
+}
+.boltiv-theme-toggle:not(.profile-theme-toggle) {
+  position: fixed !important;
+  top: 18px !important;
+  right: 18px !important;
+  z-index: 100000 !important;
+  box-sizing: border-box;
+  box-shadow: 0 8px 22px rgba(0,0,0,.14);
+}
+@media (max-width: 520px) {
+  .boltiv-theme-toggle:not(.profile-theme-toggle) {
+    top: 14px !important;
+    right: 14px !important;
+    min-width: 42px;
+    height: 42px;
+  }
+}
+.profile-theme-toggle {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+}

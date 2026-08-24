@@ -327,298 +327,225 @@ html[data-theme="dark"] .boltiv-theme-toggle {
   right: auto !important;
 }
 
+
 /* =========================================================
-   GLOBAL DARK COVERAGE — auth, wallet, services, profile
-   Ensures the dashboard dark/gold look applies site-wide.
+   SERVICE-PAGE DARK MODE — full surface treatment
+   These overrides intentionally win over the legacy inline light CSS.
    ========================================================= */
-
-/* Root surfaces & page chrome */
-html[data-theme="dark"] {
-  --bg: #0b1017;
-  --card: #141b24;
-  --card2: #1a222d;
-  --text: #f5f7fa;
-  --muted: #a5afbd;
-  --line: #2b3542;
-  --soft: #151c25;
-  --gold: #d7b23f;
-  --gold2: #d7b23f;
-}
-
-html[data-theme="dark"] body,
-html[data-theme="dark"] .page,
-html[data-theme="dark"] .auth-page,
-html[data-theme="dark"] .container,
-html[data-theme="dark"] main,
-html[data-theme="dark"] .profile-page,
+html[data-theme="dark"] .airtime-page,
+html[data-theme="dark"] .data-page,
+html[data-theme="dark"] .cable-page,
+html[data-theme="dark"] .electricity-page,
+html[data-theme="dark"] .exam-page,
+html[data-theme="dark"] .security-page,
+html[data-theme="dark"] .transactions-page,
 html[data-theme="dark"] .wallet-page,
-html[data-theme="dark"] .service-page {
-  background: #0b1017 !important;
-  color: #f5f7fa !important;
+html[data-theme="dark"] .profile-page,
+html[data-theme="dark"] .receipt-page {
+  background: var(--boltiv-bg) !important;
+  color: var(--boltiv-text) !important;
 }
 
-/* Headers across all pages */
-html[data-theme="dark"] .header,
-html[data-theme="dark"] .top-bar,
-html[data-theme="dark"] .app-header,
-html[data-theme="dark"] .page-header {
-  background: rgba(15, 21, 29, 0.96) !important;
-  border-bottom-color: #2b3542 !important;
-  color: #f5f7fa !important;
+/* Airtime + Data */
+html[data-theme="dark"] .airtime-header,
+html[data-theme="dark"] .data-header { border-bottom-color: var(--boltiv-border) !important; }
+html[data-theme="dark"] .airtime-title,
+html[data-theme="dark"] .data-title { color: var(--boltiv-gold) !important; }
+html[data-theme="dark"] .airtime-subtitle,
+html[data-theme="dark"] .data-subtitle { color: var(--boltiv-muted) !important; }
+html[data-theme="dark"] .airtime-page .back-button,
+html[data-theme="dark"] .data-page .back-button {
+  background: #151c25 !important; border-color: #394351 !important; color: #e9eef4 !important;
 }
+html[data-theme="dark"] .airtime-hero,
+html[data-theme="dark"] .data-hero {
+  background: linear-gradient(145deg,#1b222c 0%,#121922 100%) !important;
+  border-color: #6d5a25 !important; box-shadow: 0 18px 45px rgba(0,0,0,.25) !important;
+}
+html[data-theme="dark"] .airtime-hero-label,
+html[data-theme="dark"] .data-hero-label { color: var(--boltiv-gold) !important; }
+html[data-theme="dark"] .airtime-hero-title,
+html[data-theme="dark"] .data-hero-title { color: #f5f7fa !important; }
+html[data-theme="dark"] .airtime-hero-text,
+html[data-theme="dark"] .data-hero-text { color: var(--boltiv-muted) !important; }
+html[data-theme="dark"] .airtime-card,
+html[data-theme="dark"] .data-card {
+  background: #141b24 !important; border-color: var(--boltiv-border) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.22) !important;
+}
+html[data-theme="dark"] .airtime-label,
+html[data-theme="dark"] .data-label { color: #aab4c2 !important; }
+html[data-theme="dark"] .airtime-input,
+html[data-theme="dark"] .data-input {
+  background: #0f1620 !important; color: #f1f4f7 !important; border-color: #34404f !important;
+}
+html[data-theme="dark"] .airtime-input::placeholder,
+html[data-theme="dark"] .data-input::placeholder { color: #7c8795 !important; }
+html[data-theme="dark"] .network-button,
+html[data-theme="dark"] .amount-button,
+html[data-theme="dark"] .plan-button {
+  background: #171f29 !important; color: #b8c0cb !important; border-color: #35404e !important;
+}
+html[data-theme="dark"] .network-button.active,
+html[data-theme="dark"] .amount-button.active,
+html[data-theme="dark"] .plan-button.active {
+  background: #2b2514 !important; color: var(--boltiv-gold) !important; border-color: var(--boltiv-gold) !important;
+}
+html[data-theme="dark"] .purchase-button { color: #111 !important; }
 
-html[data-theme="dark"] .brand-name,
-html[data-theme="dark"] .home-brand,
-html[data-theme="dark"] .home-brand span {
-  color: #d7b23f !important;
+/* Cable TV + Electricity */
+html[data-theme="dark"] .cable-page .header,
+html[data-theme="dark"] .electricity-page .header { border-bottom: 1px solid var(--boltiv-border) !important; }
+html[data-theme="dark"] .cable-page .back,
+html[data-theme="dark"] .electricity-page .back {
+  background: #151c25 !important; border-color: #394351 !important; color: #e9eef4 !important;
 }
+html[data-theme="dark"] .cable-page .title,
+html[data-theme="dark"] .electricity-page .title { color: var(--boltiv-text) !important; }
+html[data-theme="dark"] .cable-page .subtitle,
+html[data-theme="dark"] .electricity-page .subtitle { color: var(--boltiv-muted) !important; }
+html[data-theme="dark"] .cable-page .card,
+html[data-theme="dark"] .electricity-page .card {
+  background: #141b24 !important; color: var(--boltiv-text) !important; border-color: var(--boltiv-border) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.22) !important;
+}
+html[data-theme="dark"] .cable-page .label,
+html[data-theme="dark"] .electricity-page .label { color: #aab4c2 !important; }
+html[data-theme="dark"] .cable-page .input,
+html[data-theme="dark"] .cable-page .select,
+html[data-theme="dark"] .electricity-page .input,
+html[data-theme="dark"] .electricity-page .select,
+html[data-theme="dark"] .electricity-page .amount-box {
+  background: #0f1620 !important; color: #f1f4f7 !important; border-color: #34404f !important;
+}
+html[data-theme="dark"] .cable-page .provider,
+html[data-theme="dark"] .electricity-page .provider {
+  background: #171f29 !important; color: #edf1f5 !important; border-color: #35404e !important;
+}
+html[data-theme="dark"] .cable-page .provider.active,
+html[data-theme="dark"] .electricity-page .provider.active {
+  background: #2b2514 !important; border-color: var(--boltiv-gold) !important;
+}
+html[data-theme="dark"] .cable-page .provider-text,
+html[data-theme="dark"] .electricity-page .provider-text { color: var(--boltiv-muted) !important; }
+html[data-theme="dark"] .cable-page .summary,
+html[data-theme="dark"] .electricity-page .summary {
+  background: #101720 !important; border-color: var(--boltiv-border) !important;
+}
+html[data-theme="dark"] .cable-page .summary-row,
+html[data-theme="dark"] .electricity-page .summary-row { color: var(--boltiv-muted) !important; }
+html[data-theme="dark"] .cable-page .summary-row strong,
+html[data-theme="dark"] .electricity-page .summary-row strong { color: #edf1f5 !important; }
+html[data-theme="dark"] .cable-page .verify,
+html[data-theme="dark"] .electricity-page .verify {
+  background: #2b2514 !important; color: var(--boltiv-gold) !important; border-color: #6d5a25 !important;
+}
+html[data-theme="dark"] .cable-page .pay,
+html[data-theme="dark"] .electricity-page .pay { color: #111 !important; }
+html[data-theme="dark"] .cable-page .message.error,
+html[data-theme="dark"] .electricity-page .error { background:#351b1e !important; color:#ef8b91 !important; border-color:#6d2d34 !important; }
+html[data-theme="dark"] .cable-page .message.success,
+html[data-theme="dark"] .electricity-page .success { background:#123522 !important; color:#6ed69a !important; border-color:#245f3a !important; }
 
-/* Cards & panels */
-html[data-theme="dark"] .card,
-html[data-theme="dark"] .auth-card,
-html[data-theme="dark"] .form-card,
-html[data-theme="dark"] .panel,
-html[data-theme="dark"] .wallet-card,
-html[data-theme="dark"] .service-card,
-html[data-theme="dark"] .notice,
-html[data-theme="dark"] .profile-card,
-html[data-theme="dark"] .identity-card,
-html[data-theme="dark"] .details-card,
-html[data-theme="dark"] .action,
-html[data-theme="dark"] .legal-link,
-html[data-theme="dark"] .list-item,
-html[data-theme="dark"] .tx-item,
-html[data-theme="dark"] .transaction-item,
-html[data-theme="dark"] .history-item,
-html[data-theme="dark"] .notification-item,
-html[data-theme="dark"] .support-card,
-html[data-theme="dark"] .faq-item {
-  background: #141b24 !important;
-  border-color: #2b3542 !important;
-  color: #f5f7fa !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22) !important;
+/* Exam PIN */
+html[data-theme="dark"] .exam-page .head { border-bottom: 1px solid var(--boltiv-border); }
+html[data-theme="dark"] .exam-page .back { background:#151c25 !important; border-color:#394351 !important; color:#e9eef4 !important; }
+html[data-theme="dark"] .exam-page .title { color:var(--boltiv-gold) !important; }
+html[data-theme="dark"] .exam-page .sub { color:var(--boltiv-muted) !important; }
+html[data-theme="dark"] .exam-page .hero,
+html[data-theme="dark"] .exam-page .card {
+  background: linear-gradient(145deg,#1b222c 0%,#141b24 100%) !important;
+  color:var(--boltiv-text) !important; border-color:var(--boltiv-border) !important;
 }
+html[data-theme="dark"] .exam-page .hero b { color:var(--boltiv-gold) !important; }
+html[data-theme="dark"] .exam-page .hero h1 { color:#f5f7fa !important; }
+html[data-theme="dark"] .exam-page .hero p,
+html[data-theme="dark"] .exam-page .label { color:var(--boltiv-muted) !important; }
+html[data-theme="dark"] .exam-page .select,
+html[data-theme="dark"] .exam-page .qty,
+html[data-theme="dark"] .exam-page .product {
+  background:#171f29 !important; color:#edf1f5 !important; border-color:#35404e !important;
+}
+html[data-theme="dark"] .exam-page .product.active { background:#2b2514 !important; border-color:var(--boltiv-gold) !important; }
+html[data-theme="dark"] .exam-page .price { color:var(--boltiv-gold) !important; }
 
-/* Balance / gold accent cards */
-html[data-theme="dark"] .balance-card,
-html[data-theme="dark"] .home-balance-card,
-html[data-theme="dark"] .wallet-balance {
-  background: linear-gradient(145deg, #1b222c 0%, #121922 100%) !important;
-  border-color: #6d5a25 !important;
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28) !important;
-}
+/* Security */
+html[data-theme="dark"] .security-page .security-header { border-bottom-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .security-page .security-card,
+html[data-theme="dark"] .security-page .security-hero { background:#141b24 !important; color:var(--boltiv-text) !important; border-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .security-page .security-input { background:#0f1620 !important; color:#f1f4f7 !important; border-color:#34404f !important; }
+html[data-theme="dark"] .security-page .security-label,
+html[data-theme="dark"] .security-page .security-subtitle { color:var(--boltiv-muted) !important; }
 
-html[data-theme="dark"] .balance-value,
-html[data-theme="dark"] .amount,
-html[data-theme="dark"] .wallet-amount {
-  color: #d7b23f !important;
+/* Wallet */
+html[data-theme="dark"] .wallet-page .header { background:#0f151d !important; border-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .wallet-page .balance-card,
+html[data-theme="dark"] .wallet-page .card,
+html[data-theme="dark"] .wallet-page .provider-card {
+  background:#141b24 !important; color:var(--boltiv-text) !important; border-color:var(--boltiv-border) !important;
 }
+html[data-theme="dark"] .wallet-page .label,
+html[data-theme="dark"] .wallet-page .section-title { color:#aab4c2 !important; }
+html[data-theme="dark"] .wallet-page .input { background:#0f1620 !important; color:#f1f4f7 !important; border-color:#34404f !important; }
+html[data-theme="dark"] .wallet-page .wallet-modal-card { background:#141b24 !important; border-color:#35404e !important; color:#f5f7fa !important; }
+html[data-theme="dark"] .wallet-page .wallet-modal-title,
+html[data-theme="dark"] .wallet-page .wallet-modal-amount { color:#f5f7fa !important; }
+html[data-theme="dark"] .wallet-page .wallet-modal-text,
+html[data-theme="dark"] .wallet-page .wallet-modal-label { color:var(--boltiv-muted) !important; }
+html[data-theme="dark"] .wallet-page .wallet-modal-amount-box { background:#101720 !important; border-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .wallet-page .wallet-modal-cancel { background:#171f29 !important; color:#edf1f5 !important; border-color:#35404e !important; }
 
-html[data-theme="dark"] .balance-label,
-html[data-theme="dark"] .summary-label,
-html[data-theme="dark"] .label,
-html[data-theme="dark"] .muted,
-html[data-theme="dark"] .auth-subtitle,
-html[data-theme="dark"] .welcome-text,
-html[data-theme="dark"] .section-title,
-html[data-theme="dark"] small,
-html[data-theme="dark"] .helper,
-html[data-theme="dark"] .hint {
-  color: #a5afbd !important;
+/* Transactions */
+html[data-theme="dark"] .transactions-page .transactions-header { border-bottom-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .transactions-page .back-button { background:#151c25 !important; border-color:#394351 !important; color:#e9eef4 !important; }
+html[data-theme="dark"] .transactions-page .transactions-title { color:#f5f7fa !important; }
+html[data-theme="dark"] .transactions-page .transactions-subtitle { color:var(--boltiv-muted) !important; }
+html[data-theme="dark"] .transactions-page .search-box,
+html[data-theme="dark"] .transactions-page .filter-button,
+html[data-theme="dark"] .transactions-page .transaction-summary,
+html[data-theme="dark"] .transactions-page .transaction-item,
+html[data-theme="dark"] .transactions-page .modal-card {
+  background:#141b24 !important; color:var(--boltiv-text) !important; border-color:var(--boltiv-border) !important;
 }
+html[data-theme="dark"] .transactions-page .transaction-search { background:transparent !important; color:#f1f4f7 !important; border:0 !important; }
+html[data-theme="dark"] .transactions-page .filter-button.active { background:var(--boltiv-gold) !important; color:#111 !important; border-color:var(--boltiv-gold) !important; }
 
-/* Buttons */
-html[data-theme="dark"] .btn-primary,
-html[data-theme="dark"] button.primary,
-html[data-theme="dark"] .submit-btn,
-html[data-theme="dark"] .cta {
-  background: linear-gradient(135deg, #d9b542, #b5891d) !important;
-  color: #111 !important;
-  border-color: transparent !important;
+/* Profile */
+html[data-theme="dark"] .profile-page .identity-card,
+html[data-theme="dark"] .profile-page .details-card,
+html[data-theme="dark"] .profile-page .action {
+  background:#141b24 !important; color:var(--boltiv-text) !important; border-color:var(--boltiv-border) !important;
 }
+html[data-theme="dark"] .profile-page .detail-label,
+html[data-theme="dark"] .profile-page .profile-sub,
+html[data-theme="dark"] .profile-page .action-sub { color:var(--boltiv-muted) !important; }
+html[data-theme="dark"] .profile-page .detail-input { background:transparent !important; color:#f5f7fa !important; border-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .profile-page .profile-title,
+html[data-theme="dark"] .profile-page .identity-name,
+html[data-theme="dark"] .profile-page .identity-email,
+html[data-theme="dark"] .profile-page .action-title { color:#f5f7fa !important; }
 
-html[data-theme="dark"] .btn-secondary,
-html[data-theme="dark"] .btn-light,
-html[data-theme="dark"] .btn-outline {
-  background: #171f29 !important;
-  color: #eef2f6 !important;
-  border-color: #3a4553 !important;
-}
+/* Receipt */
+html[data-theme="dark"] .receipt-page .receipt-card { background:#141b24 !important; color:#f5f7fa !important; border-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .receipt-page .row { border-bottom-color:var(--boltiv-border) !important; }
+html[data-theme="dark"] .receipt-page .row span { color:var(--boltiv-muted) !important; }
+html[data-theme="dark"] .receipt-page .row strong { color:#f5f7fa !important; }
+html[data-theme="dark"] .receipt-page .status { background:#2b2514 !important; color:var(--boltiv-gold) !important; }
+html[data-theme="dark"] .receipt-page .secondary { background:#2b2514 !important; color:var(--boltiv-gold) !important; border-color:#6d5a25 !important; }
 
-html[data-theme="dark"] .btn-danger,
-html[data-theme="dark"] .logout-btn {
-  background: #351b1e !important;
-  color: #ef8b91 !important;
-  border-color: #5a2a30 !important;
+/* Service-page bottom navigation, including the alternate .nav markup. */
+html[data-theme="dark"] .airtime-page ~ .bottom-nav,
+html[data-theme="dark"] .data-page ~ .bottom-nav,
+html[data-theme="dark"] .cable-page ~ .bottom-nav,
+html[data-theme="dark"] .electricity-page ~ .bottom-nav,
+html[data-theme="dark"] .exam-page ~ .bottom-nav,
+html[data-theme="dark"] .transactions-page ~ .bottom-nav,
+html[data-theme="dark"] .wallet-page ~ .bottom-nav,
+html[data-theme="dark"] .receipt-page ~ .bottom-nav,
+html[data-theme="dark"] .bottom-nav {
+  background:rgba(14,20,28,.97) !important; border-top-color:var(--boltiv-border) !important;
 }
-
-/* Form controls */
-html[data-theme="dark"] input,
-html[data-theme="dark"] select,
-html[data-theme="dark"] textarea,
-html[data-theme="dark"] .input,
-html[data-theme="dark"] .form-control,
-html[data-theme="dark"] .search-box {
-  background: #141b24 !important;
-  color: #f2f5f8 !important;
-  border-color: #2b3542 !important;
-}
-
-html[data-theme="dark"] input:focus,
-html[data-theme="dark"] select:focus,
-html[data-theme="dark"] textarea:focus,
-html[data-theme="dark"] .input:focus {
-  border-color: #d7b23f !important;
-  box-shadow: 0 0 0 2px rgba(215, 178, 63, 0.18) !important;
-}
-
-html[data-theme="dark"] input::placeholder,
-html[data-theme="dark"] textarea::placeholder {
-  color: #778391 !important;
-}
-
-/* Links & accents */
-html[data-theme="dark"] a.link,
-html[data-theme="dark"] .text-link,
-html[data-theme="dark"] .section-link,
-html[data-theme="dark"] .eyebrow,
-html[data-theme="dark"] .gold-text {
-  color: #d7b23f !important;
-}
-
-/* Service icons / quick tiles */
-html[data-theme="dark"] .service-icon,
-html[data-theme="dark"] .icon-wrap,
-html[data-theme="dark"] .tile-icon {
-  background: #211f17 !important;
-  border-color: #625324 !important;
-  color: #d7b23f !important;
-}
-
-html[data-theme="dark"] .home-service-card,
-html[data-theme="dark"] .service-tile {
-  background: #141b24 !important;
-  border-color: #2b3542 !important;
-}
-
-/* Auth specific (login / register hardcode white) */
-html[data-theme="dark"] .auth-page,
-html[data-theme="dark"] .auth-page body,
-html[data-theme="dark"] .login-wrap,
-html[data-theme="dark"] .register-wrap {
-  background: #0b1017 !important;
-}
-
-html[data-theme="dark"] .auth-card h1,
-html[data-theme="dark"] .auth-title,
-html[data-theme="dark"] .welcome-title,
-html[data-theme="dark"] h1,
-html[data-theme="dark"] h2,
-html[data-theme="dark"] h3 {
-  color: #f3f5f8 !important;
-}
-
-html[data-theme="dark"] .auth-card h1 span,
-html[data-theme="dark"] .welcome-title span {
-  color: #d7b23f !important;
-}
-
-/* Tables & lists */
-html[data-theme="dark"] table,
-html[data-theme="dark"] thead,
-html[data-theme="dark"] tbody,
-html[data-theme="dark"] tr,
-html[data-theme="dark"] td,
-html[data-theme="dark"] th {
-  background: transparent !important;
-  color: #e8edf3 !important;
-  border-color: #2b3542 !important;
-}
-
-html[data-theme="dark"] thead th,
-html[data-theme="dark"] .table-head {
-  background: #1b232e !important;
-  color: #dce2e8 !important;
-}
-
-/* Bottom nav already covered; reinforce */
-html[data-theme="dark"] .bottom-nav,
-html[data-theme="dark"] nav.bottom {
-  background: rgba(14, 20, 28, 0.97) !important;
-  border-top-color: #2b3542 !important;
-}
-
-html[data-theme="dark"] .bottom-nav .nav-item.active,
-html[data-theme="dark"] .bottom-nav .nav-item.active .nav-icon {
-  color: #d7b23f !important;
-}
-
-/* Icon buttons / profile mini */
-html[data-theme="dark"] .icon-button,
-html[data-theme="dark"] .profile-mini,
-html[data-theme="dark"] .back-button {
-  background: #151c25 !important;
-  border-color: #394351 !important;
-  color: #e8edf3 !important;
-}
-
-/* Status pills */
-html[data-theme="dark"] .status-pill.success,
-html[data-theme="dark"] .badge-success { background: #123522 !important; color: #6ed69a !important; }
-html[data-theme="dark"] .status-pill.pending,
-html[data-theme="dark"] .badge-pending { background: #302814 !important; color: #e3bd45 !important; }
-html[data-theme="dark"] .status-pill.failed,
-html[data-theme="dark"] .badge-failed { background: #351b1e !important; color: #ef8b91 !important; }
-
-/* Modals / overlays */
-html[data-theme="dark"] .modal,
-html[data-theme="dark"] .modal-box,
-html[data-theme="dark"] .modal-content,
-html[data-theme="dark"] .coming-modal-card {
-  background: linear-gradient(145deg, #1a222c 0%, #121922 100%) !important;
-  border-color: #5e5026 !important;
-  color: #f2f4f7 !important;
-}
-
-html[data-theme="dark"] .coming-modal-backdrop,
-html[data-theme="dark"] .modal-backdrop {
-  background: rgba(8, 12, 18, 0.72) !important;
-}
-
-/* Receipt / support / legal pages */
-html[data-theme="dark"] .receipt-card,
-html[data-theme="dark"] .legal-content,
-html[data-theme="dark"] .terms-body,
-html[data-theme="dark"] .privacy-body {
-  background: #141b24 !important;
-  color: #e8edf3 !important;
-  border-color: #2b3542 !important;
-}
-
-/* Admin */
-html[data-theme="dark"] .admin-shell,
-html[data-theme="dark"] .admin-sidebar,
-html[data-theme="dark"] .admin-main {
-  background: #0b1017 !important;
-  color: #f5f7fa !important;
-}
-html[data-theme="dark"] .admin-sidebar {
-  background: #121922 !important;
-  border-color: #2b3542 !important;
-}
-
-/* Prevent white flashes from inline styles on auth pages */
-html[data-theme="dark"] [style*="background:#fff"],
-html[data-theme="dark"] [style*="background: #fff"],
-html[data-theme="dark"] [style*="background:#ffffff"],
-html[data-theme="dark"] [style*="background: #ffffff"],
-html[data-theme="dark"] [style*="background:#fbf"],
-html[data-theme="dark"] [style*="background:#fffdf"] {
-  background: #141b24 !important;
-}
-
-/* Selection */
-html[data-theme="dark"] ::selection {
-  background: rgba(215, 178, 63, 0.35);
-  color: #fff;
-}
+html[data-theme="dark"] .bottom-nav .nav,
+html[data-theme="dark"] .bottom-nav .nav-item { color:#8f9aa8 !important; }
+html[data-theme="dark"] .bottom-nav .nav.active,
+html[data-theme="dark"] .bottom-nav .nav-item.active { color:var(--boltiv-gold) !important; }

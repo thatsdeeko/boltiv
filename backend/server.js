@@ -404,7 +404,9 @@ const normalized=raw.map(p=>{
 });
 const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean));
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
-return normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&(!hasOtherNetwork||p.network_name===selected));
+const nonRetailTerms=['thryve','msme','fibrenet','hynetflex','mifi','router','learning bundle'];
+const isNonRetail=name=>{const lower=String(name||'').toLowerCase();return nonRetailTerms.some(term=>lower.includes(term));};
+return normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
 }
 const vtugatePlanCache=new Map();
 function planLookupKey(planCode,serviceId){return `${Number(serviceId)||0}:${clean(planCode)}`;}

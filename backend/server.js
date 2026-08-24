@@ -355,19 +355,20 @@ async function fetchVTUGATEDataPlans(network){
 const selected=normalizeDataNetwork(network);
 if(!selected)throw new Error('Unsupported network.');
 const serviceIds=await getVTUGATEDataServiceIds(selected);
-let bestRaw=[];
-let lastMessage='Unable to load VTUGATE data plans.';
-for(const serviceId of serviceIds){
+const responses=await Promise.all(serviceIds.map(async serviceId=>{
   let response=await vtugateRequest('api/v1/fetchdataplans',{service_id:serviceId});
   if(!response.success){
     const retry=await vtugateRequest('api/v1/fetchdataplans',{service_id:serviceId,network:selected});
     if(retry.success)response=retry;
   }
+  return response;
+}));
+let bestRaw=[];
+let lastMessage='Unable to load VTUGATE data plans.';
+for(const response of responses){
   if(!response.success){lastMessage=response.message||lastMessage;continue;}
   const raw=extractVTUGATEPlanCandidates(response.data,selected);
-  if(raw.length>bestRaw.length)bestRaw=raw;
-  // The first service that returns a real catalogue is authoritative for this request.
-  if(raw.length)break;
+  if(raw.length)bestRaw=bestRaw.concat(raw);
 }
 if(!bestRaw.length)throw new Error(lastMessage);
 const raw=bestRaw;
@@ -392,11 +393,12 @@ const normalized=raw.map(p=>{
 });
 const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean));
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
-return normalized.filter(p=>p.plan_id>0&&p.price>0&&p.name&&(!hasOtherNetwork||p.network_name===selected));
+return normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&(!hasOtherNetwork||p.network_name===selected));
 }
 const vtugatePlanCache=new Map();
-async function getAuthoritativeVTUGATEDataPlan(network,planCode){const selected=normalizeDataNetwork(network);const code=clean(planCode);if(!selected||!code)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>String(x.plan_code||x.code||"")===code);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");let providerServiceId=Number(plan.service_id||0);if(!(providerServiceId>0))throw new Error("VTUGATE did not return a service_id for the selected data plan.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,plan_code:code,service_id:providerServiceId,provider_price:Number(plan.price),customer_price:customerPrice};}
-async function resolveDataPlanName(network,planCode){try{const code=clean(planCode);const plans=await fetchVTUGATEDataPlans(network);return clean(plans.find(x=>String(x.plan_code||x.code||"")===code)?.name||"");}catch{return "";}}
+function planLookupKey(planCode,serviceId){return `${Number(serviceId)||0}:${clean(planCode)}`;}
+async function getAuthoritativeVTUGATEDataPlan(network,planKey){const selected=normalizeDataNetwork(network);const key=clean(planKey);if(!selected||!key)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>planLookupKey(x.plan_code||x.code||"",x.service_id)===key||String(x.plan_code||x.code||"")===key);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");let providerServiceId=Number(plan.service_id||0);if(!(providerServiceId>0))throw new Error("VTUGATE did not return a service_id for the selected data plan.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,plan_code:clean(plan.plan_code||plan.code||""),service_id:providerServiceId,provider_price:Number(plan.price),customer_price:customerPrice};}
+async function resolveDataPlanName(network,planKey){try{const key=clean(planKey);const plans=await fetchVTUGATEDataPlans(network);return clean(plans.find(x=>planLookupKey(x.plan_code||x.code||"",x.service_id)===key||String(x.plan_code||x.code||"")===key)?.name||"");}catch{return "";}}
 
 async function getVTUGATEEducationPrice(serviceId){const r=await vtugateRequest("api/v1/geteducationtypeprice",{service_id:serviceId});if(!r.success)throw new Error(r.message||"Unable to load education PIN price.");return Number(r.data?.data?.price??r.data?.price??0);}
 async function getVTUGATEEducationProducts(){
@@ -3872,7 +3874,9 @@ const b=await body(req);
 const network=normalizeDataNetwork(b.network);
 if(!network)return send(res,400,{success:false,message:"Unsupported network."});
 try{
-const rawPlans=await fetchVTUGATEDataPlans(network);
+let cacheEntry=vtugatePlanCache.get(network);
+if(!cacheEntry||Date.now()-cacheEntry.at>60000){cacheEntry={at:Date.now(),plans:await fetchVTUGATEDataPlans(network)};vtugatePlanCache.set(network,cacheEntry);}
+const rawPlans=cacheEntry.plans;
 const service=await getService("data");
 if(!service)return send(res,503,{success:false,message:"Data service is not configured."});
 if(service.enabled===false)return send(res,503,{success:false,message:"Data service is currently unavailable."});
@@ -3880,11 +3884,12 @@ if(service.maintenance===true)return send(res,503,{success:false,message:"Data s
 const pricing=pricingConfig(service);
 const byPlan=new Map();
 for(const plan of rawPlans){
-const planCode=clean(plan.plan_code||plan.code||""), providerPrice=Number(plan.price||0);
+const planCode=clean(plan.plan_code||plan.code||""), providerPrice=Number(plan.price||0), planServiceId=Number(plan.service_id||0);
 if(!planCode||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
-byPlan.set(planCode,{code:planCode,plan_code:planCode,bundle_id:planCode,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:Number(plan.service_id||0),size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
+const lookupKey=planLookupKey(planCode,planServiceId);
+byPlan.set(lookupKey,{code:lookupKey,plan_code:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});

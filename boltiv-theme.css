@@ -178,3 +178,208 @@ html[data-theme="dark"] .seo-footer a{color:#d8b84d!important}
 html[data-theme="dark"] .seo-mini-nav a{color:#9aa0aa!important}
 html[data-theme="dark"] .seo-wallet-balance{background:#201d13!important;border-color:#4a4020!important}
 html[data-theme="dark"] .seo-mobile-cta{background:rgba(15,18,23,.96)!important;border-color:#2a3038!important}
+
+/* =========================================================
+   BOLTIV THEME ENGINE v2 — complete surface coverage
+   Light remains the default; dark mode changes the whole UI,
+   not just the header and bottom navigation.
+   ========================================================= */
+html[data-theme="dark"]{
+  --theme-bg:#0b0d10;
+  --theme-bg2:#101419;
+  --theme-card:#14181e;
+  --theme-card2:#1a1f26;
+  --theme-text:#f4f1e8;
+  --theme-muted:#9aa2ad;
+  --theme-line:#2b323b;
+  --theme-soft:#1b2027;
+  --theme-shadow:0 18px 50px rgba(0,0,0,.34);
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .page,
+html[data-theme="dark"] .airtime-page,
+html[data-theme="dark"] .data-page,
+html[data-theme="dark"] .auth-page,
+html[data-theme="dark"] main,
+html[data-theme="dark"] .container{
+  background-color:var(--theme-bg)!important;
+  color:var(--theme-text)!important;
+}
+
+/* Dashboard / home — these were the main light-mode stragglers. */
+html[data-theme="dark"] .home-balance-card,
+html[data-theme="dark"] .home-service-card,
+html[data-theme="dark"] .home-transaction,
+html[data-theme="dark"] .home-loading,
+html[data-theme="dark"] .home-empty,
+html[data-theme="dark"] .home-trust-card,
+html[data-theme="dark"] .coming-modal-card{
+  background:var(--theme-card)!important;
+  color:var(--theme-text)!important;
+  border-color:var(--theme-line)!important;
+  box-shadow:var(--theme-shadow)!important;
+}
+html[data-theme="dark"] .home-balance-card{background:linear-gradient(145deg,#211e13,#14181e)!important;border-color:rgba(212,175,55,.65)!important}
+html[data-theme="dark"] .home-service-card:hover,
+html[data-theme="dark"] .home-service-card:focus-visible{background:var(--theme-card2)!important;border-color:rgba(212,175,55,.55)!important}
+html[data-theme="dark"] .home-service-card strong,
+html[data-theme="dark"] .home-transaction strong,
+html[data-theme="dark"] .home-trust-card strong,
+html[data-theme="dark"] .home-empty strong{color:var(--theme-text)!important}
+html[data-theme="dark"] .home-service-card small,
+html[data-theme="dark"] .home-transaction small,
+html[data-theme="dark"] .home-trust-card p,
+html[data-theme="dark"] .home-loading,
+html[data-theme="dark"] .home-empty small{color:var(--theme-muted)!important}
+html[data-theme="dark"] .home-service-card .service-icon,
+html[data-theme="dark"] .transaction-icon{background:#201d13!important;border-color:#4a4020!important;color:#e0bd48!important}
+html[data-theme="dark"] .status-pill{background:#20252c!important;color:#aeb5bf!important}
+html[data-theme="dark"] .status-pill.success{background:#13291d!important;color:#72d39b!important}
+html[data-theme="dark"] .status-pill.pending{background:#302915!important;color:#e1bf52!important}
+html[data-theme="dark"] .status-pill.failed{background:#321a1c!important;color:#ee8d8d!important}
+html[data-theme="dark"] .debit{color:#e8e5dc!important}
+html[data-theme="dark"] .home-trust-card{background:#201d13!important;border-color:rgba(212,175,55,.45)!important}
+
+/* Common page surfaces across wallet, activity, profile, services and auth. */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .profile-card,
+html[data-theme="dark"] .wallet-action,
+html[data-theme="dark"] .summary-card,
+html[data-theme="dark"] .transaction-item,
+html[data-theme="dark"] .support-card,
+html[data-theme="dark"] .provider-card,
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .airtime-card,
+html[data-theme="dark"] .data-card,
+html[data-theme="dark"] .airtime-hero,
+html[data-theme="dark"] .data-hero,
+html[data-theme="dark"] .transaction-summary,
+html[data-theme="dark"] .admin-card,
+html[data-theme="dark"] .admin-panel,
+html[data-theme="dark"] .admin-table,
+html[data-theme="dark"] .admin-stat,
+html[data-theme="dark"] .auth-card,
+html[data-theme="dark"] .login-card,
+html[data-theme="dark"] .box,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .modal-card{
+  background:var(--theme-card)!important;
+  color:var(--theme-text)!important;
+  border-color:var(--theme-line)!important;
+  box-shadow:var(--theme-shadow)!important;
+}
+
+html[data-theme="dark"] .balance-card{background:linear-gradient(145deg,#211e13,#14181e)!important;border-color:rgba(212,175,55,.65)!important}
+html[data-theme="dark"] .airtime-hero,
+html[data-theme="dark"] .data-hero{background:linear-gradient(145deg,#211e13,#14181e)!important;border-color:rgba(212,175,55,.5)!important}
+html[data-theme="dark"] .transaction-summary{background:#201d13!important;border-color:rgba(212,175,55,.45)!important}
+html[data-theme="dark"] .provider-card.active,
+html[data-theme="dark"] .network-button.active,
+html[data-theme="dark"] .amount-button.active,
+html[data-theme="dark"] .plan-button.active{background:#201d13!important;border-color:var(--gold)!important}
+
+/* Headers / typography. */
+html[data-theme="dark"] .header,
+html[data-theme="dark"] .home-header,
+html[data-theme="dark"] .airtime-header,
+html[data-theme="dark"] .data-header,
+html[data-theme="dark"] .transactions-header{background:#111419!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] .section-title,
+html[data-theme="dark"] .welcome-title,
+html[data-theme="dark"] .home-welcome h1,
+html[data-theme="dark"] .airtime-title,
+html[data-theme="dark"] .data-title,
+html[data-theme="dark"] .transactions-title,
+html[data-theme="dark"] .profile-name,
+html[data-theme="dark"] .wallet-action-title,
+html[data-theme="dark"] .provider-name,
+html[data-theme="dark"] .admin-title,
+html[data-theme="dark"] .admin-heading,
+html[data-theme="dark"] .auth-card h1,
+html[data-theme="dark"] .coming-modal-card h2,
+html[data-theme="dark"] .boltiv-transaction-title,
+html[data-theme="dark"] .boltiv-success-card h2{color:var(--theme-text)!important}
+html[data-theme="dark"] .welcome-text,
+html[data-theme="dark"] .home-welcome p,
+html[data-theme="dark"] .support-text,
+html[data-theme="dark"] .profile-email,
+html[data-theme="dark"] .transaction-date,
+html[data-theme="dark"] .transaction-status,
+html[data-theme="dark"] .airtime-hero-text,
+html[data-theme="dark"] .data-hero-text,
+html[data-theme="dark"] .airtime-label,
+html[data-theme="dark"] .data-label,
+html[data-theme="dark"] .auth-subtitle,
+html[data-theme="dark"] .admin-muted,
+html[data-theme="dark"] .transaction-detail span,
+html[data-theme="dark"] .boltiv-transaction-message,
+html[data-theme="dark"] .success-message,
+html[data-theme="dark"] .coming-modal-card p{color:var(--theme-muted)!important}
+
+/* Forms and selectors. */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .input,
+html[data-theme="dark"] .airtime-input,
+html[data-theme="dark"] .data-input,
+html[data-theme="dark"] .search-box{background:#0f1318!important;color:var(--theme-text)!important;border-color:#303741!important}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{color:#68717d!important}
+html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .filter-btn,
+html[data-theme="dark"] .filter-button,
+html[data-theme="dark"] .network-button,
+html[data-theme="dark"] .amount-button,
+html[data-theme="dark"] .plan-button,
+html[data-theme="dark"] .back-button{background:var(--theme-card)!important;color:#d4d8df!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] .wallet-modal-cancel{background:var(--theme-card)!important;color:#d4d8df!important}
+
+/* Navigation remains dark in dark mode and light in light mode. */
+html[data-theme="dark"] .bottom-nav{background:rgba(15,18,23,.98)!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] .nav-item{background:transparent!important;color:#7d8590!important}
+html[data-theme="dark"] .nav-item.active{color:var(--gold)!important}
+
+/* Tables. */
+html[data-theme="dark"] table,
+html[data-theme="dark"] .admin-table{color:var(--theme-text)!important}
+html[data-theme="dark"] th{background:#101419!important;color:#b8bec7!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] td{background:var(--theme-card)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] tr:nth-child(even) td{background:#11161c!important}
+
+/* Inline light backgrounds used by older standalone pages. */
+html[data-theme="dark"] [style*="background:#fff"],
+html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background:#ffffff"],
+html[data-theme="dark"] [style*="background: #ffffff"],
+html[data-theme="dark"] [style*="background:white"],
+html[data-theme="dark"] [style*="background: white"],
+html[data-theme="dark"] [style*="background:#fffdf7"],
+html[data-theme="dark"] [style*="background: #fffdf7"],
+html[data-theme="dark"] [style*="background:#fafaf8"],
+html[data-theme="dark"] [style*="background: #fafaf8"],
+html[data-theme="dark"] [style*="background:#f7f7f5"],
+html[data-theme="dark"] [style*="background: #f7f7f5"]{background:var(--theme-card)!important}
+html[data-theme="dark"] [style*="color:#171717"],
+html[data-theme="dark"] [style*="color: #171717"],
+html[data-theme="dark"] [style*="color:#222"],
+html[data-theme="dark"] [style*="color: #222"],
+html[data-theme="dark"] [style*="color:#333"],
+html[data-theme="dark"] [style*="color: #333"]{color:var(--theme-text)!important}
+html[data-theme="dark"] [style*="color:#777"],
+html[data-theme="dark"] [style*="color: #777"],
+html[data-theme="dark"] [style*="color:#888"],
+html[data-theme="dark"] [style*="color: #888"]{color:var(--theme-muted)!important}
+
+/* Modals / overlays. */
+html[data-theme="dark"] .coming-modal-backdrop,
+html[data-theme="dark"] .boltiv-success-overlay,
+html[data-theme="dark"] .boltiv-transaction-overlay{background:rgba(0,0,0,.76)!important}
+html[data-theme="dark"] .coming-modal-close{background:#171c22!important;color:#d8b84d!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] .boltiv-transaction-details,
+html[data-theme="dark"] .success-user{background:#101419!important;border-color:var(--theme-line)!important}
+
+/* Keep the switch itself consistent with the selected mode. */
+html[data-theme="light"] .boltiv-theme-toggle{background:rgba(255,255,255,.96)!important;color:#171717!important}
+html[data-theme="dark"] .boltiv-theme-toggle{background:#171c22!important;color:#f5f0df!important}

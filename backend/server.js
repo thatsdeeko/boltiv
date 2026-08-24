@@ -327,11 +327,18 @@ const add=v=>{const n=Number(v);if(Number.isInteger(n)&&n>0&&!ids.includes(n))id
 // MTN=62, Airtel=63, Glo=158, 9mobile=64.
 const defaultConsumerServiceIds={MTN:62,AIRTEL:63,GLO:158,'9MOBILE':64};
 
-// Explicit configuration always wins. A network-specific VTUGATE_SERVICE_MAP
-// entry is preferred over the safe built-in consumer service ID.
+// For the four Nigerian mobile networks in the current VTUGATE catalogue,
+// ALWAYS use the dedicated consumer/gifting service above. Do not let a generic
+// VTUGATE_DATA_SERVICE_ID override the network-specific service, because that
+// would make multiple networks load the same catalogue (or load a specialised
+// service such as SME/Broadband). A network-specific map may be used only for
+// networks that do not have one of the known built-in IDs.
+if(defaultConsumerServiceIds[selected]){
+  return [defaultConsumerServiceIds[selected]];
+}
+
 for(const key of [selected,selected.toUpperCase(),selected.toLowerCase()])add(VTUGATE_SERVICE_MAP?.[key]);
 if(!ids.length)add(process.env.VTUGATE_DATA_SERVICE_ID);
-if(!ids.length)add(defaultConsumerServiceIds[selected]);
 
 // If an explicit/default service is available, use only that service. This is
 // intentional: previously this function discovered every VTUGATE service whose

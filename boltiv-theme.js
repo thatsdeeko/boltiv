@@ -27,7 +27,7 @@
     const current=root.getAttribute('data-theme')==='dark'?'dark':'light';
     let meta=document.querySelector('meta[name="theme-color"]');
     if(!meta){meta=document.createElement('meta');meta.name='theme-color';document.head.appendChild(meta)}
-    meta.content=current==='dark'?'#0b0d10':'#ffffff';
+    meta.content=current==='dark'?'#090909':'#ffffff';
   }
 
   function mount(){

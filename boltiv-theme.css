@@ -1,452 +1,121 @@
-/* BOLTIV Global Theme — professional dark/light toggle */
+/* BOLTIV — Global Theme System
+   Light is the default. Dark mode is intentionally BLACK + GOLD + PURE WHITE.
+   One stylesheet is loaded by every BOLTIV page so the theme stays correlated.
+*/
+
 :root{
-  color-scheme: light;
-  --theme-bg:#f7f7f5;
-  --theme-bg2:#ffffff;
-  --theme-card:#ffffff;
-  --theme-card2:#f3f3ef;
-  --theme-text:#171717;
-  --theme-muted:#6f7378;
-  --theme-line:#e5e5e1;
-  --theme-soft:#f1f1ed;
-  --theme-shadow:0 14px 45px rgba(0,0,0,.10);
+  color-scheme:light;
+  --boltiv-gold:#D4AF37;
+  --boltiv-black:#000000;
+  --boltiv-white:#FFFFFF;
 }
-html[data-theme="light"]{color-scheme:light;}
-html[data-theme="dark"]{color-scheme:dark;}
-
-/* Global dark surface */
-html[data-theme="dark"] body{background:var(--theme-bg)!important;color:var(--theme-text)!important}
-html[data-theme="dark"] .page,
-html[data-theme="dark"] main,
-html[data-theme="dark"] section{color:var(--theme-text)}
-html[data-theme="dark"] .header{background:rgba(11,13,16,.94)!important;border-color:var(--theme-line)!important;backdrop-filter:blur(14px)}
-html[data-theme="dark"] .brand-tagline,
-html[data-theme="dark"] .footer-text{color:#7f8792!important}
-html[data-theme="dark"] .profile-mini{background:var(--theme-card)!important;color:var(--gold2)!important;border-color:rgba(212,175,55,.55)!important}
-
-/* Shared surfaces */
-html[data-theme="dark"] .card,
-html[data-theme="dark"] .wallet-action,
-html[data-theme="dark"] .summary-card,
-html[data-theme="dark"] .transaction-item,
-html[data-theme="dark"] .support-card,
-html[data-theme="dark"] .provider-card,
-html[data-theme="dark"] .profile-card,
-html[data-theme="dark"] .empty-state,
-html[data-theme="dark"] .boltiv-transaction-card,
-html[data-theme="dark"] .boltiv-toast,
-html[data-theme="dark"] .modal,
-html[data-theme="dark"] .modal-content,
-html[data-theme="dark"] .panel,
-html[data-theme="dark"] .box,
-html[data-theme="dark"] .auth-card,
-html[data-theme="dark"] .login-card{background:var(--theme-card)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important;box-shadow:var(--theme-shadow)!important}
-html[data-theme="dark"] .wallet-action:hover,
-html[data-theme="dark"] .wallet-action:active{background:var(--theme-card2)!important}
-html[data-theme="dark"] .balance-card{background:linear-gradient(145deg,#211e13,#14181e)!important;box-shadow:var(--theme-shadow)!important}
-html[data-theme="dark"] .notice{background:#201d13!important;color:#aeb3bb!important;border-color:var(--gold)!important}
-html[data-theme="dark"] .provider-card.active{background:#201d13!important}
-
-/* Typography */
-html[data-theme="dark"] .welcome-title,
-html[data-theme="dark"] .section-title,
-html[data-theme="dark"] .profile-name,
-html[data-theme="dark"] .transaction-title,
-html[data-theme="dark"] .provider-name,
-html[data-theme="dark"] .wallet-action-title,
-html[data-theme="dark"] .boltiv-toast-title{color:var(--theme-text)!important}
-html[data-theme="dark"] .welcome-text,
-html[data-theme="dark"] .support-text,
-html[data-theme="dark"] .profile-email,
-html[data-theme="dark"] .transaction-date,
-html[data-theme="dark"] .transaction-status,
-html[data-theme="dark"] .balance-label,
-html[data-theme="dark"] .summary-label,
-html[data-theme="dark"] .label,
-html[data-theme="dark"] .boltiv-toast-message{color:var(--theme-muted)!important}
-
-/* Inputs */
-html[data-theme="dark"] .input,
-html[data-theme="dark"] input,
-html[data-theme="dark"] select,
-html[data-theme="dark"] textarea{background:#0f1318!important;color:var(--theme-text)!important;border-color:#303741!important}
-html[data-theme="dark"] .input::placeholder,
-html[data-theme="dark"] input::placeholder,
-html[data-theme="dark"] textarea::placeholder{color:#68717d!important}
-html[data-theme="dark"] .input:focus,
-html[data-theme="dark"] input:focus,
-html[data-theme="dark"] select:focus,
-html[data-theme="dark"] textarea:focus{border-color:var(--gold)!important;background:#12171d!important}
-html[data-theme="dark"] option{background:#14181e;color:#f4f1e8}
-
-/* Buttons / filters */
-html[data-theme="dark"] .btn-secondary,
-html[data-theme="dark"] .filter-btn{background:var(--theme-card)!important;color:#c7cbd2!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] .filter-btn.active{color:#171717!important;background:var(--gold)!important}
-
-/* Navigation */
-html[data-theme="dark"] .bottom-nav{background:rgba(15,18,23,.96)!important;border-color:var(--theme-line)!important;box-shadow:0 -12px 35px rgba(0,0,0,.28)}
-html[data-theme="dark"] .nav-item{color:#7d8590!important}
-html[data-theme="dark"] .nav-item.active{color:var(--gold)!important}
-
-/* Receipt / transaction overlays */
-html[data-theme="dark"] .boltiv-transaction-overlay{background:rgba(0,0,0,.72)!important}
-html[data-theme="dark"] .boltiv-transaction-overlay.processing .boltiv-transaction-icon{background:#201d13!important}
-
-/* Tables and common admin elements */
-html[data-theme="dark"] table{color:var(--theme-text)!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] th{background:#101419!important;color:#aeb4bd!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] td{background:var(--theme-card)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] tr:nth-child(even) td{background:#11161c!important}
-html[data-theme="dark"] .badge{border-color:var(--theme-line)!important}
-html[data-theme="dark"] hr{border-color:var(--theme-line)!important}
-
-/* Inline light colors found across standalone pages */
-html[data-theme="dark"] [style*="background:#fff"],
-html[data-theme="dark"] [style*="background: #fff"],
-html[data-theme="dark"] [style*="background:#ffffff"],
-html[data-theme="dark"] [style*="background: #ffffff"],
-html[data-theme="dark"] [style*="background:white"],
-html[data-theme="dark"] [style*="background: white"]{background:var(--theme-card)!important}
-html[data-theme="dark"] [style*="color:#171717"],
-html[data-theme="dark"] [style*="color: #171717"],
-html[data-theme="dark"] [style*="color:#333"],
-html[data-theme="dark"] [style*="color: #333"],
-html[data-theme="dark"] [style*="color:#222"],
-html[data-theme="dark"] [style*="color: #222"]{color:var(--theme-text)!important}
-html[data-theme="dark"] [style*="color:#777"],
-html[data-theme="dark"] [style*="color: #777"],
-html[data-theme="dark"] [style*="color:#888"],
-html[data-theme="dark"] [style*="color: #888"]{color:var(--theme-muted)!important}
-html[data-theme="dark"] [style*="border:1px solid #e5e5e1"],
-html[data-theme="dark"] [style*="border: 1px solid #e5e5e1"],
-html[data-theme="dark"] [style*="border:1px solid #dcdcd8"]{border-color:var(--theme-line)!important}
-
-/* Theme switch */
-.boltiv-theme-toggle{position:fixed;right:16px;top:14px;z-index:10001;width:44px;height:44px;border:1px solid rgba(212,175,55,.45);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.94);color:#171717;box-shadow:0 8px 28px rgba(0,0,0,.18);backdrop-filter:blur(12px);font-size:18px;transition:.2s ease}
-.boltiv-theme-toggle:hover{transform:translateY(-1px);border-color:var(--gold);box-shadow:0 10px 32px rgba(0,0,0,.25)}
-html[data-theme="dark"] .boltiv-theme-toggle{background:#171c22;color:#f5f0df;border-color:rgba(212,175,55,.55);box-shadow:0 10px 32px rgba(0,0,0,.42)}
-.boltiv-theme-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
-.boltiv-theme-toggle .theme-icon{line-height:1}
-
-
-.boltiv-theme-toggle.inside-header{position:absolute;right:16px;top:50%;transform:translateY(-50%);}
-.boltiv-theme-toggle.inside-header:hover{transform:translateY(calc(-50% - 1px));}
-.top{position:relative!important;padding-right:76px!important}
-.header{position:relative!important;padding-right:70px!important}
-
-/* Don't let the switch cover important admin content */
-.admin-theme-space{padding-right:58px}
-
-/* Browser scrollbar / selection */
-html[data-theme="dark"]{scrollbar-color:#3b424c #0b0d10}
-html[data-theme="dark"] ::-webkit-scrollbar{width:9px;height:9px}
-html[data-theme="dark"] ::-webkit-scrollbar-track{background:#0b0d10}
-html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#343b45;border-radius:20px}
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#4a535f}
-html[data-theme="dark"] ::selection{background:rgba(212,175,55,.35);color:#fff}
-
-@media(max-width:520px){.boltiv-theme-toggle{top:10px;right:10px;width:40px;height:40px;font-size:16px}.boltiv-theme-toggle.inside-header{right:10px;top:50%;}.top{padding-right:62px!important}.header{padding-right:58px!important}}
-
-/* Public homepage / SEO page */
-html[data-theme="dark"] .seo-nav{border-color:#2a3038!important}
-html[data-theme="dark"] .seo-brand{color:var(--theme-text)!important}
-html[data-theme="dark"] .seo-btn.secondary{background:#14181e!important;color:#d8b84d!important;border-color:#3b3420!important}
-html[data-theme="dark"] .seo-card,
-html[data-theme="dark"] .seo-service,
-html[data-theme="dark"] .seo-benefit,
-html[data-theme="dark"] .seo-step,
-html[data-theme="dark"] .seo-trust,
-html[data-theme="dark"] .seo-wallet-card,
-html[data-theme="dark"] .seo-faq details,
-html[data-theme="dark"] .seo-availability-card{background:#14181e!important;border-color:#2a3038!important;box-shadow:var(--theme-shadow)!important}
-html[data-theme="dark"] .seo-hero p,
-html[data-theme="dark"] .seo-section-intro,
-html[data-theme="dark"] .seo-card p,
-html[data-theme="dark"] .seo-service span,
-html[data-theme="dark"] .seo-benefit span,
-html[data-theme="dark"] .seo-step span,
-html[data-theme="dark"] .seo-trust p,
-html[data-theme="dark"] .seo-wallet-card p,
-html[data-theme="dark"] .seo-faq p{color:#9aa0aa!important}
-html[data-theme="dark"] .seo-service .icon,
-html[data-theme="dark"] .seo-benefit .icon,
-html[data-theme="dark"] .seo-availability-card .availability-icon{background:#201d13!important;border-color:#4a4020!important}
-html[data-theme="dark"] .seo-section.alt{border-color:#2a3038!important}
-html[data-theme="dark"] .seo-footer{border-color:#2a3038!important;color:#8d949e!important}
-html[data-theme="dark"] .seo-footer a{color:#d8b84d!important}
-html[data-theme="dark"] .seo-mini-nav a{color:#9aa0aa!important}
-html[data-theme="dark"] .seo-wallet-balance{background:#201d13!important;border-color:#4a4020!important}
-html[data-theme="dark"] .seo-mobile-cta{background:rgba(15,18,23,.96)!important;border-color:#2a3038!important}
+html[data-theme="light"]{color-scheme:light}
+html[data-theme="dark"]{color-scheme:dark}
 
 /* =========================================================
-   BOLTIV THEME ENGINE v2 — complete surface coverage
-   Light remains the default; dark mode changes the whole UI,
-   not just the header and bottom navigation.
+   DARK MODE — one consistent BOLTIV visual language
    ========================================================= */
 html[data-theme="dark"]{
-  --theme-bg:#0b0d10;
-  --theme-bg2:#101419;
-  --theme-card:#14181e;
-  --theme-card2:#1a1f26;
-  --theme-text:#f4f1e8;
-  --theme-muted:#9aa2ad;
-  --theme-line:#2b323b;
-  --theme-soft:#1b2027;
-  --theme-shadow:0 18px 50px rgba(0,0,0,.34);
+  --theme-bg:#000000;
+  --theme-surface:#000000;
+  --theme-card:#D4AF37;
+  --theme-text:#FFFFFF;
+  --theme-line:#D4AF37;
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body{
+  background:#000000 !important;
+  color:#FFFFFF !important;
 }
 
 html[data-theme="dark"] body,
-html[data-theme="dark"] .page,
-html[data-theme="dark"] .airtime-page,
-html[data-theme="dark"] .data-page,
-html[data-theme="dark"] .auth-page,
-html[data-theme="dark"] main,
-html[data-theme="dark"] .container{
-  background-color:var(--theme-bg)!important;
-  color:var(--theme-text)!important;
+html[data-theme="dark"] body *{
+  border-color:#D4AF37;
 }
 
-/* Dashboard / home — these were the main light-mode stragglers. */
-html[data-theme="dark"] .home-balance-card,
-html[data-theme="dark"] .home-service-card,
-html[data-theme="dark"] .home-transaction,
-html[data-theme="dark"] .home-loading,
-html[data-theme="dark"] .home-empty,
-html[data-theme="dark"] .home-trust-card,
-html[data-theme="dark"] .coming-modal-card{
-  background:var(--theme-card)!important;
-  color:var(--theme-text)!important;
-  border-color:var(--theme-line)!important;
-  box-shadow:var(--theme-shadow)!important;
-}
-html[data-theme="dark"] .home-balance-card{background:linear-gradient(145deg,#211e13,#14181e)!important;border-color:rgba(212,175,55,.65)!important}
-html[data-theme="dark"] .home-service-card:hover,
-html[data-theme="dark"] .home-service-card:focus-visible{background:var(--theme-card2)!important;border-color:rgba(212,175,55,.55)!important}
-html[data-theme="dark"] .home-service-card strong,
-html[data-theme="dark"] .home-transaction strong,
-html[data-theme="dark"] .home-trust-card strong,
-html[data-theme="dark"] .home-empty strong{color:var(--theme-text)!important}
-html[data-theme="dark"] .home-service-card small,
-html[data-theme="dark"] .home-transaction small,
-html[data-theme="dark"] .home-trust-card p,
-html[data-theme="dark"] .home-loading,
-html[data-theme="dark"] .home-empty small{color:var(--theme-muted)!important}
-html[data-theme="dark"] .home-service-card .service-icon,
-html[data-theme="dark"] .transaction-icon{background:#201d13!important;border-color:#4a4020!important;color:#e0bd48!important}
-html[data-theme="dark"] .status-pill{background:#20252c!important;color:#aeb5bf!important}
-html[data-theme="dark"] .status-pill.success{background:#13291d!important;color:#72d39b!important}
-html[data-theme="dark"] .status-pill.pending{background:#302915!important;color:#e1bf52!important}
-html[data-theme="dark"] .status-pill.failed{background:#321a1c!important;color:#ee8d8d!important}
-html[data-theme="dark"] .debit{color:#e8e5dc!important}
-html[data-theme="dark"] .home-trust-card{background:#201d13!important;border-color:rgba(212,175,55,.45)!important}
-
-/* Common page surfaces across wallet, activity, profile, services and auth. */
-html[data-theme="dark"] .card,
-html[data-theme="dark"] .profile-card,
-html[data-theme="dark"] .wallet-action,
-html[data-theme="dark"] .summary-card,
-html[data-theme="dark"] .transaction-item,
-html[data-theme="dark"] .support-card,
-html[data-theme="dark"] .provider-card,
-html[data-theme="dark"] .empty-state,
-html[data-theme="dark"] .airtime-card,
-html[data-theme="dark"] .data-card,
-html[data-theme="dark"] .airtime-hero,
-html[data-theme="dark"] .data-hero,
-html[data-theme="dark"] .transaction-summary,
-html[data-theme="dark"] .admin-card,
-html[data-theme="dark"] .admin-panel,
-html[data-theme="dark"] .admin-table,
-html[data-theme="dark"] .admin-stat,
-html[data-theme="dark"] .auth-card,
-html[data-theme="dark"] .login-card,
-html[data-theme="dark"] .box,
-html[data-theme="dark"] .panel,
-html[data-theme="dark"] .modal-card{
-  background:var(--theme-card)!important;
-  color:var(--theme-text)!important;
-  border-color:var(--theme-line)!important;
-  box-shadow:var(--theme-shadow)!important;
-}
-
-html[data-theme="dark"] .balance-card{background:linear-gradient(145deg,#211e13,#14181e)!important;border-color:rgba(212,175,55,.65)!important}
-html[data-theme="dark"] .airtime-hero,
-html[data-theme="dark"] .data-hero{background:linear-gradient(145deg,#211e13,#14181e)!important;border-color:rgba(212,175,55,.5)!important}
-html[data-theme="dark"] .transaction-summary{background:#201d13!important;border-color:rgba(212,175,55,.45)!important}
-html[data-theme="dark"] .provider-card.active,
-html[data-theme="dark"] .network-button.active,
-html[data-theme="dark"] .amount-button.active,
-html[data-theme="dark"] .plan-button.active{background:#201d13!important;border-color:var(--gold)!important}
-
-/* Headers / typography. */
-html[data-theme="dark"] .header,
-html[data-theme="dark"] .home-header,
-html[data-theme="dark"] .airtime-header,
-html[data-theme="dark"] .data-header,
-html[data-theme="dark"] .transactions-header{background:#111419!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] .section-title,
-html[data-theme="dark"] .welcome-title,
-html[data-theme="dark"] .home-welcome h1,
-html[data-theme="dark"] .airtime-title,
-html[data-theme="dark"] .data-title,
-html[data-theme="dark"] .transactions-title,
-html[data-theme="dark"] .profile-name,
-html[data-theme="dark"] .wallet-action-title,
-html[data-theme="dark"] .provider-name,
-html[data-theme="dark"] .admin-title,
-html[data-theme="dark"] .admin-heading,
-html[data-theme="dark"] .auth-card h1,
-html[data-theme="dark"] .coming-modal-card h2,
-html[data-theme="dark"] .boltiv-transaction-title,
-html[data-theme="dark"] .boltiv-success-card h2{color:var(--theme-text)!important}
-html[data-theme="dark"] .welcome-text,
-html[data-theme="dark"] .home-welcome p,
-html[data-theme="dark"] .support-text,
-html[data-theme="dark"] .profile-email,
-html[data-theme="dark"] .transaction-date,
-html[data-theme="dark"] .transaction-status,
-html[data-theme="dark"] .airtime-hero-text,
-html[data-theme="dark"] .data-hero-text,
-html[data-theme="dark"] .airtime-label,
-html[data-theme="dark"] .data-label,
-html[data-theme="dark"] .auth-subtitle,
-html[data-theme="dark"] .admin-muted,
-html[data-theme="dark"] .transaction-detail span,
-html[data-theme="dark"] .boltiv-transaction-message,
-html[data-theme="dark"] .success-message,
-html[data-theme="dark"] .coming-modal-card p{color:var(--theme-muted)!important}
-
-/* Forms and selectors. */
-html[data-theme="dark"] input,
-html[data-theme="dark"] select,
-html[data-theme="dark"] textarea,
-html[data-theme="dark"] .input,
-html[data-theme="dark"] .airtime-input,
-html[data-theme="dark"] .data-input,
-html[data-theme="dark"] .search-box{background:#0f1318!important;color:var(--theme-text)!important;border-color:#303741!important}
-html[data-theme="dark"] input::placeholder,
-html[data-theme="dark"] textarea::placeholder{color:#68717d!important}
-html[data-theme="dark"] .btn-secondary,
-html[data-theme="dark"] .filter-btn,
-html[data-theme="dark"] .filter-button,
-html[data-theme="dark"] .network-button,
-html[data-theme="dark"] .amount-button,
-html[data-theme="dark"] .plan-button,
-html[data-theme="dark"] .back-button{background:var(--theme-card)!important;color:#d4d8df!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] .wallet-modal-cancel{background:var(--theme-card)!important;color:#d4d8df!important}
-
-/* Navigation remains dark in dark mode and light in light mode. */
-html[data-theme="dark"] .bottom-nav{background:rgba(15,18,23,.98)!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] .nav-item{background:transparent!important;color:#7d8590!important}
-html[data-theme="dark"] .nav-item.active{color:var(--gold)!important}
-
-/* Tables. */
-html[data-theme="dark"] table,
-html[data-theme="dark"] .admin-table{color:var(--theme-text)!important}
-html[data-theme="dark"] th{background:#101419!important;color:#b8bec7!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] td{background:var(--theme-card)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] tr:nth-child(even) td{background:#11161c!important}
-
-/* Inline light backgrounds used by older standalone pages. */
-html[data-theme="dark"] [style*="background:#fff"],
-html[data-theme="dark"] [style*="background: #fff"],
-html[data-theme="dark"] [style*="background:#ffffff"],
-html[data-theme="dark"] [style*="background: #ffffff"],
-html[data-theme="dark"] [style*="background:white"],
-html[data-theme="dark"] [style*="background: white"],
-html[data-theme="dark"] [style*="background:#fffdf7"],
-html[data-theme="dark"] [style*="background: #fffdf7"],
-html[data-theme="dark"] [style*="background:#fafaf8"],
-html[data-theme="dark"] [style*="background: #fafaf8"],
-html[data-theme="dark"] [style*="background:#f7f7f5"],
-html[data-theme="dark"] [style*="background: #f7f7f5"]{background:var(--theme-card)!important}
-html[data-theme="dark"] [style*="color:#171717"],
-html[data-theme="dark"] [style*="color: #171717"],
-html[data-theme="dark"] [style*="color:#222"],
-html[data-theme="dark"] [style*="color: #222"],
-html[data-theme="dark"] [style*="color:#333"],
-html[data-theme="dark"] [style*="color: #333"]{color:var(--theme-text)!important}
-html[data-theme="dark"] [style*="color:#777"],
-html[data-theme="dark"] [style*="color: #777"],
-html[data-theme="dark"] [style*="color:#888"],
-html[data-theme="dark"] [style*="color: #888"]{color:var(--theme-muted)!important}
-
-/* Modals / overlays. */
-html[data-theme="dark"] .coming-modal-backdrop,
-html[data-theme="dark"] .boltiv-success-overlay,
-html[data-theme="dark"] .boltiv-transaction-overlay{background:rgba(0,0,0,.76)!important}
-html[data-theme="dark"] .coming-modal-close{background:#171c22!important;color:#d8b84d!important;border-color:var(--theme-line)!important}
-html[data-theme="dark"] .boltiv-transaction-details,
-html[data-theme="dark"] .success-user{background:#101419!important;border-color:var(--theme-line)!important}
-
-/* Keep the switch itself consistent with the selected mode. */
-html[data-theme="light"] .boltiv-theme-toggle{background:rgba(255,255,255,.96)!important;color:#171717!important}
-html[data-theme="dark"] .boltiv-theme-toggle{background:#171c22!important;color:#f5f0df!important}
-
-/* ==========================================================
-   BOLTIV DARK MODE — PURE BLACK + PURE WHITE + GOLD
-   Dark mode uses a true dark background, white surfaces,
-   black typography on those surfaces, and gold accents.
-   ========================================================== */
-html[data-theme="dark"]{
-  --theme-bg:#090909;
-  --theme-bg2:#0d0d0d;
-  --theme-card:#ffffff;
-  --theme-card2:#ffffff;
-  --theme-text:#ffffff;
-  --theme-muted:#cfcfcf;
-  --theme-line:#3a3a3a;
-  --theme-soft:#151515;
-  --theme-shadow:0 18px 50px rgba(0,0,0,.45);
-  color-scheme:dark;
-}
-
-html[data-theme="dark"] body,
 html[data-theme="dark"] .page,
 html[data-theme="dark"] main,
 html[data-theme="dark"] section,
 html[data-theme="dark"] .container,
 html[data-theme="dark"] .auth-page,
 html[data-theme="dark"] .airtime-page,
-html[data-theme="dark"] .data-page{
-  background:#090909 !important;
-  color:#fff !important;
+html[data-theme="dark"] .data-page,
+html[data-theme="dark"] .boltiv-animated-home,
+html[data-theme="dark"] .seo-page{
+  background:#000000 !important;
+  color:#FFFFFF !important;
 }
 
-/* Header / navigation: black background, white + gold controls. */
+/* ---------- Global text ---------- */
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6,
+html[data-theme="dark"] p,
+html[data-theme="dark"] span,
+html[data-theme="dark"] label,
+html[data-theme="dark"] small,
+html[data-theme="dark"] strong,
+html[data-theme="dark"] b,
+html[data-theme="dark"] li,
+html[data-theme="dark"] td,
+html[data-theme="dark"] th,
+html[data-theme="dark"] a,
+html[data-theme="dark"] .welcome-text,
+html[data-theme="dark"] .home-welcome p,
+html[data-theme="dark"] .brand-tagline,
+html[data-theme="dark"] .footer-text,
+html[data-theme="dark"] .profile-email,
+html[data-theme="dark"] .transaction-date,
+html[data-theme="dark"] .transaction-status,
+html[data-theme="dark"] .support-text,
+html[data-theme="dark"] .home-service-card small,
+html[data-theme="dark"] .home-transaction small,
+html[data-theme="dark"] .home-trust-card p,
+html[data-theme="dark"] .admin-muted,
+html[data-theme="dark"] .auth-tagline{
+  color:#FFFFFF !important;
+}
+
+/* Gold branding/accent text remains gold. */
+html[data-theme="dark"] .brand,
+html[data-theme="dark"] .brand-name,
+html[data-theme="dark"] .home-brand,
+html[data-theme="dark"] .auth-logo,
+html[data-theme="dark"] .footer-logo,
+html[data-theme="dark"] .welcome-title span,
+html[data-theme="dark"] .home-welcome h1 span,
+html[data-theme="dark"] .section-link,
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .airtime-subtitle,
+html[data-theme="dark"] .data-subtitle,
+html[data-theme="dark"] .transactions-subtitle,
+html[data-theme="dark"] .balance-value,
+html[data-theme="dark"] .balance-mark,
+html[data-theme="dark"] .support-title,
+html[data-theme="dark"] .admin-gold{
+  color:#D4AF37 !important;
+}
+
+/* ---------- Headers ---------- */
 html[data-theme="dark"] .header,
 html[data-theme="dark"] .home-header,
 html[data-theme="dark"] .airtime-header,
 html[data-theme="dark"] .data-header,
 html[data-theme="dark"] .transactions-header,
-html[data-theme="dark"] .top{
-  background:#0b0b0b !important;
-  color:#fff !important;
-  border-color:#333 !important;
-}
-html[data-theme="dark"] .brand-name,
-html[data-theme="dark"] .brand,
-html[data-theme="dark"] .auth-logo,
-html[data-theme="dark"] .footer-logo,
-html[data-theme="dark"] .balance-value,
-html[data-theme="dark"] .support-title,
-html[data-theme="dark"] .admin-gold{
-  color:#D4AF37 !important;
-}
-html[data-theme="dark"] .brand-tagline,
-html[data-theme="dark"] .footer-text{
-  color:#fff !important;
-  opacity:.72;
-}
-html[data-theme="dark"] .profile-mini{
-  background:#fff !important;
-  color:#D4AF37 !important;
+html[data-theme="dark"] .top,
+html[data-theme="dark"] header{
+  background:#000000 !important;
+  color:#FFFFFF !important;
   border-color:#D4AF37 !important;
 }
 
-/* All primary content surfaces become pure white. */
+/* ---------- EVERY CARD / PANEL / SURFACE = GOLD ---------- */
 html[data-theme="dark"] .card,
+html[data-theme="dark"] .balance-card,
 html[data-theme="dark"] .profile-card,
 html[data-theme="dark"] .wallet-action,
 html[data-theme="dark"] .summary-card,
@@ -461,7 +130,6 @@ html[data-theme="dark"] .data-hero,
 html[data-theme="dark"] .transaction-summary,
 html[data-theme="dark"] .admin-card,
 html[data-theme="dark"] .admin-panel,
-html[data-theme="dark"] .admin-table,
 html[data-theme="dark"] .admin-stat,
 html[data-theme="dark"] .auth-card,
 html[data-theme="dark"] .login-card,
@@ -479,81 +147,65 @@ html[data-theme="dark"] .home-transaction,
 html[data-theme="dark"] .home-loading,
 html[data-theme="dark"] .home-empty,
 html[data-theme="dark"] .home-trust-card,
-html[data-theme="dark"] .coming-modal-card{
-  background:#fff !important;
-  color:#111 !important;
+html[data-theme="dark"] .coming-modal-card,
+html[data-theme="dark"] .seo-card,
+html[data-theme="dark"] .seo-service,
+html[data-theme="dark"] .seo-benefit,
+html[data-theme="dark"] .seo-step,
+html[data-theme="dark"] .seo-trust,
+html[data-theme="dark"] .seo-wallet-card,
+html[data-theme="dark"] .seo-faq details,
+html[data-theme="dark"] .seo-availability-card,
+html[data-theme="dark"] .container > .content,
+html[data-theme="dark"] .content-card{
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
   border-color:#D4AF37 !important;
-  box-shadow:0 14px 40px rgba(0,0,0,.28) !important;
+  box-shadow:0 14px 35px rgba(212,175,55,.18) !important;
 }
 
-/* Gold-highlighted cards keep a subtle gold tint only where intentional. */
-html[data-theme="dark"] .balance-card,
-html[data-theme="dark"] .home-balance-card,
-html[data-theme="dark"] .airtime-hero,
-html[data-theme="dark"] .data-hero{
-  background:#fff !important;
-  border-color:#D4AF37 !important;
+/* Text INSIDE gold cards is always pure white. */
+html[data-theme="dark"] .card *,
+html[data-theme="dark"] .balance-card *,
+html[data-theme="dark"] .profile-card *,
+html[data-theme="dark"] .wallet-action *,
+html[data-theme="dark"] .summary-card *,
+html[data-theme="dark"] .transaction-item *,
+html[data-theme="dark"] .support-card *,
+html[data-theme="dark"] .provider-card *,
+html[data-theme="dark"] .airtime-card *,
+html[data-theme="dark"] .data-card *,
+html[data-theme="dark"] .airtime-hero *,
+html[data-theme="dark"] .data-hero *,
+html[data-theme="dark"] .home-balance-card *,
+html[data-theme="dark"] .home-service-card *,
+html[data-theme="dark"] .home-transaction *,
+html[data-theme="dark"] .home-trust-card *,
+html[data-theme="dark"] .admin-card *,
+html[data-theme="dark"] .admin-panel *,
+html[data-theme="dark"] .admin-stat *,
+html[data-theme="dark"] .auth-card *,
+html[data-theme="dark"] .login-card *,
+html[data-theme="dark"] .boltiv-toast *,
+html[data-theme="dark"] .boltiv-transaction-card *,
+html[data-theme="dark"] .boltiv-success-card *,
+html[data-theme="dark"] .coming-modal-card *{
+  color:#FFFFFF !important;
 }
 
-/* Text on the dark background. */
-html[data-theme="dark"] .welcome-title,
-html[data-theme="dark"] .section-title,
-html[data-theme="dark"] .home-welcome h1,
-html[data-theme="dark"] .airtime-title,
-html[data-theme="dark"] .data-title,
-html[data-theme="dark"] .transactions-title,
-html[data-theme="dark"] .admin-title,
-html[data-theme="dark"] .admin-heading,
-html[data-theme="dark"] .auth-subtitle,
-html[data-theme="dark"] .profile-section-title,
-html[data-theme="dark"] .section-heading{
-  color:#fff !important;
-}
-html[data-theme="dark"] .welcome-text,
-html[data-theme="dark"] .home-welcome p,
-html[data-theme="dark"] .airtime-hero-text,
-html[data-theme="dark"] .data-hero-text,
-html[data-theme="dark"] .admin-muted,
-html[data-theme="dark"] .auth-tagline{
-  color:#fff !important;
-  opacity:.72;
+/* Gold remains the accent even inside gold surfaces. */
+html[data-theme="dark"] .card .gold,
+html[data-theme="dark"] .card .accent,
+html[data-theme="dark"] .balance-value,
+html[data-theme="dark"] .support-title,
+html[data-theme="dark"] .wallet-action-icon,
+html[data-theme="dark"] .transaction-icon,
+html[data-theme="dark"] .service-icon,
+html[data-theme="dark"] .profile-avatar{
+  color:#D4AF37 !important;
 }
 
-/* Text inside white surfaces is black for maximum contrast. */
-html[data-theme="dark"] .card .welcome-title,
-html[data-theme="dark"] .card .section-title,
-html[data-theme="dark"] .profile-card .profile-name,
-html[data-theme="dark"] .profile-card .profile-email,
-html[data-theme="dark"] .wallet-action-title,
-html[data-theme="dark"] .provider-name,
-html[data-theme="dark"] .transaction-title,
-html[data-theme="dark"] .boltiv-toast-title,
-html[data-theme="dark"] .boltiv-transaction-title,
-html[data-theme="dark"] .boltiv-success-card h2,
-html[data-theme="dark"] .admin-card .admin-title,
-html[data-theme="dark"] .admin-panel .admin-heading,
-html[data-theme="dark"] .auth-card h1,
-html[data-theme="dark"] .coming-modal-card h2,
-html[data-theme="dark"] .home-service-card strong,
-html[data-theme="dark"] .home-transaction strong,
-html[data-theme="dark"] .home-trust-card strong{
-  color:#111 !important;
-}
-html[data-theme="dark"] .profile-email,
-html[data-theme="dark"] .transaction-date,
-html[data-theme="dark"] .transaction-status,
-html[data-theme="dark"] .support-text,
-html[data-theme="dark"] .boltiv-toast-message,
-html[data-theme="dark"] .boltiv-transaction-message,
-html[data-theme="dark"] .success-message,
-html[data-theme="dark"] .home-service-card small,
-html[data-theme="dark"] .home-transaction small,
-html[data-theme="dark"] .home-trust-card p{
-  color:#555 !important;
-  opacity:1;
-}
-
-/* Inputs are also pure white, with black text and gold focus. */
+/* ---------- Inputs: black, white text, gold border ---------- */
 html[data-theme="dark"] input,
 html[data-theme="dark"] select,
 html[data-theme="dark"] textarea,
@@ -561,134 +213,316 @@ html[data-theme="dark"] .input,
 html[data-theme="dark"] .airtime-input,
 html[data-theme="dark"] .data-input,
 html[data-theme="dark"] .search-box{
-  background:#fff !important;
-  color:#111 !important;
-  border-color:#D4AF37 !important;
+  background:#000000 !important;
+  color:#FFFFFF !important;
+  border:1px solid #D4AF37 !important;
+  box-shadow:none !important;
 }
 html[data-theme="dark"] input::placeholder,
 html[data-theme="dark"] textarea::placeholder{
-  color:#777 !important;
+  color:#FFFFFF !important;
+  opacity:1 !important;
 }
 html[data-theme="dark"] input:focus,
 html[data-theme="dark"] select:focus,
 html[data-theme="dark"] textarea:focus,
 html[data-theme="dark"] .input:focus{
-  border-color:#D4AF37 !important;
-  box-shadow:0 0 0 3px rgba(212,175,55,.18) !important;
+  background:#000000 !important;
+  color:#FFFFFF !important;
+  border-color:#FFFFFF !important;
+  box-shadow:0 0 0 2px #D4AF37 !important;
 }
-html[data-theme="dark"] option{background:#fff;color:#111}
+html[data-theme="dark"] option{background:#000000 !important;color:#FFFFFF !important}
 
-/* Buttons: gold primary, white secondary, black text. */
+/* ---------- Buttons ---------- */
 html[data-theme="dark"] .btn-primary,
 html[data-theme="dark"] .auth-btn,
+html[data-theme="dark"] .purchase-button,
 html[data-theme="dark"] .boltiv-transaction-button,
 html[data-theme="dark"] .boltiv-success-btn,
 html[data-theme="dark"] .filter-btn.active,
+html[data-theme="dark"] .filter-button.active,
 html[data-theme="dark"] .network-button.active,
 html[data-theme="dark"] .amount-button.active,
-html[data-theme="dark"] .plan-button.active{
+html[data-theme="dark"] .plan-button.active,
+html[data-theme="dark"] .close-button,
+html[data-theme="dark"] .wallet-modal-confirm,
+html[data-theme="dark"] .coming-modal-button{
   background:#D4AF37 !important;
-  color:#111 !important;
+  color:#FFFFFF !important;
   border-color:#D4AF37 !important;
 }
+
 html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .btn-light,
 html[data-theme="dark"] .filter-btn,
 html[data-theme="dark"] .filter-button,
 html[data-theme="dark"] .network-button,
 html[data-theme="dark"] .amount-button,
 html[data-theme="dark"] .plan-button,
 html[data-theme="dark"] .back-button,
-html[data-theme="dark"] .wallet-modal-cancel{
-  background:#fff !important;
-  color:#111 !important;
+html[data-theme="dark"] .wallet-modal-cancel,
+html[data-theme="dark"] .coming-modal-close{
+  background:#000000 !important;
+  color:#FFFFFF !important;
   border-color:#D4AF37 !important;
 }
 
-/* Gold icons / accents. */
-html[data-theme="dark"] .wallet-action-icon,
-html[data-theme="dark"] .wallet-action .icon,
-html[data-theme="dark"] .service-icon,
-html[data-theme="dark"] .transaction-icon,
-html[data-theme="dark"] .profile-avatar{
-  color:#D4AF37 !important;
-  border-color:#D4AF37 !important;
-}
-html[data-theme="dark"] .profile-avatar{
+/* ---------- Icons / avatar ---------- */
+html[data-theme="dark"] .profile-mini,
+html[data-theme="dark"] .icon-button{
   background:#D4AF37 !important;
-  color:#111 !important;
-}
-html[data-theme="dark"] .service-icon,
-html[data-theme="dark"] .transaction-icon{
-  background:#fff !important;
-}
-
-/* Notices and status pills: white surfaces with gold accents. */
-html[data-theme="dark"] .notice,
-html[data-theme="dark"] .transaction-icon,
-html[data-theme="dark"] .success-ring,
-html[data-theme="dark"] .boltiv-transaction-details,
-html[data-theme="dark"] .success-user,
-html[data-theme="dark"] .home-trust-card,
-html[data-theme="dark"] .status-pill.pending{
-  background:#fff !important;
-  color:#111 !important;
+  color:#FFFFFF !important;
   border-color:#D4AF37 !important;
 }
-html[data-theme="dark"] .notice,
-html[data-theme="dark"] .notice strong,
-html[data-theme="dark"] .status-pill.pending{
-  color:#111 !important;
+html[data-theme="dark"] .profile-avatar{
+  background:#FFFFFF !important;
+  color:#D4AF37 !important;
+  border:1px solid #D4AF37 !important;
+}
+html[data-theme="dark"] .service-icon,
+html[data-theme="dark"] .transaction-icon,
+html[data-theme="dark"] .wallet-modal-icon,
+html[data-theme="dark"] .success-ring{
+  background:#000000 !important;
+  color:#FFFFFF !important;
+  border-color:#FFFFFF !important;
 }
 
-/* Bottom navigation stays black; active state is gold, inactive is white. */
+/* ---------- Bottom navigation: black + white + gold ---------- */
 html[data-theme="dark"] .bottom-nav{
-  background:#0b0b0b !important;
-  border-top-color:#333 !important;
-  box-shadow:0 -12px 35px rgba(0,0,0,.42) !important;
+  background:#000000 !important;
+  border-top:1px solid #D4AF37 !important;
+  box-shadow:0 -12px 30px rgba(0,0,0,.7) !important;
 }
-html[data-theme="dark"] .nav-item{color:#fff !important}
-html[data-theme="dark"] .nav-item.active{color:#D4AF37 !important}
+html[data-theme="dark"] .nav-item,
+html[data-theme="dark"] .nav-item .nav-icon{
+  color:#FFFFFF !important;
+  background:transparent !important;
+}
+html[data-theme="dark"] .nav-item.active,
 html[data-theme="dark"] .nav-item.active .nav-icon{
-  background:#D4AF37 !important;
-  color:#111 !important;
+  color:#D4AF37 !important;
 }
 
-/* Theme toggle: white circle on dark background, gold border/icon. */
+/* ---------- Tables ---------- */
+html[data-theme="dark"] table,
+html[data-theme="dark"] .admin-table{
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#D4AF37 !important;
+}
+html[data-theme="dark"] th,
+html[data-theme="dark"] td{
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#FFFFFF !important;
+}
+
+/* ---------- Notices / status ---------- */
+html[data-theme="dark"] .notice,
+html[data-theme="dark"] .status-pill,
+html[data-theme="dark"] .status-pill.success,
+html[data-theme="dark"] .status-pill.pending,
+html[data-theme="dark"] .status-pill.failed,
+html[data-theme="dark"] .success-user,
+html[data-theme="dark"] .boltiv-transaction-details{
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#FFFFFF !important;
+}
+
+/* ---------- Overlays ---------- */
+html[data-theme="dark"] .boltiv-transaction-overlay,
+html[data-theme="dark"] .boltiv-success-overlay,
+html[data-theme="dark"] .coming-modal-backdrop{
+  background:rgba(0,0,0,.90) !important;
+}
+
+/* ---------- Theme toggle ---------- */
+.boltiv-theme-toggle{
+  background:#FFFFFF !important;
+  color:#D4AF37 !important;
+  border:1px solid #D4AF37 !important;
+  box-shadow:0 8px 24px rgba(0,0,0,.20) !important;
+}
 html[data-theme="dark"] .boltiv-theme-toggle{
-  background:#fff !important;
+  background:#000000 !important;
   color:#D4AF37 !important;
   border-color:#D4AF37 !important;
-  box-shadow:0 10px 30px rgba(0,0,0,.45) !important;
 }
+.boltiv-theme-toggle:focus-visible{outline:2px solid #D4AF37 !important;outline-offset:3px}
 
-/* Tables stay white with black text; headers are gold. */
-html[data-theme="dark"] table,
-html[data-theme="dark"] .admin-table{background:#fff !important;color:#111 !important}
-html[data-theme="dark"] th{
-  background:#D4AF37 !important;
-  color:#111 !important;
-  border-color:#D4AF37 !important;
-}
-html[data-theme="dark"] td{
-  background:#fff !important;
-  color:#111 !important;
-  border-color:#e5e5e5 !important;
-}
-
-/* Inline legacy light surfaces. */
+/* ---------- Legacy inline light colors: force them into the same theme ---------- */
 html[data-theme="dark"] [style*="background:#fff"],
 html[data-theme="dark"] [style*="background: #fff"],
 html[data-theme="dark"] [style*="background:#ffffff"],
 html[data-theme="dark"] [style*="background: #ffffff"],
 html[data-theme="dark"] [style*="background:white"],
 html[data-theme="dark"] [style*="background: white"]{
-  background:#fff !important;
-  color:#111 !important;
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+}
+html[data-theme="dark"] [style*="color:#171717"],
+html[data-theme="dark"] [style*="color: #171717"],
+html[data-theme="dark"] [style*="color:#333"],
+html[data-theme="dark"] [style*="color: #333"],
+html[data-theme="dark"] [style*="color:#222"],
+html[data-theme="dark"] [style*="color: #222"]{
+  color:#FFFFFF !important;
 }
 
-/* Scrollbar uses the same three-color system. */
-html[data-theme="dark"]{scrollbar-color:#D4AF37 #090909}
-html[data-theme="dark"] ::-webkit-scrollbar-track{background:#090909}
+/* Static/legal pages and custom admin inline styles. */
+html[data-theme="dark"] .login,
+html[data-theme="dark"] .login-box,
+html[data-theme="dark"] .container,
+html[data-theme="dark"] .content,
+html[data-theme="dark"] .section,
+html[data-theme="dark"] .faq-item,
+html[data-theme="dark"] .policy-card,
+html[data-theme="dark"] .contact-card{
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#D4AF37 !important;
+}
+
+/* Keep plain page links readable. */
+html[data-theme="dark"] a{color:#FFFFFF !important}
+html[data-theme="dark"] a:hover{color:#D4AF37 !important}
+
+/* Browser chrome / selection */
+html[data-theme="dark"]{scrollbar-color:#D4AF37 #000000}
+html[data-theme="dark"] ::-webkit-scrollbar{width:9px;height:9px}
+html[data-theme="dark"] ::-webkit-scrollbar-track{background:#000000}
 html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#D4AF37;border-radius:20px}
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#e5c65c}
-html[data-theme="dark"] ::selection{background:#D4AF37;color:#111}
+html[data-theme="dark"] ::selection{background:#D4AF37;color:#FFFFFF}
+
+/* Toggle placement */
+.boltiv-theme-toggle.inside-header{position:absolute;right:16px;top:50%;transform:translateY(-50%)}
+.header,.top{position:relative !important;padding-right:70px !important}
+@media(max-width:520px){
+  .boltiv-theme-toggle{width:40px;height:40px;font-size:16px}
+  .boltiv-theme-toggle.inside-header{right:10px}
+  .header,.top{padding-right:58px !important}
+}
+
+/* =========================================================
+   PAGE-COVERAGE PASS
+   The same black/gold/white treatment is applied to the
+   page-specific cards used by Profile, Wallet, History,
+   Support, Security, Auth, Exam PINs, Receipt and Admin.
+   ========================================================= */
+html[data-theme="dark"] [class*="-card"],
+html[data-theme="dark"] [class*="_card"],
+html[data-theme="dark"] .stat,
+html[data-theme="dark"] .service-card,
+html[data-theme="dark"] .issue-card,
+html[data-theme="dark"] .ticket-card,
+html[data-theme="dark"] .identity-card,
+html[data-theme="dark"] .details-card,
+html[data-theme="dark"] .security-card,
+html[data-theme="dark"] .form-card,
+html[data-theme="dark"] .history-stat,
+html[data-theme="dark"] .history-item,
+html[data-theme="dark"] .product,
+html[data-theme="dark"] .hero,
+html[data-theme="dark"] .security-hero,
+html[data-theme="dark"] .support-hero,
+html[data-theme="dark"] .receipt-card,
+html[data-theme="dark"] .reset-success,
+html[data-theme="dark"] .error-box,
+html[data-theme="dark"] .coming-soon,
+html[data-theme="dark"] .pin-setup-card,
+html[data-theme="dark"] .wallet-modal-card,
+html[data-theme="dark"] .pin-modal-box{
+  background:#D4AF37 !important;
+  color:#FFFFFF !important;
+  border-color:#D4AF37 !important;
+  box-shadow:0 14px 35px rgba(212,175,55,.18) !important;
+}
+
+html[data-theme="dark"] [class*="-card"] *,
+html[data-theme="dark"] [class*="_card"] *,
+html[data-theme="dark"] .stat *,
+html[data-theme="dark"] .service-card *,
+html[data-theme="dark"] .issue-card *,
+html[data-theme="dark"] .ticket-card *,
+html[data-theme="dark"] .identity-card *,
+html[data-theme="dark"] .details-card *,
+html[data-theme="dark"] .security-card *,
+html[data-theme="dark"] .form-card *,
+html[data-theme="dark"] .history-stat *,
+html[data-theme="dark"] .history-item *,
+html[data-theme="dark"] .product *,
+html[data-theme="dark"] .hero *,
+html[data-theme="dark"] .security-hero *,
+html[data-theme="dark"] .support-hero *,
+html[data-theme="dark"] .receipt-card *,
+html[data-theme="dark"] .reset-success *,
+html[data-theme="dark"] .error-box *,
+html[data-theme="dark"] .coming-soon *,
+html[data-theme="dark"] .pin-setup-card *,
+html[data-theme="dark"] .wallet-modal-card *,
+html[data-theme="dark"] .pin-modal-box *{
+  color:#FFFFFF !important;
+}
+
+/* Common page controls stay black so white text remains crisp. */
+html[data-theme="dark"] .section-head,
+html[data-theme="dark"] .toolbar,
+html[data-theme="dark"] .actions,
+html[data-theme="dark"] .form-group,
+html[data-theme="dark"] .detail-row,
+html[data-theme="dark"] .summary-row,
+html[data-theme="dark"] .row,
+html[data-theme="dark"] .bar,
+html[data-theme="dark"] .loading,
+html[data-theme="dark"] .activity,
+html[data-theme="dark"] .providers,
+html[data-theme="dark"] .provider-grid,
+html[data-theme="dark"] .grid2,
+html[data-theme="dark"] .grid3,
+html[data-theme="dark"] .table-wrap{
+  color:#FFFFFF !important;
+}
+
+/* Admin login/app shells remain black; their actual panels are gold. */
+html[data-theme="dark"] .app,
+html[data-theme="dark"] .main,
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .login{
+  background:#000000 !important;
+  color:#FFFFFF !important;
+}
+
+/* Admin/service labels outside cards are pure white. */
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .stat-value,
+html[data-theme="dark"] .section-head,
+html[data-theme="dark"] .heading,
+html[data-theme="dark"] .title,
+html[data-theme="dark"] .subtitle,
+html[data-theme="dark"] .text,
+html[data-theme="dark"] .label,
+html[data-theme="dark"] .side-label,
+html[data-theme="dark"] .modal-title,
+html[data-theme="dark"] .modal-text,
+html[data-theme="dark"] .detail-label,
+html[data-theme="dark"] .history-stat-label,
+html[data-theme="dark"] .history-stat-value,
+html[data-theme="dark"] .security-label,
+html[data-theme="dark"] .ticket-subject,
+html[data-theme="dark"] .ticket-meta,
+html[data-theme="dark"] .issue-title,
+html[data-theme="dark"] .issue-text{
+  color:#FFFFFF !important;
+}
+
+/* Gold active/selected controls. */
+html[data-theme="dark"] .active,
+html[data-theme="dark"] .selected,
+html[data-theme="dark"] .live,
+html[data-theme="dark"] .status-badge,
+html[data-theme="dark"] .badge{
+  color:#FFFFFF !important;
+}

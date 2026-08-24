@@ -400,13 +400,27 @@ const normalized=raw.map(p=>{
   const explicitDays=parseCatalogNumber(findCatalogField(p,['validity_days','validityDays','days','validity_in_days']));
   const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):0);
   const serviceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
-  return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0};
+  const deliveryRateRaw=parseCatalogNumber(findCatalogField(p,['delivery_rate','deliveryRate']));
+  const deliveryRate=Number.isFinite(deliveryRateRaw)?deliveryRateRaw:null;
+  return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0,delivery_rate:deliveryRate};
 });
 const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean));
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
 const nonRetailTerms=['thryve','msme','fibrenet','hynetflex','mifi','router','learning bundle'];
 const isNonRetail=name=>{const lower=String(name||'').toLowerCase();return nonRetailTerms.some(term=>lower.includes(term));};
-return normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
+const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
+// Multiple sales channels (SME, Gifting, Awoof, Transfer, Direct, Data Share) often sell the exact same
+// bundle size+validity at different prices and reliability. Keep only the best one per (size, validity):
+// prefer the most reliable delivery track record, and use price as the tiebreaker.
+const bestByBundle=new Map();
+for(const p of cleaned){
+  const bundleKey=p.size_mb>0&&p.validity_days>0?`${p.size_mb}:${p.validity_days}`:`unkeyed:${p.plan_code}`;
+  const existing=bestByBundle.get(bundleKey);
+  if(!existing){bestByBundle.set(bundleKey,p);continue;}
+  const pRate=p.delivery_rate??50, exRate=existing.delivery_rate??50;
+  if(pRate>exRate||(pRate===exRate&&p.price<existing.price))bestByBundle.set(bundleKey,p);
+}
+return Array.from(bestByBundle.values());
 }
 const vtugatePlanCache=new Map();
 function planLookupKey(planCode,serviceId){return `${Number(serviceId)||0}:${clean(planCode)}`;}

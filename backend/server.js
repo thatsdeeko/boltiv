@@ -319,10 +319,28 @@ const selected=normalizeDataNetwork(network);
 if(!selected)throw new Error('Unsupported network.');
 const ids=[];
 const add=v=>{const n=Number(v);if(Number.isInteger(n)&&n>0&&!ids.includes(n))ids.push(n);};
-// Explicit configuration first.
-for(const key of [selected,selected.toUpperCase(),selected.toLowerCase(),'data','DATA'])add(VTUGATE_SERVICE_MAP?.[key]);
-add(process.env.VTUGATE_DATA_SERVICE_ID);
-// Build a complete Data-service candidate list from VTUGATE.
+
+// The normal BOLTIV "Buy Data" catalogue should use VTUGATE's consumer/gifting
+// data service for each network. Do not merge Awoof, SME, SME2, DG, CG,
+// Data Share, or Broadband services into the normal catalogue.
+// These defaults match the VTUGATE service catalogue returned to BOLTIV:
+// MTN=62, Airtel=63, Glo=158, 9mobile=64.
+const defaultConsumerServiceIds={MTN:62,AIRTEL:63,GLO:158,'9MOBILE':64};
+
+// Explicit configuration always wins. A network-specific VTUGATE_SERVICE_MAP
+// entry is preferred over the safe built-in consumer service ID.
+for(const key of [selected,selected.toUpperCase(),selected.toLowerCase()])add(VTUGATE_SERVICE_MAP?.[key]);
+if(!ids.length)add(process.env.VTUGATE_DATA_SERVICE_ID);
+if(!ids.length)add(defaultConsumerServiceIds[selected]);
+
+// If an explicit/default service is available, use only that service. This is
+// intentional: previously this function discovered every VTUGATE service whose
+// name contained "data", which mixed Awoof/SME/Broadband/etc. into Buy Data.
+if(ids.length)return ids;
+
+// Last-resort discovery for deployments whose provider catalogue differs from
+// the known service IDs. Prefer a service explicitly labelled gifting/consumer
+// data for the selected network and exclude specialised catalogue types.
 if(Date.now()-vtugateServiceCache.at>300000){
   const r=await fetchVTUGATEServices(true);
   if(r.success){
@@ -342,11 +360,11 @@ if(Date.now()-vtugateServiceCache.at>300000){
     vtugateServiceCache.at=Date.now();
   }
 }
-const aliases=['data','mobile data','internet data','data bundle','data bundles','data plan','data plans','mobile data bundle'];
 const has=(hay,w)=>{const t=String(w).toLowerCase();return hay===t||hay.includes(` ${t} `)||hay.startsWith(`${t} `)||hay.endsWith(` ${t}`)||hay.includes(t);};
-const matches=vtugateServiceCache.data.filter(x=>aliases.some(w=>has(x.hay,w)));
-const networkMatches=matches.filter(x=>has(x.hay,selected.toLowerCase()));
-for(const x of [...networkMatches,...matches])add(x.id);
+const specialised=['awoof','sme','sme2','broadband','data share','datashare',' dg',' dg ',' cg',' cg '];
+const matches=vtugateServiceCache.data.filter(x=>has(x.hay,selected.toLowerCase())&&has(x.hay,'data')&&!specialised.some(w=>has(x.hay,w)));
+const preferred=matches.find(x=>has(x.hay,'gifting'))||matches[0];
+if(preferred)add(preferred.id);
 if(!ids.length)throw new Error(`VTUGATE service ID for ${selected} data is not configured.`);
 return ids;
 }
@@ -380,14 +398,19 @@ const normalized=raw.map(p=>{
   const id=parseCatalogNumber(codeRaw??idRaw);
   const planCode=clean(codeRaw??idRaw??'');
   const price=parseCatalogNumber(findCatalogField(p,['vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','selling_price','sellingPrice','price','amount','cost','plan_price','planPrice']));
-  const rawValidity=normalizeCatalogValidity(p);
+  // VTUGATE responses are not fully consistent about where validity lives.
+  // Prefer the provider field, then safely derive it from the plan name when
+  // the name itself contains values such as "1 day", "30 days", or "365 Days".
   const sizeValue=findCatalogField(p,['size_mb','sizeMb','data_mb','dataMb','volume','size','quantity','data_size','dataSize']);
   const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
   const parsedSize=parseCatalogNumber(sizeValue);
   const sizeMb=Number.isFinite(parsedSize)&&parsedSize>0?Math.round(parsedSize):(sizeMatch?(sizeMatch[2].toUpperCase()==='GB'?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0);
-  const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+  const providerValidity=normalizeCatalogValidity(p);
+  const nameValidityMatch=name.match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+  const validityMatch=String(providerValidity||'').match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i)||nameValidityMatch;
   const explicitDays=parseCatalogNumber(findCatalogField(p,['validity_days','validityDays','days','validity_in_days']));
   const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):0);
+  const rawValidity=providerValidity|| (nameValidityMatch?nameValidityMatch[0]:'');
   const serviceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
   return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0};
 });

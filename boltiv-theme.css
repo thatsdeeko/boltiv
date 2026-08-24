@@ -1,0 +1,180 @@
+/* BOLTIV Global Theme — professional dark/light toggle */
+:root{
+  color-scheme: light;
+  --theme-bg:#f7f7f5;
+  --theme-bg2:#ffffff;
+  --theme-card:#ffffff;
+  --theme-card2:#f3f3ef;
+  --theme-text:#171717;
+  --theme-muted:#6f7378;
+  --theme-line:#e5e5e1;
+  --theme-soft:#f1f1ed;
+  --theme-shadow:0 14px 45px rgba(0,0,0,.10);
+}
+html[data-theme="light"]{color-scheme:light;}
+html[data-theme="dark"]{color-scheme:dark;}
+
+/* Global dark surface */
+html[data-theme="dark"] body{background:var(--theme-bg)!important;color:var(--theme-text)!important}
+html[data-theme="dark"] .page,
+html[data-theme="dark"] main,
+html[data-theme="dark"] section{color:var(--theme-text)}
+html[data-theme="dark"] .header{background:rgba(11,13,16,.94)!important;border-color:var(--theme-line)!important;backdrop-filter:blur(14px)}
+html[data-theme="dark"] .brand-tagline,
+html[data-theme="dark"] .footer-text{color:#7f8792!important}
+html[data-theme="dark"] .profile-mini{background:var(--theme-card)!important;color:var(--gold2)!important;border-color:rgba(212,175,55,.55)!important}
+
+/* Shared surfaces */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .wallet-action,
+html[data-theme="dark"] .summary-card,
+html[data-theme="dark"] .transaction-item,
+html[data-theme="dark"] .support-card,
+html[data-theme="dark"] .provider-card,
+html[data-theme="dark"] .profile-card,
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .boltiv-transaction-card,
+html[data-theme="dark"] .boltiv-toast,
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .box,
+html[data-theme="dark"] .auth-card,
+html[data-theme="dark"] .login-card{background:var(--theme-card)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important;box-shadow:var(--theme-shadow)!important}
+html[data-theme="dark"] .wallet-action:hover,
+html[data-theme="dark"] .wallet-action:active{background:var(--theme-card2)!important}
+html[data-theme="dark"] .balance-card{background:linear-gradient(145deg,#211e13,#14181e)!important;box-shadow:var(--theme-shadow)!important}
+html[data-theme="dark"] .notice{background:#201d13!important;color:#aeb3bb!important;border-color:var(--gold)!important}
+html[data-theme="dark"] .provider-card.active{background:#201d13!important}
+
+/* Typography */
+html[data-theme="dark"] .welcome-title,
+html[data-theme="dark"] .section-title,
+html[data-theme="dark"] .profile-name,
+html[data-theme="dark"] .transaction-title,
+html[data-theme="dark"] .provider-name,
+html[data-theme="dark"] .wallet-action-title,
+html[data-theme="dark"] .boltiv-toast-title{color:var(--theme-text)!important}
+html[data-theme="dark"] .welcome-text,
+html[data-theme="dark"] .support-text,
+html[data-theme="dark"] .profile-email,
+html[data-theme="dark"] .transaction-date,
+html[data-theme="dark"] .transaction-status,
+html[data-theme="dark"] .balance-label,
+html[data-theme="dark"] .summary-label,
+html[data-theme="dark"] .label,
+html[data-theme="dark"] .boltiv-toast-message{color:var(--theme-muted)!important}
+
+/* Inputs */
+html[data-theme="dark"] .input,
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea{background:#0f1318!important;color:var(--theme-text)!important;border-color:#303741!important}
+html[data-theme="dark"] .input::placeholder,
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{color:#68717d!important}
+html[data-theme="dark"] .input:focus,
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus{border-color:var(--gold)!important;background:#12171d!important}
+html[data-theme="dark"] option{background:#14181e;color:#f4f1e8}
+
+/* Buttons / filters */
+html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .filter-btn{background:var(--theme-card)!important;color:#c7cbd2!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] .filter-btn.active{color:#171717!important;background:var(--gold)!important}
+
+/* Navigation */
+html[data-theme="dark"] .bottom-nav{background:rgba(15,18,23,.96)!important;border-color:var(--theme-line)!important;box-shadow:0 -12px 35px rgba(0,0,0,.28)}
+html[data-theme="dark"] .nav-item{color:#7d8590!important}
+html[data-theme="dark"] .nav-item.active{color:var(--gold)!important}
+
+/* Receipt / transaction overlays */
+html[data-theme="dark"] .boltiv-transaction-overlay{background:rgba(0,0,0,.72)!important}
+html[data-theme="dark"] .boltiv-transaction-overlay.processing .boltiv-transaction-icon{background:#201d13!important}
+
+/* Tables and common admin elements */
+html[data-theme="dark"] table{color:var(--theme-text)!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] th{background:#101419!important;color:#aeb4bd!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] td{background:var(--theme-card)!important;color:var(--theme-text)!important;border-color:var(--theme-line)!important}
+html[data-theme="dark"] tr:nth-child(even) td{background:#11161c!important}
+html[data-theme="dark"] .badge{border-color:var(--theme-line)!important}
+html[data-theme="dark"] hr{border-color:var(--theme-line)!important}
+
+/* Inline light colors found across standalone pages */
+html[data-theme="dark"] [style*="background:#fff"],
+html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background:#ffffff"],
+html[data-theme="dark"] [style*="background: #ffffff"],
+html[data-theme="dark"] [style*="background:white"],
+html[data-theme="dark"] [style*="background: white"]{background:var(--theme-card)!important}
+html[data-theme="dark"] [style*="color:#171717"],
+html[data-theme="dark"] [style*="color: #171717"],
+html[data-theme="dark"] [style*="color:#333"],
+html[data-theme="dark"] [style*="color: #333"],
+html[data-theme="dark"] [style*="color:#222"],
+html[data-theme="dark"] [style*="color: #222"]{color:var(--theme-text)!important}
+html[data-theme="dark"] [style*="color:#777"],
+html[data-theme="dark"] [style*="color: #777"],
+html[data-theme="dark"] [style*="color:#888"],
+html[data-theme="dark"] [style*="color: #888"]{color:var(--theme-muted)!important}
+html[data-theme="dark"] [style*="border:1px solid #e5e5e1"],
+html[data-theme="dark"] [style*="border: 1px solid #e5e5e1"],
+html[data-theme="dark"] [style*="border:1px solid #dcdcd8"]{border-color:var(--theme-line)!important}
+
+/* Theme switch */
+.boltiv-theme-toggle{position:fixed;right:16px;top:14px;z-index:10001;width:44px;height:44px;border:1px solid rgba(212,175,55,.45);border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.94);color:#171717;box-shadow:0 8px 28px rgba(0,0,0,.18);backdrop-filter:blur(12px);font-size:18px;transition:.2s ease}
+.boltiv-theme-toggle:hover{transform:translateY(-1px);border-color:var(--gold);box-shadow:0 10px 32px rgba(0,0,0,.25)}
+html[data-theme="dark"] .boltiv-theme-toggle{background:#171c22;color:#f5f0df;border-color:rgba(212,175,55,.55);box-shadow:0 10px 32px rgba(0,0,0,.42)}
+.boltiv-theme-toggle:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.boltiv-theme-toggle .theme-icon{line-height:1}
+
+
+.boltiv-theme-toggle.inside-header{position:absolute;right:16px;top:50%;transform:translateY(-50%);}
+.boltiv-theme-toggle.inside-header:hover{transform:translateY(calc(-50% - 1px));}
+.top{position:relative!important;padding-right:76px!important}
+.header{position:relative!important;padding-right:70px!important}
+
+/* Don't let the switch cover important admin content */
+.admin-theme-space{padding-right:58px}
+
+/* Browser scrollbar / selection */
+html[data-theme="dark"]{scrollbar-color:#3b424c #0b0d10}
+html[data-theme="dark"] ::-webkit-scrollbar{width:9px;height:9px}
+html[data-theme="dark"] ::-webkit-scrollbar-track{background:#0b0d10}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#343b45;border-radius:20px}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#4a535f}
+html[data-theme="dark"] ::selection{background:rgba(212,175,55,.35);color:#fff}
+
+@media(max-width:520px){.boltiv-theme-toggle{top:10px;right:10px;width:40px;height:40px;font-size:16px}.boltiv-theme-toggle.inside-header{right:10px;top:50%;}.top{padding-right:62px!important}.header{padding-right:58px!important}}
+
+/* Public homepage / SEO page */
+html[data-theme="dark"] .seo-nav{border-color:#2a3038!important}
+html[data-theme="dark"] .seo-brand{color:var(--theme-text)!important}
+html[data-theme="dark"] .seo-btn.secondary{background:#14181e!important;color:#d8b84d!important;border-color:#3b3420!important}
+html[data-theme="dark"] .seo-card,
+html[data-theme="dark"] .seo-service,
+html[data-theme="dark"] .seo-benefit,
+html[data-theme="dark"] .seo-step,
+html[data-theme="dark"] .seo-trust,
+html[data-theme="dark"] .seo-wallet-card,
+html[data-theme="dark"] .seo-faq details,
+html[data-theme="dark"] .seo-availability-card{background:#14181e!important;border-color:#2a3038!important;box-shadow:var(--theme-shadow)!important}
+html[data-theme="dark"] .seo-hero p,
+html[data-theme="dark"] .seo-section-intro,
+html[data-theme="dark"] .seo-card p,
+html[data-theme="dark"] .seo-service span,
+html[data-theme="dark"] .seo-benefit span,
+html[data-theme="dark"] .seo-step span,
+html[data-theme="dark"] .seo-trust p,
+html[data-theme="dark"] .seo-wallet-card p,
+html[data-theme="dark"] .seo-faq p{color:#9aa0aa!important}
+html[data-theme="dark"] .seo-service .icon,
+html[data-theme="dark"] .seo-benefit .icon,
+html[data-theme="dark"] .seo-availability-card .availability-icon{background:#201d13!important;border-color:#4a4020!important}
+html[data-theme="dark"] .seo-section.alt{border-color:#2a3038!important}
+html[data-theme="dark"] .seo-footer{border-color:#2a3038!important;color:#8d949e!important}
+html[data-theme="dark"] .seo-footer a{color:#d8b84d!important}
+html[data-theme="dark"] .seo-mini-nav a{color:#9aa0aa!important}
+html[data-theme="dark"] .seo-wallet-balance{background:#201d13!important;border-color:#4a4020!important}
+html[data-theme="dark"] .seo-mobile-cta{background:rgba(15,18,23,.96)!important;border-color:#2a3038!important}

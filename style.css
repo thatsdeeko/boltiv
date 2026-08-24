@@ -841,3 +841,7 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+/* Global theme bridge — dark mode is controlled by boltiv-theme.js */
+html[data-theme="dark"] body{background:#0b0d10;color:#f4f1e8}
+html[data-theme="dark"] .card{background:#14181e;border-color:#2a3038}

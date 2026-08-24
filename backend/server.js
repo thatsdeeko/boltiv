@@ -317,63 +317,23 @@ function extractVTUGATEPlanCandidates(responseData,selected){
 async function getVTUGATEDataServiceIds(network){
 const selected=normalizeDataNetwork(network);
 if(!selected)throw new Error('Unsupported network.');
-const ids=[];
-const add=v=>{const n=Number(v);if(Number.isInteger(n)&&n>0&&!ids.includes(n))ids.push(n);};
 
-// The normal BOLTIV "Buy Data" catalogue should use VTUGATE's consumer/gifting
-// data service for each network. Do not merge Awoof, SME, SME2, DG, CG,
-// Data Share, or Broadband services into the normal catalogue.
-// These defaults match the VTUGATE service catalogue returned to BOLTIV:
-// MTN=62, Airtel=63, Glo=158, 9mobile=64.
-const defaultConsumerServiceIds={MTN:62,AIRTEL:63,GLO:158,'9MOBILE':64};
+// VTUGATE service IDs from the current service catalogue supplied to BOLTIV.
+// These are the normal consumer/gifting data services used by the Buy Data page.
+// Do NOT discover/merge every service containing the word "data" because that
+// also pulls Awoof, SME, SME2, DG, CG, Data Share and Broadband products.
+const consumerDataServiceIds={
+  MTN:62,
+  AIRTEL:63,
+  GLO:158,
+  '9MOBILE':64
+};
 
-// For the four Nigerian mobile networks in the current VTUGATE catalogue,
-// ALWAYS use the dedicated consumer/gifting service above. Do not let a generic
-// VTUGATE_DATA_SERVICE_ID override the network-specific service, because that
-// would make multiple networks load the same catalogue (or load a specialised
-// service such as SME/Broadband). A network-specific map may be used only for
-// networks that do not have one of the known built-in IDs.
-if(defaultConsumerServiceIds[selected]){
-  return [defaultConsumerServiceIds[selected]];
+const serviceId=Number(consumerDataServiceIds[selected]||0);
+if(!Number.isInteger(serviceId)||serviceId<=0){
+  throw new Error(`VTUGATE consumer data service ID for ${selected} is not configured.`);
 }
-
-for(const key of [selected,selected.toUpperCase(),selected.toLowerCase()])add(VTUGATE_SERVICE_MAP?.[key]);
-if(!ids.length)add(process.env.VTUGATE_DATA_SERVICE_ID);
-
-// If an explicit/default service is available, use only that service. This is
-// intentional: previously this function discovered every VTUGATE service whose
-// name contained "data", which mixed Awoof/SME/Broadband/etc. into Buy Data.
-if(ids.length)return ids;
-
-// Last-resort discovery for deployments whose provider catalogue differs from
-// the known service IDs. Prefer a service explicitly labelled gifting/consumer
-// data for the selected network and exclude specialised catalogue types.
-if(Date.now()-vtugateServiceCache.at>300000){
-  const r=await fetchVTUGATEServices(true);
-  if(r.success){
-    const root=r.data?.data??r.data;
-    const records=[];
-    const visit=(value,depth=0)=>{
-      if(!value||depth>8)return;
-      if(Array.isArray(value)){for(const item of value)visit(item,depth+1);return;}
-      if(typeof value!=='object')return;
-      const id=Number(value.service_id??value.serviceId??value.serviceID??value.id??value.service?.id??value.service?.service_id??value.service?.serviceId??0);
-      const hay=[value.name,value.service_name,value.serviceName,value.service_title,value.title,value.label,value.code,value.service_code,value.serviceCode,value.slug,value.type,value.category,value.service_type,value.serviceType,value.provider,value.network,value.network_name,value.networkName,value.data_type,value.dataType,value.description,value.service?.name,value.service?.service_name,value.service?.code].filter(v=>v!==undefined&&v!==null).join(' ').toLowerCase();
-      if(id>0&&hay)records.push({id,hay,raw:value});
-      for(const [k,v] of Object.entries(value)){if(['raw','meta','pagination'].includes(k))continue;visit(v,depth+1);}
-    };
-    visit(root);
-    vtugateServiceCache.data=records;
-    vtugateServiceCache.at=Date.now();
-  }
-}
-const has=(hay,w)=>{const t=String(w).toLowerCase();return hay===t||hay.includes(` ${t} `)||hay.startsWith(`${t} `)||hay.endsWith(` ${t}`)||hay.includes(t);};
-const specialised=['awoof','sme','sme2','broadband','data share','datashare',' dg',' dg ',' cg',' cg '];
-const matches=vtugateServiceCache.data.filter(x=>has(x.hay,selected.toLowerCase())&&has(x.hay,'data')&&!specialised.some(w=>has(x.hay,w)));
-const preferred=matches.find(x=>has(x.hay,'gifting'))||matches[0];
-if(preferred)add(preferred.id);
-if(!ids.length)throw new Error(`VTUGATE service ID for ${selected} data is not configured.`);
-return ids;
+return [serviceId];
 }
 
 async function fetchVTUGATEDataPlans(network){
@@ -397,7 +357,7 @@ for(const response of responses){
 }
 if(!bestRaw.length)throw new Error(lastMessage);
 const raw=bestRaw;
-const normalized=raw.map(p=>{
+const normalized=raw.map((p,index)=>{
   const name=clean(findCatalogField(p,['plan_name','planName','name','plan','bundle_name','bundleName','product_name','productName','description','title','label'])??'');
   const networkName=normalizeDataNetwork(findCatalogField(p,['network','network_name','networkName','network_code','networkCode','operator','operator_name','provider','provider_name'])??p.__network??selected)||selected;
   const codeRaw=findCatalogField(p,['code','plan_code','planCode','bundle_code','bundleCode','product_code','productCode']);
@@ -405,21 +365,29 @@ const normalized=raw.map(p=>{
   const id=parseCatalogNumber(codeRaw??idRaw);
   const planCode=clean(codeRaw??idRaw??'');
   const price=parseCatalogNumber(findCatalogField(p,['vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','selling_price','sellingPrice','price','amount','cost','plan_price','planPrice']));
-  // VTUGATE responses are not fully consistent about where validity lives.
-  // Prefer the provider field, then safely derive it from the plan name when
-  // the name itself contains values such as "1 day", "30 days", or "365 Days".
   const sizeValue=findCatalogField(p,['size_mb','sizeMb','data_mb','dataMb','volume','size','quantity','data_size','dataSize']);
   const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
   const parsedSize=parseCatalogNumber(sizeValue);
   const sizeMb=Number.isFinite(parsedSize)&&parsedSize>0?Math.round(parsedSize):(sizeMatch?(sizeMatch[2].toUpperCase()==='GB'?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0);
-  const providerValidity=normalizeCatalogValidity(p);
-  const nameValidityMatch=name.match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
-  const validityMatch=String(providerValidity||'').match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i)||nameValidityMatch;
+
+  // VTUGATE can return validity as text, as a numeric day count, or only in
+  // the plan name. Normalize all three forms so the frontend never loses it.
+  const validityValue=findCatalogField(p,['validity','validity_period','validityPeriod','validityDuration','duration','duration_text','expiry','expiry_period','expiryPeriod']);
   const explicitDays=parseCatalogNumber(findCatalogField(p,['validity_days','validityDays','days','validity_in_days']));
-  const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):0);
-  const rawValidity=providerValidity|| (nameValidityMatch?nameValidityMatch[0]:'');
-  const serviceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
-  return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0};
+  const providerValidity=validityValue!==undefined?clean(validityValue):'';
+  const providerValidityMatch=providerValidity.match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+  const nameValidityMatch=name.match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
+  const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(providerValidityMatch&&/day/i.test(providerValidityMatch[2])?Number(providerValidityMatch[1]):(nameValidityMatch&&/day/i.test(nameValidityMatch[2])?Number(nameValidityMatch[1]):0));
+  let rawValidity=providerValidity||'';
+  if(!rawValidity&&validityDays>0)rawValidity=`${validityDays} ${validityDays===1?'Day':'Days'}`;
+  if(!rawValidity&&nameValidityMatch)rawValidity=nameValidityMatch[0];
+
+  // The catalogue endpoint was called with exactly one known consumer service
+  // ID. If VTUGATE omits service_id on individual plans, retain that requested
+  // service ID so the same plan remains purchasable and price-authoritative.
+  const requestedServiceId=Number(serviceIds[0]||0);
+  const returnedServiceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
+  return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(returnedServiceId)&&returnedServiceId>0?returnedServiceId:requestedServiceId};
 });
 const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean));
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
@@ -427,7 +395,7 @@ return normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&(!hasOtherNetwork||p
 }
 const vtugatePlanCache=new Map();
 function planLookupKey(planCode,serviceId){return `${Number(serviceId)||0}:${clean(planCode)}`;}
-async function getAuthoritativeVTUGATEDataPlan(network,planKey){const selected=normalizeDataNetwork(network);const key=clean(planKey);if(!selected||!key)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const plan=entry.plans.find(x=>planLookupKey(x.plan_code||x.code||"",x.service_id)===key||String(x.plan_code||x.code||"")===key);if(!plan)throw new Error("The selected data plan is no longer available.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");let providerServiceId=Number(plan.service_id||0);if(!(providerServiceId>0))throw new Error("VTUGATE did not return a service_id for the selected data plan.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,plan_code:clean(plan.plan_code||plan.code||""),service_id:providerServiceId,provider_price:Number(plan.price),customer_price:customerPrice};}
+async function getAuthoritativeVTUGATEDataPlan(network,planCode,expectedServiceId=0){const selected=normalizeDataNetwork(network);const key=clean(planCode);const requestedServiceId=Number(expectedServiceId||0);if(!selected||!key)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const candidates=entry.plans.filter(x=>clean(x.plan_code||x.code||"")===key);const plan=requestedServiceId>0?candidates.find(x=>Number(x.service_id||0)===requestedServiceId):candidates[0];if(!plan)throw new Error("The selected data plan is no longer available or its service_id does not match the selected plan.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const providerServiceId=Number(plan.service_id||0);if(!(providerServiceId>0))throw new Error("VTUGATE did not return a service_id for the selected data plan.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,plan_code:clean(plan.plan_code||plan.code||""),service_id:providerServiceId,provider_price:Number(plan.price),customer_price:customerPrice};}
 async function resolveDataPlanName(network,planKey){try{const key=clean(planKey);const plans=await fetchVTUGATEDataPlans(network);return clean(plans.find(x=>planLookupKey(x.plan_code||x.code||"",x.service_id)===key||String(x.plan_code||x.code||"")===key)?.name||"");}catch{return "";}}
 
 async function getVTUGATEEducationPrice(serviceId){const r=await vtugateRequest("api/v1/geteducationtypeprice",{service_id:serviceId});if(!r.success)throw new Error(r.message||"Unable to load education PIN price.");return Number(r.data?.data?.price??r.data?.price??0);}
@@ -459,7 +427,7 @@ if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test
 const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};const suppliedPin=String(data.transactionPin||"");if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
 let providerPayload={},recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
 if(service==="data"){
-const planCode=clean(data.plan_code??data.bundle_id??data.plan_id??data.providerPayload?.plan_code??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??"");const network=normalizeDataNetwork(data.network||data.providerPayload?.network);let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planCode);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};providerPayload={service_id:Number(authoritative.service_id),network,phone:recipient,plan_id:planCode,plan_code:planCode,code:planCode,bundle_id:planCode,amount,ref:null};
+const planCode=clean(data.plan_code??data.bundle_id??data.plan_id??data.providerPayload?.plan_code??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??"");const selectedServiceId=Number(data.service_id??data.providerPayload?.service_id??0);const network=normalizeDataNetwork(data.network||data.providerPayload?.network);let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planCode,selectedServiceId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};providerPayload={service_id:Number(authoritative.service_id),phone_number:recipient,amount:Number(authoritative.provider_price),plan_code:planCode,network,phone:recipient,plan_id:planCode,code:planCode,bundle_id:planCode,ref:null};
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return{success:false,statusCode:400,message:"Invalid education PIN product."};if(![1,2,5].includes(quantity))return{success:false,statusCode:400,message:"Education PIN quantity must be 1, 2, or 5."};const serviceId=productId;let unitPrice;try{unitPrice=await getVTUGATEEducationPrice(serviceId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current education PIN price."};}const productCode=clean(data.product_code||data.providerPayload?.product_code||data.exam||"waec");const expectedTotal=Number((unitPrice*quantity).toFixed(2));if(Math.abs(amount-expectedTotal)>.009)return{success:false,statusCode:400,message:"The selected education PIN price has changed. Please refresh the products and try again."};pricingMeta={providerCost:Number((unitPrice*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-unitPrice*quantity).toFixed(2)),plan:productCode.toUpperCase()};providerPayload={service_id:serviceId,phone:recipient||user.phone||"08000000000",quantity,product_code:productCode,ref:null};
 }else if(service==="airtime"){
@@ -3919,7 +3887,7 @@ if(!planCode||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
 const lookupKey=planLookupKey(planCode,planServiceId);
-byPlan.set(lookupKey,{code:lookupKey,plan_code:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
+byPlan.set(lookupKey,{code:planCode,plan_code:planCode,bundle_id:planCode,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.size_mb)-Number(b.size_mb)||Number(a.validity_days)-Number(b.validity_days)||Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});

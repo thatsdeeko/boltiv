@@ -692,6 +692,8 @@ ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`
 );
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT`);
 await db(`CREATE INDEX IF NOT EXISTS users_status_idx ON users(status)`);
 await db(`
 CREATE TABLE IF NOT EXISTS email_verification_tokens(
@@ -1235,7 +1237,8 @@ async function registerUser(
 email,
 password,
 name,
-phone
+phone,
+termsAccepted
 ){
 
 email=
@@ -1249,6 +1252,15 @@ clean(name);
 
 phone=
 clean(phone);
+
+termsAccepted=Boolean(termsAccepted);
+
+if(!termsAccepted){
+return{
+success:false,
+message:"You must agree to the Terms & Conditions and Privacy Policy before creating your account."
+};
+}
 
 if(name.length<2){
 
@@ -1323,11 +1335,13 @@ phone,
 email,
 password_hash,
 email_verified,
+terms_accepted_at,
+terms_version,
 created_at,
 updated_at
 )
 VALUES(
-$1,$2,$3,$4,$5,FALSE,NOW(),NOW()
+$1,$2,$3,$4,$5,FALSE,NOW(),'2026-08',NOW(),NOW()
 )
 RETURNING
 id,
@@ -1361,22 +1375,12 @@ try{
   console.error("REGISTRATION VERIFICATION EMAIL ERROR:",error?.stack||error?.message||error);
 }
 
-// Create an authenticated session immediately after registration so the
-// new user can set the mandatory Transaction PIN before entering BOLTIV.
-const sessionToken=token();
-await db(
-`INSERT INTO user_sessions(token,user_id,expires_at)
-VALUES($1,$2,NOW()+INTERVAL '30 days')`,
-[sessionToken,user.id]
-);
-
 return{
 success:true,
 message:
 verificationEmailSent
-? "Account created successfully. A verification email has been sent. Please create your Transaction PIN."
-: "Account created successfully, but the verification email could not be sent. Please request another verification email.",
-_sessionToken:sessionToken,
+? "Account created successfully. Please check your email and verify your email address before signing in."
+: "Account created successfully, but the verification email could not be sent. Please request another verification email before signing in.",
 transactionPinSet:false,
 verificationEmailSent,
 user:{
@@ -1410,7 +1414,8 @@ name,
 phone,
 email,
 password_hash,
-status
+status,
+email_verified
 FROM users
 WHERE LOWER(email)=LOWER($1)`,
 [email]
@@ -1444,6 +1449,14 @@ message:
 "Invalid email or password."
 };
 
+}
+
+if(user.email_verified !== true){
+return{
+success:false,
+code:"EMAIL_NOT_VERIFIED",
+message:"Please verify your email address before signing in. Check your inbox for the BOLTIV verification email."
+};
 }
 
 if(!user.user_id){
@@ -3393,7 +3406,8 @@ await registerUser(
 b.email,
 b.password,
 b.name,
-b.phone
+b.phone,
+b.termsAccepted
 );
 if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); result.sessionToken=result._sessionToken; delete result._sessionToken; }
 return send(

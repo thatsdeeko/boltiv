@@ -2764,10 +2764,22 @@ async function adminMonitoring(req){
   return{success:true,monitoring:{database,vtugate:Boolean(VTUGATE_API_KEY&&VTUGATE_API_BASE_URL),pending:Number(d.pending||0),stalePending:Number(d.stale_pending||0),failedLastHour:Number(d.failed_last_hour||0),successfulLast24h:Number(d.successful_last_24h||0),unsuccessfulLast24h:Number(d.unsuccessful_last_24h||0),successRate:rate,lastSuccessful:d.last_successful||null,responseMs:Date.now()-started,timestamp:new Date().toISOString()}};
 }
 
-async function adminVTUGATEProvider(req,action){
+async function adminVTUGATEProvider(req,action,network){
 const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
 if(action==="account"){const r=await getVTUGATEAccountDetails();return{success:r.success,statusCode:r.statusCode,message:r.message||"",account:r.data?.data||r.data||null};}
 if(action==="services"){const r=await fetchVTUGATEServices(true);return{success:r.success,statusCode:r.statusCode,message:r.message||"",services:r.data?.data||r.data?.services||r.data||[]};}
+if(action==="rawplans"){
+const selected=normalizeDataNetwork(network||"MTN")||"MTN";
+let serviceIds=[];
+try{serviceIds=await getVTUGATEDataServiceIds(selected);}
+catch(e){return{success:false,statusCode:200,message:"COULD NOT FIND A SERVICE ID FOR THIS NETWORK: "+e.message,network:selected,serviceIdsTried:[],results:[]};}
+const results=[];
+for(const serviceId of serviceIds){
+const r=await vtugateRequest("api/v1/fetchdataplans",{service_id:serviceId});
+results.push({serviceId,success:r.success,statusCode:r.statusCode,message:r.message,raw:r.data});
+}
+return{success:true,statusCode:200,network:selected,serviceIdsTried:serviceIds,results};
+}
 return{success:false,statusCode:400,message:"Unsupported VTUGATE provider action."};
 }
 
@@ -3094,6 +3106,7 @@ if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=awa
 if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/vtugate/account"){const result=await adminVTUGATEProvider(req,"account");return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/vtugate/services"){const result=await adminVTUGATEProvider(req,"services");return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/vtugate/rawplans"){const result=await adminVTUGATEProvider(req,"rawplans",url.searchParams.get("network"));return send(res,result.statusCode||200,result);}
 if(req.method==="GET"&&path==="/api/admin/analytics"){const result=await adminAnalytics(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/reconciliation"){const admin=await adminFromToken(req);if(!admin)return;const result=await getFinancialReconciliation();return send(res,200,{success:true,reconciliation:result});}
 if(req.method==="GET"&&path==="/api/admin/ledger"){const admin=await adminFromToken(req);if(!admin)return;const r=await db(`SELECT id,account_type,owner_id,direction,amount,balance_after,reference,transaction_id,category,description,created_at FROM financial_ledger ORDER BY created_at DESC LIMIT 300`);return send(res,200,{success:true,ledger:r.rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}))});}

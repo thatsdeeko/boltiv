@@ -14,10 +14,9 @@
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
 <link href="https://boltiv.ng/electricity" rel="canonical"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="stylesheet" href="../boltiv-theme.css">
-</head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body>
-<div class="page electricity-page"><div class="container">
+<div class="page"><div class="container">
 <header class="header"><button class="back" onclick="history.back()">‹</button><div><div class="title">Electricity</div><div class="subtitle">Pay your electricity bill</div></div></header>
 <section class="card">
 <div class="field"><label class="label" id="electricity-provider-label">ELECTRICITY PROVIDER</label><div aria-labelledby="electricity-provider-label" class="providers" role="group">
@@ -56,8 +55,6 @@ $("verify").onclick=async()=>{let n=$("meter").value.trim(),meterType=$("meterTy
 $("meter").addEventListener("input",()=>{verified=false;$("pay").disabled=true;$("summary").style.display="none"});$("meterType").addEventListener("change",()=>{verified=false;$("pay").disabled=true;$("summary").style.display="none"});$("amount").addEventListener("input",check);
 $("pay").onclick=async()=>{let v=Number($("amount").value),n=$("meter").value.trim();if(!verified)return msg("Please verify your meter first.","error");if(v<100)return msg("Minimum electricity payment is ₦100.","error");$("pay").disabled=true;const transactionPin=await boltivGetTransactionPin();if(!transactionPin){$("pay").disabled=false;return;}msg("Processing your electricity payment...","success");try{const r=await fetch("https://boltiv-backend.onrender.com/api/vtu/electricity",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({provider:selectedProvider,meterNumber:n,meterType:$("meterType").value,amount:v,service:"electricity",providerPayload:{service:"electricity",provider:selectedProvider,meterNumber:n,meterType:$("meterType").value,amount:v},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin:transactionPin})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process electricity payment.");msg(`${d.message||"Electricity request received."} Reference: ${d.reference||"-"}`,"success");}catch(e){msg(e.message||"Electricity payment failed.","error");}finally{$("pay").disabled=false}};
 </script>
-<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
-<script src="../boltiv-theme.js"></script>
 </body>
 </html>
 <!-- BOLTIV ELECTRICITY COMPRESSED -->

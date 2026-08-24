@@ -28,8 +28,7 @@ body.modal-open{overflow:hidden!important}
 .coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:#716e68!important;font-size:14px!important;line-height:1.55!important}
 .coming-modal-button{width:100%!important;min-height:50px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#e1bf43,#bd920b)!important;color:#fff!important;font-weight:800!important;cursor:pointer!important}
 </style>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="stylesheet" href="../boltiv-theme.css">
-</head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
 <body class="boltiv-animated-home">
 <div aria-hidden="true" class="home-ambient">
 <span class="ambient-orb ambient-orb-one"></span>
@@ -182,7 +181,5 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&comingModal&&!comin
 loadHome();
 setInterval(loadHome,30000);
 </script>
-<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
-<script src="../boltiv-theme.js"></script>
 </body>
 </html>

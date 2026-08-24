@@ -38,7 +38,6 @@ body{background:#fff;color:#171717}
 .resend{display:block;width:100%;margin-top:10px;border:0;background:transparent;color:#b8860b;font-size:11px;font-weight:900;cursor:pointer}
 @media (max-width:480px){.auth-card{padding:22px}.code-input,.pin-input{letter-spacing:5px}}
 </style>
-<link rel="stylesheet" href="../boltiv-theme.css">
 </head>
 <body>
 <div class="page"><div class="container"><div class="auth-page">
@@ -85,6 +84,4 @@ async function requestCode(){
 async function resetPin(){clearStatus();const email=emailInput.value.trim().toLowerCase(),code=codeInput.value.trim(),pin=newPinInput.value.trim(),confirm=confirmPinInput.value.trim();if(!/^[0-9]{6}$/.test(code))return showStatus("Enter the 6-digit verification code.");if(!/^[0-9]{4}$/.test(pin))return showStatus("Transaction PIN must contain exactly 4 digits.");if(pin!==confirm)return showStatus("The new PINs do not match.");const btn=document.getElementById("resetPinBtn");btn.disabled=true;try{const r=await fetch(API_BASE+"/api/auth/reset-transaction-pin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,code,pin})});const data=await r.json().catch(()=>({}));if(!r.ok||!data.success)return showStatus(data.message||"Unable to reset your Transaction PIN.");formArea.style.display="none";successArea.classList.add("show");}catch(e){showStatus("Unable to contact BOLTIV right now. Please try again later.");}finally{btn.disabled=false;}}
 document.getElementById("sendCodeBtn").onclick=requestCode;document.getElementById("resetPinBtn").onclick=resetPin;document.getElementById("resendBtn").onclick=requestCode;
 </script>
-<button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
-<script src="../boltiv-theme.js"></script>
 </body></html>

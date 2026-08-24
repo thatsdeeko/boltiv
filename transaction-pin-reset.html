@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+(function(){document.documentElement.setAttribute("data-theme","light");})();
+</script>
 <base href="/">
 <meta name="robots" content="noindex,nofollow">
 <meta charset="utf-8">
@@ -38,7 +41,7 @@ body{background:#fff;color:#171717}
 .resend{display:block;width:100%;margin-top:10px;border:0;background:transparent;color:#b8860b;font-size:11px;font-weight:900;cursor:pointer}
 @media (max-width:480px){.auth-card{padding:22px}.code-input,.pin-input{letter-spacing:5px}}
 </style>
-<link rel="stylesheet" href="../boltiv-theme.css">
+<link rel="stylesheet" href="boltiv-theme.css">
 </head>
 <body>
 <div class="page"><div class="container"><div class="auth-page">
@@ -86,5 +89,5 @@ async function resetPin(){clearStatus();const email=emailInput.value.trim().toLo
 document.getElementById("sendCodeBtn").onclick=requestCode;document.getElementById("resetPinBtn").onclick=resetPin;document.getElementById("resendBtn").onclick=requestCode;
 </script>
 <button type="button" class="boltiv-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button>
-<script src="../boltiv-theme.js"></script>
+<script src="boltiv-theme.js"></script>
 </body></html>

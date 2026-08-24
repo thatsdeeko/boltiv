@@ -326,3 +326,299 @@ html[data-theme="dark"] .boltiv-theme-toggle {
   top: auto !important;
   right: auto !important;
 }
+
+/* =========================================================
+   GLOBAL DARK COVERAGE — auth, wallet, services, profile
+   Ensures the dashboard dark/gold look applies site-wide.
+   ========================================================= */
+
+/* Root surfaces & page chrome */
+html[data-theme="dark"] {
+  --bg: #0b1017;
+  --card: #141b24;
+  --card2: #1a222d;
+  --text: #f5f7fa;
+  --muted: #a5afbd;
+  --line: #2b3542;
+  --soft: #151c25;
+  --gold: #d7b23f;
+  --gold2: #d7b23f;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .page,
+html[data-theme="dark"] .auth-page,
+html[data-theme="dark"] .container,
+html[data-theme="dark"] main,
+html[data-theme="dark"] .profile-page,
+html[data-theme="dark"] .wallet-page,
+html[data-theme="dark"] .service-page {
+  background: #0b1017 !important;
+  color: #f5f7fa !important;
+}
+
+/* Headers across all pages */
+html[data-theme="dark"] .header,
+html[data-theme="dark"] .top-bar,
+html[data-theme="dark"] .app-header,
+html[data-theme="dark"] .page-header {
+  background: rgba(15, 21, 29, 0.96) !important;
+  border-bottom-color: #2b3542 !important;
+  color: #f5f7fa !important;
+}
+
+html[data-theme="dark"] .brand-name,
+html[data-theme="dark"] .home-brand,
+html[data-theme="dark"] .home-brand span {
+  color: #d7b23f !important;
+}
+
+/* Cards & panels */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .auth-card,
+html[data-theme="dark"] .form-card,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .wallet-card,
+html[data-theme="dark"] .service-card,
+html[data-theme="dark"] .notice,
+html[data-theme="dark"] .profile-card,
+html[data-theme="dark"] .identity-card,
+html[data-theme="dark"] .details-card,
+html[data-theme="dark"] .action,
+html[data-theme="dark"] .legal-link,
+html[data-theme="dark"] .list-item,
+html[data-theme="dark"] .tx-item,
+html[data-theme="dark"] .transaction-item,
+html[data-theme="dark"] .history-item,
+html[data-theme="dark"] .notification-item,
+html[data-theme="dark"] .support-card,
+html[data-theme="dark"] .faq-item {
+  background: #141b24 !important;
+  border-color: #2b3542 !important;
+  color: #f5f7fa !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22) !important;
+}
+
+/* Balance / gold accent cards */
+html[data-theme="dark"] .balance-card,
+html[data-theme="dark"] .home-balance-card,
+html[data-theme="dark"] .wallet-balance {
+  background: linear-gradient(145deg, #1b222c 0%, #121922 100%) !important;
+  border-color: #6d5a25 !important;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="dark"] .balance-value,
+html[data-theme="dark"] .amount,
+html[data-theme="dark"] .wallet-amount {
+  color: #d7b23f !important;
+}
+
+html[data-theme="dark"] .balance-label,
+html[data-theme="dark"] .summary-label,
+html[data-theme="dark"] .label,
+html[data-theme="dark"] .muted,
+html[data-theme="dark"] .auth-subtitle,
+html[data-theme="dark"] .welcome-text,
+html[data-theme="dark"] .section-title,
+html[data-theme="dark"] small,
+html[data-theme="dark"] .helper,
+html[data-theme="dark"] .hint {
+  color: #a5afbd !important;
+}
+
+/* Buttons */
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] button.primary,
+html[data-theme="dark"] .submit-btn,
+html[data-theme="dark"] .cta {
+  background: linear-gradient(135deg, #d9b542, #b5891d) !important;
+  color: #111 !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="dark"] .btn-secondary,
+html[data-theme="dark"] .btn-light,
+html[data-theme="dark"] .btn-outline {
+  background: #171f29 !important;
+  color: #eef2f6 !important;
+  border-color: #3a4553 !important;
+}
+
+html[data-theme="dark"] .btn-danger,
+html[data-theme="dark"] .logout-btn {
+  background: #351b1e !important;
+  color: #ef8b91 !important;
+  border-color: #5a2a30 !important;
+}
+
+/* Form controls */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .input,
+html[data-theme="dark"] .form-control,
+html[data-theme="dark"] .search-box {
+  background: #141b24 !important;
+  color: #f2f5f8 !important;
+  border-color: #2b3542 !important;
+}
+
+html[data-theme="dark"] input:focus,
+html[data-theme="dark"] select:focus,
+html[data-theme="dark"] textarea:focus,
+html[data-theme="dark"] .input:focus {
+  border-color: #d7b23f !important;
+  box-shadow: 0 0 0 2px rgba(215, 178, 63, 0.18) !important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: #778391 !important;
+}
+
+/* Links & accents */
+html[data-theme="dark"] a.link,
+html[data-theme="dark"] .text-link,
+html[data-theme="dark"] .section-link,
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .gold-text {
+  color: #d7b23f !important;
+}
+
+/* Service icons / quick tiles */
+html[data-theme="dark"] .service-icon,
+html[data-theme="dark"] .icon-wrap,
+html[data-theme="dark"] .tile-icon {
+  background: #211f17 !important;
+  border-color: #625324 !important;
+  color: #d7b23f !important;
+}
+
+html[data-theme="dark"] .home-service-card,
+html[data-theme="dark"] .service-tile {
+  background: #141b24 !important;
+  border-color: #2b3542 !important;
+}
+
+/* Auth specific (login / register hardcode white) */
+html[data-theme="dark"] .auth-page,
+html[data-theme="dark"] .auth-page body,
+html[data-theme="dark"] .login-wrap,
+html[data-theme="dark"] .register-wrap {
+  background: #0b1017 !important;
+}
+
+html[data-theme="dark"] .auth-card h1,
+html[data-theme="dark"] .auth-title,
+html[data-theme="dark"] .welcome-title,
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3 {
+  color: #f3f5f8 !important;
+}
+
+html[data-theme="dark"] .auth-card h1 span,
+html[data-theme="dark"] .welcome-title span {
+  color: #d7b23f !important;
+}
+
+/* Tables & lists */
+html[data-theme="dark"] table,
+html[data-theme="dark"] thead,
+html[data-theme="dark"] tbody,
+html[data-theme="dark"] tr,
+html[data-theme="dark"] td,
+html[data-theme="dark"] th {
+  background: transparent !important;
+  color: #e8edf3 !important;
+  border-color: #2b3542 !important;
+}
+
+html[data-theme="dark"] thead th,
+html[data-theme="dark"] .table-head {
+  background: #1b232e !important;
+  color: #dce2e8 !important;
+}
+
+/* Bottom nav already covered; reinforce */
+html[data-theme="dark"] .bottom-nav,
+html[data-theme="dark"] nav.bottom {
+  background: rgba(14, 20, 28, 0.97) !important;
+  border-top-color: #2b3542 !important;
+}
+
+html[data-theme="dark"] .bottom-nav .nav-item.active,
+html[data-theme="dark"] .bottom-nav .nav-item.active .nav-icon {
+  color: #d7b23f !important;
+}
+
+/* Icon buttons / profile mini */
+html[data-theme="dark"] .icon-button,
+html[data-theme="dark"] .profile-mini,
+html[data-theme="dark"] .back-button {
+  background: #151c25 !important;
+  border-color: #394351 !important;
+  color: #e8edf3 !important;
+}
+
+/* Status pills */
+html[data-theme="dark"] .status-pill.success,
+html[data-theme="dark"] .badge-success { background: #123522 !important; color: #6ed69a !important; }
+html[data-theme="dark"] .status-pill.pending,
+html[data-theme="dark"] .badge-pending { background: #302814 !important; color: #e3bd45 !important; }
+html[data-theme="dark"] .status-pill.failed,
+html[data-theme="dark"] .badge-failed { background: #351b1e !important; color: #ef8b91 !important; }
+
+/* Modals / overlays */
+html[data-theme="dark"] .modal,
+html[data-theme="dark"] .modal-box,
+html[data-theme="dark"] .modal-content,
+html[data-theme="dark"] .coming-modal-card {
+  background: linear-gradient(145deg, #1a222c 0%, #121922 100%) !important;
+  border-color: #5e5026 !important;
+  color: #f2f4f7 !important;
+}
+
+html[data-theme="dark"] .coming-modal-backdrop,
+html[data-theme="dark"] .modal-backdrop {
+  background: rgba(8, 12, 18, 0.72) !important;
+}
+
+/* Receipt / support / legal pages */
+html[data-theme="dark"] .receipt-card,
+html[data-theme="dark"] .legal-content,
+html[data-theme="dark"] .terms-body,
+html[data-theme="dark"] .privacy-body {
+  background: #141b24 !important;
+  color: #e8edf3 !important;
+  border-color: #2b3542 !important;
+}
+
+/* Admin */
+html[data-theme="dark"] .admin-shell,
+html[data-theme="dark"] .admin-sidebar,
+html[data-theme="dark"] .admin-main {
+  background: #0b1017 !important;
+  color: #f5f7fa !important;
+}
+html[data-theme="dark"] .admin-sidebar {
+  background: #121922 !important;
+  border-color: #2b3542 !important;
+}
+
+/* Prevent white flashes from inline styles on auth pages */
+html[data-theme="dark"] [style*="background:#fff"],
+html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background:#ffffff"],
+html[data-theme="dark"] [style*="background: #ffffff"],
+html[data-theme="dark"] [style*="background:#fbf"],
+html[data-theme="dark"] [style*="background:#fffdf"] {
+  background: #141b24 !important;
+}
+
+/* Selection */
+html[data-theme="dark"] ::selection {
+  background: rgba(215, 178, 63, 0.35);
+  color: #fff;
+}

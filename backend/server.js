@@ -314,6 +314,61 @@ function extractVTUGATEPlanCandidates(responseData,selected){
   return out;
 }
 
+// Reject non-consumer products that VTUGATE sometimes returns under data service IDs
+// (Thryve ads, broadband/FibreNet/MiFi, corporate gifting, awoof/sme/cg/dg, etc.).
+// The Buy Data page must only show normal mobile gifting/consumer plans.
+function isConsumerMobileDataPlan(plan){
+  const name=clean(plan?.name||"").toLowerCase();
+  const validity=clean(plan?.validity||plan?.validity_period||plan?.duration||"").toLowerCase();
+  const code=clean(plan?.plan_code||plan?.code||"").toLowerCase();
+  const hay=`${name} ${validity} ${code}`;
+  if(!name)return false;
+
+  const reject=[
+    /\bthryve\b/,
+    /\bbroadband\b/,
+    /\bfibrenet\b/,
+    /\bfibre[\s_-]?net\b/,
+    /\bfiber[\s_-]?net\b/,
+    /\bfibre\b/,
+    /\bfiber\b/,
+    /\bmifi\b/,
+    /\bmi[\s_-]?fi\b/,
+    /\bhynetflex\b/,
+    /\bcorporate\b/,
+    /\brouter\b/,
+    /\bawoof\b/,
+    /\bsme2?\b/,
+    /\bdata[\s_-]?share\b/,
+    /\bdg\b/,
+    /\bcg\b/,
+    /\bad[\s_-]?(lite|bumper|mega|standard|premium)\b/,
+    /\bads?[\s_-]?(lite|bumper|mega|standard|premium|google)\b/,
+    /\bthryve[\s_-]?(ad|data|talk|bundles?)\b/,
+    /\b1\.5\s*tb\b/,
+    /\b[12]\s*tb\b/,
+    /\byearly\b/,
+    /\b365\s*days?\b.*\b(broadband|fibre|fiber|tb)\b/,
+    /\b(broadband|fibre|fiber|mifi).*\b(365|yearly)\b/
+  ];
+  if(reject.some(re=>re.test(hay)))return false;
+
+  // Extremely expensive "data" rows are almost always fixed broadband products.
+  const price=Number(plan?.price||0);
+  if(Number.isFinite(price)&&price>50000)return false;
+
+  // Prefer real mobile data signals: size in MB/GB in name or size_mb field.
+  const sizeMb=Number(plan?.size_mb||0);
+  const hasSize=sizeMb>0||/\d+(?:\.\d+)?\s*(gb|mb)\b/i.test(name);
+  // Allow classic short-validity gifting names even when size parsing fails.
+  const looksLikeMobileGifting=/\b(gifting|gift|daily|weekly|monthly|night|social|whatsapp|youtube|buffet)\b/i.test(name)
+    ||/\b\d+\s*(day|days|hour|hours)\b/i.test(name)
+    ||/\b\d+(?:\.\d+)?\s*(gb|mb)\b/i.test(name);
+  if(!hasSize&&!looksLikeMobileGifting)return false;
+
+  return true;
+}
+
 async function getVTUGATEDataServiceIds(network){
 const selected=normalizeDataNetwork(network);
 if(!selected)throw new Error('Unsupported network.');
@@ -389,13 +444,20 @@ const normalized=raw.map((p,index)=>{
   const returnedServiceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
   return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(returnedServiceId)&&returnedServiceId>0?returnedServiceId:requestedServiceId};
 });
-const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean));
-const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
-return normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&(!hasOtherNetwork||p.network_name===selected));
+// Always keep only plans that belong to the selected network when a network
+// label is present. Also drop non-consumer products (broadband, Thryve, etc.).
+return normalized.filter(p=>{
+  if(!p.plan_code||!(p.price>0)||!p.name)return false;
+  if(!isConsumerMobileDataPlan(p))return false;
+  const planNet=normalizeDataNetwork(p.network_name||"");
+  // If the plan carries a network label, it must match the selected network.
+  if(planNet&&planNet!==selected)return false;
+  return true;
+});
 }
 const vtugatePlanCache=new Map();
 function planLookupKey(planCode,serviceId){return `${Number(serviceId)||0}:${clean(planCode)}`;}
-async function getAuthoritativeVTUGATEDataPlan(network,planCode,expectedServiceId=0){const selected=normalizeDataNetwork(network);const key=clean(planCode);const requestedServiceId=Number(expectedServiceId||0);if(!selected||!key)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const candidates=entry.plans.filter(x=>clean(x.plan_code||x.code||"")===key);const plan=requestedServiceId>0?candidates.find(x=>Number(x.service_id||0)===requestedServiceId):candidates[0];if(!plan)throw new Error("The selected data plan is no longer available or its service_id does not match the selected plan.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const providerServiceId=Number(plan.service_id||0);if(!(providerServiceId>0))throw new Error("VTUGATE did not return a service_id for the selected data plan.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,plan_code:clean(plan.plan_code||plan.code||""),service_id:providerServiceId,provider_price:Number(plan.price),customer_price:customerPrice};}
+async function getAuthoritativeVTUGATEDataPlan(network,planCode,expectedServiceId=0){const selected=normalizeDataNetwork(network);const key=clean(planCode);const requestedServiceId=Number(expectedServiceId||0);if(!selected||!key)throw new Error("Invalid data plan.");let entry=vtugatePlanCache.get(selected);if(!entry||Date.now()-entry.at>60000){entry={at:Date.now(),plans:await fetchVTUGATEDataPlans(selected)};vtugatePlanCache.set(selected,entry);}const candidates=entry.plans.filter(x=>clean(x.plan_code||x.code||"")===key);const plan=requestedServiceId>0?candidates.find(x=>Number(x.service_id||0)===requestedServiceId):candidates[0];if(!plan)throw new Error("The selected data plan is no longer available or its service_id does not match the selected plan.");if(!isConsumerMobileDataPlan(plan))throw new Error("The selected plan is not a consumer mobile data product.");const service=await getService("data");if(!service||service.enabled===false||service.maintenance===true)throw new Error("Data service is currently unavailable.");const providerServiceId=Number(plan.service_id||0);if(!(providerServiceId>0))throw new Error("VTUGATE did not return a service_id for the selected data plan.");const customerPrice=customerPriceFromCost(plan.price,pricingConfig(service));return{...plan,plan_code:clean(plan.plan_code||plan.code||""),service_id:providerServiceId,provider_price:Number(plan.price),customer_price:customerPrice};}
 async function resolveDataPlanName(network,planKey){try{const key=clean(planKey);const plans=await fetchVTUGATEDataPlans(network);return clean(plans.find(x=>planLookupKey(x.plan_code||x.code||"",x.service_id)===key||String(x.plan_code||x.code||"")===key)?.name||"");}catch{return "";}}
 
 async function getVTUGATEEducationPrice(serviceId){const r=await vtugateRequest("api/v1/geteducationtypeprice",{service_id:serviceId});if(!r.success)throw new Error(r.message||"Unable to load education PIN price.");return Number(r.data?.data?.price??r.data?.price??0);}

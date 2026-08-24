@@ -22,7 +22,7 @@ boltivRequireAuth();
 .profile-top{display:flex;align-items:center;justify-content:space-between;padding:22px 0 18px}
 .profile-title{font-size:25px;font-weight:1000;color:var(--ptext);letter-spacing:-.5px}.profile-title span{color:var(--pgold2)}
 .profile-sub{margin-top:5px;font-size:9px;color:#8a8a84;letter-spacing:1.2px;font-weight:800}
-.profile-badge{width:44px;height:44px;border-radius:15px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #eadca8;display:flex;align-items:center;justify-content:center;color:var(--pgold2);font-size:19px;box-shadow:0 8px 24px rgba(180,145,35,.09)}
+.profile-top-right{display:flex;align-items:center;gap:10px}.profile-badge{width:44px;height:44px;border-radius:15px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #eadca8;display:flex;align-items:center;justify-content:center;color:var(--pgold2);font-size:19px;box-shadow:0 8px 24px rgba(180,145,35,.09)}
 .identity-card{position:relative;overflow:hidden;padding:23px 20px;border-radius:26px;background:linear-gradient(145deg,#fffdf5,#fff);border:1px solid #eadca8;box-shadow:0 14px 36px rgba(45,38,20,.07);animation:profileEnter .5s ease both}
 .identity-card:after{content:"";position:absolute;width:150px;height:150px;right:-55px;top:-70px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,.18),transparent 68%)}
 .identity{display:flex;align-items:center;gap:15px;position:relative;z-index:1}
@@ -41,6 +41,22 @@ boltivRequireAuth();
 .modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,14,.55);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:.25s}.modal.show{opacity:1;visibility:visible}.modal-box{width:100%;max-width:370px;padding:26px 22px;border-radius:24px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #d8bd55;text-align:center;transform:translateY(20px) scale(.95);transition:.25s}.modal.show .modal-box{transform:translateY(0) scale(1)}.modal-icon{width:58px;height:58px;margin:0 auto 15px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fffaf0;border:1px solid #d8bd55;color:#D4AF37;font-size:24px}.modal-title{color:#171717;font-size:19px;font-weight:1000}.modal-text{margin-top:7px;color:#777;font-size:11px;line-height:1.6}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}.modal-btn{width:100%;padding:13px;border-radius:12px;font-size:11px;font-weight:1000;cursor:pointer}.modal-btn.primary{border:0;background:#c9a227;color:#fff}.modal-btn.secondary{border:1px solid #e5e5e1;background:#fff;color:#777}.logout-modal .modal-box{border-color:#e7baba}.logout-modal .modal-icon{background:#fff4f4;border-color:#e7baba;color:#b44d4d}
 @media(max-width:420px){.profile-title{font-size:23px}.identity-card{padding:21px 17px}.details-card{padding-left:15px;padding-right:15px}}
 @media(prefers-reduced-motion:reduce){.profile-page:before,.profile-page:after,.section,.identity-card{animation:none!important}.action{transition:none}}
+html[data-theme="dark"] .profile-page{background:linear-gradient(180deg,#0b0f14 0%,#0f151d 55%,#0b1016 100%)}
+html[data-theme="dark"] .profile-title,html[data-theme="dark"] .section-head h3,html[data-theme="dark"] .identity-name,html[data-theme="dark"] .action-title,html[data-theme="dark"] .legal-title{color:#f3f4f6}
+html[data-theme="dark"] .profile-sub,html[data-theme="dark"] .identity-email,html[data-theme="dark"] .detail-label,html[data-theme="dark"] .action-sub,html[data-theme="dark"] .legal-sub{color:#aab4c2}
+html[data-theme="dark"] .profile-badge{background:linear-gradient(145deg,#1a222d,#121821);border-color:#3a3420}
+html[data-theme="dark"] .identity-card,html[data-theme="dark"] .details-card,html[data-theme="dark"] .action,html[data-theme="dark"] .legal-link{background:linear-gradient(145deg,#151d27,#111820);border-color:#293442;box-shadow:0 14px 36px rgba(0,0,0,.25)}
+html[data-theme="dark"] .detail{border-color:#293442}
+html[data-theme="dark"] .detail-input{color:#f3f4f6}
+html[data-theme="dark"] .detail-input:disabled{-webkit-text-fill-color:#f3f4f6}
+html[data-theme="dark"] .detail-input.editing{background:#19212c;border-color:#6e5b20;color:#f3f4f6;-webkit-text-fill-color:#f3f4f6}
+html[data-theme="dark"] .edit-btn,html[data-theme="dark"] .action-icon,html[data-theme="dark"] .status{background:#1b2025;border-color:#4b4225}
+html[data-theme="dark"] .modal-box{background:linear-gradient(145deg,#151d27,#111820);border-color:#6e5b20}
+html[data-theme="dark"] .modal-title{color:#f3f4f6}
+html[data-theme="dark"] .modal-text{color:#aab4c2}
+html[data-theme="dark"] .modal-btn.secondary{background:#19212c;border-color:#293442;color:#aab4c2}
+html[data-theme="dark"] .profile-theme-toggle{background:#151d27;border-color:#4b4225}
+
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
 <style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="stylesheet" href="../boltiv-theme.css">
@@ -58,7 +74,7 @@ My <span>Profile</span>
 MANAGE YOUR BOLTIV ACCOUNT
 </div>
 </div>
-<div class="profile-badge">◆</div>
+<div class="profile-top-right"><button type="button" class="boltiv-theme-toggle profile-theme-toggle" data-boltiv-theme-toggle aria-label="Switch to dark mode" title="Switch to dark mode">🌙</button><div class="profile-badge">◆</div></div>
 </div>
 <!-- IDENTITY -->
 <div class="identity-card">

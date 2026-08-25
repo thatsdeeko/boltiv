@@ -7,9 +7,9 @@
 .buy-again-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
 .buy-again-heading{color:#171717;font-size:11px;font-weight:1000;letter-spacing:.4px}
 .buy-again-subtitle{color:#777;font-size:9px}
-.buy-again-list{display:grid;gap:8px}
-.buy-again-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid #e5e5e1;border-radius:12px;background:#ffffff}
-.buy-again-info{min-width:0}
+.buy-again-list{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;width:100%;min-width:0;box-sizing:border-box}
+.buy-again-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid #e5e5e1;border-radius:12px;background:#ffffff;min-width:0;width:100%;box-sizing:border-box;overflow:hidden}
+.buy-again-info{min-width:0;flex:1 1 auto;overflow:hidden}
 .buy-again-plan{color:#171717;font-size:11px;font-weight:1000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .buy-again-meta{color:#777;font-size:9px;margin-top:4px}
 .buy-again-date{color:#999;font-size:8px;margin-top:2px;font-style:italic}

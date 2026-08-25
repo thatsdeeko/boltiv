@@ -291,14 +291,17 @@ function parseDataSizeMb(plan,name=''){
       const nameAmount=Number(nameMatch[1]);
       const nameUnit=nameMatch[2].toUpperCase();
       if(Number.isFinite(nameAmount)&&nameAmount>0){
-        // If the numeric provider value is a GB quantity, convert it;
-        // otherwise trust the explicit size printed in the plan name.
-        if(nameUnit==='GB' && numeric<=100)return Math.round(numeric*1024);
-        if(nameUnit==='MB' && Math.abs(numeric-nameAmount)<0.01)return Math.round(nameAmount);
+        // Generic provider fields (volume/size/quantity) are sometimes
+        // returned in GB while the plan name is the authoritative display
+        // size. Prefer the explicit unit in the plan name instead of
+        // accidentally treating 0.5 as 0.5MB for a "500MB" plan.
+        if(nameUnit==='MB')return Math.round(nameAmount);
+        // For GB names, a small generic numeric value is normally GB
+        // (e.g. 0.5, 1, 1.5). Larger values are commonly already MB.
+        if(numeric<=100)return Math.round(numeric*1024);
+        return Math.round(nameAmount*1024);
       }
     }
-    // Generic numeric catalog fields are treated as MB unless their value
-    // is fractional and the plan name explicitly says GB.
     return Math.round(numeric);
   }
   if(nameMatch){
@@ -499,7 +502,7 @@ if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test
 const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};const suppliedPin=String(data.transactionPin||"");if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
 let providerPayload={},recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
 if(service==="data"){
-const planCode=clean(data.plan_code??data.bundle_id??data.plan_id??data.providerPayload?.plan_code??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??"");const network=normalizeDataNetwork(data.network||data.providerPayload?.network);let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planCode);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};providerPayload={service_id:Number(authoritative.service_id),network,phone:recipient,plan_id:planCode,plan_code:planCode,code:planCode,bundle_id:planCode,amount,ref:null};
+const planCode=clean(data.plan_code??data.bundle_id??data.plan_id??data.providerPayload?.plan_code??data.providerPayload?.bundle_id??data.providerPayload?.plan_id??"");const network=normalizeDataNetwork(data.network||data.providerPayload?.network);let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planCode);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current data plan price."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};providerPayload={service_id:Number(authoritative.service_id),code:clean(authoritative.plan_code),phone:recipient,amount,ref:null};
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return{success:false,statusCode:400,message:"Invalid education PIN product."};if(![1,2,5].includes(quantity))return{success:false,statusCode:400,message:"Education PIN quantity must be 1, 2, or 5."};const serviceId=productId;let unitPrice;try{unitPrice=await getVTUGATEEducationPrice(serviceId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current education PIN price."};}const productCode=clean(data.product_code||data.providerPayload?.product_code||data.exam||"waec");const expectedTotal=Number((unitPrice*quantity).toFixed(2));if(Math.abs(amount-expectedTotal)>.009)return{success:false,statusCode:400,message:"The selected education PIN price has changed. Please refresh the products and try again."};pricingMeta={providerCost:Number((unitPrice*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-unitPrice*quantity).toFixed(2)),plan:productCode.toUpperCase()};providerPayload={service_id:serviceId,phone:recipient||user.phone||"08000000000",quantity,product_code:productCode,ref:null};
 }else if(service==="airtime"){

@@ -3932,7 +3932,9 @@ if(customerPrice===null)continue;
 const lookupKey=planLookupKey(planCode,planServiceId);
 byPlan.set(lookupKey,{code:lookupKey,plan_code:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
-const plans=Array.from(byPlan.values()).sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
+const plans=Array.from(byPlan.values())
+.filter(plan=>Number(plan.size_mb||0)<=1024)
+.sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});
 }catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}
 }

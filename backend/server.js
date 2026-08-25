@@ -266,6 +266,48 @@ function parseCatalogNumber(value){
   return Number.isFinite(n)?n:NaN;
 }
 
+function parseDataSizeMb(plan,name=''){
+  // Prefer an explicit unit in the provider value, then the plan name.
+  const candidates=[
+    ['size_mb',plan?.size_mb],['sizeMb',plan?.sizeMb],['data_mb',plan?.data_mb],['dataMb',plan?.dataMb],
+    ['volume',plan?.volume],['size',plan?.size],['quantity',plan?.quantity],['data_size',plan?.data_size],['dataSize',plan?.dataSize]
+  ];
+  const nameText=String(name||'');
+  const nameMatch=nameText.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
+  for(const [key,value] of candidates){
+    if(value===undefined||value===null||value==='')continue;
+    const text=String(value).trim();
+    const unitMatch=text.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
+    if(unitMatch){
+      const amount=Number(unitMatch[1]);
+      if(Number.isFinite(amount)&&amount>0)return Math.round(unitMatch[2].toUpperCase()==='GB'?amount*1024:amount);
+    }
+    const numeric=parseCatalogNumber(value);
+    if(!Number.isFinite(numeric)||numeric<=0)continue;
+    // Explicit MB fields are always MB. For generic fields, use the plan
+    // name's unit when available (e.g. API returns 0.5 with name "500MB").
+    if(/^size_mb$|^sizeMb$|^data_mb$|^dataMb$/.test(key))return Math.round(numeric);
+    if(nameMatch){
+      const nameAmount=Number(nameMatch[1]);
+      const nameUnit=nameMatch[2].toUpperCase();
+      if(Number.isFinite(nameAmount)&&nameAmount>0){
+        // If the numeric provider value is a GB quantity, convert it;
+        // otherwise trust the explicit size printed in the plan name.
+        if(nameUnit==='GB' && numeric<=100)return Math.round(numeric*1024);
+        if(nameUnit==='MB' && Math.abs(numeric-nameAmount)<0.01)return Math.round(nameAmount);
+      }
+    }
+    // Generic numeric catalog fields are treated as MB unless their value
+    // is fractional and the plan name explicitly says GB.
+    return Math.round(numeric);
+  }
+  if(nameMatch){
+    const amount=Number(nameMatch[1]);
+    if(Number.isFinite(amount)&&amount>0)return Math.round(nameMatch[2].toUpperCase()==='GB'?amount*1024:amount);
+  }
+  return 0;
+}
+
 function collectVTUGATEPlanCandidates(value,inheritedNetwork='',out=[],seen=new Set(),depth=0,inheritedPlanId=''){
   if(value==null||depth>12)return out;
   if(Array.isArray(value)){for(const item of value)collectVTUGATEPlanCandidates(item,inheritedNetwork,out,seen,depth+1,inheritedPlanId);return out;}
@@ -384,7 +426,11 @@ for(const response of responses){
 if(!bestRaw.length)throw new Error(lastMessage);
 const raw=bestRaw;
 const normalized=raw.map(p=>{
+  const channelRaw=findCatalogField(p,['plan_type','planType','data_type','dataType','bundle_type','bundleType','service_type','serviceType','category','plan_category','planCategory','channel','channel_name','channelName','type','product_type','productType']);
+  const channel=clean(channelRaw??'');
   const name=clean(findCatalogField(p,['plan_name','planName','name','plan','bundle_name','bundleName','product_name','productName','description','title','label'])??'');
+  const channelSearch=[channel,clean(p.plan_name||''),clean(p.name||''),clean(p.description||''),clean(p.title||''),clean(p.label||'')].join(' ').toLowerCase();
+  const salesChannel=/\b(sme|gifting)\b/i.test(channelSearch)?( /\bsme\b/i.test(channelSearch)?'SME':'Gifting'):'';
   const networkName=normalizeDataNetwork(findCatalogField(p,['network','network_name','networkName','network_code','networkCode','operator','operator_name','provider','provider_name'])??p.__network??selected)||selected;
   const codeRaw=findCatalogField(p,['code','plan_code','planCode','bundle_code','bundleCode','product_code','productCode']);
   const idRaw=findCatalogField(p,['id','plan_id','planId','bundle_id','bundleId','product_id','productId']);
@@ -392,23 +438,20 @@ const normalized=raw.map(p=>{
   const planCode=clean(codeRaw??idRaw??'');
   const price=parseCatalogNumber(findCatalogField(p,['vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','selling_price','sellingPrice','price','amount','cost','plan_price','planPrice']));
   const rawValidity=normalizeCatalogValidity(p);
-  const sizeValue=findCatalogField(p,['size_mb','sizeMb','data_mb','dataMb','volume','size','quantity','data_size','dataSize']);
-  const sizeMatch=name.match(/(\d+(?:\.\d+)?)\s*(GB|MB)\b/i);
-  const parsedSize=parseCatalogNumber(sizeValue);
-  const sizeMb=Number.isFinite(parsedSize)&&parsedSize>0?Math.round(parsedSize):(sizeMatch?(sizeMatch[2].toUpperCase()==='GB'?Math.round(Number(sizeMatch[1])*1024):Math.round(Number(sizeMatch[1]))):0);
+  const sizeMb=parseDataSizeMb(p,name);
   const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
   const explicitDays=parseCatalogNumber(findCatalogField(p,['validity_days','validityDays','days','validity_in_days']));
   const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):0);
   const serviceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
   const deliveryRateRaw=parseCatalogNumber(findCatalogField(p,['delivery_rate','deliveryRate']));
   const deliveryRate=Number.isFinite(deliveryRateRaw)?deliveryRateRaw:null;
-  return{...p,network_name:networkName,name,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0,delivery_rate:deliveryRate};
+  return{...p,network_name:networkName,name,sales_channel:salesChannel,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0,delivery_rate:deliveryRate};
 });
 const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean));
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
 const nonRetailTerms=['thryve','msme','fibrenet','hynetflex','mifi','router','learning bundle'];
 const isNonRetail=name=>{const lower=String(name||'').toLowerCase();return nonRetailTerms.some(term=>lower.includes(term));};
-const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
+const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&['SME','Gifting'].includes(p.sales_channel)&&Number(p.size_mb||0)>=500&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
 // Multiple sales channels (SME, Gifting, Awoof, Transfer, Direct, Data Share) often sell the exact same
 // bundle size+validity at different prices and reliability. Keep only the best one per (size, validity):
 // prefer the most reliable delivery track record, and use price as the tiebreaker.
@@ -3930,10 +3973,10 @@ if(!planCode||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
 const lookupKey=planLookupKey(planCode,planServiceId);
-byPlan.set(lookupKey,{code:lookupKey,plan_code:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
+byPlan.set(lookupKey,{code:lookupKey,plan_code:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,sales_channel:clean(plan.sales_channel||''),service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values())
-.filter(plan=>Number(plan.size_mb||0)>=1024)
+.filter(plan=>['SME','Gifting'].includes(plan.sales_channel)&&Number(plan.size_mb||0)>=500)
 .sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans});
 }catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}

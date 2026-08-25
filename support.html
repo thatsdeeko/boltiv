@@ -404,6 +404,7 @@ Choose an issue below or send us a support request. For transaction problems, ke
 <option value="Cable TV">Cable TV</option>
 <option value="Electricity">Electricity</option>
 <option value="Account">Account</option>
+<option value="Transaction Issue">Transaction Issue</option>
 <option value="Other">Other</option>
 </select>
 </div>
@@ -497,6 +498,17 @@ formMessage.className="boltiv-message message-error boltiv-message show";
 }
 
 /* ISSUE CARDS */
+const supportParams=new URLSearchParams(location.search);
+const requestedIssue=supportParams.get("issue");
+if(requestedIssue){
+  const normalizedIssue=requestedIssue.toLowerCase().includes("transaction")?"Transaction Issue":requestedIssue;
+  if([...subject.options].some(option=>option.value===normalizedIssue)){
+    subject.value=normalizedIssue;
+    const target=[...document.querySelectorAll(".issue-card")].find(card=>card.dataset.issue===normalizedIssue);
+    if(target)target.classList.add("selected");
+  }
+}
+
 document.querySelectorAll(".issue-card").forEach(card=>{
 
 card.onclick=()=>{

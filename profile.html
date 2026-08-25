@@ -36,6 +36,7 @@ boltivRequireAuth();
 .detail{padding:15px 0;border-bottom:1px solid #efede6}.detail:last-of-type{border-bottom:0}.detail-label{margin-bottom:7px;color:#898982;font-size:8px;font-weight:900;letter-spacing:.9px}.detail-input{width:100%;padding:0;border:0;outline:0;background:transparent;color:#242424;font-size:13px;font-weight:800;line-height:20px}.detail-input:disabled{opacity:1;-webkit-text-fill-color:#242424}.detail-input.editing{padding:10px;border-radius:11px;background:#fffdf6;border:1px solid #d9bf61;color:#7f6209;-webkit-text-fill-color:#7f6209}
 .save-btn{display:none;width:100%;margin-top:14px;padding:15px;border:0;border-radius:14px;background:linear-gradient(135deg,#d4af37,#D4AF37);color:#fff;font-size:11px;font-weight:1000;box-shadow:0 10px 22px rgba(184,134,11,.18)}.save-btn.show{display:block}
 .actions{display:grid;gap:10px}.action{width:100%;min-height:68px;padding:13px 14px;display:flex;align-items:center;gap:12px;border-radius:18px;background:#fff;border:1px solid var(--pline);color:#242424;text-align:left;cursor:pointer;box-shadow:0 7px 20px rgba(30,30,20,.035);transition:transform .18s,border-color .18s,box-shadow .18s}.action:active{transform:scale(.985);border-color:#d7bb59}.action-icon{width:40px;height:40px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:13px;background:#fffaf0;border:1px solid #eadca8;color:#D4AF37;font-size:15px}.action-text{flex:1}.action-title{font-size:11px;font-weight:900;color:#202020}.action-sub{margin-top:4px;color:#85857f;font-size:8px;line-height:1.45}.action-arrow{color:#a6a39b;font-size:18px}.logout{color:#b44d4d}.logout .action-icon{color:#b44d4d;background:#fff4f4;border-color:#f0cccc}
+.privacy-toggle{display:flex;align-items:center;gap:8px;flex-shrink:0}.privacy-state{font-size:8px;font-weight:900;letter-spacing:.4px;color:#9b760c}.privacy-switch{position:relative;width:38px;height:22px;border:1px solid #dec873;border-radius:999px;background:#f7f1dc;padding:0;cursor:pointer;transition:.18s}.privacy-switch:before{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;border:1px solid #d8bd55;box-shadow:0 2px 5px rgba(90,70,15,.12);transition:.18s}.privacy-switch.on{background:#c9a227;border-color:#c9a227}.privacy-switch.on:before{transform:translateX(16px);border-color:#fff}.status-modal .modal-box{max-width:390px;text-align:left}.status-summary{display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:14px;background:#fffaf0;border:1px solid #eadca8;margin-top:15px}.status-summary-dot{width:9px;height:9px;border-radius:50%;background:#4caf68;box-shadow:0 0 0 4px rgba(76,175,104,.12);flex-shrink:0}.status-summary-dot.degraded{background:#d39a28;box-shadow:0 0 0 4px rgba(211,154,40,.12)}.status-summary-dot.offline{background:#b44d4d;box-shadow:0 0 0 4px rgba(180,77,77,.12)}.status-summary-title{font-size:11px;font-weight:1000;color:#202020}.status-summary-sub{margin-top:3px;font-size:8px;color:#777}.status-list{display:grid;gap:8px;margin-top:12px}.status-row{display:flex;align-items:center;justify-content:space-between;padding:10px 11px;border-radius:12px;background:#fff;border:1px solid #ebe6d7}.status-row span:first-child{font-size:9px;font-weight:900;color:#303030}.status-pill{font-size:7px;font-weight:1000;letter-spacing:.4px;color:#4b8b59;background:#f0f8f1;border:1px solid #cde7d1;padding:4px 7px;border-radius:999px}.status-pill.warn{color:#9a6b12;background:#fff7df;border-color:#ecd69a}.status-pill.off{color:#a94c4c;background:#fff1f1;border-color:#edc4c4}.status-refresh{margin-top:13px;width:100%;padding:11px;border:1px solid #dec873;border-radius:12px;background:#fffaf0;color:#9b760c;font-size:9px;font-weight:1000;cursor:pointer}
 .legal-links{display:grid;gap:10px}.legal-link{min-height:64px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:18px;background:#fff;border:1px solid var(--pline);color:#242424;text-decoration:none;box-shadow:0 7px 20px rgba(30,30,20,.035);transition:transform .18s,border-color .18s,box-shadow .18s}.legal-link:active{transform:scale(.985);border-color:#d7bb59}.legal-title{font-size:11px;font-weight:900;color:#202020}.legal-sub{margin-top:4px;color:#85857f;font-size:8px;line-height:1.45}.legal-section{padding-bottom:18px}.legal-section .section-head h3{letter-spacing:.2px}.legal-link .action-arrow{font-size:18px;flex-shrink:0}
 .message{display:none;margin-top:12px;padding:12px;border-radius:11px;font-size:10px;line-height:1.5;text-align:center}.message.show{display:block}.message.error{background:#fff0f0;color:#b94c4c;border:1px solid #e07878}.message.success{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,14,.55);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:.25s}.modal.show{opacity:1;visibility:visible}.modal-box{width:100%;max-width:370px;padding:26px 22px;border-radius:24px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #d8bd55;text-align:center;transform:translateY(20px) scale(.95);transition:.25s}.modal.show .modal-box{transform:translateY(0) scale(1)}.modal-icon{width:58px;height:58px;margin:0 auto 15px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fffaf0;border:1px solid #d8bd55;color:#D4AF37;font-size:24px}.modal-title{color:#171717;font-size:19px;font-weight:1000}.modal-text{margin-top:7px;color:#777;font-size:11px;line-height:1.6}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}.modal-btn{width:100%;padding:13px;border-radius:12px;font-size:11px;font-weight:1000;cursor:pointer}.modal-btn.primary{border:0;background:#c9a227;color:#fff}.modal-btn.secondary{border:1px solid #e5e5e1;background:#fff;color:#777}.logout-modal .modal-box{border-color:#e7baba}.logout-modal .modal-icon{background:#fff4f4;border-color:#e7baba;color:#b44d4d}
@@ -126,9 +127,14 @@ SAVE CHANGES
 </button>
 <button class="action" id="notificationsBtn" type="button">
 <div class="action-icon">🔔</div>
-<div class="action-text"><div class="action-title">Notifications</div><div class="action-sub">View account and transaction updates</div></div>
+<div class="action-text"><div class="action-title">Notifications</div><div class="action-sub">Manage transaction and account alerts</div></div>
 <div class="action-arrow">›</div>
 </button>
+<div class="action" id="balancePrivacyAction" role="group" aria-label="Balance privacy">
+<div class="action-icon">◉</div>
+<div class="action-text"><div class="action-title">Balance Privacy</div><div class="action-sub">Control when your wallet balance is displayed</div></div>
+<div class="privacy-toggle"><span class="privacy-state" id="balancePrivacyState">VISIBLE</span><button aria-label="Hide balance" aria-pressed="false" class="privacy-switch" id="balancePrivacySwitch" type="button"></button></div>
+</div>
 </div>
 </div>
 <!-- LEGAL -->
@@ -143,15 +149,34 @@ SAVE CHANGES
 <div><div class="legal-title">Terms &amp; Conditions</div><div class="legal-sub">Rules for using BOLTIV services</div></div>
 <span class="action-arrow">›</span>
 </a>
+<a class="legal-link" href="/terms">
+<div><div class="legal-title">Refund &amp; Transaction Policy</div><div class="legal-sub">How reversals, refunds and transaction issues are handled</div></div>
+<span class="action-arrow">›</span>
+</a>
 </div>
 </div>
 <!-- ACCOUNT & SUPPORT -->
 <div class="section">
-<div class="section-head"><h3>Account &amp; Support</h3></div>
+<div class="section-head"><h3>Support</h3></div>
 <div class="actions">
-<button class="action" id="supportBtn" type="button">
+<button class="action" id="helpCenterBtn" type="button">
 <div class="action-icon">?</div>
-<div class="action-text"><div class="action-title">Support</div><div class="action-sub">Get help with your account and transactions</div></div>
+<div class="action-text"><div class="action-title">Help Center</div><div class="action-sub">Find answers, guides and support options</div></div>
+<div class="action-arrow">›</div>
+</button>
+<button class="action" id="reportTransactionBtn" type="button">
+<div class="action-icon">!</div>
+<div class="action-text"><div class="action-title">Report a Transaction</div><div class="action-sub">Report a failed, pending or undelivered transaction</div></div>
+<div class="action-arrow">›</div>
+</button>
+<button class="action" id="contactSupportBtn" type="button">
+<div class="action-icon">✉</div>
+<div class="action-text"><div class="action-title">Contact Support</div><div class="action-sub">Reach the BOLTIV support team directly</div></div>
+<div class="action-arrow">›</div>
+</button>
+<button class="action" id="systemStatusBtn" type="button">
+<div class="action-icon">●</div>
+<div class="action-text"><div class="action-title">System Status</div><div class="action-sub">Check BOLTIV service availability</div></div>
 <div class="action-arrow">›</div>
 </button>
 <button class="action logout" id="logoutBtn" type="button">
@@ -185,6 +210,17 @@ Your personal information has been successfully updated.
 <button class="modal-btn primary" id="successDone" type="button">
 DONE
 </button>
+</div>
+</div>
+<!-- SYSTEM STATUS MODAL -->
+<div class="modal status-modal" id="statusModal">
+<div class="modal-box">
+<div class="modal-icon">●</div>
+<div class="modal-title">System Status</div>
+<div class="modal-text">Live availability of the BOLTIV platform.</div>
+<div class="status-summary"><span class="status-summary-dot" id="statusOverallDot"></span><div><div class="status-summary-title" id="statusOverallTitle">Checking systems...</div><div class="status-summary-sub" id="statusOverallSub">Please wait while we check BOLTIV.</div></div></div>
+<div class="status-list" id="statusList"></div>
+<button class="status-refresh" id="statusRefresh" type="button">CHECK AGAIN</button>
 </div>
 </div>
 <!-- LOGOUT MODAL -->
@@ -245,6 +281,20 @@ JSON.stringify(user)
 
 }
 
+function syncBalancePrivacy(email){
+  const normalized=String(email||"").trim().toLowerCase();
+  balancePrivacyKey=BALANCE_HIDDEN_PREFIX+(normalized||"default");
+  balancePrivacyHidden=boltivMemoryStorage.getItem(balancePrivacyKey)==="1";
+  renderBalancePrivacy();
+}
+
+function renderBalancePrivacy(){
+  if(!balancePrivacySwitch||!balancePrivacyState)return;
+  balancePrivacySwitch.classList.toggle("on",balancePrivacyHidden);
+  balancePrivacySwitch.setAttribute("aria-pressed",String(balancePrivacyHidden));
+  balancePrivacySwitch.setAttribute("aria-label",balancePrivacyHidden?"Show balance":"Hide balance");
+  balancePrivacyState.textContent=balancePrivacyHidden?"HIDDEN":"VISIBLE";
+}
 
 /* =========================
    ELEMENTS
@@ -265,9 +315,14 @@ const message=document.getElementById("profileMessage");
 
 const successModal=document.getElementById("successModal");
 const logoutModal=document.getElementById("logoutModal");
-
+const statusModal=document.getElementById("statusModal");
+const balancePrivacySwitch=document.getElementById("balancePrivacySwitch");
+const balancePrivacyState=document.getElementById("balancePrivacyState");
 
 let editing=false;
+const BALANCE_HIDDEN_PREFIX="boltivBalanceHidden:";
+let balancePrivacyKey="";
+let balancePrivacyHidden=false;
 
 
 /* =========================
@@ -343,6 +398,7 @@ identityName.textContent=name;
 identityEmail.textContent=
 email||"No email added";
 
+syncBalancePrivacy(email);
 
 /* AVATAR INITIALS */
 
@@ -572,18 +628,58 @@ location.href="/notifications";
 
 };
 
+if(balancePrivacySwitch){
+  balancePrivacySwitch.onclick=(event)=>{
+    event.stopPropagation();
+    balancePrivacyHidden=!balancePrivacyHidden;
+    if(balancePrivacyKey)boltivMemoryStorage.setItem(balancePrivacyKey,balancePrivacyHidden?"1":"0");
+    renderBalancePrivacy();
+  };
+}
 
 /* =========================
    SUPPORT
 ========================= */
 
-document
-.getElementById("supportBtn")
-.onclick=()=>{
+document.getElementById("helpCenterBtn").onclick=()=>{ location.href="/support"; };
+document.getElementById("reportTransactionBtn").onclick=()=>{ location.href="/support?issue=Transaction"; };
+document.getElementById("contactSupportBtn").onclick=()=>{ location.href="/contact"; };
 
-location.href="/support";
-
-};
+const statusList=document.getElementById("statusList");
+const statusOverallDot=document.getElementById("statusOverallDot");
+const statusOverallTitle=document.getElementById("statusOverallTitle");
+const statusOverallSub=document.getElementById("statusOverallSub");
+function statusRow(name,state){
+  const label=state==="online"?"OPERATIONAL":state==="degraded"?"DEGRADED":"UNAVAILABLE";
+  const cls=state==="online"?"":" "+(state==="degraded"?"warn":"off");
+  return `<div class="status-row"><span>${name}</span><span class="status-pill${cls}">${label}</span></div>`;
+}
+async function checkSystemStatus(){
+  statusList.innerHTML="<div style=\"font-size:9px;color:#777;padding:6px 2px\">Checking live services...</div>";
+  statusOverallTitle.textContent="Checking systems...";
+  statusOverallSub.textContent="Connecting to the BOLTIV health service.";
+  statusOverallDot.className="status-summary-dot";
+  try{
+    const response=await fetch("https://boltiv-backend.onrender.com/api/health",{cache:"no-store"});
+    const data=await response.json();
+    const apiState=response.ok&&data.status==="online"?"online":data.status==="degraded"?"degraded":"offline";
+    const vtugateState=data.configuration&&data.configuration.vtugate?"online":"degraded";
+    const mailState=data.configuration&&data.configuration.mail?"online":"degraded";
+    const dbState=data.database==="connected"?"online":"offline";
+    const overall=apiState==="online"&&dbState==="online"?"online":apiState==="offline"||dbState==="offline"?"degraded":"degraded";
+    statusOverallDot.className="status-summary-dot"+(overall==="degraded"?" degraded":"");
+    statusOverallTitle.textContent=overall==="online"?"All systems operational":"Some services may be limited";
+    statusOverallSub.textContent=data.timestamp?"Last checked "+new Date(data.timestamp).toLocaleTimeString("en-NG",{hour:"2-digit",minute:"2-digit"}):"Live status updated";
+    statusList.innerHTML=statusRow("BOLTIV API",apiState)+statusRow("Database",dbState)+statusRow("VTUGATE Services",vtugateState)+statusRow("Notifications",mailState);
+  }catch(error){
+    statusOverallDot.className="status-summary-dot offline";
+    statusOverallTitle.textContent="Status check unavailable";
+    statusOverallSub.textContent="We couldn't reach the live health service.";
+    statusList.innerHTML=statusRow("BOLTIV API","offline");
+  }
+}
+document.getElementById("systemStatusBtn").onclick=()=>{ statusModal.classList.add("show"); checkSystemStatus(); };
+document.getElementById("statusRefresh").onclick=checkSystemStatus;
 
 
 /* =========================
@@ -646,6 +742,10 @@ logoutModal.classList.remove("show");
 
 };
 
+statusModal.onclick=(event)=>{
+  if(event.target===statusModal) statusModal.classList.remove("show");
+};
+
 
 /* =========================
    ESC KEY
@@ -659,6 +759,7 @@ if(event.key!=="Escape")return;
 
 successModal.classList.remove("show");
 logoutModal.classList.remove("show");
+statusModal.classList.remove("show");
 
 if(editing){
 

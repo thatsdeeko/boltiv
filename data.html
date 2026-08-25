@@ -301,12 +301,12 @@ $("purchaseButton").onclick=async()=>{
   if(!transactionPin){modalBtn.style.display="block";return;}
   show("processing","Processing Data","Your request is being sent securely.","PLEASE WAIT",info(p));modalBtn.style.display="none";
   try{
-    const r=await fetch(API+"/api/vtu/data",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network:selectedNetwork,plan_code:selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price),service:"data",providerPayload:{service:"data",phone:p,network:selectedNetwork,plan_code:selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price)},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin})});
+    const r=await fetch(API+"/api/vtu/data",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network:selectedNetwork,plan_code:selectedPlan.plan_code||selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price),service:"data",providerPayload:{service:"data",phone:p,network:selectedNetwork,plan_code:selectedPlan.plan_code||selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price)},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin})});
     const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process data purchase.");
     saveBuyAgain({
       network:selectedNetwork,
       phone:p,
-      plan_code:selectedPlan.code,
+      plan_code:selectedPlan.plan_code||selectedPlan.code,
       bundle_id:selectedPlan.bundle_id,
       service_id:selectedPlan.service_id,
       plan_name:planLabel(selectedPlan),

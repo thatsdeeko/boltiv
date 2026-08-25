@@ -255,7 +255,13 @@ function isOneDayPlan(plan){
 function renderPlans(plans){
   selectedPlan=null;
   planGrid.innerHTML="";
-  const filtered=Array.isArray(plans)?plans:[];
+  const filtered=(Array.isArray(plans)?plans:[]).filter(plan=>{
+    const text=[plan?.sales_channel,plan?.plan_type,plan?.planType,plan?.data_type,plan?.dataType,plan?.bundle_type,plan?.bundleType,plan?.category,plan?.channel,plan?.channel_name,plan?.channelName,plan?.name,plan?.description].filter(Boolean).join(" ").toLowerCase();
+    const sizeText=[plan?.size_mb,plan?.sizeMb,plan?.data_mb,plan?.dataMb,plan?.volume,plan?.size,plan?.quantity,plan?.data_size,plan?.dataSize,plan?.name].filter(Boolean).join(" ");
+    const match=sizeText.match(/(\d+(?:\.\d+)?)\s*(gb|mb)\b/i);
+    const explicitSize=match?(Number(match[2].toLowerCase()==="gb"?Number(match[1])*1024:Number(match[1]))):(Number(plan?.size_mb)||0);
+    return /\b(sme|gifting)\b/.test(text)&&explicitSize>=500;
+  });
   if(!filtered.length){planGrid.innerHTML='<div class="plan-loading">No data plans are currently available for this network.</div>';return;}
   filtered.forEach(plan=>{
     const b=document.createElement("button");
@@ -278,7 +284,7 @@ async function loadPlans(network){
     if(!r.ok||!d.success)throw new Error(d.message||"Unable to load data plans.");
     renderPlans(d.plans);
     lastLoadedPlans=d.plans||[];
-    planHint.textContent=d.plans?.length?d.plans.length+" live plans available":"";
+    planHint.textContent=d.plans?.length?d.plans.length+" SME & Gifting plans (500MB+) available":"";
   }catch(e){
     planGrid.innerHTML='<div class="plan-loading">'+esc(e.message||"Unable to load data plans.")+'</div>';
   }

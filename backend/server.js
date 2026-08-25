@@ -691,7 +691,7 @@ await db(
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`
 );
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`);
-await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE`);
+await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE`);
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ`);
 await db(`ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version TEXT`);
 await db(`CREATE INDEX IF NOT EXISTS users_status_idx ON users(status)`);

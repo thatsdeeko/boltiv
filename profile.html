@@ -662,20 +662,17 @@ async function checkSystemStatus(){
   try{
     const response=await fetch("https://boltiv-backend.onrender.com/api/health",{cache:"no-store"});
     const data=await response.json();
-    const apiState=response.ok&&data.status==="online"?"online":data.status==="degraded"?"degraded":"offline";
-    const vtugateState=data.configuration&&data.configuration.vtugate?"online":"degraded";
-    const mailState=data.configuration&&data.configuration.mail?"online":"degraded";
-    const dbState=data.database==="connected"?"online":"offline";
-    const overall=apiState==="online"&&dbState==="online"?"online":apiState==="offline"||dbState==="offline"?"degraded":"degraded";
-    statusOverallDot.className="status-summary-dot"+(overall==="degraded"?" degraded":"");
-    statusOverallTitle.textContent=overall==="online"?"All systems operational":"Some services may be limited";
+    const overall=data.status==="online"?"online":data.status==="degraded"?"degraded":"offline";
+    const services=data.services||{};
+    statusOverallDot.className="status-summary-dot"+(overall==="degraded"?" degraded":overall==="offline"?" offline":"");
+    statusOverallTitle.textContent=overall==="online"?"All systems operational":overall==="degraded"?"Some services may be limited":"BOLTIV is currently unavailable";
     statusOverallSub.textContent=data.timestamp?"Last checked "+new Date(data.timestamp).toLocaleTimeString("en-NG",{hour:"2-digit",minute:"2-digit"}):"Live status updated";
-    statusList.innerHTML=statusRow("BOLTIV API",apiState)+statusRow("Database",dbState)+statusRow("VTUGATE Services",vtugateState)+statusRow("Notifications",mailState);
+    statusList.innerHTML=statusRow("BOLTIV Platform",services.platform||overall)+statusRow("Airtime & Data",services.airtimeData||overall)+statusRow("Payments & Wallet",services.paymentsWallet||overall)+statusRow("Transactions",services.transactions||overall);
   }catch(error){
     statusOverallDot.className="status-summary-dot offline";
-    statusOverallTitle.textContent="Status check unavailable";
-    statusOverallSub.textContent="We couldn't reach the live health service.";
-    statusList.innerHTML=statusRow("BOLTIV API","offline");
+    statusOverallTitle.textContent="BOLTIV is currently unavailable";
+    statusOverallSub.textContent="We couldn't reach BOLTIV right now. Please try again shortly.";
+    statusList.innerHTML=statusRow("BOLTIV Platform","offline")+statusRow("Airtime & Data","offline")+statusRow("Payments & Wallet","offline")+statusRow("Transactions","offline");
   }
 }
 document.getElementById("systemStatusBtn").onclick=()=>{ statusModal.classList.add("show"); checkSystemStatus(); };

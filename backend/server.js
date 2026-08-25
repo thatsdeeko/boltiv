@@ -4111,30 +4111,56 @@ if(
 req.method==="GET"&&
 path==="/api/health"
 ){
-let database="not_configured";
-if(DATABASE_URL){
-try{
-await db("SELECT 1");
-database="connected";
-}catch(error){
-database="unavailable";
-}
-}
-const ready=database==="connected";
-return send(res,ready?200:503,{
-success:ready,
-message:ready?"BOLTIV API is healthy.":"BOLTIV API is not ready.",
-status:ready?"online":"degraded",
-database,
-configuration:{
-flutterwave:Boolean(FLW_SECRET_KEY),
-vtu:Boolean(VTUGATE_API_KEY&&VTUGATE_API_BASE_URL),
-vtugate:Boolean(VTUGATE_API_KEY&&VTUGATE_API_BASE_URL),
-mail:Boolean(RESEND_API_KEY)
-},
-timestamp:new Date().toISOString()
-});
+  // Public health check: expose only customer-facing service states.
+  // Never expose provider names, database state, API configuration, or secrets.
+  const services={
+    platform:"online",
+    airtimeData:"online",
+    paymentsWallet:"online",
+    transactions:"online"
+  };
 
+  let databaseOk=true;
+  try{
+    if(!DATABASE_URL) databaseOk=false;
+    else await db("SELECT 1");
+  }catch(error){
+    databaseOk=false;
+  }
+
+  if(!databaseOk){
+    services.platform="degraded";
+    services.airtimeData="degraded";
+    services.paymentsWallet="degraded";
+    services.transactions="degraded";
+  }else{
+    try{
+      const [airtime,data]=await Promise.all([getService("airtime"),getService("data")]);
+      if((airtime&&(airtime.enabled===false||airtime.maintenance===true))||
+         (data&&(data.enabled===false||data.maintenance===true))){
+        services.airtimeData="degraded";
+      }
+    }catch(error){
+      services.airtimeData="degraded";
+    }
+
+    // Server-side provider check; only the public service state is returned.
+    try{
+      const provider=await fetchVTUGATEServices(false);
+      if(!provider.success) services.airtimeData="degraded";
+    }catch(error){
+      services.airtimeData="degraded";
+    }
+  }
+
+  const status=Object.values(services).includes("degraded")?"degraded":"online";
+  return send(res,status==="online"?200:503,{
+    success:true,
+    message:status==="online"?"BOLTIV is operational.":"Some BOLTIV services may be limited.",
+    status,
+    services,
+    timestamp:new Date().toISOString()
+  });
 }
 
 

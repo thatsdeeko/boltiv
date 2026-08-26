@@ -3432,7 +3432,8 @@ return null;
 async function handleAuthRoutes(
 req,
 res,
-path
+path,
+url
 ){
 
 /*
@@ -4145,8 +4146,13 @@ path==="/api/health"
     }
 
     // Server-side provider check; only the public service state is returned.
+    // Uses fetchallservices (all=true) — the same endpoint the rest of the
+    // app relies on for real service-ID resolution and purchases — so this
+    // check reflects the provider path actually used, instead of the
+    // separate/unused fetchservices endpoint which was causing false
+    // "degraded" readings.
     try{
-      const provider=await fetchVTUGATEServices(false);
+      const provider=await fetchVTUGATEServices(true);
       if(!provider.success) services.airtimeData="degraded";
     }catch(error){
       services.airtimeData="degraded";
@@ -4219,7 +4225,8 @@ const authHandled=
 await handleAuthRoutes(
 req,
 res,
-path
+path,
+url
 );
 
 if(authHandled){

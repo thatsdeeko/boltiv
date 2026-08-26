@@ -62,6 +62,17 @@ body.modal-open{overflow:hidden!important}
 .insight-empty{font-size:12px;color:#878073;padding:4px 0}
 @media (max-width:560px){.dashboard-insights{grid-template-columns:1fr}.insight-card.full{grid-column:auto}.insight-stats{grid-template-columns:repeat(3,1fr)}}
 </style>
+
+<style id="boltiv-announcement-ticker">
+.boltiv-announcement{margin:12px 0 18px;border:1px solid rgba(197,154,28,.22);border-radius:14px;background:#fffdf7;overflow:hidden;box-shadow:0 6px 18px rgba(30,24,10,.04)}
+.boltiv-announcement-track{display:flex;align-items:center;min-width:max-content;animation:boltivTicker 22s linear infinite;padding:10px 0;will-change:transform}
+.boltiv-announcement:hover .boltiv-announcement-track{animation-play-state:paused}
+.boltiv-announcement-mark{display:inline-flex;align-items:center;gap:7px;padding:0 18px;color:#a17b13;font-size:10px;font-weight:900;letter-spacing:.1em;white-space:nowrap}
+.boltiv-announcement-dot{width:6px;height:6px;border-radius:50%;background:#d4af37;box-shadow:0 0 0 4px rgba(212,175,55,.12)}
+.boltiv-announcement-copy{padding-right:34px;color:#4e493f;font-size:11px;font-weight:700;white-space:nowrap}
+@keyframes boltivTicker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.boltiv-announcement-track{animation:none;min-width:100%}.boltiv-announcement-copy:nth-of-type(n+3){display:none}}
+</style>
 </head>
 <body class="boltiv-animated-home">
 <div aria-hidden="true" class="home-ambient">
@@ -88,7 +99,10 @@ body.modal-open{overflow:hidden!important}
 </button>
 <button class="profile-mini" id="profileButton" onclick="location.href='/profile'">U</button>
 </div>
-</header>
+</header><div class="boltiv-announcement" id="boltivAnnouncement" aria-label="BOLTIV announcement" hidden>
+<div class="boltiv-announcement-track" id="boltivAnnouncementTrack"></div>
+</div>
+
 <main>
 <section class="home-welcome">
 <div>
@@ -308,6 +322,21 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&comingModal&&!comingModal.hidden)closeComingModal();});
 loadHome();
 setInterval(loadHome,30000);
+</script>
+
+<script>
+(async function loadBoltivAnnouncement(){
+  const box=document.getElementById('boltivAnnouncement'),track=document.getElementById('boltivAnnouncementTrack');
+  if(!box||!track)return;
+  try{
+    const r=await fetch('/api/platform/settings',{cache:'no-store'});
+    const d=await r.json(); const s=d&&d.settings||{};
+    const text=String(s.announcement_text||'').trim();
+    if(!s.announcement_enabled||!text){box.hidden=true;return;}
+    const item=`<span class="boltiv-announcement-mark"><span class="boltiv-announcement-dot"></span>BOLTIV UPDATE</span><span class="boltiv-announcement-copy">${text}</span>`;
+    track.innerHTML=item+item; box.hidden=false;
+  }catch(e){box.hidden=true;}
+})();
 </script>
 </body>
 </html>

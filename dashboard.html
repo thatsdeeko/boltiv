@@ -38,7 +38,31 @@ body.modal-open{overflow:hidden!important}
 .balance-visibility-toggle svg{width:12px;height:12px;display:block}
 .balance-value.is-hidden{letter-spacing:2px;font-size:31px}
 @media (max-width:420px){.balance-visibility-toggle{width:22px;height:22px}.balance-value.is-hidden{font-size:29px;letter-spacing:2px}}
-</style></head>
+</style>
+<style id="boltiv-dashboard-insights-inline">
+.dashboard-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.insight-card{background:linear-gradient(145deg,#fff,#fffdf7);border:1px solid rgba(197,154,28,.20);border-radius:20px;padding:17px;box-shadow:0 10px 28px rgba(30,24,10,.055)}
+.insight-card.full{grid-column:1/-1}
+.insight-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
+.insight-title{font-size:12px;letter-spacing:.12em;font-weight:800;color:#6f654f}
+.insight-link{border:0;background:none;color:#a17b13;font-size:12px;font-weight:800;padding:0;cursor:pointer}
+.insight-main{font-size:22px;font-weight:850;color:#171717;line-height:1.15}
+.insight-sub{font-size:11px;color:#817b70;margin-top:5px}
+.insight-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+.insight-stat{padding:10px;border-radius:13px;background:#faf8f0;border:1px solid #eee7d5;min-width:0}
+.insight-stat b{display:block;font-size:12px;color:#26231e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.insight-stat small{display:block;font-size:10px;color:#8b8477;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.repeat-list{display:grid;gap:8px}
+.repeat-item{display:flex;align-items:center;gap:10px;width:100%;border:1px solid #eee8d9;background:#fff;border-radius:14px;padding:10px;text-align:left;cursor:pointer}
+.repeat-icon{width:34px;height:34px;border-radius:11px;background:#faf3d9;color:#a17b13;display:grid;place-items:center;font-weight:900;flex:0 0 auto}
+.repeat-main{min-width:0;flex:1}
+.repeat-main strong{display:block;font-size:12px;color:#24211d}
+.repeat-main small{display:block;font-size:10px;color:#888174;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.repeat-arrow{color:#a17b13;font-size:17px}
+.insight-empty{font-size:12px;color:#878073;padding:4px 0}
+@media (max-width:560px){.dashboard-insights{grid-template-columns:1fr}.insight-card.full{grid-column:auto}.insight-stats{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
 <body class="boltiv-animated-home">
 <div aria-hidden="true" class="home-ambient">
 <span class="ambient-orb ambient-orb-one"></span>
@@ -106,6 +130,32 @@ body.modal-open{overflow:hidden!important}
 <section class="section home-recent-section">
 <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
 <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
+</section>
+<section class="dashboard-insights" aria-label="Wallet insights">
+<section class="insight-card">
+<div class="insight-head"><span class="insight-title">SPENDING OVERVIEW</span><button class="insight-link" onclick="location.href='/transactions'" type="button">View →</button></div>
+<div class="insight-main" id="monthlySpent">₦0.00</div>
+<div class="insight-sub" id="monthlySpentLabel">Spent this month</div>
+<div class="insight-stats">
+<div class="insight-stat"><b id="spentAirtime">₦0</b><small>Airtime</small></div>
+<div class="insight-stat"><b id="spentData">₦0</b><small>Data</small></div>
+<div class="insight-stat"><b id="spentOther">₦0</b><small>Other</small></div>
+</div>
+</section>
+<section class="insight-card">
+<div class="insight-head"><span class="insight-title">WALLET ACTIVITY</span><button class="insight-link" onclick="location.href='/wallet'" type="button">Wallet →</button></div>
+<div class="insight-main" id="walletActivityBalance">₦0.00</div>
+<div class="insight-sub">Current balance</div>
+<div class="insight-stats">
+<div class="insight-stat"><b id="walletAdded">₦0</b><small>Added</small></div>
+<div class="insight-stat"><b id="walletSpent">₦0</b><small>Spent</small></div>
+<div class="insight-stat"><b id="walletRefunds">₦0</b><small>Refunds</small></div>
+</div>
+</section>
+<section class="insight-card full">
+<div class="insight-head"><span class="insight-title">QUICK REPEAT</span><button class="insight-link" onclick="location.href='/transactions'" type="button">See activity →</button></div>
+<div class="repeat-list" id="quickRepeatList"><div class="insight-empty">Your successful services will appear here for quick access.</div></div>
+</section>
 </section>
 <section class="section home-trust-card">
 <div class="trust-icon">✓</div>
@@ -182,9 +232,49 @@ async function loadHome(){
   if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
   const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0};
   if(me.user){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();setupBalancePrivacy(me.user);}
-  if(wallet.success&&wallet.wallet){const b=Number(wallet.wallet.balance||0);currentWalletBalance=String(b);setBalanceVisibility(balanceHidden);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
-  renderRecent(Array.isArray(tx.transactions)?tx.transactions:[]); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
+  const walletBalance=wallet.success&&wallet.wallet?Number(wallet.wallet.balance||0):Number(currentWalletBalance||0);
+  if(wallet.success&&wallet.wallet){const b=walletBalance;currentWalletBalance=String(b);setBalanceVisibility(balanceHidden);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
+  const transactions=Array.isArray(tx.transactions)?tx.transactions:[];
+  renderRecent(transactions); renderDashboardInsights(transactions,walletBalance); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
  }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
+}
+function normalizeStatus(t){return String(t?.status||'successful').toLowerCase();}
+function isSuccessful(t){const s=normalizeStatus(t);return !s.includes('fail')&&!s.includes('cancel')&&!s.includes('pending')&&!s.includes('process');}
+function transactionDate(t){return new Date(t?.date||t?.createdAt||0);}
+function servicePath(t){const s=String(t?.service||'').toLowerCase();if(s.includes('airtime'))return'/airtime';if(s.includes('data'))return'/data';if(s.includes('electric'))return'/electricity';if(s.includes('cable')||s.includes('tv'))return'/cable';if(s.includes('exam'))return'/exam-pin';return'/transactions';}
+function renderDashboardInsights(items,balance){
+ const now=new Date(), month=now.getMonth(), year=now.getFullYear();
+ const valid=Array.isArray(items)?items:[];
+ const monthTx=valid.filter(t=>{const d=transactionDate(t);return d.getMonth()===month&&d.getFullYear()===year&&isSuccessful(t);});
+ const serviceTx=monthTx.filter(t=>typeInfo(t)[0]!=='wallet');
+ const amount=t=>Math.abs(Number(t?.amount||0));
+ const spent=serviceTx.reduce((n,t)=>n+amount(t),0);
+ const by=(name)=>serviceTx.filter(t=>typeInfo(t)[1]===name).reduce((n,t)=>n+amount(t),0);
+ const airtime=by('Airtime'), data=by('Data'), other=Math.max(0,spent-airtime-data);
+ const added=valid.filter(t=>typeInfo(t)[0]==='wallet'&&isSuccessful(t)).reduce((n,t)=>n+amount(t),0);
+ const refunds=valid.filter(t=>normalizeStatus(t).includes('refund')).reduce((n,t)=>n+amount(t),0);
+ const totalSpent=valid.filter(t=>typeInfo(t)[0]!=='wallet'&&isSuccessful(t)).reduce((n,t)=>n+amount(t),0);
+ document.getElementById('monthlySpent').textContent=money(spent);
+ document.getElementById('spentAirtime').textContent=money(airtime).replace('.00','');
+ document.getElementById('spentData').textContent=money(data).replace('.00','');
+ document.getElementById('spentOther').textContent=money(other).replace('.00','');
+ document.getElementById('walletActivityBalance').textContent=money(balance);
+ document.getElementById('walletAdded').textContent=money(added).replace('.00','');
+ document.getElementById('walletSpent').textContent=money(totalSpent).replace('.00','');
+ document.getElementById('walletRefunds').textContent=money(refunds).replace('.00','');
+ renderQuickRepeat(valid);
+}
+function renderQuickRepeat(items){
+ const list=document.getElementById('quickRepeatList');
+ const seen=new Set(); const candidates=[];
+ const sorted=items.slice().sort((a,b)=>transactionDate(b)-transactionDate(a));
+ for(const t of sorted){
+   if(!isSuccessful(t)||typeInfo(t)[0]==='wallet')continue;
+   const [type,name,icon]=typeInfo(t); const recipient=String(t.recipient||t.phone||t.accountNumber||t.meterNumber||t.reference||'').trim();
+   const key=type+'|'+recipient; if(seen.has(key))continue; seen.add(key); candidates.push({t,name,icon,recipient,path:servicePath(t)}); if(candidates.length>=3)break;
+ }
+ if(!candidates.length){list.innerHTML='<div class="insight-empty">Your successful services will appear here for quick access.</div>';return;}
+ list.innerHTML=candidates.map(x=>`<button class="repeat-item" type="button" onclick="location.href='${x.path}'"><span class="repeat-icon">${x.icon}</span><span class="repeat-main"><strong>${esc(x.name)}</strong><small>${esc(x.recipient||'Open service')}</small></span><span class="repeat-arrow">›</span></button>`).join('');
 }
 function renderRecent(items){
  const list=document.getElementById('recentList'); if(!items.length){list.innerHTML='<div class="home-empty"><span>↯</span><strong>No transactions yet</strong><small>Your purchases and wallet funding will appear here.</small></div>';return;}

@@ -97,6 +97,11 @@ body.modal-open{overflow:hidden!important}
 <p>Your everyday digital services, in one place.</p>
 </div>
 </section>
+<section class="dashboard-status-card" id="dashboardStatusCard" role="button" tabindex="0" aria-label="View BOLTIV system status" onclick="location.href='/profile#system-status'" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); location.href='/profile#system-status'; }">
+<div class="dashboard-status-icon" id="dashboardStatusIcon">●</div>
+<div class="dashboard-status-copy"><strong id="dashboardStatusTitle">Checking system status…</strong><small id="dashboardStatusSub">Checking BOLTIV services</small></div>
+<span class="dashboard-status-arrow">→</span>
+</section>
 <section class="home-balance-card">
 <div class="home-balance-top">
 <div><div class="balance-label-row"><div class="balance-label">AVAILABLE BALANCE</div><button aria-label="Hide balance" aria-pressed="false" class="balance-visibility-toggle" id="balanceVisibilityToggle" title="Hide balance" type="button">
@@ -131,27 +136,7 @@ body.modal-open{overflow:hidden!important}
 <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
 <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
 </section>
-<section class="dashboard-insights" aria-label="Wallet insights">
-<section class="insight-card">
-<div class="insight-head"><span class="insight-title">SPENDING OVERVIEW</span><button class="insight-link" onclick="location.href='/transactions'" type="button">View →</button></div>
-<div class="insight-main" id="monthlySpent">₦0.00</div>
-<div class="insight-sub" id="monthlySpentLabel">Spent this month</div>
-<div class="insight-stats">
-<div class="insight-stat"><b id="spentAirtime">₦0</b><small>Airtime</small></div>
-<div class="insight-stat"><b id="spentData">₦0</b><small>Data</small></div>
-<div class="insight-stat"><b id="spentOther">₦0</b><small>Other</small></div>
-</div>
-</section>
-<section class="insight-card">
-<div class="insight-head"><span class="insight-title">WALLET ACTIVITY</span><button class="insight-link" onclick="location.href='/wallet'" type="button">Wallet →</button></div>
-<div class="insight-main" id="walletActivityBalance">₦0.00</div>
-<div class="insight-sub">Current balance</div>
-<div class="insight-stats insight-stats-3">
-<div class="insight-stat"><b id="walletAdded">₦0</b><small>Added</small></div>
-<div class="insight-stat"><b id="walletSpent">₦0</b><small>Spent</small></div>
-<div class="insight-stat"><b id="walletPending">₦0</b><small>Pending</small></div>
-</div>
-</section>
+<section class="dashboard-insights" aria-label="Quick repeat">
 <section class="insight-card full">
 <div class="insight-head"><span class="insight-title">QUICK REPEAT</span><button class="insight-link" onclick="location.href='/transactions'" type="button">See activity →</button></div>
 <div class="repeat-list" id="quickRepeatList"><div class="insight-empty">Your successful services will appear here for quick access.</div></div>
@@ -308,6 +293,29 @@ document.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&comingModal&&!comingModal.hidden)closeComingModal();});
 loadHome();
 setInterval(loadHome,30000);
+
+async function loadDashboardSystemStatus(){
+  const card=document.getElementById('dashboardStatusCard');
+  const icon=document.getElementById('dashboardStatusIcon');
+  const title=document.getElementById('dashboardStatusTitle');
+  const sub=document.getElementById('dashboardStatusSub');
+  if(!card||!icon||!title||!sub)return;
+  try{
+    const r=await fetch(API_BASE+'/api/health',{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    const services=Array.isArray(d.services)?d.services:[];
+    const states=services.map(x=>String(x.status||'').toLowerCase());
+    const offline=!r.ok || states.some(x=>x==='offline'||x==='unavailable');
+    const degraded=states.some(x=>x==='degraded'||x==='limited'||x==='warning');
+    card.classList.remove('online','degraded','offline');
+    if(offline){icon.textContent='●';title.textContent='BOLTIV is currently unavailable';sub.textContent='Some services cannot be reached right now';card.classList.add('offline');}
+    else if(degraded){icon.textContent='●';title.textContent='Some services may be limited';sub.textContent='BOLTIV is online with a service issue';card.classList.add('degraded');}
+    else{icon.textContent='●';title.textContent='All systems operational';sub.textContent='BOLTIV services are running normally';card.classList.add('online');}
+  }catch(e){
+    card.classList.remove('online','degraded');card.classList.add('offline');icon.textContent='●';title.textContent='BOLTIV is currently unavailable';sub.textContent='Unable to reach the platform right now';
+  }
+}
+loadDashboardSystemStatus();
 </script>
 </body>
 </html>

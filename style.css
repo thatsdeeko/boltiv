@@ -274,7 +274,7 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
 .home-brand img{width:34px;height:40px;object-fit:contain}
 .home-header-actions{display:flex;align-items:center;gap:8px}
 .icon-button{width:38px;height:38px;border:1px solid var(--line);border-radius:50%;background:#fff;color:#716d62;font-size:19px;display:flex;align-items:center;justify-content:center}
-.home-welcome{padding:26px 2px 18px}
+.home-welcome{padding:24px 2px 18px}
 .eyebrow{font-size:9px;font-weight:900;letter-spacing:1.7px;color:var(--gold2);margin-bottom:7px}
 .home-welcome h1{font-size:27px;line-height:1.15;letter-spacing:-.6px;margin:0}.home-welcome h1 span{color:var(--gold2)}
 .home-welcome p{margin-top:7px;color:var(--muted);font-size:12px;line-height:1.5}

@@ -1142,6 +1142,35 @@ async function adminNotifications(req){
   const client=await pool.connect(); try{await client.query("BEGIN");for(const uid of userIds)await client.query(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[uid,title,message,type]);await client.query("COMMIT");try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({recipient,count:userIds.length,title,type}),requestIp(req)]);}catch{}return{success:true,sent:userIds.length,message:`Notification sent to ${userIds.length} user(s).`};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
 }
 
+async function getWalletSummary(userId){
+
+const result=
+await db(
+`SELECT
+COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful'),0) AS total_deposited,
+COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful'),0) AS total_spent,
+COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful' AND date>=NOW()-INTERVAL '7 days'),0) AS spent_week,
+COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful' AND date>=date_trunc('month',NOW())),0) AS spent_month,
+COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful' AND date>=NOW()-INTERVAL '7 days'),0) AS deposited_week,
+COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful' AND date>=date_trunc('month',NOW())),0) AS deposited_month
+FROM transactions
+WHERE user_id=$1`,
+[userId]
+);
+
+const row=result.rows[0]||{};
+
+return{
+totalDeposited:Number(row.total_deposited||0),
+totalSpent:Number(row.total_spent||0),
+spentThisWeek:Number(row.spent_week||0),
+spentThisMonth:Number(row.spent_month||0),
+depositedThisWeek:Number(row.deposited_week||0),
+depositedThisMonth:Number(row.deposited_month||0)
+};
+
+}
+
 async function getTransactions(userId){
 
 const result=
@@ -3807,6 +3836,41 @@ user.user_id
 return send(res,200,{
 success:true,
 transactions
+});
+
+}
+
+
+/*
+WALLET HISTORY SUMMARY
+*/
+
+if(
+req.method==="GET"&&
+path==="/api/wallet/summary"
+){
+
+const user=
+await userFromToken(req);
+
+if(!user){
+
+return send(res,401,{
+success:false,
+message:
+"Unauthorized."
+});
+
+}
+
+const summary=
+await getWalletSummary(
+user.user_id
+);
+
+return send(res,200,{
+success:true,
+summary
 });
 
 }

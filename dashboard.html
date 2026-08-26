@@ -99,8 +99,8 @@ body.modal-open{overflow:hidden!important}
 </button>
 <button class="profile-mini" id="profileButton" onclick="location.href='/profile'">U</button>
 </div>
-</header><div class="boltiv-announcement" id="boltivAnnouncement" aria-label="BOLTIV announcement" hidden>
-<div class="boltiv-announcement-track" id="boltivAnnouncementTrack"></div>
+</header><div class="boltiv-announcement" id="boltivAnnouncement" aria-label="BOLTIV announcement">
+<div class="boltiv-announcement-track" id="boltivAnnouncementTrack"><span class="boltiv-announcement-mark"><span class="boltiv-announcement-dot"></span>BOLTIV UPDATE</span><span class="boltiv-announcement-copy">Welcome to BOLTIV — Fast. Simple. Powerful.</span><span class="boltiv-announcement-mark"><span class="boltiv-announcement-dot"></span>BOLTIV UPDATE</span><span class="boltiv-announcement-copy">Welcome to BOLTIV — Fast. Simple. Powerful.</span></div>
 </div>
 
 <main>
@@ -328,14 +328,29 @@ setInterval(loadHome,30000);
 (async function loadBoltivAnnouncement(){
   const box=document.getElementById('boltivAnnouncement'),track=document.getElementById('boltivAnnouncementTrack');
   if(!box||!track)return;
+  const fallback='Welcome to BOLTIV — Fast. Simple. Powerful.';
+  const render=(text)=>{
+    const safe=String(text||fallback).trim()||fallback;
+    track.replaceChildren();
+    for(let i=0;i<2;i++){
+      const mark=document.createElement('span'); mark.className='boltiv-announcement-mark';
+      const dot=document.createElement('span'); dot.className='boltiv-announcement-dot'; mark.append(dot,document.createTextNode('BOLTIV UPDATE'));
+      const copy=document.createElement('span'); copy.className='boltiv-announcement-copy'; copy.textContent=safe;
+      track.append(mark,copy);
+    }
+    box.hidden=false;
+  };
+  render(fallback);
   try{
     const r=await fetch('/api/platform/settings',{cache:'no-store'});
+    if(!r.ok)throw new Error('announcement settings unavailable');
     const d=await r.json(); const s=d&&d.settings||{};
-    const text=String(s.announcement_text||'').trim();
-    if(!s.announcement_enabled||!text){box.hidden=true;return;}
-    const item=`<span class="boltiv-announcement-mark"><span class="boltiv-announcement-dot"></span>BOLTIV UPDATE</span><span class="boltiv-announcement-copy">${text}</span>`;
-    track.innerHTML=item+item; box.hidden=false;
-  }catch(e){box.hidden=true;}
+    if(s.announcement_enabled===false){box.hidden=true;return;}
+    render(String(s.announcement_text||fallback));
+  }catch(e){
+    // Keep the fallback announcement visible if the settings endpoint is unavailable.
+    render(fallback);
+  }
 })();
 </script>
 </body>

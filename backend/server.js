@@ -1149,10 +1149,13 @@ await db(
 `SELECT
 COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful'),0) AS total_deposited,
 COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful'),0) AS total_spent,
+COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status IN ('pending','processing')),0) AS pending_amount,
 COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful' AND date>=NOW()-INTERVAL '7 days'),0) AS spent_week,
 COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful' AND date>=date_trunc('month',NOW())),0) AS spent_month,
 COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful' AND date>=NOW()-INTERVAL '7 days'),0) AS deposited_week,
-COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful' AND date>=date_trunc('month',NOW())),0) AS deposited_month
+COALESCE(SUM(amount) FILTER (WHERE type='credit' AND status='successful' AND date>=date_trunc('month',NOW())),0) AS deposited_month,
+COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful' AND date>=date_trunc('month',NOW()) AND service ILIKE '%airtime%'),0) AS spent_month_airtime,
+COALESCE(SUM(amount) FILTER (WHERE type='debit' AND status='successful' AND date>=date_trunc('month',NOW()) AND service ILIKE '%data%'),0) AS spent_month_data
 FROM transactions
 WHERE user_id=$1`,
 [userId]
@@ -1160,13 +1163,21 @@ WHERE user_id=$1`,
 
 const row=result.rows[0]||{};
 
+const spentMonth=Number(row.spent_month||0);
+const spentMonthAirtime=Number(row.spent_month_airtime||0);
+const spentMonthData=Number(row.spent_month_data||0);
+
 return{
 totalDeposited:Number(row.total_deposited||0),
 totalSpent:Number(row.total_spent||0),
+pendingAmount:Number(row.pending_amount||0),
 spentThisWeek:Number(row.spent_week||0),
-spentThisMonth:Number(row.spent_month||0),
+spentThisMonth:spentMonth,
 depositedThisWeek:Number(row.deposited_week||0),
-depositedThisMonth:Number(row.deposited_month||0)
+depositedThisMonth:Number(row.deposited_month||0),
+spentThisMonthAirtime:spentMonthAirtime,
+spentThisMonthData:spentMonthData,
+spentThisMonthOther:Math.max(0,spentMonth-spentMonthAirtime-spentMonthData)
 };
 
 }

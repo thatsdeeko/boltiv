@@ -223,45 +223,42 @@ async function loadHome(){
  try{
   const authInit={credentials:'include'};
   if(token) authInit.headers={Authorization:'Bearer '+token};
-  const [meRes,walletRes,txRes,noteRes]=await Promise.all([
+  const [meRes,walletRes,txRes,noteRes,summaryRes]=await Promise.all([
    fetch(API_BASE+'/api/me',authInit),
    fetch(API_BASE+'/api/wallet',authInit),
    fetch(API_BASE+'/api/transactions',Object.assign({},authInit,{cache:'no-store'})),
-   fetch(API_BASE+'/api/notifications',Object.assign({},authInit,{cache:'no-store'}))
+   fetch(API_BASE+'/api/notifications',Object.assign({},authInit,{cache:'no-store'})),
+   fetch(API_BASE+'/api/wallet/summary',Object.assign({},authInit,{cache:'no-store'}))
   ]);
   if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
-  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0};
+  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0}; const summaryRaw=summaryRes.ok?await summaryRes.json():{success:false};
   if(me.user){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();setupBalancePrivacy(me.user);}
   const walletBalance=wallet.success&&wallet.wallet?Number(wallet.wallet.balance||0):Number(currentWalletBalance||0);
   if(wallet.success&&wallet.wallet){const b=walletBalance;currentWalletBalance=String(b);setBalanceVisibility(balanceHidden);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
   const transactions=Array.isArray(tx.transactions)?tx.transactions:[];
-  renderRecent(transactions); renderDashboardInsights(transactions,walletBalance); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
+  const summary=summaryRaw.success&&summaryRaw.summary?summaryRaw.summary:null;
+  renderRecent(transactions); renderDashboardInsights(transactions,walletBalance,summary); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
  }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
 }
 function normalizeStatus(t){return String(t?.status||'successful').toLowerCase();}
 function isSuccessful(t){const s=normalizeStatus(t);return !s.includes('fail')&&!s.includes('cancel')&&!s.includes('pending')&&!s.includes('process')&&!s.includes('refund');}
 function transactionDate(t){return new Date(t?.date||t?.createdAt||0);}
 function servicePath(t){const s=String(t?.service||'').toLowerCase();if(s.includes('airtime'))return'/airtime';if(s.includes('data'))return'/data';if(s.includes('electric'))return'/electricity';if(s.includes('cable')||s.includes('tv'))return'/cable';if(s.includes('exam'))return'/exam-pin';return'/transactions';}
-function renderDashboardInsights(items,balance){
- const now=new Date(), month=now.getMonth(), year=now.getFullYear();
+function renderDashboardInsights(items,balance,summary){
  const valid=Array.isArray(items)?items:[];
- const monthTx=valid.filter(t=>{const d=transactionDate(t);return d.getMonth()===month&&d.getFullYear()===year&&isSuccessful(t);});
- const serviceTx=monthTx.filter(t=>typeInfo(t)[0]!=='wallet');
- const amount=t=>Math.abs(Number(t?.amount||0));
- const spent=serviceTx.reduce((n,t)=>n+amount(t),0);
- const by=(name)=>serviceTx.filter(t=>typeInfo(t)[1]===name).reduce((n,t)=>n+amount(t),0);
- const airtime=by('Airtime'), data=by('Data'), other=Math.max(0,spent-airtime-data);
- const added=valid.filter(t=>typeInfo(t)[0]==='wallet'&&isSuccessful(t)).reduce((n,t)=>n+amount(t),0);
- const totalSpent=valid.filter(t=>typeInfo(t)[0]!=='wallet'&&isSuccessful(t)).reduce((n,t)=>n+amount(t),0);
- const pending=valid.filter(t=>{const s=normalizeStatus(t);return typeInfo(t)[0]!=='wallet'&&(s.includes('pending')||s.includes('process'));}).reduce((n,t)=>n+amount(t),0);
- document.getElementById('monthlySpent').textContent=money(spent);
- document.getElementById('spentAirtime').textContent=money(airtime).replace('.00','');
- document.getElementById('spentData').textContent=money(data).replace('.00','');
- document.getElementById('spentOther').textContent=money(other).replace('.00','');
+ // Figures come from the server-side wallet summary (a full-table SQL
+ // aggregate) rather than being computed from this recent-activity list,
+ // which the API caps to the latest 100 rows and would otherwise silently
+ // under-count totals once a user passes that many transactions.
+ const s=summary||{};
+ document.getElementById('monthlySpent').textContent=money(s.spentThisMonth||0);
+ document.getElementById('spentAirtime').textContent=money(s.spentThisMonthAirtime||0).replace('.00','');
+ document.getElementById('spentData').textContent=money(s.spentThisMonthData||0).replace('.00','');
+ document.getElementById('spentOther').textContent=money(s.spentThisMonthOther||0).replace('.00','');
  document.getElementById('walletActivityBalance').textContent=money(balance);
- document.getElementById('walletAdded').textContent=money(added).replace('.00','');
- document.getElementById('walletSpent').textContent=money(totalSpent).replace('.00','');
- document.getElementById('walletPending').textContent=money(pending).replace('.00','');
+ document.getElementById('walletAdded').textContent=money(s.totalDeposited||0).replace('.00','');
+ document.getElementById('walletSpent').textContent=money(s.totalSpent||0).replace('.00','');
+ document.getElementById('walletPending').textContent=money(s.pendingAmount||0).replace('.00','');
  renderQuickRepeat(valid);
 }
 function renderQuickRepeat(items){

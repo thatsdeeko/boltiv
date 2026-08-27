@@ -231,6 +231,22 @@ finally{clearTimeout(timer);}}
 async function fetchVTUGATEServices(all=true){return vtugateRequest(all?"api/v1/fetchallservices":"api/v1/fetchservices",{});}
 async function getVTUGATEAccountDetails(){return vtugateRequest("api/v1/accountdetails",{});}
 const vtugateServiceCache={at:0,data:[]};
+// Cable TV plans aren't exposed through a live VTUGATE pricing endpoint the way data
+// and education PINs are, so — unlike those services — cable had no server-side price
+// source to check against: the client-supplied amount was trusted as-is. That let a
+// tampered request pay any amount for a real plan, and it meant provider price changes
+// never reached customers. This table is the authoritative source cable purchases are
+// now validated against, mirroring the plans shown on the cable page.
+const CABLE_PLANS={
+DSTV:{Compact:19000,Confam:11000,Yanga:6000},
+GOTV:{Jolli:5800,Max:8500}
+};
+function getCablePlanPrice(provider,plan){
+const providerPlans=CABLE_PLANS[clean(provider).toUpperCase()];
+if(!providerPlans)return null;
+const price=providerPlans[clean(plan)];
+return Number.isFinite(price)&&price>0?price:null;
+}
 async function getVTUGATEServiceId(category,provider=""){
 const keys=[provider,String(provider).toUpperCase(),String(provider).toLowerCase(),category,String(category).toUpperCase(),String(category).toLowerCase()];
 for(const key of keys){const explicit=VTUGATE_SERVICE_MAP?.[key];if(Number(explicit)>0)return Number(explicit);}
@@ -417,13 +433,17 @@ const responses=await Promise.all(serviceIds.map(async serviceId=>{
     const retry=await vtugateRequest('api/v1/fetchdataplans',{service_id:serviceId,network:selected});
     if(retry.success)response=retry;
   }
-  return response;
+  return {serviceId,response};
 }));
 let bestRaw=[];
 let lastMessage='Unable to load VTUGATE data plans.';
-for(const response of responses){
+for(const {serviceId,response} of responses){
   if(!response.success){lastMessage=response.message||lastMessage;continue;}
-  const raw=extractVTUGATEPlanCandidates(response.data,selected);
+  // Tag each candidate with the service_id we actually requested it under —
+  // VTUGATE's plan objects don't always echo their own service_id back, and
+  // without this fallback those plans resolve to service_id 0, which makes
+  // every purchase attempt fail authoritative lookup at buy time.
+  const raw=extractVTUGATEPlanCandidates(response.data,selected).map(p=>({...p,__requested_service_id:serviceId}));
   if(raw.length)bestRaw=bestRaw.concat(raw);
 }
 if(!bestRaw.length)throw new Error(lastMessage);
@@ -445,7 +465,8 @@ const normalized=raw.map(p=>{
   const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
   const explicitDays=parseCatalogNumber(findCatalogField(p,['validity_days','validityDays','days','validity_in_days']));
   const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):0);
-  const serviceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID'])||0);
+  const parsedServiceId=parseCatalogNumber(findCatalogField(p,['service_id','serviceId','serviceID']));
+  const serviceId=Number.isFinite(parsedServiceId)&&parsedServiceId>0?parsedServiceId:Number(p.__requested_service_id||0);
   const deliveryRateRaw=parseCatalogNumber(findCatalogField(p,['delivery_rate','deliveryRate']));
   const deliveryRate=Number.isFinite(deliveryRateRaw)?deliveryRateRaw:null;
   return{...p,network_name:networkName,name,sales_channel:salesChannel,plan_id:id,plan_code:planCode||String(id||''),price,size_mb:sizeMb,validity_days:validityDays,validity:rawValidity,validity_period:rawValidity,duration:rawValidity,service_id:Number.isFinite(serviceId)&&serviceId>0?serviceId:0,delivery_rate:deliveryRate};
@@ -508,9 +529,9 @@ const productId=Number(data.product_id||data.providerPayload?.product_id||0),qua
 }else if(service==="airtime"){
 const network=normalizeDataNetwork(data.network||data.providerPayload?.network);if(!network)return{success:false,statusCode:400,message:"Unsupported network."};if(!/^0\d{10}$/.test(recipient))return{success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};const serviceId=await getVTUGATEServiceId("airtime",network);providerPayload={service_id:serviceId,network,amount,phone:recipient,phone_number:recipient,msisdn:recipient,airtime_amount:amount,ref:null};pricingMeta.network=network;
 }else if(service==="cable"){
-const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("cable",providerName);const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,phone_number:recipient,msisdn:recipient,plan,package:plan,amount,ref:null};pricingMeta.network=providerName;pricingMeta.plan=plan;
+const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("cable",providerName);const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const expectedPrice=getCablePlanPrice(providerName,plan);if(expectedPrice===null)return{success:false,statusCode:400,message:"The selected cable TV plan is not recognized."};if(Math.abs(amount-expectedPrice)>.009)return{success:false,statusCode:400,message:"The selected cable TV plan price has changed. Please refresh and try again."};pricingMeta={providerCost:expectedPrice,customerPrice:expectedPrice,grossProfit:0,network:providerName,plan};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,phone_number:recipient,msisdn:recipient,plan,package:plan,amount,ref:null};
 }else if(service==="electricity"){
-const disco=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};const serviceId=await getVTUGATEServiceId("electricity");const meterType=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=disco.toUpperCase();pricingMeta.plan=meterType;
+const disco=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};const serviceId=await getVTUGATEServiceId("electricity");const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=disco.toUpperCase();pricingMeta.plan=meterType;
 }
 const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
 let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
@@ -2636,7 +2657,7 @@ async function createCustomerFlutterwaveDynamicAccount(user,amount){return creat
 async function creditFlutterwaveVirtualAccount(payload){
 const data=payload?.data||payload||{};const accountNumber=clean(data?.account?.account_number||data?.account_number||data?.transfer_account||payload?.meta_data?.account_number||payload?.meta?.account_number);const amount=Number(data?.amount||data?.amount_settled||data?.charged_amount||0);const txId=clean(data?.id||data?.flw_ref||data?.tx_ref||payload?.id);const txRef=clean(data?.tx_ref||data?.reference||"");if(!Number.isFinite(amount)||amount<=0)throw new Error("Flutterwave webhook has an invalid amount.");if(!txId&&!txRef&&!accountNumber)throw new Error("Flutterwave webhook is missing a transaction identifier.");let va=null;if(txRef)va=(await db(`SELECT * FROM flutterwave_virtual_accounts WHERE tx_ref=$1 LIMIT 1`,[txRef])).rows[0]||null;if(!va&&accountNumber)va=(await db(`SELECT * FROM flutterwave_virtual_accounts WHERE account_number=$1 LIMIT 1`,[accountNumber])).rows[0]||null;if(!va)throw new Error("No BOLTIV owner is mapped to this Flutterwave virtual-account payment.");
 if(txId || txRef){
-const verified=/^\d+$/.test(txId)?await flutterwaveRequest(`/transactions.html${encodeURIComponent(txId)}/verify`):await flutterwaveRequest(`/transactions.htmlverify_by_reference?tx_ref=${encodeURIComponent(txRef)}`);
+const verified=/^\d+$/.test(txId)?await flutterwaveRequest(`/transactions/${encodeURIComponent(txId)}/verify`):await flutterwaveRequest(`/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`);
 const vd=verified.data?.data||{};
 if(!verified.success||String(vd.status||"").toLowerCase()!=="successful")throw new Error(flutterwaveError(verified,"Flutterwave transaction verification failed."));
 if(String(vd.currency||"").toUpperCase()!=="NGN")throw new Error("Flutterwave transaction currency is not NGN.");
@@ -4115,7 +4136,12 @@ message:
 }
 
 const b=await body(req);
-if(!b.service){b.service=path.split("/").pop();}
+// path.split("/").pop() yields "exam-pin" (hyphen) for the /api/vtu/exam-pin route,
+// but processVTUTransaction's service whitelist uses "exam_pin" (underscore) — without
+// this normalization, any caller that omits `service` from the body (the generic
+// /api/vtu/purchase route, or a future client) would always get rejected with
+// "This service is not currently wired to VTUGATE." for exam PIN purchases.
+if(!b.service){b.service=path.split("/").pop().replace(/-/g,"_");}
 if(!b.providerPayload){b.providerPayload={...b,service:b.service};}
 const result=await processVTUTransaction(user,b);
 
@@ -4291,11 +4317,11 @@ PUBLIC PLATFORM CONFIGURATION
 if(req.method==='GET'&&path==='/api/pricing'){
   const keys=['airtime','data','cable','electricity','exam_pin'];
   const out={};
-  for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={markup_mode:p.markup_mode,markup_pct:p.markup_pct,markup_fixed:p.markup_fixed};}
+  for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={available:Boolean(svc&&svc.enabled!==false&&svc.maintenance!==true)};}
   return send(res,200,{success:true,pricing:out});
 }
 
-if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,fee,maintenance,config FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin') ORDER BY key`);return send(res,200,{success:true,services:r.rows});}
+if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,maintenance FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin') ORDER BY key`);return send(res,200,{success:true,services:r.rows.map(x=>({...x,available:x.enabled!==false&&x.maintenance!==true}))});}
 if(req.method==='GET'&&path==='/api/platform/settings'){const fallback=[{text:'Welcome to BOLTIV — Fast. Simple. Powerful.',enabled:true}]; let items=await getPlatformSetting('announcement_items',fallback); if(!Array.isArray(items))items=fallback; items=items.filter(x=>x&&x.text&&x.enabled!==false).slice(0,10); return send(res,200,{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true)),announcement_enabled:Boolean(await getPlatformSetting('announcement_enabled',true)),announcement_text:String(await getPlatformSetting('announcement_text',items[0]?.text||fallback[0].text)),announcement_items:items}});}
 
 /*

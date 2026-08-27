@@ -61,7 +61,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 @media(max-width:550px){.container{padding:14px}.top{padding:0 14px}.toolbar{flex-wrap:wrap}.toolbar input,.toolbar select{width:100%;max-width:none}.quick{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr}.stat{padding:13px}.stat-value{font-size:18px}}
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="manifest" href="/manifest.webmanifest">
+</head>
 <body>
 <div class="login" id="loginPage">
 <div class="login-box">
@@ -783,5 +784,6 @@ api("/api/admin/me")
   .catch(()=>showLogin());
 
 </script>
-</div></main></div></body>
+</div></main></div><script src="/boltiv-install.js?v=53"></script>
+</body>
 </html>

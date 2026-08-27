@@ -26,7 +26,8 @@
 .bottom-nav .nav-icon { display:block; margin:0; font-size:19px; line-height:1; }
 .bottom-nav .nav.active { color:#D4AF37; }
 @media (max-width:380px){ .container{padding:0 12px;} .card{padding:18px;} }
-</style></head>
+</style><link rel="manifest" href="/manifest.webmanifest">
+</head>
 <body>
 <div class="page"><div class="container">
 <header class="data-header"><button class="back-button" onclick="history.back()">‹</button><div><div class="data-title">Electricity</div><div class="data-subtitle">PAY YOUR ELECTRICITY BILL</div></div></header>
@@ -83,6 +84,7 @@ $("meter").addEventListener("input",()=>{verified=false;$("pay").disabled=true;$
 function payDetails(v,n,d){const t=d&&(d.token||d.delivery?.token||d.providerData?.data?.token||d.providerData?.token);const u=d&&(d.providerData?.data?.units||d.units||"");return`<div class="modal-detail"><span>Service</span><strong>Electricity</strong></div><div class="modal-detail"><span>Provider</span><strong>${selectedProvider}</strong></div><div class="modal-detail"><span>Meter</span><strong>${n}</strong></div><div class="modal-detail"><span>Type</span><strong>${$("meterType").value}</strong></div><div class="modal-detail"><span>Amount</span><strong>${money(v)}</strong></div>`+(t?`<div class="modal-detail"><span>Token</span><strong>${t}</strong></div>`:"")+(u?`<div class="modal-detail"><span>Units</span><strong>${u}</strong></div>`:"")}
 $("pay").onclick=async()=>{let v=Number($("amount").value),n=$("meter").value.trim();if(!verified)return msg("Please verify your meter first.","error");if(v<100)return msg("Minimum electricity payment is ₦100.","error");$("pay").disabled=true;const transactionPin=await boltivGetTransactionPin();if(!transactionPin){$("pay").disabled=false;return;}showModal("processing","Processing Payment","Connecting to BOLTIV...");mb.style.display="none";try{const r=await fetch("https://boltiv-backend.onrender.com/api/vtu/electricity",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({provider:selectedProvider,meterNumber:n,meterType:$("meterType").value,amount:v,service:"electricity",providerPayload:{service:"electricity",provider:selectedProvider,meterNumber:n,meterType:$("meterType").value,amount:v},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin:transactionPin})});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process electricity payment.");showModal("success","Payment Successful",d.message||"Your electricity payment was successful.",payDetails(v,n,d)+(d.reference?`<div class="modal-detail"><span>Reference</span><strong>${d.reference}</strong></div>`:""));mb.style.display="block";}catch(e){showModal("failed","Payment Failed",e.message||"Electricity payment failed.",payDetails(v,n));mb.style.display="block";}finally{$("pay").disabled=false}};
 </script>
+<script src="/boltiv-install.js?v=53"></script>
 </body>
 </html>
 <!-- BOLTIV ELECTRICITY -->

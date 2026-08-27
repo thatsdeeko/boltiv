@@ -44,7 +44,8 @@ boltivRequireAuth();
 @media(prefers-reduced-motion:reduce){.profile-page:before,.profile-page:after,.section,.identity-card{animation:none!important}.action{transition:none}}
 </style>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style></head>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="manifest" href="/manifest.webmanifest">
+</head>
 <body>
 <div class="page profile-page">
 <div class="container">
@@ -720,9 +721,20 @@ logoutModal.classList.remove("show");
 
 document
 .getElementById("confirmLogout")
-.onclick=()=>{
+.onclick=async()=>{
 
-boltivMemoryStorage.removeItem("boltivLoggedIn");
+// Previously this only removed a local "boltivLoggedIn" flag — it never told the
+// server to invalidate the session, and never cleared the stored bearer token or
+// HttpOnly cookie. That meant "logging out" on a shared device didn't actually log
+// anyone out: the session stayed valid server-side, and boltivRequireAuth would
+// silently re-authenticate the same user on the very next page load.
+try{
+const api=window.BOLTIV_API_BASE || 'https://boltiv-backend.onrender.com';
+const token=boltivMemoryStorage.getItem('boltivAuthToken');
+await fetch(api+'/api/auth/logout',{method:'POST',credentials:'include',headers:token?{Authorization:'Bearer '+token}:{}});
+}catch(e){}
+
+boltivMemoryStorage.clear();
 
 logoutModal.classList.remove("show");
 
@@ -821,6 +833,7 @@ window.addEventListener("pageshow",()=>{
 });
 
 </script>
+<script src="/boltiv-install.js?v=53"></script>
 </body>
 </html>
 

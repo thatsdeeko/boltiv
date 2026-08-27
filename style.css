@@ -841,3 +841,12 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+/* BOLTIV install prompt */
+.boltiv-install-prompt{position:fixed;left:14px;right:14px;bottom:86px;z-index:100000;display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;padding:17px 16px;background:#fffdf7;border:1px solid #eadfb9;border-radius:18px;box-shadow:0 18px 50px rgba(55,42,8,.18);transform:translateY(18px);opacity:0;transition:transform .22s ease,opacity .22s ease}
+.boltiv-install-prompt.is-visible{transform:translateY(0);opacity:1}
+.boltiv-install-copy{min-width:0}.boltiv-install-title{font-size:15px;font-weight:1000;color:#171717;margin-bottom:4px}.boltiv-install-text{font-size:11px;line-height:1.45;color:#716e68}
+.boltiv-install-action{grid-column:1 / -1;width:100%;min-height:43px;border:0;border-radius:11px;background:linear-gradient(135deg,#dcb83c,#bd920b);color:#fff;font-size:11px;font-weight:1000;letter-spacing:.3px}
+.boltiv-install-close{position:absolute;right:10px;top:8px;width:28px;height:28px;border:0;background:transparent;color:#8d6907;font-size:22px;line-height:1}
+@media(min-width:700px){.boltiv-install-prompt{left:auto;right:22px;bottom:22px;width:380px}.boltiv-install-action{grid-column:auto;min-width:120px}.boltiv-install-copy{padding-right:12px}}
+@media(prefers-reduced-motion:reduce){.boltiv-install-prompt{transition:none}}

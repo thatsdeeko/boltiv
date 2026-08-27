@@ -78,7 +78,12 @@
     if(!exemptPaths.includes(path)){
       try{
         const api=window.BOLTIV_API_BASE || 'https://boltiv-backend.onrender.com';
-        const r=await nativeFetch(api+'/api/security',{credentials:'include',cache:'no-store'});
+        // Same cookie-first, bearer-token-fallback pattern as boltivAuthReady above —
+        // otherwise this check silently no-ops on browsers that block the cross-site
+        // cookie, and the PIN-setup gate never fires for those users.
+        const token=mem.get('boltivAuthToken');
+        const headers=token?{Authorization:'Bearer '+token}:{};
+        const r=await nativeFetch(api+'/api/security',{credentials:'include',cache:'no-store',headers});
         const d=await r.json().catch(()=>({}));
         if(r.ok && d.success && !d.transactionPinSet){
           location.replace('/security?setup=required');

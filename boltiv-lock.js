@@ -87,7 +87,7 @@
         .boltiv-lock-key:active{background:#fdf6e0}
         .boltiv-lock-key.boltiv-lock-bio{color:#b8860b;font-size:19px}
         .boltiv-lock-key.boltiv-lock-back{color:#c0392b;font-size:19px}
-        .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:#171717;font-size:13px;text-decoration:underline;padding:10px}
+        .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:#b8860b;font-size:13px;font-weight:700;text-decoration:underline;padding:10px}
         @media(max-width:360px){.boltiv-lock-box{width:46px;height:46px}.boltiv-lock-key{height:56px}}
       </style>
       <div class="boltiv-lock-brand"><img src="/assets/boltiv-logo.webp" alt=""/><span>BOLTIV</span></div>

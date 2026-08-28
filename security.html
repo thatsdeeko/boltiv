@@ -509,6 +509,47 @@ Your Transaction PIN is securely protected and used to authorize your transactio
 
 </div>
 </div>
+<!-- BIOMETRIC UNLOCK CARD -->
+<div class="security-card" id="biometricCard" style="margin-top:16px">
+<div class="security-status">
+<div class="status-left">
+<div aria-live="polite" class="status-icon" id="biometricStatusIcon" role="status">
+⚿
+</div>
+<div>
+<div class="status-title">
+Biometric Unlock
+</div>
+<div aria-live="polite" class="status-text" id="biometricStatusText" role="status">
+Checking this device...
+</div>
+</div>
+</div>
+<div aria-live="polite" class="status-badge status-off" id="biometricStatus" role="status">
+OFF
+</div>
+</div>
+<div id="biometricUnsupported" class="hidden">
+<div class="security-note" style="margin-top:14px">
+This device or browser doesn't support biometric unlock (Face ID, Touch ID, or fingerprint).
+</div>
+</div>
+<div id="biometricSetupSection" class="hidden" style="margin-top:14px">
+<button class="security-button" id="biometricEnrollBtn" type="button">
+ENABLE BIOMETRIC UNLOCK
+</button>
+</div>
+<div id="biometricListSection" class="hidden" style="margin-top:14px">
+<div id="biometricList"></div>
+<button class="security-button" id="biometricEnrollAnotherBtn" style="margin-top:12px" type="button">
+ADD ANOTHER DEVICE
+</button>
+</div>
+<div class="security-note" style="margin-top:14px">
+Once enabled, you can unlock BOLTIV with your face or fingerprint instead of your PIN when returning to the app. Your PIN still works at any time, and your fingerprint or face data never leaves this device.
+</div>
+</div>
+</div>
 </div>
 </div>
 <!-- BOTTOM NAV -->
@@ -822,6 +863,173 @@ window.addEventListener(
 "pageshow",
 updateStatus
 );
+
+/* =========================
+   BIOMETRIC UNLOCK
+========================= */
+
+const biometricStatus=document.getElementById("biometricStatus");
+const biometricStatusIcon=document.getElementById("biometricStatusIcon");
+const biometricStatusText=document.getElementById("biometricStatusText");
+const biometricUnsupported=document.getElementById("biometricUnsupported");
+const biometricSetupSection=document.getElementById("biometricSetupSection");
+const biometricListSection=document.getElementById("biometricListSection");
+const biometricList=document.getElementById("biometricList");
+const biometricEnrollBtn=document.getElementById("biometricEnrollBtn");
+const biometricEnrollAnotherBtn=document.getElementById("biometricEnrollAnotherBtn");
+
+function authHeaders(){
+  const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
+  return token?{Authorization:"Bearer "+token}:{};
+}
+
+function platformDeviceLabel(){
+  const ua=navigator.userAgent||"";
+  if(/iPhone/.test(ua))return "iPhone";
+  if(/iPad/.test(ua))return "iPad";
+  if(/Android/.test(ua))return "Android device";
+  if(/Macintosh/.test(ua))return "Mac";
+  if(/Windows/.test(ua))return "Windows PC";
+  return "This device";
+}
+
+function base64urlToBuffer(str){
+  str=String(str||"").replace(/-/g,"+").replace(/_/g,"/");
+  while(str.length%4)str+="=";
+  const bin=atob(str);
+  const buf=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);
+  return buf.buffer;
+}
+function bufferToBase64url(buf){
+  const bytes=new Uint8Array(buf);
+  let bin="";
+  for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+
+async function webauthnSupported(){
+  if(!window.PublicKeyCredential)return false;
+  try{
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  }catch(e){return false;}
+}
+
+function renderBiometricList(credentials){
+  biometricList.innerHTML=credentials.map(c=>`
+    <div class="security-status" style="margin-bottom:10px">
+      <div class="status-left">
+        <div class="status-icon">⚿</div>
+        <div>
+          <div class="status-title">${(c.device_label||"Device").replace(/[<>&]/g,ch=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[ch]))}</div>
+          <div class="status-text">Added ${new Date(c.created_at).toLocaleDateString()}</div>
+        </div>
+      </div>
+      <button class="show-pin" type="button" data-remove-id="${c.id}">REMOVE</button>
+    </div>
+  `).join("");
+  biometricList.querySelectorAll("[data-remove-id]").forEach(btn=>{
+    btn.onclick=()=>removeBiometric(Number(btn.getAttribute("data-remove-id")));
+  });
+}
+
+async function loadBiometricState(){
+  const supported=await webauthnSupported();
+  if(!supported){
+    biometricStatusText.textContent="Not available on this device";
+    biometricStatus.textContent="OFF";
+    biometricUnsupported.classList.remove("hidden");
+    biometricSetupSection.classList.add("hidden");
+    biometricListSection.classList.add("hidden");
+    return;
+  }
+  try{
+    const r=await fetch(API_BASE+"/api/webauthn/credentials",{credentials:"include",headers:authHeaders()});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||"Unable to load biometric status.");
+    if(d.credentials.length){
+      biometricStatusIcon.textContent="✓";
+      biometricStatusText.textContent=d.credentials.length===1?"Enabled on 1 device":`Enabled on ${d.credentials.length} devices`;
+      biometricStatus.textContent="ON";
+      biometricStatus.className="status-badge status-on";
+      biometricSetupSection.classList.add("hidden");
+      biometricListSection.classList.remove("hidden");
+      renderBiometricList(d.credentials);
+    }else{
+      biometricStatusText.textContent="Not set up on this account";
+      biometricStatus.textContent="OFF";
+      biometricSetupSection.classList.remove("hidden");
+      biometricListSection.classList.add("hidden");
+    }
+  }catch(e){
+    biometricStatusText.textContent="Unable to check biometric status";
+  }
+}
+
+async function enrollBiometric(){
+  try{
+    const optRes=await fetch(API_BASE+"/api/webauthn/register/options",{method:"POST",credentials:"include",headers:Object.assign({"Content-Type":"application/json"},authHeaders())});
+    const optData=await optRes.json();
+    if(!optRes.ok||!optData.success)throw new Error(optData.message||"Unable to start biometric setup.");
+    const o=optData.options;
+    const publicKey={
+      rp:o.rp,
+      user:{id:base64urlToBuffer(o.user.id),name:o.user.name,displayName:o.user.displayName},
+      challenge:base64urlToBuffer(o.challenge),
+      pubKeyCredParams:o.pubKeyCredParams,
+      authenticatorSelection:o.authenticatorSelection,
+      timeout:o.timeout,
+      attestation:o.attestation,
+      excludeCredentials:(o.excludeCredentials||[]).map(c=>({type:c.type,id:base64urlToBuffer(c.id)}))
+    };
+    const cred=await navigator.credentials.create({publicKey});
+    const credentialPayload={
+      id:cred.id,
+      rawId:bufferToBase64url(cred.rawId),
+      type:cred.type,
+      response:{
+        clientDataJSON:bufferToBase64url(cred.response.clientDataJSON),
+        attestationObject:bufferToBase64url(cred.response.attestationObject)
+      }
+    };
+    const verifyRes=await fetch(API_BASE+"/api/webauthn/register/verify",{
+      method:"POST",credentials:"include",
+      headers:Object.assign({"Content-Type":"application/json"},authHeaders()),
+      body:JSON.stringify({credential:credentialPayload,deviceLabel:platformDeviceLabel()})
+    });
+    const verifyData=await verifyRes.json();
+    if(!verifyRes.ok||!verifyData.success)throw new Error(verifyData.message||"Unable to enable biometric unlock.");
+    showMessage(verifyData.message||"Biometric unlock enabled.","success");
+    await loadBiometricState();
+  }catch(e){
+    if(e && e.name==="NotAllowedError"){
+      showMessage("Biometric setup was cancelled.","error");
+    }else{
+      showMessage(e.message||"Unable to enable biometric unlock.","error");
+    }
+  }
+}
+
+async function removeBiometric(id){
+  if(!confirm("Remove biometric unlock for this device?"))return;
+  try{
+    const r=await fetch(API_BASE+"/api/webauthn/credentials/remove",{
+      method:"POST",credentials:"include",
+      headers:Object.assign({"Content-Type":"application/json"},authHeaders()),
+      body:JSON.stringify({id})
+    });
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.message||"Unable to remove this credential.");
+    showMessage("Biometric credential removed.","success");
+    await loadBiometricState();
+  }catch(e){
+    showMessage(e.message||"Unable to remove this credential.","error");
+  }
+}
+
+if(biometricEnrollBtn)biometricEnrollBtn.onclick=enrollBiometric;
+if(biometricEnrollAnotherBtn)biometricEnrollAnotherBtn.onclick=enrollBiometric;
+loadBiometricState();
 
 </script>
 <script src="/boltiv-install.js?v=53"></script>

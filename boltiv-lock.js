@@ -40,6 +40,26 @@
 
   function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
+  function base64urlToBuffer(str){
+    str=String(str||"").replace(/-/g,"+").replace(/_/g,"/");
+    while(str.length%4)str+="=";
+    const bin=atob(str);
+    const buf=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)buf[i]=bin.charCodeAt(i);
+    return buf.buffer;
+  }
+  function bufferToBase64url(buf){
+    const bytes=new Uint8Array(buf);
+    let bin="";
+    for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  }
+  async function biometricAvailable(){
+    if(!window.PublicKeyCredential)return false;
+    try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();}
+    catch(e){return false;}
+  }
+
   function buildOverlay(){
     const user=currentUser();
     const el=document.createElement("div");
@@ -59,7 +79,7 @@
         .boltiv-lock-box.filled span{display:block}
         .boltiv-lock-error{margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;align-self:flex-start}
         .boltiv-lock-keypad{margin-top:auto;padding-top:40px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-width:320px}
-        .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:#171717;border-radius:50%}
+        .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:#171717;border-radius:50%;display:flex;align-items:center;justify-content:center}
         .boltiv-lock-key:active{background:#f4f4f0}
         .boltiv-lock-key.boltiv-lock-bio{color:#555;font-size:19px}
         .boltiv-lock-key.boltiv-lock-back{color:#c0392b;font-size:19px}
@@ -73,7 +93,7 @@
       <div class="boltiv-lock-error" id="boltivLockError"></div>
       <div class="boltiv-lock-keypad" id="boltivLockKeypad">
         ${[1,2,3,4,5,6,7,8,9].map(n=>`<button type="button" class="boltiv-lock-key" data-digit="${n}">${n}</button>`).join("")}
-        <button type="button" class="boltiv-lock-key boltiv-lock-bio" id="boltivLockBio" aria-label="Biometric unlock">&#128272;</button>
+        <button type="button" class="boltiv-lock-key boltiv-lock-bio" id="boltivLockBio" aria-label="Biometric unlock"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3a7 7 0 0 0-7 7v2c0 2.5-.5 4.5-1.5 6"/><path d="M12 3a7 7 0 0 1 7 7v2c0 1 .1 1.9.3 2.7"/><path d="M8 10a4 4 0 0 1 8 0v2c0 3.5 1 6 2.5 8"/><path d="M12 10v2c0 4-1.5 7-4 9"/><path d="M15.5 21c-1-1.5-1.8-3-2.2-5"/><path d="M9 21c.7-1 1.2-2 1.5-3"/></svg></button>
         <button type="button" class="boltiv-lock-key" data-digit="0">0</button>
         <button type="button" class="boltiv-lock-key boltiv-lock-back" id="boltivLockBack" aria-label="Delete">&#10094;</button>
       </div>
@@ -95,12 +115,73 @@
       btn.addEventListener("click",()=>onDigit(btn.getAttribute("data-digit")));
     });
     el.querySelector("#boltivLockBack").addEventListener("click",onBackspace);
-    el.querySelector("#boltivLockBio").addEventListener("click",()=>{
-      showError("Biometric unlock isn't set up on this device yet — use your PIN.");
-    });
+    el.querySelector("#boltivLockBio").addEventListener("click",()=>{tryBiometric(true);});
     el.querySelector("#boltivLockLogout").addEventListener("click",onLogout);
 
+    biometricAvailable().then(available=>{
+      const bioBtn=el.querySelector("#boltivLockBio");
+      if(!available){
+        if(bioBtn)bioBtn.style.visibility="hidden";
+        return;
+      }
+      // Auto-prompt once the overlay is up, the way native apps prompt Face ID
+      // immediately — the PIN pad stays usable the whole time as a fallback.
+      tryBiometric(false);
+    });
+
     return el;
+  }
+
+  async function tryBiometric(userInitiated){
+    if(submitting)return;
+    submitting=true;
+    try{
+      const optRes=await fetch(API+"/api/webauthn/authenticate/options",{
+        method:"POST",credentials:"include",
+        headers:Object.assign({"Content-Type":"application/json"},authHeaders())
+      });
+      const optData=await optRes.json().catch(()=>({}));
+      if(!optRes.ok||!optData.success){
+        if(userInitiated)showError("Biometric unlock isn't set up on this device yet — use your PIN.");
+        return;
+      }
+      const o=optData.options;
+      const publicKey={
+        rpId:o.rpId,
+        challenge:base64urlToBuffer(o.challenge),
+        timeout:o.timeout,
+        userVerification:o.userVerification,
+        allowCredentials:(o.allowCredentials||[]).map(c=>({type:c.type,id:base64urlToBuffer(c.id)}))
+      };
+      const assertion=await navigator.credentials.get({publicKey});
+      const credentialPayload={
+        id:assertion.id,
+        rawId:bufferToBase64url(assertion.rawId),
+        type:assertion.type,
+        response:{
+          clientDataJSON:bufferToBase64url(assertion.response.clientDataJSON),
+          authenticatorData:bufferToBase64url(assertion.response.authenticatorData),
+          signature:bufferToBase64url(assertion.response.signature)
+        }
+      };
+      const verifyRes=await fetch(API+"/api/webauthn/authenticate/verify",{
+        method:"POST",credentials:"include",
+        headers:Object.assign({"Content-Type":"application/json"},authHeaders()),
+        body:JSON.stringify({credential:credentialPayload})
+      });
+      const verifyData=await verifyRes.json().catch(()=>({}));
+      if(verifyRes.ok&&verifyData.success){
+        unlock();
+        return;
+      }
+      if(userInitiated)showError(verifyData.message||"Biometric verification failed. Use your PIN.");
+    }catch(e){
+      // NotAllowedError covers both "user cancelled" and "user declined" —
+      // silent when this was the automatic prompt, shown when they tapped it.
+      if(userInitiated)showError("Biometric unlock was cancelled — use your PIN.");
+    }finally{
+      submitting=false;
+    }
   }
 
   function updateBoxes(){

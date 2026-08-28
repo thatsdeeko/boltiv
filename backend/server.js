@@ -711,6 +711,286 @@ return false;
 
 }
 
+/* =========================================================
+   WEBAUTHN (BIOMETRIC UNLOCK)
+   ---------------------------------------------------------
+   Minimal, dependency-free WebAuthn relying-party implementation using only
+   Node's built-in crypto. No npm package is used here — this environment has
+   no network access to install one, and the protocol pieces needed for our
+   scope (registration + assertion verification for an already-logged-in
+   user, attestation format "none"/unchecked) are small enough to implement
+   directly and correctly:
+     - a minimal CBOR decoder (COSE keys and attestationObject use a
+       constrained, predictable subset of CBOR: maps, byte strings, text
+       strings, integers)
+     - authenticatorData binary parsing (fixed layout per the WebAuthn spec)
+     - COSE key -> Node KeyObject (via JWK, for EC2/P-256 and RSA)
+     - ECDSA/RSA signature verification of the assertion
+   The actual biometric (fingerprint/face) never leaves the user's device —
+   only a signature proving the correct platform authenticator was used
+   reaches this server, which is the whole point of WebAuthn.
+   ========================================================= */
+
+const RP_ID=(()=>{try{return new URL(FRONTEND_URL).hostname;}catch(e){return "boltiv.ng";}})();
+const RP_NAME="BOLTIV";
+const EXPECTED_ORIGIN=FRONTEND_URL;
+
+function base64url(buf){return Buffer.from(buf).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
+function fromBase64url(str){str=String(str||"").replace(/-/g,"+").replace(/_/g,"/");while(str.length%4)str+="=";return Buffer.from(str,"base64");}
+
+/* --- minimal CBOR decoder (decode only; enough for COSE keys + attestationObject) --- */
+function cborDecode(buf,offset=0){
+  const view=buf;
+  function readUInt(firstByteInfo,off){
+    if(firstByteInfo<24)return {value:firstByteInfo,next:off};
+    if(firstByteInfo===24)return {value:view.readUInt8(off),next:off+1};
+    if(firstByteInfo===25)return {value:view.readUInt16BE(off),next:off+2};
+    if(firstByteInfo===26)return {value:view.readUInt32BE(off),next:off+4};
+    if(firstByteInfo===27){
+      const hi=view.readUInt32BE(off),lo=view.readUInt32BE(off+4);
+      return {value:hi*4294967296+lo,next:off+8};
+    }
+    throw new Error("CBOR: unsupported length encoding");
+  }
+  function decodeAt(off){
+    const first=view.readUInt8(off);
+    const majorType=first>>5;
+    const info=first&0x1f;
+    off+=1;
+    if(majorType===0){ // unsigned int
+      const r=readUInt(info,off);
+      return {value:r.value,next:r.next};
+    }
+    if(majorType===1){ // negative int
+      const r=readUInt(info,off);
+      return {value:-1-r.value,next:r.next};
+    }
+    if(majorType===2){ // byte string
+      const r=readUInt(info,off);
+      const bytes=view.slice(r.next,r.next+r.value);
+      return {value:bytes,next:r.next+r.value};
+    }
+    if(majorType===3){ // text string
+      const r=readUInt(info,off);
+      const str=view.slice(r.next,r.next+r.value).toString("utf8");
+      return {value:str,next:r.next+r.value};
+    }
+    if(majorType===4){ // array
+      const r=readUInt(info,off);
+      let cur=r.next;
+      const arr=[];
+      for(let i=0;i<r.value;i++){const d=decodeAt(cur);arr.push(d.value);cur=d.next;}
+      return {value:arr,next:cur};
+    }
+    if(majorType===5){ // map
+      const r=readUInt(info,off);
+      let cur=r.next;
+      const map=new Map();
+      for(let i=0;i<r.value;i++){
+        const k=decodeAt(cur);cur=k.next;
+        const v=decodeAt(cur);cur=v.next;
+        map.set(k.value,v.value);
+      }
+      return {value:map,next:cur};
+    }
+    if(majorType===7){ // simple/float
+      if(info===20)return {value:false,next:off};
+      if(info===21)return {value:true,next:off};
+      if(info===22)return {value:null,next:off};
+      throw new Error("CBOR: unsupported simple value");
+    }
+    throw new Error("CBOR: unsupported major type "+majorType);
+  }
+  return decodeAt(offset);
+}
+
+/* --- COSE key (decoded CBOR map) -> Node crypto public KeyObject, via JWK --- */
+function coseKeyToPublicKeyObject(coseMap){
+  const kty=coseMap.get(1);
+  if(kty===2){ // EC2
+    const crv=coseMap.get(-1);
+    const x=coseMap.get(-2);
+    const y=coseMap.get(-3);
+    if(crv!==1)throw new Error("Unsupported EC curve (only P-256 is supported).");
+    const jwk={kty:"EC",crv:"P-256",x:base64url(x),y:base64url(y)};
+    return {keyObject:crypto.createPublicKey({key:jwk,format:"jwk"}),jwk,alg:-7};
+  }
+  if(kty===3){ // RSA
+    const n=coseMap.get(-1);
+    const e=coseMap.get(-2);
+    const jwk={kty:"RSA",n:base64url(n),e:base64url(e)};
+    return {keyObject:crypto.createPublicKey({key:jwk,format:"jwk"}),jwk,alg:-257};
+  }
+  throw new Error("Unsupported public key type.");
+}
+
+function publicKeyObjectFromStoredJwk(jwk){
+  return crypto.createPublicKey({key:jwk,format:"jwk"});
+}
+
+/* --- authenticatorData binary layout (WebAuthn spec §6.1) --- */
+function parseAuthenticatorData(authData){
+  if(authData.length<37)throw new Error("authenticatorData too short.");
+  const rpIdHash=authData.slice(0,32);
+  const flags=authData.readUInt8(32);
+  const signCount=authData.readUInt32BE(33);
+  let offset=37;
+  let credentialId=null,publicKeyJwk=null,publicKeyObject=null;
+  const attestedCredentialDataIncluded=Boolean(flags&0x40);
+  if(attestedCredentialDataIncluded){
+    offset+=16; // aaguid
+    const credIdLen=authData.readUInt16BE(offset);offset+=2;
+    credentialId=authData.slice(offset,offset+credIdLen);offset+=credIdLen;
+    const decoded=cborDecode(authData,offset);
+    offset=decoded.next;
+    const parsedKey=coseKeyToPublicKeyObject(decoded.value);
+    publicKeyJwk=parsedKey.jwk;
+    publicKeyObject=parsedKey.keyObject;
+  }
+  return {
+    rpIdHash,
+    userPresent:Boolean(flags&0x01),
+    userVerified:Boolean(flags&0x04),
+    signCount,
+    credentialId,
+    publicKeyJwk,
+    publicKeyObject
+  };
+}
+
+async function createWebAuthnChallenge(userId,purpose){
+  const challenge=base64url(crypto.randomBytes(32));
+  await db(`DELETE FROM webauthn_challenges WHERE user_id=$1 AND purpose=$2`,[userId,purpose]);
+  await db(`INSERT INTO webauthn_challenges(user_id,purpose,challenge,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL '3 minutes')`,[userId,purpose,challenge]);
+  return challenge;
+}
+async function consumeWebAuthnChallenge(userId,purpose,submittedChallenge){
+  const r=await db(`DELETE FROM webauthn_challenges WHERE user_id=$1 AND purpose=$2 AND expires_at>NOW() RETURNING challenge`,[userId,purpose]);
+  if(!r.rows.length)return false;
+  return r.rows[0].challenge===submittedChallenge;
+}
+
+async function webauthnRegistrationOptions(user){
+  const challenge=await createWebAuthnChallenge(user.user_id,"register");
+  const existing=await db(`SELECT credential_id FROM webauthn_credentials WHERE user_id=$1`,[user.user_id]);
+  return{
+    success:true,
+    options:{
+      rp:{name:RP_NAME,id:RP_ID},
+      user:{id:base64url(Buffer.from(String(user.user_id))),name:user.email||user.user_id,displayName:user.name||user.email||"BOLTIV User"},
+      challenge,
+      pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},
+      timeout:60000,
+      attestation:"none",
+      excludeCredentials:existing.rows.map(r=>({type:"public-key",id:r.credential_id}))
+    }
+  };
+}
+
+async function webauthnRegistrationVerify(user,credential,deviceLabel){
+  const clientDataJSON=fromBase64url(credential?.response?.clientDataJSON);
+  const attestationObject=fromBase64url(credential?.response?.attestationObject);
+  const rawCredentialId=fromBase64url(credential?.id);
+  if(!clientDataJSON.length||!attestationObject.length||!rawCredentialId.length){
+    return{success:false,statusCode:400,message:"Invalid biometric registration response."};
+  }
+  let clientData;
+  try{clientData=JSON.parse(clientDataJSON.toString("utf8"));}
+  catch(e){return{success:false,statusCode:400,message:"Invalid biometric registration response."};}
+  if(clientData.type!=="webauthn.create")return{success:false,statusCode:400,message:"Unexpected registration ceremony type."};
+  if(clientData.origin!==EXPECTED_ORIGIN)return{success:false,statusCode:400,message:"Registration origin mismatch."};
+  const ok=await consumeWebAuthnChallenge(user.user_id,"register",clientData.challenge);
+  if(!ok)return{success:false,statusCode:400,message:"This registration request expired. Please try again."};
+
+  let attestation;
+  try{attestation=cborDecode(attestationObject,0).value;}
+  catch(e){return{success:false,statusCode:400,message:"Unable to parse the authenticator response."};}
+  const authDataBuf=attestation.get("authData");
+  if(!authDataBuf)return{success:false,statusCode:400,message:"Authenticator did not return credential data."};
+
+  let parsed;
+  try{parsed=parseAuthenticatorData(authDataBuf);}
+  catch(e){return{success:false,statusCode:400,message:"Unable to parse authenticator data."};}
+
+  const expectedRpIdHash=crypto.createHash("sha256").update(RP_ID).digest();
+  if(!parsed.rpIdHash.equals(expectedRpIdHash))return{success:false,statusCode:400,message:"Authenticator is not registered for this site."};
+  if(!parsed.userPresent)return{success:false,statusCode:400,message:"User presence was not confirmed by the authenticator."};
+  if(!parsed.credentialId||!parsed.publicKeyJwk)return{success:false,statusCode:400,message:"No credential was returned by the authenticator."};
+
+  const credentialIdB64=base64url(parsed.credentialId);
+  const dupe=await db(`SELECT id FROM webauthn_credentials WHERE credential_id=$1`,[credentialIdB64]);
+  if(dupe.rows.length)return{success:false,statusCode:409,message:"This authenticator is already registered."};
+
+  await db(`INSERT INTO webauthn_credentials(user_id,credential_id,public_key_jwk,sign_count,device_label) VALUES($1,$2,$3::jsonb,$4,$5)`,
+    [user.user_id,credentialIdB64,JSON.stringify(parsed.publicKeyJwk),parsed.signCount,clean(deviceLabel)||"This device"]);
+  try{await addNotification(user.user_id,"Biometric unlock added","A new device was enrolled for biometric unlock on your BOLTIV account.","security");}catch{}
+  return{success:true,message:"Biometric unlock enabled for this device."};
+}
+
+async function webauthnAuthenticationOptions(user){
+  const creds=await db(`SELECT credential_id FROM webauthn_credentials WHERE user_id=$1`,[user.user_id]);
+  if(!creds.rows.length)return{success:false,statusCode:404,message:"No biometric credential is registered on this account."};
+  const challenge=await createWebAuthnChallenge(user.user_id,"authenticate");
+  return{
+    success:true,
+    options:{
+      rpId:RP_ID,
+      challenge,
+      timeout:60000,
+      userVerification:"required",
+      allowCredentials:creds.rows.map(r=>({type:"public-key",id:r.credential_id}))
+    }
+  };
+}
+
+async function webauthnAuthenticationVerify(user,credential){
+  const clientDataJSON=fromBase64url(credential?.response?.clientDataJSON);
+  const authenticatorData=fromBase64url(credential?.response?.authenticatorData);
+  const signature=fromBase64url(credential?.response?.signature);
+  const credentialIdB64=String(credential?.id||"");
+  if(!clientDataJSON.length||!authenticatorData.length||!signature.length||!credentialIdB64){
+    return{success:false,statusCode:400,message:"Invalid biometric response."};
+  }
+  let clientData;
+  try{clientData=JSON.parse(clientDataJSON.toString("utf8"));}
+  catch(e){return{success:false,statusCode:400,message:"Invalid biometric response."};}
+  if(clientData.type!=="webauthn.get")return{success:false,statusCode:400,message:"Unexpected authentication ceremony type."};
+  if(clientData.origin!==EXPECTED_ORIGIN)return{success:false,statusCode:400,message:"Authentication origin mismatch."};
+  const ok=await consumeWebAuthnChallenge(user.user_id,"authenticate",clientData.challenge);
+  if(!ok)return{success:false,statusCode:400,message:"This biometric prompt expired. Please try again."};
+
+  const row=(await db(`SELECT id,public_key_jwk,sign_count FROM webauthn_credentials WHERE user_id=$1 AND credential_id=$2`,[user.user_id,credentialIdB64])).rows[0];
+  if(!row)return{success:false,statusCode:404,message:"This device is not registered for biometric unlock."};
+
+  let parsed;
+  try{parsed=parseAuthenticatorData(authenticatorData);}
+  catch(e){return{success:false,statusCode:400,message:"Unable to parse authenticator data."};}
+  const expectedRpIdHash=crypto.createHash("sha256").update(RP_ID).digest();
+  if(!parsed.rpIdHash.equals(expectedRpIdHash))return{success:false,statusCode:400,message:"Authenticator is not registered for this site."};
+  if(!parsed.userPresent)return{success:false,statusCode:400,message:"User presence was not confirmed by the authenticator."};
+
+  let publicKeyObject;
+  try{publicKeyObject=publicKeyObjectFromStoredJwk(row.public_key_jwk);}
+  catch(e){return{success:false,statusCode:500,message:"Stored credential is invalid."};}
+
+  const signedData=Buffer.concat([authenticatorData,crypto.createHash("sha256").update(clientDataJSON).digest()]);
+  let verified=false;
+  try{
+    const alg=row.public_key_jwk.kty==="RSA"?"RSA-SHA256":"sha256";
+    verified=crypto.verify(alg,signedData,publicKeyObject,signature);
+  }catch(e){verified=false;}
+  if(!verified)return{success:false,statusCode:401,message:"Biometric verification failed."};
+
+  if(Number(parsed.signCount)>0&&Number(parsed.signCount)<=Number(row.sign_count)){
+    // Signature counter went backwards or didn't increase — a sign a cloned
+    // authenticator may be in use. Refuse rather than silently accept.
+    return{success:false,statusCode:401,message:"Biometric verification failed. Please use your PIN."};
+  }
+  await db(`UPDATE webauthn_credentials SET sign_count=$1,last_used_at=NOW() WHERE id=$2`,[parsed.signCount,row.id]);
+  return{success:true};
+}
+
 async function setup(){
 
 if(!DATABASE_URL){
@@ -822,6 +1102,30 @@ user_id TEXT PRIMARY KEY,
 transaction_pin_hash TEXT,
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS webauthn_credentials(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+credential_id TEXT UNIQUE NOT NULL,
+public_key_jwk JSONB NOT NULL,
+sign_count BIGINT NOT NULL DEFAULT 0,
+device_label TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+last_used_at TIMESTAMPTZ
+)`);
+await db(`CREATE INDEX IF NOT EXISTS webauthn_credentials_user_idx ON webauthn_credentials(user_id)`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS webauthn_challenges(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+purpose TEXT NOT NULL,
+challenge TEXT NOT NULL,
+expires_at TIMESTAMPTZ NOT NULL,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS webauthn_challenges_user_idx ON webauthn_challenges(user_id,purpose)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS support_tickets(
@@ -3651,6 +3955,50 @@ const security=await getSecurity(user.user_id);
 if(!security?.transaction_pin_hash)return send(res,400,{success:false,message:"No Transaction PIN is set on this account."});
 if(!verifyPassword(pin,security.transaction_pin_hash))return send(res,401,{success:false,message:"Incorrect PIN."});
 return send(res,200,{success:true});
+}
+/*
+WEBAUTHN (BIOMETRIC UNLOCK)
+*/
+if(req.method==="GET"&&path==="/api/webauthn/credentials"){
+const r=await db(`SELECT id,device_label,created_at,last_used_at FROM webauthn_credentials WHERE user_id=$1 ORDER BY created_at DESC`,[user.user_id]);
+return send(res,200,{success:true,credentials:r.rows});
+}
+if(req.method==="POST"&&path==="/api/webauthn/credentials/remove"){
+const rl=rateLimit(req,`webauthn-remove:${user.user_id}`,10,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const b=await body(req);
+const id=Number(b.id);
+if(!(id>0))return send(res,400,{success:false,message:"A credential id is required."});
+const r=await db(`DELETE FROM webauthn_credentials WHERE id=$1 AND user_id=$2 RETURNING id`,[id,user.user_id]);
+if(!r.rows.length)return send(res,404,{success:false,message:"Credential not found."});
+try{await addNotification(user.user_id,"Biometric unlock removed","A biometric credential was removed from your BOLTIV account.","security");}catch{}
+return send(res,200,{success:true});
+}
+if(req.method==="POST"&&path==="/api/webauthn/register/options"){
+const rl=rateLimit(req,`webauthn-register-options:${user.user_id}`,10,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const result=await webauthnRegistrationOptions(user);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+if(req.method==="POST"&&path==="/api/webauthn/register/verify"){
+const rl=rateLimit(req,`webauthn-register-verify:${user.user_id}`,10,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const b=await body(req);
+const result=await webauthnRegistrationVerify(user,b.credential,b.deviceLabel);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+if(req.method==="POST"&&path==="/api/webauthn/authenticate/options"){
+const rl=rateLimit(req,`webauthn-auth-options:${user.user_id}`,20,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const result=await webauthnAuthenticationOptions(user);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+if(req.method==="POST"&&path==="/api/webauthn/authenticate/verify"){
+const rl=rateLimit(req,`webauthn-auth-verify:${user.user_id}`,20,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const b=await body(req);
+const result=await webauthnAuthenticationVerify(user,b.credential);
+return send(res,result.success?200:(result.statusCode||400),result);
 }
 if(req.method==="GET"&&path==="/api/transactions/detail"){
 const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0];

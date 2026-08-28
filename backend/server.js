@@ -3638,6 +3638,20 @@ const rl=rateLimit(req,`transaction-pin-change:${user.user_id}`,5,15*60*1000);
 if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=await body(req); const result=await setTransactionPin(user.user_id,b.pin,b.currentPin||""); return send(res,result.success?200:400,result);
 }
+if(req.method==="POST"&&path==="/api/security/verify-pin"){
+// Used by the inactivity lock screen — confirms the entered PIN matches the
+// stored one without performing any wallet action. Rate-limited the same way
+// as a PIN change, since a 4-digit PIN only has 10,000 combinations.
+const rl=rateLimit(req,`verify-pin:${user.user_id}`,5,15*60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const b=await body(req);
+const pin=clean(b.pin);
+if(!/^\d{4}$/.test(pin))return send(res,400,{success:false,message:"Enter your 4-digit PIN."});
+const security=await getSecurity(user.user_id);
+if(!security?.transaction_pin_hash)return send(res,400,{success:false,message:"No Transaction PIN is set on this account."});
+if(!verifyPassword(pin,security.transaction_pin_hash))return send(res,401,{success:false,message:"Incorrect PIN."});
+return send(res,200,{success:true});
+}
 if(req.method==="GET"&&path==="/api/transactions/detail"){
 const ref=clean(url.searchParams.get("reference")); const r=await db(`SELECT * FROM transactions WHERE user_id=$1 AND reference=$2 LIMIT 1`,[user.user_id,ref]); if(!r.rows.length)return send(res,404,{success:false,message:"Transaction not found."}); const t=r.rows[0];
 let meta=t.metadata; if(typeof meta==="string"){try{meta=JSON.parse(meta)}catch{meta={}}} meta=meta&&typeof meta==="object"?meta:{};

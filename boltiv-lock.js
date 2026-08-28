@@ -37,6 +37,7 @@
   let pinBuffer="";
   let boxes=[];
   let submitting=false;
+  let hiddenSiblings=[];
 
   function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
@@ -66,8 +67,11 @@
     el.id="boltivLockOverlay";
     el.innerHTML=`
       <style>
-        #boltivLockOverlay{position:fixed;inset:0;z-index:999999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:64px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#171717;overflow-y:auto}
+        #boltivLockOverlay{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:48px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#171717;overflow-y:auto}
         #boltivLockOverlay *{box-sizing:border-box}
+        .boltiv-lock-brand{display:flex;align-items:center;gap:8px;align-self:center;margin-bottom:34px}
+        .boltiv-lock-brand img{width:26px;height:30px;object-fit:contain;display:block}
+        .boltiv-lock-brand span{font-size:15px;font-weight:1000;letter-spacing:2.5px;color:#D4AF37}
         .boltiv-lock-avatar{width:64px;height:64px;border-radius:50%;background:#fff9e6;border:1px solid #ead58a;color:#b8860b;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:1000;align-self:flex-start}
         .boltiv-lock-title{margin-top:26px;font-size:26px;font-weight:1000;align-self:flex-start}
         .boltiv-lock-sub{margin-top:6px;font-size:13px;color:#777;align-self:flex-start}
@@ -75,17 +79,18 @@
         .boltiv-lock-box{width:54px;height:54px;border:1.5px solid #e5e5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000}
         .boltiv-lock-box.filled{border-color:#D4AF37}
         .boltiv-lock-box.active{border-color:#171717}
-        .boltiv-lock-box span{width:10px;height:10px;border-radius:50%;background:#171717;display:none}
+        .boltiv-lock-box span{width:10px;height:10px;border-radius:50%;background:#D4AF37;display:none}
         .boltiv-lock-box.filled span{display:block}
         .boltiv-lock-error{margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;align-self:flex-start}
         .boltiv-lock-keypad{margin-top:auto;padding-top:40px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-width:320px}
         .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:#171717;border-radius:50%;display:flex;align-items:center;justify-content:center}
-        .boltiv-lock-key:active{background:#f4f4f0}
-        .boltiv-lock-key.boltiv-lock-bio{color:#555;font-size:19px}
+        .boltiv-lock-key:active{background:#fdf6e0}
+        .boltiv-lock-key.boltiv-lock-bio{color:#b8860b;font-size:19px}
         .boltiv-lock-key.boltiv-lock-back{color:#c0392b;font-size:19px}
         .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:#171717;font-size:13px;text-decoration:underline;padding:10px}
         @media(max-width:360px){.boltiv-lock-box{width:46px;height:46px}.boltiv-lock-key{height:56px}}
       </style>
+      <div class="boltiv-lock-brand"><img src="/assets/boltiv-logo.webp" alt=""/><span>BOLTIV</span></div>
       <div class="boltiv-lock-avatar">${esc(initials(user))}</div>
       <div class="boltiv-lock-title">Welcome Back${firstName(user)?" "+esc(firstName(user)):""}</div>
       <div class="boltiv-lock-sub">Enter your 4-Digit PIN</div>
@@ -266,11 +271,26 @@
     if(overlay&&overlay.parentNode){overlay.parentNode.removeChild(overlay);}
     overlay=null;
     document.documentElement.style.overflow="";
+    // Restore whatever visibility each sibling had before we hid it.
+    hiddenSiblings.forEach(({el,display})=>{el.style.display=display;});
+    hiddenSiblings=[];
   }
 
   function showLock(){
     if(overlay)return;
     overlay=buildOverlay();
+    // Some page chrome (in particular the bottom nav bar) is styled elsewhere
+    // in this app with `z-index: 2147483647 !important` — the maximum possible
+    // value — which would otherwise render on top of any overlay, no matter
+    // how high its own z-index is set. Rather than fight that, hide every
+    // other direct child of <body> outright while locked, and restore each
+    // one's original display value on unlock.
+    hiddenSiblings=[];
+    Array.from(document.body.children).forEach(el=>{
+      if(el===overlay)return;
+      hiddenSiblings.push({el,display:el.style.display});
+      el.style.display="none";
+    });
   }
 
   async function checkLock(){

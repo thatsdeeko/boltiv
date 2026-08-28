@@ -55,6 +55,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 .ticket{border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:8px}.ticket:last-child{margin-bottom:0}.ticket-title{font-weight:1000;font-size:10px}.ticket-meta{font-size:8px;color:#999;margin-top:5px}
 .modal{display:none;position:fixed;inset:0;background:#0008;z-index:100;align-items:center;justify-content:center;padding:15px}.modal.show{display:flex}.modal-box{width:100%;max-width:650px;max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:18px}.modal-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:13px;margin-bottom:15px}.modal-head h2{font-size:12px;font-weight:1000}.close{border:0;background:#f4f4f4;width:30px;height:30px;border-radius:7px;font-size:18px}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.notice{padding:11px;background:var(--ybg);border:1px solid #ead58a;border-radius:8px;color:var(--yellow);font-size:9px;margin-bottom:13px}
 .profile{display:grid;grid-template-columns:58px 1fr;gap:12px;align-items:center}.avatar{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--ybg);color:var(--g2);font-size:21px;font-weight:1000}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.detail-grid p{font-size:9px;color:#888}.detail-grid p b{display:block;font-size:8px;color:#aaa;font-weight:1000;letter-spacing:.4px;margin-bottom:4px}@media(max-width:550px){.detail-grid{grid-template-columns:1fr}}
 .sidebar-backdrop{display:none}
 @media(max-width:900px){.sidebar-backdrop.show{display:block;position:fixed;inset:0;background:#0006;z-index:45}}
 @media(max-width:900px){.sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}.main{margin-left:0;width:100%}.menu{display:block}.stats{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
@@ -388,19 +389,19 @@ No notification history loaded yet.
 <div class="stats">
 <div class="stat">
 <div class="stat-label">OPEN TICKETS</div>
-<div class="stat-value">0</div>
+<div class="stat-value" id="tOpen">0</div>
 </div>
 <div class="stat">
 <div class="stat-label">PENDING</div>
-<div class="stat-value">0</div>
+<div class="stat-value" id="tPending">0</div>
 </div>
 <div class="stat">
 <div class="stat-label">RESOLVED</div>
-<div class="stat-value">0</div>
+<div class="stat-value" id="tResolved">0</div>
 </div>
 <div class="stat">
 <div class="stat-label">TODAY</div>
-<div class="stat-value">0</div>
+<div class="stat-value" id="tToday">0</div>
 </div>
 </div>
 <div class="toolbar">
@@ -619,7 +620,7 @@ let sessionReady = false;
 let adminCsrfToken = "";
 let users=[],transactions=[],payments=[];
 const $=id=>document.getElementById(id);
-function esc(v){return String(v??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 async function ensureAdminCsrf(){
  if(adminCsrfToken)return adminCsrfToken;
  const r=await fetch(API+"/api/admin/csrf",{credentials:"include"});
@@ -704,7 +705,7 @@ async function loadMonitoring(){try{const d=await api("/api/admin/monitoring");c
 async function logout(){
  try{await api("/api/admin/logout",{method:"POST"});}
  catch(e){console.warn("Logout request failed:",e.message);}
- finally{token="";showLogin();showMsg("Logged out successfully.",true);}
+ finally{adminCsrfToken="";showLogin();showMsg("Logged out successfully.",true);}
 }
 $("logout").onclick=logout;
 async function loadAdminWallet(){try{const d=await api('/api/admin/wallet');const b=Number(d.wallet?.balance||0);if($('adminWalletBalance'))$('adminWalletBalance').textContent='₦'+b.toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});if($('sAdminWallet'))$('sAdminWallet').textContent='₦'+b.toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});}catch(e){console.error('Admin wallet:',e);}}
@@ -756,6 +757,51 @@ function renderAudit(list){
  if(!area)return;
  area.innerHTML=list.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>ADMIN</th><th>ACTION</th><th>TARGET</th><th>DETAILS</th></tr></thead><tbody>'+list.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.email||x.admin_id)}</td><td>${esc(x.action)}</td><td>${esc((x.target_type||"")+" "+(x.target_id||""))}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join("")+"</tbody></table></div>":'<div class="empty">No audit logs available.</div>';
 }
+
+// Support ticket management. The backend has always had /api/admin/support,
+// /api/admin/support/reply and /api/admin/support/status — this page just never
+// had the frontend wired up. Without these, loadSupport()/filterSupport() were
+// referenced (nav clicks, loadAll(), the toolbar's oninput/onchange handlers) but
+// never defined, which threw a ReferenceError the moment the page tried to use
+// them — breaking the automatic "already logged in" session check on every
+// load, and silently skipping every loadAll() call that came after loadSupport()
+// in its Promise.allSettled list (audit, services, security, settings,
+// analytics, reconciliation, ledger, alerts).
+let supportTickets=[];
+async function loadSupport(){
+ try{
+  const d=await api("/api/admin/support");
+  supportTickets=d.tickets||[];
+  const today=new Date().toDateString();
+  $("tOpen").textContent=supportTickets.filter(t=>t.status==="open").length;
+  $("tPending").textContent=supportTickets.filter(t=>t.status==="pending").length;
+  $("tResolved").textContent=supportTickets.filter(t=>t.status==="resolved"||t.status==="closed").length;
+  $("tToday").textContent=supportTickets.filter(t=>new Date(t.created_at).toDateString()===today).length;
+  filterSupport();
+ }catch(e){$("supportTickets").innerHTML='<div class="error-box">'+esc(e.message)+'</div>';}
+}
+function filterSupport(){
+ const q=$("supportSearch")?$("supportSearch").value.trim().toLowerCase():"";
+ const status=$("supportFilter")?$("supportFilter").value:"";
+ const list=supportTickets.filter(t=>{
+  const hay=[t.subject,t.message,t.name,t.email,t.user_id,String(t.id)].join(" ").toLowerCase();
+  return (!q||hay.includes(q))&&(!status||t.status===status);
+ });
+ renderSupportTickets(list);
+}
+function renderSupportTickets(list){
+ const area=$("supportTickets");
+ if(!area)return;
+ area.innerHTML=list.length?list.map(t=>`<div class="ticket"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start"><div><div class="ticket-title">${esc(t.subject)}</div><div class="ticket-meta">${esc(t.name||t.email||t.user_id)} · #${esc(t.id)} · ${new Date(t.created_at).toLocaleString()}</div></div><span class="badge ${t.status==="resolved"||t.status==="closed"?"successful":t.status==="pending"?"pending":"failed"}">${esc(t.status)}</span></div><div class="actions"><button class="btn" onclick="viewSupportTicket(${Number(t.id)})">VIEW / REPLY</button></div></div>`).join(""):'<div class="empty">No support tickets available.</div>';
+}
+async function viewSupportTicket(id){
+ const t=supportTickets.find(x=>Number(x.id)===Number(id));
+ if(!t)return;
+ openModal("TICKET #"+esc(t.id),`<div class="detail-grid"><p><b>Customer</b><br>${esc(t.name||t.email||t.user_id)}</p><p><b>Subject</b><br>${esc(t.subject)}</p><p><b>Status</b><br>${esc(t.status)}</p><p><b>Opened</b><br>${new Date(t.created_at).toLocaleString()}</p></div><div class="notice" style="margin-top:12px">${esc(t.message)}</div><label style="margin-top:12px">UPDATE STATUS</label><select id="ticketStatus"><option value="open" ${t.status==="open"?"selected":""}>OPEN</option><option value="pending" ${t.status==="pending"?"selected":""}>PENDING</option><option value="resolved" ${t.status==="resolved"?"selected":""}>RESOLVED</option><option value="closed" ${t.status==="closed"?"selected":""}>CLOSED</option></select><button class="btn" style="margin-top:8px" onclick="updateSupportStatus(${Number(t.id)})">UPDATE STATUS</button><label style="margin-top:14px">REPLY TO CUSTOMER</label><textarea id="ticketReply" placeholder="Type your reply..."></textarea><div class="actions"><button class="btn" onclick="closeModal()">CLOSE</button><button class="btn primary" onclick="replySupportTicket(${Number(t.id)})">SEND REPLY</button></div>`);
+}
+async function updateSupportStatus(id){try{const status=$("ticketStatus").value;await api("/api/admin/support/status",{method:"POST",body:JSON.stringify({ticketId:id,status})});closeModal();await loadSupport();alert("Ticket status updated.")}catch(e){alert(e.message)}}
+async function replySupportTicket(id){try{const message=$("ticketReply").value.trim();if(!message){alert("Enter a reply message.");return;}await api("/api/admin/support/reply",{method:"POST",body:JSON.stringify({ticketId:id,message})});closeModal();await loadSupport();alert("Reply sent.")}catch(e){alert(e.message)}}
+
 
 async function loadServices(){try{const d=await api("/api/admin/services");const a=d.services||[];$('servicesArea').innerHTML=a.map(x=>{const p=x.config&&x.config.pricing||{};const mode=p.mode||'discount';const value=mode==='fixed'?`₦${Number(p.fixed_profit||0).toLocaleString()}`:`${Number(p.discount_pct||0)}%`;return `<div class="service-card"><div class="service-icon">${esc(x.icon||'⚙')}</div><div class="service-name">${esc(x.name)}</div><div class="service-status" style="color:${x.enabled&&!x.maintenance?'var(--green)':'var(--yellow)'}">● ${x.enabled&&!x.maintenance?'ACTIVE':'DISABLED'}</div><div style="font-size:10px;margin-top:8px">Pricing: ${esc(mode)} ${value}</div><div style="font-size:10px;margin-top:4px">Fee: ₦${Number(x.fee||0).toLocaleString()}</div><button class="btn" style="margin-top:12px" onclick="manageService('${esc(x.key)}')">MANAGE</button></div>`}).join('')}catch(e){$('servicesArea').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
 async function manageService(key){try{const d=await api('/api/admin/services');const x=(d.services||[]).find(v=>v.key===key);if(!x)return;const p=x.config&&x.config.pricing||{};openModal('MANAGE '+String(x.name).toUpperCase(),`<label>STATUS</label><select id="svcEnabled"><option value="true" ${x.enabled?'selected':''}>ENABLED</option><option value="false" ${!x.enabled?'selected':''}>DISABLED</option></select><label>MAINTENANCE</label><select id="svcMaintenance"><option value="false" ${!x.maintenance?'selected':''}>OFF</option><option value="true" ${x.maintenance?'selected':''}>ON</option></select><label>SERVICE FEE</label><input id="svcFee" type="number" min="0" step="0.01" value="${Number(x.fee||0)}"><label>PRICING MODE</label><select id="svcPricingMode"><option value="discount" ${String(p.mode||'discount')==='discount'?'selected':''}>PROVIDER DISCOUNT %</option><option value="fixed" ${String(p.mode||'discount')==='fixed'?'selected':''}>FIXED PROFIT PER SALE</option></select><label>DISCOUNT %</label><input id="svcDiscount" type="number" min="0" max="100" step="0.01" value="${Number(p.discount_pct||0)}"><label>FIXED PROFIT</label><input id="svcFixedProfit" type="number" min="0" step="0.01" value="${Number(p.fixed_profit||0)}"><div style="font-size:9px;color:#666;margin-top:8px">Use the provider's real wholesale discount/cost. Profit is recorded after successful service transactions.</div><div class="actions"><button class="btn" onclick="closeModal()">CANCEL</button><button class="btn primary" onclick="saveService('${esc(x.key)}')">SAVE</button></div>`)}catch(e){alert(e.message)}}

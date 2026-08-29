@@ -72,16 +72,16 @@
         .boltiv-lock-brand{display:flex;align-items:center;gap:8px;align-self:center;margin-bottom:34px}
         .boltiv-lock-brand img{width:26px;height:30px;object-fit:contain;display:block}
         .boltiv-lock-brand span{font-size:15px;font-weight:1000;letter-spacing:2.5px;color:#D4AF37}
-        .boltiv-lock-avatar{width:64px;height:64px;border-radius:50%;background:#fff9e6;border:1px solid #ead58a;color:#b8860b;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:1000;align-self:flex-start}
-        .boltiv-lock-title{margin-top:26px;font-size:26px;font-weight:1000;align-self:flex-start}
-        .boltiv-lock-sub{margin-top:6px;font-size:13px;color:#777;align-self:flex-start}
-        .boltiv-lock-boxes{display:flex;gap:14px;margin-top:28px;align-self:flex-start}
+        .boltiv-lock-avatar{width:64px;height:64px;border-radius:50%;background:#fff9e6;border:1px solid #ead58a;color:#b8860b;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:1000;align-self:center}
+        .boltiv-lock-title{margin-top:26px;font-size:26px;font-weight:1000;align-self:center;text-align:center}
+        .boltiv-lock-sub{margin-top:6px;font-size:13px;color:#777;align-self:center;text-align:center}
+        .boltiv-lock-boxes{display:flex;gap:14px;margin-top:28px;align-self:center;justify-content:center}
         .boltiv-lock-box{width:54px;height:54px;border:1.5px solid #e5e5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000}
         .boltiv-lock-box.filled{border-color:#D4AF37}
         .boltiv-lock-box.active{border-color:#171717}
         .boltiv-lock-box span{width:10px;height:10px;border-radius:50%;background:#D4AF37;display:none}
         .boltiv-lock-box.filled span{display:block}
-        .boltiv-lock-error{margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;align-self:flex-start}
+        .boltiv-lock-error{margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;align-self:center;text-align:center;max-width:320px}
         .boltiv-lock-keypad{margin-top:auto;padding-top:40px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-width:320px}
         .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:#171717;border-radius:50%;display:flex;align-items:center;justify-content:center}
         .boltiv-lock-key:active{background:#fdf6e0}

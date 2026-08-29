@@ -849,4 +849,5 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
 .boltiv-install-action{grid-column:1 / -1;width:100%;min-height:43px;border:0;border-radius:11px;background:linear-gradient(135deg,#dcb83c,#bd920b);color:#fff;font-size:11px;font-weight:1000;letter-spacing:.3px}
 .boltiv-install-close{position:absolute;right:10px;top:8px;width:28px;height:28px;border:0;background:transparent;color:#8d6907;font-size:22px;line-height:1}
 @media(min-width:700px){.boltiv-install-prompt{left:auto;right:22px;bottom:22px;width:380px}.boltiv-install-action{grid-column:auto;min-width:120px}.boltiv-install-copy{padding-right:12px}}
+.boltiv-install-ios-icon{display:inline-flex;vertical-align:-2px;color:#bd920b;margin:0 1px}
 @media(prefers-reduced-motion:reduce){.boltiv-install-prompt{transition:none}}

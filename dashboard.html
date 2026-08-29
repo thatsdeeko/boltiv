@@ -63,6 +63,20 @@ body.modal-open{overflow:hidden!important}
 @media (max-width:560px){.dashboard-insights{grid-template-columns:1fr}.insight-card.full{grid-column:auto}.insight-stats{grid-template-columns:repeat(3,1fr)}}
 </style>
 
+<style id="boltiv-loading-state">
+/* While the very first data fetch is pending, these elements show an honest
+   "still loading" shimmer instead of placeholder values that look like real,
+   final data (e.g. a bare "₦0.00" that's indistinguishable from an actual
+   zero balance). If the backend has been idle and is cold-starting, this can
+   legitimately take up to a minute — the shimmer plus the delayed status
+   line below make that read as "loading" rather than "broken". */
+.boltiv-skeleton{position:relative;color:transparent!important;background:linear-gradient(90deg,#efe9d8 25%,#faf6ea 37%,#efe9d8 63%);background-size:400% 100%;animation:boltivShimmer 1.4s ease infinite;border-radius:7px}
+@keyframes boltivShimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media (prefers-reduced-motion:reduce){.boltiv-skeleton{animation:none;background:#efe9d8}}
+.boltiv-connecting-note{display:none;margin-top:8px;font-size:11px;color:#a17b13;font-weight:700}
+.boltiv-connecting-note.is-visible{display:block}
+</style>
+
 <style id="boltiv-announcement-ticker">
 .boltiv-announcement{margin:24px 0 0;border:1px solid rgba(197,154,28,.22);border-radius:14px;background:#fffdf7;overflow:hidden;box-shadow:0 6px 18px rgba(30,24,10,.04)}
 .boltiv-announcement-track{display:flex;align-items:center;min-width:max-content;animation:boltivTicker 22s linear infinite;padding:10px 0;will-change:transform}
@@ -108,8 +122,9 @@ body.modal-open{overflow:hidden!important}
 <section class="home-welcome">
 <div>
 <div class="eyebrow">WELCOME BACK</div>
-<h1>Hello, <span id="userName">User</span></h1>
+<h1>Hello, <span class="boltiv-skeleton" id="userName">User</span></h1>
 <p>Your everyday digital services, in one place.</p>
+<div class="boltiv-connecting-note" id="boltivConnectingNote" role="status" aria-live="polite">Still connecting to BOLTIV — this can take up to a minute if the app has been idle.</div>
 </div>
 </section>
 <section class="home-balance-card">
@@ -117,7 +132,7 @@ body.modal-open{overflow:hidden!important}
 <div><div class="balance-label-row"><div class="balance-label">AVAILABLE BALANCE</div><button aria-label="Hide balance" aria-pressed="false" class="balance-visibility-toggle" id="balanceVisibilityToggle" title="Hide balance" type="button">
 <svg aria-hidden="true" class="balance-eye balance-eye-open" fill="none" viewBox="0 0 24 24"><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path><circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="1.8"></circle></svg>
 <svg aria-hidden="true" class="balance-eye balance-eye-closed" fill="none" viewBox="0 0 24 24" hidden><path d="m3 3 18 18M10.6 6.8A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a18 18 0 0 1-3.2 3.6M6.5 6.6C4 8.2 2.8 12 2.8 12s3.4 5.5 9.2 5.5c1.3 0 2.5-.3 3.5-.8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg>
-</button></div><div class="balance-value" id="walletBalance">₦0.00</div></div>
+</button></div><div class="balance-value boltiv-skeleton" id="walletBalance">₦0.00</div></div>
 <div class="balance-mark">₦</div>
 </div>
 <div class="home-balance-actions">
@@ -149,7 +164,7 @@ body.modal-open{overflow:hidden!important}
 <section class="dashboard-insights" aria-label="Wallet insights">
 <section class="insight-card">
 <div class="insight-head"><span class="insight-title">SPENDING OVERVIEW</span><button class="insight-link" onclick="location.href='/transactions'" type="button">View →</button></div>
-<div class="insight-main" id="monthlySpent">₦0.00</div>
+<div class="insight-main boltiv-skeleton" id="monthlySpent">₦0.00</div>
 <div class="insight-sub" id="monthlySpentLabel">Spent this month</div>
 <div class="insight-stats">
 <div class="insight-stat"><b id="spentAirtime">₦0</b><small>Airtime</small></div>
@@ -159,7 +174,7 @@ body.modal-open{overflow:hidden!important}
 </section>
 <section class="insight-card">
 <div class="insight-head"><span class="insight-title">WALLET ACTIVITY</span><button class="insight-link" onclick="location.href='/wallet'" type="button">Wallet →</button></div>
-<div class="insight-main" id="walletActivityBalance">₦0.00</div>
+<div class="insight-main boltiv-skeleton" id="walletActivityBalance">₦0.00</div>
 <div class="insight-sub">Current balance</div>
 <div class="insight-stats insight-stats-3">
 <div class="insight-stat"><b id="walletAdded">₦0</b><small>Added</small></div>
@@ -233,6 +248,10 @@ if(balanceToggle){balanceToggle.addEventListener('click',()=>{
 const typeInfo=t=>{const s=String(t.service||'').toLowerCase();if(s.includes('airtime'))return['airtime','Airtime','☎'];if(s.includes('data'))return['data','Data','⌁'];if(s.includes('electric'))return['electricity','Electricity','ϟ'];if(s.includes('cable')||s.includes('tv'))return['cable','Cable TV','▣'];if(s.includes('wallet')||s.includes('fund'))return['wallet','Wallet Funding','₦'];return['other','Transaction','•']};
 const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDateString('en-NG',{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})};
 async function loadHome(){
+ const connectingTimer=setTimeout(()=>{
+   const note=document.getElementById('boltivConnectingNote');
+   if(note)note.classList.add('is-visible');
+ },4000);
  await window.boltivAuthReady;
  const token=boltivMemoryStorage.getItem(TOKEN_KEY);
  try{
@@ -253,7 +272,13 @@ async function loadHome(){
   const transactions=Array.isArray(tx.transactions)?tx.transactions:[];
   const summary=summaryRaw.success&&summaryRaw.summary?summaryRaw.summary:null;
   renderRecent(transactions); renderDashboardInsights(transactions,walletBalance,summary); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
- }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';}}
+  document.querySelectorAll('.boltiv-skeleton').forEach(el=>el.classList.remove('boltiv-skeleton'));
+ }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';document.querySelectorAll('.boltiv-skeleton').forEach(el=>el.classList.remove('boltiv-skeleton'));}
+ }finally{
+  clearTimeout(connectingTimer);
+  const note=document.getElementById('boltivConnectingNote');
+  if(note)note.classList.remove('is-visible');
+ }
 }
 function normalizeStatus(t){return String(t?.status||'successful').toLowerCase();}
 function isSuccessful(t){const s=normalizeStatus(t);return !s.includes('fail')&&!s.includes('cancel')&&!s.includes('pending')&&!s.includes('process')&&!s.includes('refund');}

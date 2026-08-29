@@ -288,5 +288,11 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <a class="seo-btn primary" href="/register">Create account</a>
 </div>
 <script src="/boltiv-install.js?v=53"></script>
+<script>
+// Fire-and-forget: nudge the backend awake as early as possible for anyone
+// landing here before they log in. See boltiv-client.js for the recurring
+// keep-warm ping used on the rest of the app once someone's signed in.
+fetch('https://boltiv-backend.onrender.com/api/health',{cache:'no-store'}).catch(function(){});
+</script>
 </body>
 </html>

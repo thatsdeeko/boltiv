@@ -96,4 +96,21 @@
     }
     return u;
   };
+
+  // Lightweight keep-warm ping. This is a complement to, not a substitute
+  // for, an external uptime monitor (e.g. UptimeRobot hitting /api/health
+  // every ~10 minutes) — a self-ping can only run while a BOLTIV tab is
+  // open and the backend is already awake to serve it; it cannot run while
+  // the Render service is fully spun down, since no app code executes in
+  // that state at all. What it DOES help with: as long as anyone has the
+  // app open, this resets Render's idle timer, reducing how often the
+  // backend goes cold in the first place during normal usage hours.
+  (function(){
+    const api=window.BOLTIV_API_BASE || 'https://boltiv-backend.onrender.com';
+    function ping(){
+      if(document.visibilityState!=='visible') return;
+      nativeFetch(api+'/api/health',{cache:'no-store'}).catch(()=>{});
+    }
+    setInterval(ping,5*60*1000);
+  })();
 })();

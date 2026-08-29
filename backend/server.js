@@ -518,6 +518,16 @@ async function processVTUTransaction(user,data){
 const userId=clean(user.user_id);const service=clean(data.service||data.providerPayload?.service).toLowerCase();const amount=Number(data.amount);
 if(!userId)return{success:false,statusCode:401,message:"Unauthorized."};
 if(!["airtime","data","exam_pin","cable","electricity"].includes(service))return{success:false,statusCode:400,message:"This service is not currently wired to VTUGATE."};
+// Enforce the admin panel's per-service Enabled/Maintenance toggle for every
+// service at the one place that actually matters — before any wallet debit.
+// Previously only Data checked this (as a side effect of its price lookup),
+// and Exam PINs only checked it when listing products, never at purchase
+// time — so disabling Airtime, Cable TV, or Electricity in admin.html, or
+// buying from an already-loaded Exam PIN product page, did not actually
+// stop the purchase from going through.
+const serviceRecord=await getService(service);
+if(!serviceRecord||serviceRecord.enabled===false)return{success:false,statusCode:503,message:"This service is currently unavailable."};
+if(serviceRecord.maintenance===true)return{success:false,statusCode:503,message:"This service is currently under maintenance."};
 if(!validAmount(amount))return{success:false,statusCode:400,message:"Invalid amount."};
 if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test(clean(data.phone||data.providerPayload?.phone||"08000000000")))return{success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
 const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};const suppliedPin=String(data.transactionPin||"");if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};

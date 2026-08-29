@@ -294,7 +294,7 @@ body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,syst
 /* ALL SERVICE PAGES */
 .airtime-page,.data-page{background:var(--bg)}
 .airtime-header,.data-header{padding:17px 0 13px!important;border-bottom:1px solid var(--line)!important}
-.airtime-title,.data-title{font-size:21px!important;letter-spacing:-.3px!important}.airtime-subtitle,.data-subtitle{font-size:8px!important;letter-spacing:1.3px!important;color:var(--gold2)!important;font-weight:900}
+.airtime-title,.data-title{font-size:21px!important;letter-spacing:-.3px!important;color:var(--gold2)!important}.airtime-subtitle,.data-subtitle{font-size:8px!important;letter-spacing:1.3px!important;color:var(--gold2)!important;font-weight:900}
 .back-button{width:38px!important;height:38px!important;border:1px solid var(--line)!important;border-radius:50%!important;background:#fff!important;color:#59564f!important}
 .airtime-hero,.data-hero{margin-top:15px!important;padding:19px!important;border:1px solid var(--gold3)!important;border-radius:19px!important;background:linear-gradient(145deg,#fffdf7,#fff)!important;box-shadow:var(--shadow)}
 .airtime-hero-label,.data-hero-label{font-size:8px!important;letter-spacing:1.6px!important;color:var(--gold2)!important}.airtime-hero-title,.data-hero-title{font-size:24px!important;letter-spacing:-.5px!important}.airtime-hero-text,.data-hero-text{font-size:10px!important;line-height:1.55!important;color:#777!important}

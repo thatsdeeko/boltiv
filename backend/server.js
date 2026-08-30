@@ -3005,33 +3005,24 @@ const message=r?.data?.message||r?.data?.error||r?.message;
 return typeof message==="string"&&message.trim()?message.trim():fallback;
 }
 
-async function adminFlutterwaveReconciliation(req){
-  const admin=await adminFromToken(req);
-  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  if(!flutterwaveConfigured())return{success:false,statusCode:503,message:"Flutterwave is not configured."};
-  const u=new URL(req.url,"http://localhost");
-  const toParam=clean(u.searchParams.get("to"));
-  const fromParam=clean(u.searchParams.get("from"));
-  const today=new Date();
-  const to=toParam||today.toISOString().slice(0,10);
-  const from=fromParam||new Date(today.getTime()-30*86400000).toISOString().slice(0,10);
-  const dateOk=v=>/^\d{4}-\d{2}-\d{2}$/.test(v);
-  if(!dateOk(from)||!dateOk(to))return{success:false,statusCode:400,message:"Use YYYY-MM-DD for from/to dates."};
-  try{
-    const [balanceR,txR,setR]=await Promise.all([
-      flutterwaveRequest("/balances/NGN"),
-      flutterwaveRequest(`/transactions?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&status=successful&page=1&page_size=100`),
-      flutterwaveRequest(`/settlements?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&page=1`)
-    ]);
-    const bd=balanceR.data?.data||{};
-    const txData=Array.isArray(txR.data?.data)?txR.data.data:[];
-    const settlements=Array.isArray(setR.data?.data)?setR.data.data:[];
-    const collectionGross=txData.reduce((a,x)=>a+Number(x.charged_amount||x.amount||0),0);
-    const collectionNet=txData.reduce((a,x)=>a+Number(x.settlement_amount||0),0);
-    const settlementGross=settlements.reduce((a,x)=>a+Number(x.gross_amount||0),0);
-    const settlementNet=settlements.reduce((a,x)=>a+Number(x.net_amount||0),0);
-    return{success:true,range:{from,to},balance:{currency:"NGN",available:Number(bd.available_balance||0),ledger:Number(bd.ledger_balance||0)},collections:{count:txData.length,gross:Number(collectionGross.toFixed(2)),net:Number(collectionNet.toFixed(2)),transactions:txData.slice(0,100)},settlements:{count:settlements.length,gross:Number(settlementGross.toFixed(2)),net:Number(settlementNet.toFixed(2)),items:settlements.slice(0,100)},note:"Customer wallet purchases are internal BOLTIV debits. They do not create a second Flutterwave collection. Flutterwave collections are the customer funding transactions; successful collections are settled by Flutterwave according to the merchant settlement schedule."};
-  }catch(e){return{success:false,statusCode:502,message:e.message||"Unable to reconcile Flutterwave."};}
+async function getFlutterwaveCashReconciliation(req){
+const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+if(!flutterwaveConfigured())return{success:false,statusCode:503,message:"Flutterwave is not configured."};
+const now=new Date(),from=new Date(now.getTime()-30*24*60*60*1000),iso=d=>d.toISOString().slice(0,10),fromDate=iso(from),toDate=iso(now);
+try{
+const [balances,local]=await Promise.all([
+flutterwaveRequest('/balances'),
+db(`SELECT t.id,t.amount,t.reference,t.provider_reference,t.date,t.status,t.metadata,u.email,u.name FROM transactions t LEFT JOIN users u ON u.user_id=t.user_id WHERE t.type='credit' AND t.service='Wallet Funding' AND t.status='successful' AND t.date>=NOW()-INTERVAL '30 days' ORDER BY t.date DESC LIMIT 500`)
+]);
+if(!balances.success)throw new Error(flutterwaveError(balances,'Unable to fetch Flutterwave balances.'));
+const fetchPages=async(base,maxPages=10)=>{const out=[];for(let page=1;page<=maxPages;page++){const r=await flutterwaveRequest(`${base}${base.includes('?')?'&':'?'}page=${page}`);if(!r.success)throw new Error(flutterwaveError(r,'Unable to fetch Flutterwave data.'));const rows=Array.isArray(r.data?.data)?r.data.data:[];out.push(...rows);if(rows.length<10)break;}return out;};
+const [collectionRows,settlementRows]=await Promise.all([fetchPages(`/transactions?from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}&status=successful&currency=NGN`),fetchPages(`/settlements?from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}`)]);
+const balanceRows=Array.isArray(balances.data?.data)?balances.data.data:[],ngn=balanceRows.find(x=>String(x.currency||'').toUpperCase()==='NGN')||{},localRows=local.rows||[];
+const localByRef=new Map();for(const x of localRows){for(const key of [x.provider_reference,x.metadata?.provider_reference,x.metadata?.tx_ref].filter(Boolean))localByRef.set(String(key),x);}
+const collections=collectionRows.map(x=>{const ref=String(x.tx_ref||x.flw_ref||x.id||''),match=localByRef.get(ref)||localRows.find(l=>String(l.provider_reference||'')===String(x.id||''));return{id:x.id,tx_ref:x.tx_ref||null,flw_ref:x.flw_ref||null,amount:Number(x.amount||0),amount_settled:Number(x.amount_settled||0),status:String(x.status||''),created_at:x.created_at||x.date||null,customer:x.customer?.email||x.customer?.name||null,boltivReference:match?.reference||null,boltivUser:match?.email||match?.name||null,matched:Boolean(match)};});
+const grossCollections=collections.reduce((a,x)=>a+x.amount,0),settledGross=settlementRows.reduce((a,x)=>a+Number(x.gross_amount||x.amount||0),0),settledNet=settlementRows.reduce((a,x)=>a+Number(x.net_amount||0),0),localFunding=localRows.reduce((a,x)=>a+Number(x.amount||0),0),matchedCollections=collections.filter(x=>x.matched).reduce((a,x)=>a+x.amount,0),unmatchedCollections=collections.filter(x=>!x.matched).reduce((a,x)=>a+x.amount,0);
+return{success:true,reconciliation:{period:{from:fromDate,to:toDate},flutterwave:{ngnAvailableBalance:Number(ngn.available_balance||0),ngnLedgerBalance:Number(ngn.ledger_balance||0)},collections:{count:collections.length,gross:grossCollections,matchedGross:matchedCollections,unmatchedGross:unmatchedCollections},settlements:{count:settlementRows.length,gross:settledGross,net:settledNet},localFunding:{count:localRows.length,gross:localFunding},difference:{collectionVsSettlement:Number((grossCollections-settledGross).toFixed(2)),flutterwaveAvailableVsLocalFunding:Number((Number(ngn.available_balance||0)-localFunding).toFixed(2))},recentCollections:collections.slice(0,20),recentSettlements:settlementRows.slice(0,20).map(x=>({id:x.id,transaction_date:x.transaction_date||x.created_datetime||x.created_at||null,processed_date:x.processed_date||x.processed_datetime||null,gross_amount:Number(x.gross_amount||x.amount||0),net_amount:Number(x.net_amount||0),status:x.status||null,destination:x.destination||x.settlement_account||null,transaction_count:Number(x.transaction_count||x.charge_count||0)}))}};
+}catch(e){console.error('FLUTTERWAVE CASH RECONCILIATION ERROR:',e?.stack||e?.message||e);return{success:false,statusCode:502,message:e?.message||'Unable to reconcile Flutterwave cash and settlements.'};}
 }
 
 async function adminRevenue(req,action){
@@ -3629,7 +3620,8 @@ result
 }
 
 
-if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/flutterwave/reconciliation"){const result=await adminFlutterwaveReconciliation(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==='GET'&&path==='/api/admin/flutterwave/reconciliation'){const result=await getFlutterwaveCashReconciliation(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}

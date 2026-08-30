@@ -196,6 +196,12 @@ return Number(price.toFixed(2));
 }
 
 function normalizeDataNetwork(value){const n=clean(value).toUpperCase().replace(/\s+/g,""); if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE"; return ["MTN","AIRTEL","GLO"].includes(n)?n:"";}
+// Nigerian MSISDN prefix → network map, mirrored from the airtime.html client-side
+// detector. Number portability (MNP, active since 2013) means a prefix no longer
+// guarantees the *current* network, so this is used to flag a likely mismatch and
+// require the client to send networkConfirmed:true — never a hard block on its own.
+const NETWORK_PREFIXES={"0803":"MTN","0806":"MTN","0703":"MTN","0706":"MTN","0704":"MTN","0813":"MTN","0814":"MTN","0816":"MTN","0810":"MTN","0913":"MTN","0916":"MTN","0903":"MTN","0906":"MTN","0802":"AIRTEL","0808":"AIRTEL","0708":"AIRTEL","0701":"AIRTEL","0812":"AIRTEL","0902":"AIRTEL","0901":"AIRTEL","0904":"AIRTEL","0907":"AIRTEL","0911":"AIRTEL","0912":"AIRTEL","0805":"GLO","0807":"GLO","0705":"GLO","0815":"GLO","0811":"GLO","0905":"GLO","0915":"GLO","0809":"9MOBILE","0817":"9MOBILE","0818":"9MOBILE","0908":"9MOBILE","0909":"9MOBILE"};
+function detectNetworkFromPhone(phone){return NETWORK_PREFIXES[clean(phone).slice(0,4)]||"";}
 function findTransactionField(value,keys,depth=0){if(depth>6||value==null)return "";if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}if(typeof value!=="object")return "";for(const key of keys){const v=value[key];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}for(const key of Object.keys(value)){const found=findTransactionField(value[key],keys,depth+1);if(found)return found;}return "";}
 
 function vtugateStatus(data,responseOk=true){
@@ -264,13 +270,37 @@ if(Date.now()-vtugateServiceCache.at>300000){const r=await fetchVTUGATEServices(
  visit(root);
  vtugateServiceCache.data=records;vtugateServiceCache.at=Date.now();}
 const aliases={airtime:["airtime","mobile airtime"],data:["data","mobile data","internet data","data bundle","data bundles","data plan","data plans","mobile data bundle"],cable:["cable","cable tv","cable television","dstv","gotv","startimes","showmax"],electricity:["electricity","electric","power","power bill","electricity bill"],education:["education","education pin","education pins","exam pin","exam pins"]};
+// Known providers per category, used only as a cross-check below — never as the primary
+// match — to catch a catalog entry that matches the requested provider but ALSO looks like
+// it belongs to a different one (e.g. a bundled/mislabeled listing), which the alias table
+// above has no way to anticipate.
+const KNOWN_PROVIDERS={airtime:["mtn","airtel","glo","9mobile"],cable:["dstv","gotv","startimes","showmax"]};
 const p=clean(provider).toLowerCase();
-const wanted=[...(aliases[category]||[category]),p].filter(Boolean);
-const providerHit=p?vtugateServiceCache.data.find(x=>wanted.some(w=>x.hay===w||x.hay.includes(` ${w} `)||x.hay.startsWith(`${w} `)||x.hay.endsWith(` ${w}`))):null;
-const categoryHit=vtugateServiceCache.data.find(x=>aliases[category]?.some(w=>x.hay===w||x.hay.includes(` ${w} `)||x.hay.startsWith(`${w} `)||x.hay.endsWith(` ${w}`)));
-const item=providerHit||categoryHit;
-if(!item)throw new Error(`VTUGATE service ID for ${provider||category} is not configured.`);
-return item.id;
+function termMatches(hay,term){return !!term&&(hay===term||hay.includes(` ${term} `)||hay.startsWith(`${term} `)||hay.endsWith(` ${term}`));}
+const categoryTerms=aliases[category]||[category];
+const matchesCategory=x=>categoryTerms.some(w=>termMatches(x.hay,w));
+// Previously this OR'd category aliases together with the provider name into one list and
+// returned the first record matching ANY of them — so a generic/other-network "airtime"
+// record could satisfy the match on the category term alone, before the provider was ever
+// checked, and BOLTIV would send VTUGATE the wrong network's service_id even though the
+// correct network name was in the payload (VTUGATE routes by service_id, not by that field).
+// A candidate must now match the category AND (when a provider is given) the provider.
+const providerHit=p?vtugateServiceCache.data.find(x=>matchesCategory(x)&&termMatches(x.hay,p)):null;
+if(p){
+  // Second line of defense: don't silently fall back to "any record in this category" when
+  // a specific provider was requested — that's the same failure mode as the bug above, just
+  // approached from a different angle. Fail loudly instead of guessing a network.
+  if(!providerHit)throw new Error(`VTUGATE service ID for ${provider} ${category} could not be confirmed \u2014 refusing to guess a network. Check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
+  // Even a record that matched our provider term could be an ambiguous/mislabeled catalog
+  // entry that also mentions a different known provider in this category. Refuse to trust it.
+  const otherProviders=(KNOWN_PROVIDERS[category]||[]).filter(other=>other!==p);
+  const ambiguous=otherProviders.some(other=>termMatches(providerHit.hay,other));
+  if(ambiguous)throw new Error(`VTUGATE service catalog entry resolved for ${provider} ${category} looks ambiguous (it also matches another provider name). Refusing to guess \u2014 check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
+  return providerHit.id;
+}
+const categoryHit=vtugateServiceCache.data.find(matchesCategory);
+if(!categoryHit)throw new Error(`VTUGATE service ID for ${category} is not configured.`);
+return categoryHit.id;
 }
 
 function parseCatalogNumber(value){
@@ -537,7 +567,7 @@ const requestedPlanCode=clean(data.plan_code??data.providerPayload?.plan_code??d
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return{success:false,statusCode:400,message:"Invalid education PIN product."};if(![1,2,5].includes(quantity))return{success:false,statusCode:400,message:"Education PIN quantity must be 1, 2, or 5."};const serviceId=productId;let unitPrice;try{unitPrice=await getVTUGATEEducationPrice(serviceId);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the current education PIN price."};}const productCode=clean(data.product_code||data.providerPayload?.product_code||data.exam||"waec");const expectedTotal=Number((unitPrice*quantity).toFixed(2));if(Math.abs(amount-expectedTotal)>.009)return{success:false,statusCode:400,message:"The selected education PIN price has changed. Please refresh the products and try again."};pricingMeta={providerCost:Number((unitPrice*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-unitPrice*quantity).toFixed(2)),plan:productCode.toUpperCase()};providerPayload={service_id:serviceId,phone:recipient||user.phone||"08000000000",phone_number:recipient||user.phone||"08000000000",msisdn:recipient||user.phone||"08000000000",quantity,product_code:productCode,ref:null};
 }else if(service==="airtime"){
-const network=normalizeDataNetwork(data.network||data.providerPayload?.network);if(!network)return{success:false,statusCode:400,message:"Unsupported network."};if(!/^0\d{10}$/.test(recipient))return{success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};const serviceId=await getVTUGATEServiceId("airtime",network);providerPayload={service_id:serviceId,network,amount,phone:recipient,phone_number:recipient,msisdn:recipient,airtime_amount:amount,ref:null};pricingMeta.network=network;
+const network=normalizeDataNetwork(data.network||data.providerPayload?.network);if(!network)return{success:false,statusCode:400,message:"Unsupported network."};if(!/^0\d{10}$/.test(recipient))return{success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};const detectedNetwork=detectNetworkFromPhone(recipient);const networkConfirmed=data.networkConfirmed===true||data.providerPayload?.networkConfirmed===true;if(detectedNetwork&&detectedNetwork!==network&&!networkConfirmed)return{success:false,statusCode:409,message:`This number looks like a ${detectedNetwork} line, but ${network} was selected. Numbers can be ported \u2014 confirm the network and try again.`,detectedNetwork,requiresNetworkConfirmation:true};const serviceId=await getVTUGATEServiceId("airtime",network);providerPayload={service_id:serviceId,network,amount,phone:recipient,phone_number:recipient,msisdn:recipient,airtime_amount:amount,ref:null};pricingMeta.network=network;
 }else if(service==="cable"){
 const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();const serviceId=await getVTUGATEServiceId("cable",providerName);const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const expectedPrice=getCablePlanPrice(providerName,plan);if(expectedPrice===null)return{success:false,statusCode:400,message:"The selected cable TV plan is not recognized."};if(Math.abs(amount-expectedPrice)>.009)return{success:false,statusCode:400,message:"The selected cable TV plan price has changed. Please refresh and try again."};pricingMeta={providerCost:expectedPrice,customerPrice:expectedPrice,grossProfit:0,network:providerName,plan};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,phone_number:recipient,msisdn:recipient,plan,package:plan,amount,ref:null};
 }else if(service==="electricity"){

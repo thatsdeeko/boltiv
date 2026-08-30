@@ -20,8 +20,3 @@ FLW_BASE_URL=https://api.flutterwave.com/v3
 FLW_SECRET_HASH=
 FLW_CALLBACK_URL=
 ```
-
-
-## Flutterwave cash reconciliation
-
-The admin Financial Reconciliation page now includes a Flutterwave Cash & Settlement check. It reads the NGN balance, successful collections, and settlements from Flutterwave so customer funding can be reconciled against BOLTIV wallet/revenue records. VTU purchases do not create a second Flutterwave collection.

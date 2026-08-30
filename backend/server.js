@@ -3005,14 +3005,87 @@ const message=r?.data?.message||r?.data?.error||r?.message;
 return typeof message==="string"&&message.trim()?message.trim():fallback;
 }
 
+async function adminRevenueWithdrawal(req){
+  const auth=await requireAdminCsrf(req); if(!auth.success)return auth;
+  const admin=auth.admin, b=await body(req);
+  const amount=Number(b.amount), bankCode=clean(b.bankCode||b.account_bank), accountNumber=clean(b.accountNumber||b.account_number);
+  if(!validAmount(amount)||amount<=0)return{success:false,statusCode:400,message:"Enter a valid withdrawal amount."};
+  if(!/^\d{10}$/.test(accountNumber))return{success:false,statusCode:400,message:"Enter a valid 10-digit Nigerian bank account number."};
+  if(!/^\d{3,6}$/.test(bankCode))return{success:false,statusCode:400,message:"Enter a valid Flutterwave bank code."};
+  if(!flutterwaveConfigured())return{success:false,statusCode:503,message:"Flutterwave is not configured."};
+  const resolve=await flutterwaveRequest('/accounts/resolve',{method:'POST',body:JSON.stringify({account_number:accountNumber,account_bank:bankCode})});
+  if(!resolve.success)return{success:false,statusCode:400,message:flutterwaveError(resolve,'Unable to verify the destination bank account.')};
+  const resolved=resolve.data?.data||{}, accountName=clean(resolved.account_name||resolved.accountName);
+  if(!accountName)return{success:false,statusCode:400,message:'Flutterwave could not resolve the destination account name.'};
+  const client=await pool.connect(); let withdrawal=null;
+  try{
+    await client.query('BEGIN');
+    await client.query(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
+    const w=await client.query(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1 FOR UPDATE`,[admin.id]);
+    const balance=Number(w.rows[0]?.balance||0);
+    if(amount>balance+0.000001){await client.query('ROLLBACK');return{success:false,statusCode:400,message:`Insufficient revenue balance. Available: ₦${balance.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};}
+    const reference=`BOLTIV-REV-${Date.now()}-${Math.random().toString(36).slice(2,8)}`.toUpperCase().slice(0,42);
+    const wr=await client.query(`UPDATE admin_revenue_wallets SET balance=balance-$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id]);
+    const balanceAfter=Number(wr.rows[0].balance);
+    await addAdminRevenueLedger(client,admin.id,'withdrawal',-amount,balanceAfter,`Flutterwave revenue withdrawal to ${accountName}`,`WITHDRAWAL-${reference}`);
+    const ins=await client.query(`INSERT INTO admin_revenue_withdrawals(admin_id,amount,bank_code,account_number,account_name,status,reference) VALUES($1,$2,$3,$4,$5,'pending',$6) RETURNING *`,[admin.id,amount,bankCode,accountNumber,accountName,reference]);
+    withdrawal=ins.rows[0];
+    await client.query(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,$2,$3,$4,$5::jsonb,$6)`,[admin.id,'revenue_withdrawal_reserved','admin_revenue_withdrawal',String(withdrawal.id),JSON.stringify({amount,bankCode,accountNumber,accountName,reference}),requestIp(req)]);
+    await client.query('COMMIT');
+  }catch(e){try{await client.query('ROLLBACK')}catch{};console.error('REVENUE WITHDRAWAL RESERVE ERROR',e?.stack||e?.message||e);return{success:false,statusCode:500,message:'Unable to reserve the revenue balance.'};}finally{client.release();}
+  const callbackUrl=BACKEND_PUBLIC_URL?`${BACKEND_PUBLIC_URL}/api/flutterwave/webhook`:undefined;
+  const transfer=await flutterwaveRequest('/transfers',{method:'POST',body:JSON.stringify({account_bank:bankCode,account_number:accountNumber,amount,currency:'NGN',debit_currency:'NGN',beneficiary_name:accountName,reference,narration:'BOLTIV revenue withdrawal',...(callbackUrl?{callback_url:callbackUrl}:{})})});
+  if(!transfer.success){
+    // A transport timeout is ambiguous: Flutterwave may have accepted the transfer even if the response was lost.
+    // Check the unique reference before reversing the reserved balance to prevent duplicate withdrawals.
+    let recovered=null;
+    if(transfer.statusCode===502){
+      try{
+        const lookup=await flutterwaveRequest(`/transfers?reference=${encodeURIComponent(reference)}`);
+        const rows=Array.isArray(lookup.data?.data)?lookup.data.data:[];
+        recovered=rows.find(x=>String(x.reference||'')===reference)||null;
+      }catch{}
+    }
+    if(recovered){
+      const recoveredStatus=String(recovered.status||'NEW').toLowerCase();
+      const normalized=recoveredStatus==='successful'?'successful':recoveredStatus==='failed'?'failed':'pending';
+      await db(`UPDATE admin_revenue_withdrawals SET provider_transfer_id=$1,provider_message=$2,status=$3,updated_at=NOW(),completed_at=CASE WHEN $3='successful' THEN NOW() ELSE completed_at END WHERE id=$4`,[recovered.id!=null?String(recovered.id):null,clean(recovered.complete_message||'Transfer recovered after an ambiguous network response.'),normalized,withdrawal.id]);
+      if(normalized==='failed'){
+        const c=await pool.connect(); try{await c.query('BEGIN');const w=(await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id])).rows[0];await addAdminRevenueLedger(c,admin.id,'withdrawal_reversal',amount,Number(w.balance),`Reversed failed Flutterwave withdrawal ${reference}`,`REVERSAL-${reference}`);await c.query('COMMIT');}catch(e){try{await c.query('ROLLBACK')}catch{};}finally{c.release();}
+      }
+      return{success:true,message:'Flutterwave transfer was found after an ambiguous response; status has been reconciled.',withdrawalId:withdrawal.id,reference,providerTransferId:recovered.id!=null?String(recovered.id):null,status:normalized,accountName,amount};
+    }
+    const c=await pool.connect(); try{await c.query('BEGIN'); const cur=(await c.query(`SELECT status FROM admin_revenue_withdrawals WHERE id=$1 FOR UPDATE`,[withdrawal.id])).rows[0]; if(cur?.status==='pending'){const w=(await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[amount,admin.id])).rows[0]; await addAdminRevenueLedger(c,admin.id,'withdrawal_reversal',amount,Number(w.balance),`Reversed failed Flutterwave withdrawal ${reference}`,`REVERSAL-${reference}`); await c.query(`UPDATE admin_revenue_withdrawals SET status='failed',provider_message=$1,updated_at=NOW() WHERE id=$2`,[flutterwaveError(transfer,'Flutterwave transfer failed.'),withdrawal.id]);} await c.query('COMMIT');}catch(e){try{await c.query('ROLLBACK')}catch{};console.error('REVENUE WITHDRAWAL REVERSAL ERROR',e?.stack||e?.message||e);}finally{c.release();}
+    return{success:false,statusCode:400,message:flutterwaveError(transfer,'Flutterwave transfer could not be initiated.'),withdrawalId:withdrawal.id};
+  }
+  const data=transfer.data?.data||{}, providerTransferId=data.id!=null?String(data.id):null, ps=String(data.status||'NEW').toLowerCase(), normalized=ps==='successful'?'successful':ps==='failed'?'failed':'pending';
+  await db(`UPDATE admin_revenue_withdrawals SET provider_transfer_id=$1,provider_message=$2,status=$3,updated_at=NOW(),completed_at=CASE WHEN $3='successful' THEN NOW() ELSE completed_at END WHERE id=$4`,[providerTransferId,clean(data.complete_message||transfer.data?.message||'Transfer initiated'),normalized,withdrawal.id]);
+  return{success:true,message:normalized==='successful'?'Revenue withdrawal completed successfully.':'Revenue withdrawal initiated. Flutterwave will complete the transfer and update its status.',withdrawalId:withdrawal.id,reference,providerTransferId,status:normalized,accountName,amount};
+}
+async function adminRevenueWithdrawals(req){
+  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
+  const r=await db(`SELECT id,amount,bank_code,account_number,account_name,status,reference,recipient_code,provider_transfer_id,provider_message,created_at,updated_at,completed_at FROM admin_revenue_withdrawals WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 50`,[admin.id]);
+  return{success:true,withdrawals:r.rows.map(x=>({...x,amount:Number(x.amount||0)}))};
+}
+async function adminRevenueTransferStatus(req){
+  const auth=await requireAdminCsrf(req);if(!auth.success)return auth;
+  const id=Number((await body(req)).withdrawalId); if(!Number.isInteger(id)||id<=0)return{success:false,statusCode:400,message:'Withdrawal ID is required.'};
+  const row=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 AND admin_id=$2 LIMIT 1`,[id,auth.admin.id])).rows[0]; if(!row)return{success:false,statusCode:404,message:'Withdrawal not found.'};
+  if(!row.provider_transfer_id)return{success:true,withdrawal:row};
+  const r=await flutterwaveRequest(`/transfers/${encodeURIComponent(row.provider_transfer_id)}`); if(!r.success)return{success:false,statusCode:502,message:flutterwaveError(r,'Unable to retrieve Flutterwave transfer status.')};
+  const d=r.data?.data||{}, status=String(d.status||row.status).toLowerCase(), normalized=status==='successful'?'successful':status==='failed'?'failed':'pending';
+  const client=await pool.connect(); try{await client.query('BEGIN'); const current=(await client.query(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 FOR UPDATE`,[id])).rows[0]; if(current?.status==='pending'&&normalized==='failed'){const w=(await client.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(current.amount),auth.admin.id])).rows[0]; await addAdminRevenueLedger(client,auth.admin.id,'withdrawal_reversal',Number(current.amount),Number(w.balance),`Reversed failed Flutterwave withdrawal ${current.reference}`,`REVERSAL-${current.reference}`);} await client.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_message=$2,updated_at=NOW(),completed_at=CASE WHEN $1='successful' THEN COALESCE(completed_at,NOW()) ELSE completed_at END WHERE id=$3`,[normalized,clean(d.complete_message||r.data?.message||''),id]); await client.query('COMMIT');}catch(e){try{await client.query('ROLLBACK')}catch{};return{success:false,statusCode:500,message:'Unable to update withdrawal status.'};}finally{client.release();}
+  return{success:true,withdrawal:(await db(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1`,[id])).rows[0]};
+}
+
 async function adminRevenue(req,action){
 const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-if(action!=="summary")return{success:false,statusCode:404,message:"Revenue withdrawal is disabled in BOLTIV. Use the Flutterwave dashboard for withdrawals."};
+if(action!=="summary")return{success:false,statusCode:404,message:"Unknown revenue action."};
 await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CONFLICT(admin_id) DO NOTHING`,[admin.id]);
 const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
 const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
 const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
-return{success:true,summary:{balance:Number(w?.balance||0),sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0)},withdrawalsDisabled:true,withdrawalInstructions:"Withdrawals are handled directly in the Flutterwave dashboard."};
+return{success:true,summary:{balance:Number(w?.balance||0),sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0)},withdrawalsDisabled:false,withdrawalInstructions:"Revenue withdrawals can be initiated from the BOLTIV admin dashboard and are tracked through Flutterwave."};
 }
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
 async function initializeAdminWalletFunding(req){
@@ -3601,6 +3674,9 @@ result
 
 
 if(req.method==="GET"&&path==="/api/admin/wallet"){const result=await adminWalletInfo(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/wallet/funding-account"){const result=await getAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="POST"&&path==="/api/admin/wallet/funding-account"){const result=await createAdminFlutterwaveFundingAccount(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==='GET'&&path==='/api/admin/revenue'){const result=await adminRevenue(req,'summary');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/revenue/withdrawals"){const result=await adminRevenueWithdrawals(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/revenue/withdraw"){const result=await adminRevenueWithdrawal(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="POST"&&path==="/api/admin/revenue/withdraw/status"){const result=await adminRevenueTransferStatus(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/initialize"){const result=await initializeAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/wallet/fund/verify"){const result=await verifyAdminWalletFunding(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/users/action"){const result=await adminUserAction(req);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -4332,6 +4408,16 @@ if(supplied.length===expectedBuf.length && crypto.timingSafeEqual(supplied,expec
 }
 if(!valid)return send(res,401,{success:false,message:"Invalid Flutterwave webhook signature."});
 let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{success:false,message:"Invalid JSON payload."});}
+    const transferEvent=String(payload?.event||payload?.type||payload?.event_type||'').toLowerCase();
+    if(transferEvent.includes('transfer') && (payload?.data?.reference || payload?.data?.id)){
+      const td=payload.data||{}, tref=clean(td.reference), pid=td.id!=null?String(td.id):null;
+      const wd=(await db(`SELECT * FROM admin_revenue_withdrawals WHERE (reference=$1 OR provider_transfer_id=$2) LIMIT 1`,[tref||'__none__',pid||'__none__'])).rows[0];
+      if(wd){
+        const ts=String(td.status||'').toLowerCase(), normalized=ts==='successful'?'successful':ts==='failed'?'failed':'pending';
+        const c=await pool.connect(); try{await c.query('BEGIN'); const cur=(await c.query(`SELECT * FROM admin_revenue_withdrawals WHERE id=$1 FOR UPDATE`,[wd.id])).rows[0]; if(cur?.status==='pending'&&normalized==='failed'){const w=(await c.query(`UPDATE admin_revenue_wallets SET balance=balance+$1,updated_at=NOW() WHERE admin_id=$2 RETURNING balance`,[Number(cur.amount),cur.admin_id])).rows[0]; await addAdminRevenueLedger(c,Number(cur.admin_id),'withdrawal_reversal',Number(cur.amount),Number(w.balance),`Reversed failed Flutterwave withdrawal ${cur.reference}`,`REVERSAL-${cur.reference}`);} await c.query(`UPDATE admin_revenue_withdrawals SET status=$1,provider_transfer_id=COALESCE(provider_transfer_id,$2),provider_message=$3,updated_at=NOW(),completed_at=CASE WHEN $1='successful' THEN COALESCE(completed_at,NOW()) ELSE completed_at END WHERE id=$4`,[normalized,pid,clean(td.complete_message||payload?.message||''),wd.id]); await c.query('COMMIT'); }catch(e){try{await c.query('ROLLBACK')}catch{};console.error('FLUTTERWAVE TRANSFER WEBHOOK ERROR',e?.stack||e?.message||e);}finally{c.release();}
+        return send(res,200,{success:true,message:'Flutterwave transfer status processed.'});
+      }
+    }
 const event=String(payload?.event||payload?.type||payload?.event_type||"").toLowerCase();
 if(event==="charge.completed"||event==="account_transaction"||event==="bank_transfer_transaction"||payload?.["event.type"]==="BANK_TRANSFER_TRANSACTION"){
 const result=await creditFlutterwaveVirtualAccount(payload);return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Flutterwave funding webhook processed.",...result});

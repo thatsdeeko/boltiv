@@ -11,6 +11,7 @@
 <div class="airtime-hero"><div class="airtime-hero-label">BOLTIV AIRTIME</div><div class="airtime-hero-title">Stay Connected.</div><div class="airtime-hero-text">Recharge any supported network instantly from your BOLTIV wallet.</div></div>
 <div class="airtime-card">
 <label class="airtime-label" id="phone-number-label">PHONE NUMBER</label><input aria-label="Phone number" aria-labelledby="phone-number-label" class="airtime-input" id="phoneNumber" inputmode="numeric" maxlength="11" placeholder="08012345678" type="tel"/>
+<div aria-live="polite" id="networkHint" style="margin:-11px 0 12px;font-size:10px;font-weight:800;color:#777"></div>
 <label class="airtime-label" for="customAmount">SELECT NETWORK</label><div class="network-grid"><button class="network-button" data-network="MTN">MTN</button><button class="network-button" data-network="AIRTEL">AIRTEL</button><button class="network-button" data-network="GLO">GLO</button><button class="network-button" data-network="9MOBILE">9MOBILE</button></div>
 <label class="airtime-label" for="customAmount">SELECT AMOUNT</label><div class="amount-grid"><button class="amount-button" data-amount="100">₦100</button><button class="amount-button" data-amount="200">₦200</button><button class="amount-button" data-amount="500">₦500</button><button class="amount-button" data-amount="1000">₦1,000</button><button class="amount-button" data-amount="2000">₦2,000</button><button class="amount-button" data-amount="5000">₦5,000</button></div>
 <label class="airtime-label" for="customAmount">OR ENTER AMOUNT</label><input aria-label="Custom amount" class="airtime-input" id="customAmount" inputmode="numeric" min="50" placeholder="Enter amount" type="number"/>
@@ -18,11 +19,28 @@
 <nav class="bottom-nav"><button class="nav-item" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button><button class="nav-item" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button><button class="nav-item" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button><button class="nav-item" onclick="location.href='/profile'"><span class="nav-icon">◉</span>Profile</button></nav>
 <div class="boltiv-modal" id="boltivModal"><div class="boltiv-modal-card"><div class="receipt-brand"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/></div><div class="modal-icon" id="modalIcon">!</div><div aria-live="polite" class="modal-status" id="modalStatus" role="status">NOTICE</div><div class="modal-title" id="modalTitle"></div><div aria-live="polite" class="modal-message" id="modalMessage" role="status"></div><div class="modal-details" id="modalDetails" style="display:none"></div><button class="modal-button" id="modalButton">GOT IT</button></div></div>
 <script>
-const API="https://boltiv-backend.onrender.com",modal=document.getElementById("boltivModal"),mi=document.getElementById("modalIcon"),ms=document.getElementById("modalStatus"),mt=document.getElementById("modalTitle"),mm=document.getElementById("modalMessage"),md=document.getElementById("modalDetails"),mb=document.getElementById("modalButton"),phone=document.getElementById("phoneNumber"),custom=document.getElementById("customAmount");let network="",amount=0;
+const API="https://boltiv-backend.onrender.com",modal=document.getElementById("boltivModal"),mi=document.getElementById("modalIcon"),ms=document.getElementById("modalStatus"),mt=document.getElementById("modalTitle"),mm=document.getElementById("modalMessage"),md=document.getElementById("modalDetails"),mb=document.getElementById("modalButton"),phone=document.getElementById("phoneNumber"),custom=document.getElementById("customAmount"),networkHint=document.getElementById("networkHint");let network="",amount=0,networkPickedManually=false,networkConfirmed=false,pendingConfirmAction=null;
+// Nigerian MSISDN prefix → network map. Number portability (MNP, since 2013) means a
+// prefix no longer *guarantees* the current network, so this drives an auto-suggest +
+// mismatch warning, never a hard block — the user can always confirm and proceed.
+const NETWORK_PREFIXES={"0803":"MTN","0806":"MTN","0703":"MTN","0706":"MTN","0704":"MTN","0813":"MTN","0814":"MTN","0816":"MTN","0810":"MTN","0913":"MTN","0916":"MTN","0903":"MTN","0906":"MTN","0802":"AIRTEL","0808":"AIRTEL","0708":"AIRTEL","0701":"AIRTEL","0812":"AIRTEL","0902":"AIRTEL","0901":"AIRTEL","0904":"AIRTEL","0907":"AIRTEL","0911":"AIRTEL","0912":"AIRTEL","0805":"GLO","0807":"GLO","0705":"GLO","0815":"GLO","0811":"GLO","0905":"GLO","0915":"GLO","0809":"9MOBILE","0817":"9MOBILE","0818":"9MOBILE","0908":"9MOBILE","0909":"9MOBILE"};
+function detectNetwork(p){return NETWORK_PREFIXES[String(p||"").slice(0,4)]||""}
+function selectNetworkButton(net){document.querySelectorAll(".network-button").forEach(x=>x.classList.toggle("active",x.dataset.network===net));network=net}
+function refreshNetworkHint(){
+const p=phone.value.trim();const detected=/^\d{4,}$/.test(p)?detectNetwork(p):"";
+networkConfirmed=false;
+if(!detected){networkHint.textContent="";networkHint.style.color="#777";return}
+if(!network||!networkPickedManually){selectNetworkButton(detected);networkHint.textContent="Detected network: "+detected;networkHint.style.color="#777";return}
+if(network===detected){networkHint.textContent="Detected network: "+detected;networkHint.style.color="#777"}
+else{networkHint.textContent="This number looks like "+detected+", not "+network+". Numbers can be ported — double-check before buying.";networkHint.style.color="#b94c4c"}
+}
+phone.addEventListener("input",refreshNetworkHint);
 function money(n){return"₦"+Number(n||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function show(type,title,msg,details=""){modal.className="boltiv-modal show "+type;mt.textContent=title;mm.textContent=msg;mi.textContent=type==="success"?"✓":type==="failed"?"×":"!";ms.textContent=type==="processing"?"PROCESSING":type==="failed"?"FAILED":type==="success"?"SUCCESSFUL":"NOTICE";md.innerHTML=details;md.style.display=details?"block":"none"}
-function close(){modal.classList.remove("show");mb.style.display="block"}mb.onclick=close;modal.onclick=e=>{if(e.target===modal)close()};
-document.querySelectorAll(".network-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".network-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");network=b.dataset.network});
+function close(){modal.classList.remove("show");mb.style.display="block";mb.textContent="GOT IT";pendingConfirmAction=null}
+mb.onclick=()=>{if(pendingConfirmAction){const fn=pendingConfirmAction;pendingConfirmAction=null;mb.textContent="GOT IT";fn()}else close()};
+modal.onclick=e=>{if(e.target===modal)close()};
+document.querySelectorAll(".network-button").forEach(b=>b.onclick=()=>{networkPickedManually=true;selectNetworkButton(b.dataset.network);refreshNetworkHint()});
 document.querySelectorAll(".amount-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");amount=Number(b.dataset.amount);custom.value=""});
 custom.oninput=()=>{amount=Number(custom.value);document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"))};
 
@@ -34,6 +52,13 @@ const p=phone.value.trim();
 if(!/^\d{11}$/.test(p))return show("warning","Check Your Number","Enter a valid 11-digit Nigerian phone number.");
 if(!network)return show("warning","Select Network","Choose MTN, Airtel, Glo or 9mobile.");
 if(!amount||amount<50)return show("warning","Invalid Amount","The minimum airtime purchase is ₦50.");
+const detected=detectNetwork(p);
+if(detected&&detected!==network&&!networkConfirmed){
+show("warning","Confirm Network","This number looks like a "+detected+" line, but you selected "+network+". Numbers can be ported between networks — continue only if you're sure "+network+" is correct.",details());
+mb.textContent="YES, CONTINUE";mb.style.display="block";
+pendingConfirmAction=()=>{networkConfirmed=true;buy()};
+return;
+}
 const id=uid();
 if(!id)return show("failed","Session Error","Please log in again and try again.");
 const transactionPin=await boltivGetTransactionPin();
@@ -41,7 +66,7 @@ if(!transactionPin){mb.style.display="block";return;}
 show("processing","Checking Service","Connecting to BOLTIV...");
 mb.style.display="none";
 try{
-const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network,amount,airtime_amount:amount,service:"airtime",providerPayload:{service:"airtime",phone:p,network,amount,airtime_amount:amount},idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now()),transactionPin:transactionPin})});
+const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network,amount,airtime_amount:amount,service:"airtime",networkConfirmed,providerPayload:{service:"airtime",phone:p,network,amount,airtime_amount:amount,networkConfirmed},idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now()),transactionPin:transactionPin})});
 let d={};
 try{d=await r.json()}catch(e){}
 if(d.success){

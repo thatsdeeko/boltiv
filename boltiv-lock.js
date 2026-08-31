@@ -25,12 +25,12 @@
     if(!name)return "";
     return name.split(/\s+/)[0];
   }
-  function initials(user){
-    const name=String(user.name||"").trim();
-    if(!name)return (String(user.email||"?").charAt(0)||"?").toUpperCase();
-    const parts=name.split(/\s+/).filter(Boolean);
-    const chars=parts.length>1?(parts[0][0]+parts[parts.length-1][0]):parts[0].slice(0,2);
-    return chars.toUpperCase();
+
+  function isIOS(){
+    const ua=navigator.userAgent||"";
+    if(/iP(hone|od|ad)/.test(ua))return true;
+    // iPadOS 13+ reports as "Macintosh" but, unlike a real Mac, supports touch.
+    return /Macintosh/.test(ua)&&navigator.maxTouchPoints>1;
   }
 
   let overlay=null;
@@ -67,38 +67,37 @@
     el.id="boltivLockOverlay";
     el.innerHTML=`
       <style>
-        #boltivLockOverlay{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:48px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#171717;overflow-y:auto}
+        #boltivLockOverlay{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:48px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#171717;overflow-y:auto;text-align:center}
         #boltivLockOverlay *{box-sizing:border-box}
-        .boltiv-lock-brand{display:flex;align-items:center;gap:8px;align-self:center;margin-bottom:34px}
-        .boltiv-lock-brand img{width:26px;height:30px;object-fit:contain;display:block}
-        .boltiv-lock-brand span{font-size:15px;font-weight:1000;letter-spacing:2.5px;color:#D4AF37}
-        .boltiv-lock-avatar{width:64px;height:64px;border-radius:50%;background:#fff9e6;border:1px solid #ead58a;color:#b8860b;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:1000;align-self:center}
-        .boltiv-lock-title{margin-top:26px;font-size:26px;font-weight:1000;align-self:center;text-align:center}
-        .boltiv-lock-sub{margin-top:6px;font-size:13px;color:#777;align-self:center;text-align:center}
-        .boltiv-lock-boxes{display:flex;gap:14px;margin-top:28px;align-self:center;justify-content:center}
+        .boltiv-lock-avatar{width:72px;height:72px;border-radius:50%;background:#fff9e6;border:1px solid #ead58a;display:flex;align-items:center;justify-content:center;align-self:center;margin:0 auto}
+        .boltiv-lock-avatar img{width:34px;height:39px;object-fit:contain;display:block}
+        .boltiv-lock-title{width:100%;margin-top:26px;font-size:26px;font-weight:1000;text-align:center}
+        .boltiv-lock-title .gold{color:#D4AF37}
+        .boltiv-lock-title .name{color:#171717}
+        .boltiv-lock-sub{width:100%;margin-top:6px;font-size:13px;color:#777;text-align:center}
+        .boltiv-lock-boxes{display:flex;gap:14px;margin-top:28px;width:100%;justify-content:center}
         .boltiv-lock-box{width:54px;height:54px;border:1.5px solid #e5e5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000}
         .boltiv-lock-box.filled{border-color:#D4AF37}
         .boltiv-lock-box.active{border-color:#171717}
         .boltiv-lock-box span{width:10px;height:10px;border-radius:50%;background:#D4AF37;display:none}
         .boltiv-lock-box.filled span{display:block}
-        .boltiv-lock-error{margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;align-self:center;text-align:center;max-width:320px}
+        .boltiv-lock-error{width:100%;margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;text-align:center;max-width:320px;align-self:center}
         .boltiv-lock-keypad{margin-top:auto;padding-top:40px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-width:320px}
         .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:#171717;border-radius:50%;display:flex;align-items:center;justify-content:center}
         .boltiv-lock-key:active{background:#fdf6e0}
         .boltiv-lock-key.boltiv-lock-bio{color:#b8860b;font-size:19px}
         .boltiv-lock-key.boltiv-lock-back{color:#c0392b;font-size:19px}
-        .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:#b8860b;font-size:13px;font-weight:700;text-decoration:underline;padding:10px}
+        .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:#b8860b;font-size:13px;font-weight:700;text-decoration:underline;padding:10px;align-self:center}
         @media(max-width:360px){.boltiv-lock-box{width:46px;height:46px}.boltiv-lock-key{height:56px}}
       </style>
-      <div class="boltiv-lock-brand"><img src="/assets/boltiv-logo.webp" alt=""/><span>BOLTIV</span></div>
-      <div class="boltiv-lock-avatar">${esc(initials(user))}</div>
-      <div class="boltiv-lock-title">Welcome Back${firstName(user)?" "+esc(firstName(user)):""}</div>
+      <div class="boltiv-lock-avatar"><img src="/assets/boltiv-logo.webp" alt="BOLTIV"/></div>
+      <div class="boltiv-lock-title"><span class="gold">Welcome Back</span>${firstName(user)?" <span class=\"name\">"+esc(firstName(user))+"</span>":""}</div>
       <div class="boltiv-lock-sub">Enter your 4-Digit PIN</div>
       <div class="boltiv-lock-boxes" id="boltivLockBoxes"></div>
       <div class="boltiv-lock-error" id="boltivLockError"></div>
       <div class="boltiv-lock-keypad" id="boltivLockKeypad">
         ${[1,2,3,4,5,6,7,8,9].map(n=>`<button type="button" class="boltiv-lock-key" data-digit="${n}">${n}</button>`).join("")}
-        <button type="button" class="boltiv-lock-key boltiv-lock-bio" id="boltivLockBio" aria-label="Biometric unlock"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3a7 7 0 0 0-7 7v2c0 2.5-.5 4.5-1.5 6"/><path d="M12 3a7 7 0 0 1 7 7v2c0 1 .1 1.9.3 2.7"/><path d="M8 10a4 4 0 0 1 8 0v2c0 3.5 1 6 2.5 8"/><path d="M12 10v2c0 4-1.5 7-4 9"/><path d="M15.5 21c-1-1.5-1.8-3-2.2-5"/><path d="M9 21c.7-1 1.2-2 1.5-3"/></svg></button>
+        <button type="button" class="boltiv-lock-key boltiv-lock-bio" id="boltivLockBio" aria-label="${isIOS()?"Face ID unlock":"Biometric unlock"}">${isIOS()?'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6.5A2.5 2.5 0 0 1 6.5 4H8"/><path d="M16 4h1.5A2.5 2.5 0 0 1 20 6.5V8"/><path d="M20 16v1.5a2.5 2.5 0 0 1-2.5 2.5H16"/><path d="M8 20H6.5A2.5 2.5 0 0 1 4 17.5V16"/><circle cx="9" cy="10.5" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="10.5" r="0.9" fill="currentColor" stroke="none"/><path d="M9.5 15c.8.6 1.7.6 2.5.6s1.7 0 2.5-.6"/></svg>':'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3a7 7 0 0 0-7 7v2c0 2.5-.5 4.5-1.5 6"/><path d="M12 3a7 7 0 0 1 7 7v2c0 1 .1 1.9.3 2.7"/><path d="M8 10a4 4 0 0 1 8 0v2c0 3.5 1 6 2.5 8"/><path d="M12 10v2c0 4-1.5 7-4 9"/><path d="M15.5 21c-1-1.5-1.8-3-2.2-5"/><path d="M9 21c.7-1 1.2-2 1.5-3"/></svg>'}</button>
         <button type="button" class="boltiv-lock-key" data-digit="0">0</button>
         <button type="button" class="boltiv-lock-key boltiv-lock-back" id="boltivLockBack" aria-label="Delete">&#10094;</button>
       </div>

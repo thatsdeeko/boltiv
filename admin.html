@@ -700,11 +700,15 @@ async function loadMe(){
 }
 async function loadAnalytics(){
  try{const d=await api('/api/admin/analytics');const rows=d.daily||[];const maxUsers=Math.max(1,...rows.map(x=>Number(x.users||0)));const maxSales=Math.max(1,...rows.map(x=>Number(x.sales||0)));const money=v=>'₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:0,maximumFractionDigits:0});
- if($('analyticsUsersChart'))$('analyticsUsersChart').innerHTML=rows.map(x=>`<div class="bar" style="height:${Math.max(6,Number(x.users||0)/maxUsers*100)}%" title="${x.day}: ${Number(x.users||0)} users"><span>${String(x.day).slice(5)}</span></div>`).join('');
- if($('analyticsSalesChart'))$('analyticsSalesChart').innerHTML=rows.map(x=>`<div class="bar" style="height:${Math.max(6,Number(x.sales||0)/maxSales*100)}%" title="${x.day}: ${money(x.sales)}"><span>${String(x.day).slice(5)}</span></div>`).join('');
+ if($('analyticsUsersChart'))$('analyticsUsersChart').innerHTML=rows.length?rows.map(x=>`<div class="bar" style="height:${Math.max(6,Number(x.users||0)/maxUsers*100)}%" title="${x.day}: ${Number(x.users||0)} users"><span>${String(x.day).slice(5)}</span></div>`).join(''):'<div class="empty">No user growth data yet.</div>';
+ if($('analyticsSalesChart'))$('analyticsSalesChart').innerHTML=rows.length?rows.map(x=>`<div class="bar" style="height:${Math.max(6,Number(x.sales||0)/maxSales*100)}%" title="${x.day}: ${money(x.sales)}"><span>${String(x.day).slice(5)}</span></div>`).join(''):'<div class="empty">No sales data yet.</div>';
  if($('analyticsServices'))$('analyticsServices').innerHTML=(d.services||[]).length?'<div class="table-wrap"><table><thead><tr><th>SERVICE</th><th>TXNS</th><th>SUCCESS</th><th>SALES</th><th>PROFIT</th></tr></thead><tbody>'+(d.services||[]).map(x=>`<tr><td>${esc(x.service)}</td><td>${Number(x.transactions||0)}</td><td>${Number(x.successful||0)}</td><td>₦${Number(x.sales||0).toLocaleString()}</td><td>₦${Number(x.profit||0).toLocaleString()}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">No service activity yet.</div>';
  if($('analyticsTopUsers'))$('analyticsTopUsers').innerHTML=(d.topUsers||[]).length?'<div class="table-wrap"><table><thead><tr><th>CUSTOMER</th><th>TXNS</th><th>SPEND</th></tr></thead><tbody>'+(d.topUsers||[]).map(x=>`<tr><td>${esc(x.name||x.email||x.user_id)}<br><small>${esc(x.email||'')}</small></td><td>${Number(x.transactions||0)}</td><td>₦${Number(x.spend||0).toLocaleString()}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">No customer activity yet.</div>';
- }catch(e){console.error('Analytics:',e);}
+ }catch(e){
+  console.error('Analytics:',e);
+  const msg='<div class="error-box">'+esc(e.message||'Unable to load analytics right now.')+'</div>';
+  ['analyticsUsersChart','analyticsSalesChart','analyticsServices','analyticsTopUsers'].forEach(id=>{if($(id))$(id).innerHTML=msg;});
+ }
 }
 async function loadFlutterwaveCashReconciliation(){
  try{

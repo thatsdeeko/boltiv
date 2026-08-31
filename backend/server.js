@@ -287,10 +287,21 @@ const matchesCategory=x=>categoryTerms.some(w=>termMatches(x.hay,w));
 // A candidate must now match the category AND (when a provider is given) the provider.
 const providerHit=p?vtugateServiceCache.data.find(x=>matchesCategory(x)&&termMatches(x.hay,p)):null;
 if(p){
-  // Second line of defense: don't silently fall back to "any record in this category" when
-  // a specific provider was requested — that's the same failure mode as the bug above, just
-  // approached from a different angle. Fail loudly instead of guessing a network.
-  if(!providerHit)throw new Error(`VTUGATE service ID for ${provider} ${category} could not be confirmed \u2014 refusing to guess a network. Check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
+  if(!providerHit){
+    // No entry matched the requested provider by name. That's expected for a catalog that
+    // only exposes ONE generic entry for this whole category — airtime routinely works this
+    // way, since actual delivery is decided by the phone number's real current carrier (which
+    // can differ from what the customer/UI believes due to number portability), not by a
+    // per-network product on VTUGATE's side. If the category has exactly one candidate, using
+    // it is unambiguous — there is nothing else it could be. If the category has MORE than one
+    // candidate and none confirm the requested provider, that's the original bug's exact
+    // scenario (several network-specific entries, wrong one about to be picked) — refuse to
+    // guess there.
+    const categoryMatches=vtugateServiceCache.data.filter(matchesCategory);
+    if(categoryMatches.length===1)return categoryMatches[0].id;
+    if(categoryMatches.length===0)throw new Error(`VTUGATE service ID for ${category} is not configured.`);
+    throw new Error(`VTUGATE service ID for ${provider} ${category} could not be confirmed \u2014 refusing to guess a network among ${categoryMatches.length} ${category} catalog entries. Check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
+  }
   // Even a record that matched our provider term could be an ambiguous/mislabeled catalog
   // entry that also mentions a different known provider in this category. Refuse to trust it.
   const otherProviders=(KNOWN_PROVIDERS[category]||[]).filter(other=>other!==p);

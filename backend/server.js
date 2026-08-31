@@ -2844,9 +2844,9 @@ function setAdminSessionCookie(res, token){
     "Path=/",
     "HttpOnly",
     "SameSite=None",
+    "Secure",
     "Max-Age=86400"
   ];
-  if (process.env.NODE_ENV === "production") parts.push("Secure");
   res.setHeader("Set-Cookie", parts.join("; "));
 }
 
@@ -2856,9 +2856,9 @@ function clearAdminSessionCookie(res){
     "Path=/",
     "HttpOnly",
     "SameSite=None",
+    "Secure",
     "Max-Age=0"
   ];
-  if (process.env.NODE_ENV === "production") parts.push("Secure");
   res.setHeader("Set-Cookie", parts.join("; "));
 }
 
@@ -3103,7 +3103,9 @@ async function requireAdminCsrf(req){
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
   const supplied=String(req.headers["x-admin-csrf"]||"");
   const expected=await adminCsrfToken(req);
-  if(!expected||!supplied||supplied!==expected)return{success:false,statusCode:403,message:"Invalid admin CSRF token."};
+  if(!expected||!supplied)return{success:false,statusCode:403,message:"Invalid admin CSRF token."};
+  const a=Buffer.from(supplied),b=Buffer.from(expected);
+  if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return{success:false,statusCode:403,message:"Invalid admin CSRF token."};
   return{success:true,admin};
 }
 

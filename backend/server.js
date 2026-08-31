@@ -258,60 +258,40 @@ const keys=[provider,String(provider).toUpperCase(),String(provider).toLowerCase
 for(const key of keys){const explicit=VTUGATE_SERVICE_MAP?.[key];if(Number(explicit)>0)return Number(explicit);}
 const envKeys={data:["VTUGATE_DATA_SERVICE_ID"],airtime:["VTUGATE_AIRTIME_SERVICE_ID"],cable:["VTUGATE_CABLE_SERVICE_ID"],electricity:["VTUGATE_ELECTRICITY_SERVICE_ID"],education:["VTUGATE_EDUCATION_SERVICE_ID"]};
 for(const key of (envKeys[category]||[])){if(Number(process.env[key])>0)return Number(process.env[key]);}
-if(Date.now()-vtugateServiceCache.at>300000){const r=await fetchVTUGATEServices(true);if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");
- const root=r.data?.data??r.data;
- const records=[];
- const visit=(value,depth=0)=>{if(!value||depth>8)return;if(Array.isArray(value)){for(const item of value)visit(item,depth+1);return;}if(typeof value!=="object")return;
-   const id=Number(value.service_id??value.serviceId??value.serviceID??value.id??value.service?.id??value.service?.service_id??value.service?.serviceId??0);
-   const hay=[value.name,value.service_name,value.serviceName,value.service_title,value.title,value.label,value.code,value.service_code,value.serviceCode,value.slug,value.type,value.category,value.service_type,value.serviceType,value.provider,value.network,value.description,value.service?.name,value.service?.service_name,value.service?.code].filter(v=>v!==undefined&&v!==null).join(" ").toLowerCase();
-   if(id>0&&hay)records.push({id,hay,raw:value});
-   for(const [k,v] of Object.entries(value)){if(["raw","meta","pagination"].includes(k))continue;visit(v,depth+1);}
- };
- visit(root);
- vtugateServiceCache.data=records;vtugateServiceCache.at=Date.now();}
-const aliases={airtime:["airtime","mobile airtime"],data:["data","mobile data","internet data","data bundle","data bundles","data plan","data plans","mobile data bundle"],cable:["cable","cable tv","cable television","dstv","gotv","startimes","showmax"],electricity:["electricity","electric","power","power bill","electricity bill"],education:["education","education pin","education pins","exam pin","exam pins"]};
-// Known providers per category, used only as a cross-check below — never as the primary
-// match — to catch a catalog entry that matches the requested provider but ALSO looks like
-// it belongs to a different one (e.g. a bundled/mislabeled listing), which the alias table
-// above has no way to anticipate.
-const KNOWN_PROVIDERS={airtime:["mtn","airtel","glo","9mobile"],cable:["dstv","gotv","startimes","showmax"]};
-const p=clean(provider).toLowerCase();
-function termMatches(hay,term){return !!term&&(hay===term||hay.includes(` ${term} `)||hay.startsWith(`${term} `)||hay.endsWith(` ${term}`));}
-const categoryTerms=aliases[category]||[category];
-const matchesCategory=x=>categoryTerms.some(w=>termMatches(x.hay,w));
-// Previously this OR'd category aliases together with the provider name into one list and
-// returned the first record matching ANY of them — so a generic/other-network "airtime"
-// record could satisfy the match on the category term alone, before the provider was ever
-// checked, and BOLTIV would send VTUGATE the wrong network's service_id even though the
-// correct network name was in the payload (VTUGATE routes by service_id, not by that field).
-// A candidate must now match the category AND (when a provider is given) the provider.
-const providerHit=p?vtugateServiceCache.data.find(x=>matchesCategory(x)&&termMatches(x.hay,p)):null;
-if(p){
-  if(!providerHit){
-    // No entry matched the requested provider by name. That's expected for a catalog that
-    // only exposes ONE generic entry for this whole category — airtime routinely works this
-    // way, since actual delivery is decided by the phone number's real current carrier (which
-    // can differ from what the customer/UI believes due to number portability), not by a
-    // per-network product on VTUGATE's side. If the category has exactly one candidate, using
-    // it is unambiguous — there is nothing else it could be. If the category has MORE than one
-    // candidate and none confirm the requested provider, that's the original bug's exact
-    // scenario (several network-specific entries, wrong one about to be picked) — refuse to
-    // guess there.
-    const categoryMatches=vtugateServiceCache.data.filter(matchesCategory);
-    if(categoryMatches.length===1)return categoryMatches[0].id;
-    if(categoryMatches.length===0)throw new Error(`VTUGATE service ID for ${category} is not configured.`);
-    throw new Error(`VTUGATE service ID for ${provider} ${category} could not be confirmed \u2014 refusing to guess a network among ${categoryMatches.length} ${category} catalog entries. Check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
-  }
-  // Even a record that matched our provider term could be an ambiguous/mislabeled catalog
-  // entry that also mentions a different known provider in this category. Refuse to trust it.
-  const otherProviders=(KNOWN_PROVIDERS[category]||[]).filter(other=>other!==p);
-  const ambiguous=otherProviders.some(other=>termMatches(providerHit.hay,other));
-  if(ambiguous)throw new Error(`VTUGATE service catalog entry resolved for ${provider} ${category} looks ambiguous (it also matches another provider name). Refusing to guess \u2014 check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
-  return providerHit.id;
+if(Date.now()-vtugateServiceCache.at>300000){
+  const r=await fetchVTUGATEServices(true);
+  if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");
+  const root=r.data?.data??r.data;
+  vtugateServiceCache.data=Array.isArray(root)?root:[];
+  vtugateServiceCache.at=Date.now();
 }
-const categoryHit=vtugateServiceCache.data.find(matchesCategory);
-if(!categoryHit)throw new Error(`VTUGATE service ID for ${category} is not configured.`);
-return categoryHit.id;
+// VTUGATE's /api/v1/fetchallservices returns one flat row per service. Each row is tagged
+// with an explicit service_type, and the network/provider lives in a dedicated, type-specific
+// field — never free text to fuzzy-match: network_name for airtime & data, tv_name for cable,
+// disco for electricity. Matching those fields directly and exactly is simpler and strictly
+// more reliable than searching for a name/description substring, since it can't be thrown off
+// by however a given catalog entry happens to be worded.
+const serviceTypeMap={airtime:"airtime",data:"data",cable:"tv",electricity:"electricity",education:"education"};
+const providerFieldMap={airtime:"network_name",data:"network_name",cable:"tv_name",electricity:"disco"};
+const wantedType=serviceTypeMap[category]||category;
+const candidates=vtugateServiceCache.data.filter(row=>clean(row.service_type).toLowerCase()===wantedType);
+const p=clean(provider).toLowerCase();
+const field=providerFieldMap[category];
+if(p&&field){
+  const matches=candidates.filter(row=>clean(row[field]).toLowerCase()===p);
+  if(matches.length)return Number(matches[0].service_id);
+  if(candidates.length===0)throw new Error(`VTUGATE service ID for ${category} is not configured.`);
+  // No row's dedicated network field matched exactly. Safe to fall back to a lone candidate
+  // only when its field is genuinely blank — that means the catalog isn't discriminating by
+  // network at all for this category (delivery is decided by the phone number's real current
+  // carrier), which is safe regardless of which network was requested. A lone candidate that
+  // explicitly names a DIFFERENT specific network must never be used — that's the original
+  // bug's exact shape, just with only one wrong candidate instead of several.
+  if(candidates.length===1&&!clean(candidates[0][field]))return Number(candidates[0].service_id);
+  throw new Error(`VTUGATE service ID for ${provider} ${category} could not be confirmed \u2014 refusing to guess a network among ${candidates.length} ${category} catalog entries. Check the VTUGATE service catalog and consider setting VTUGATE_SERVICE_MAP explicitly.`);
+}
+if(!candidates.length)throw new Error(`VTUGATE service ID for ${category} is not configured.`);
+return Number(candidates[0].service_id);
 }
 
 function parseCatalogNumber(value){
@@ -582,7 +562,7 @@ const network=normalizeDataNetwork(data.network||data.providerPayload?.network);
 }else if(service==="cable"){
 const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the cable TV service for this provider right now."};}const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const expectedPrice=getCablePlanPrice(providerName,plan);if(expectedPrice===null)return{success:false,statusCode:400,message:"The selected cable TV plan is not recognized."};if(Math.abs(amount-expectedPrice)>.009)return{success:false,statusCode:400,message:"The selected cable TV plan price has changed. Please refresh and try again."};pricingMeta={providerCost:expectedPrice,customerPrice:expectedPrice,grossProfit:0,network:providerName,plan};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,phone_number:recipient,msisdn:recipient,plan,package:plan,amount,ref:null};
 }else if(service==="electricity"){
-const disco=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity");}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the electricity service right now."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=disco.toUpperCase();pricingMeta.plan=meterType;
+const disco=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity",disco);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the electricity service right now."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=disco.toUpperCase();pricingMeta.plan=meterType;
 }
 const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
 let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
@@ -592,7 +572,7 @@ const providerData=providerResult.data||{};const providerReference=providerResul
 }
 
 async function verifyVTUGATECable(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the cable TV service for this provider right now."};}const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const phoneVal=clean(b.phone||"08000000000");return vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:phoneVal,phone_number:phoneVal,msisdn:phoneVal});}
-async function verifyVTUGATEElectricity(req){const b=await body(req);const disco=clean(b.provider||b.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity");}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the electricity service right now."};}const meterNo=clean(b.meterNumber||b.meter_no||b.meternumber);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};const result=await vtugateRequest("api/v1/verifyelectricity",{service_id:serviceId,meter_no:meterNo,disco});if(!result.success)return result;const customerName=findTransactionField(result.data,["meter_name","customer_name","name"]);const address=findTransactionField(result.data,["cust_address","address"]);return{...result,customerName,address};}
+async function verifyVTUGATEElectricity(req){const b=await body(req);const disco=clean(b.provider||b.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity",disco);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the electricity service right now."};}const meterNo=clean(b.meterNumber||b.meter_no||b.meternumber);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};const result=await vtugateRequest("api/v1/verifyelectricity",{service_id:serviceId,meter_no:meterNo,disco});if(!result.success)return result;const customerName=findTransactionField(result.data,["meter_name","customer_name","name"]);const address=findTransactionField(result.data,["cust_address","address"]);return{...result,customerName,address};}
 
 async function debitWallet(userId,amount){
 const client=await pool.connect();

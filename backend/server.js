@@ -533,6 +533,52 @@ return{success:true,checked:rows.length,finalized,unverified};
 }
 async function reconcilePendingTransactions(){return reconcileVTUGATETransactions();}
 
+async function getAgentProfile(userId){
+  const r=await db(`SELECT user_id,agent_id,status,tier,activated_at,updated_at FROM agent_profiles WHERE user_id=$1 LIMIT 1`,[userId]);
+  if(!r.rows.length)return null;
+  return r.rows[0];
+}
+
+async function getEffectiveAgentService(userId,serviceKey){
+  const agent=await getAgentProfile(userId);
+  if(!agent||String(agent.status).toLowerCase()!=='active')return {isAgent:false,enabled:true,agent:null};
+  const r=await db(`SELECT enabled FROM agent_services WHERE user_id=$1 AND service_key=$2 LIMIT 1`,[userId,serviceKey]);
+  // Missing per-agent rows inherit the platform service availability.
+  return {isAgent:true,enabled:r.rows.length?Boolean(r.rows[0].enabled):true,agent};
+}
+
+function makeAgentId(){
+  return `BVT-${Date.now().toString(36).toUpperCase()}-${crypto.randomInt(100,999)}`;
+}
+
+async function activateAgentForUser(user,req){
+  if(!user||!user.user_id)return{success:false,statusCode:401,message:'Unauthorized.'};
+  if(String(user.status||'active').toLowerCase()==='suspended')return{success:false,statusCode:403,message:'Your BOLTIV account is suspended.'};
+  const existing=await getAgentProfile(user.user_id);
+  if(existing)return{success:true,alreadyAgent:true,agent:existing,message:'Your BOLTIV Agent account is already active.'};
+  const wallet=await getWallet(user.user_id);
+  const balance=Number(wallet?.balance||0);
+  if(balance<10000)return{success:false,statusCode:400,code:'AGENT_MINIMUM_BALANCE',message:`You need at least ₦10,000 in your BOLTIV wallet to become an Agent. Your current balance is ₦${balance.toLocaleString('en-NG',{minimumFractionDigits:2})}.`,requiredBalance:10000,currentBalance:balance};
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const dupe=await client.query(`SELECT user_id,agent_id,status,tier,activated_at,updated_at FROM agent_profiles WHERE user_id=$1 OR agent_id=$2 LIMIT 1 FOR UPDATE`,[user.user_id,makeAgentId()]);
+    if(dupe.rows.length&&dupe.rows[0].user_id===user.user_id){await client.query('COMMIT');return{success:true,alreadyAgent:true,agent:dupe.rows[0],message:'Your BOLTIV Agent account is already active.'};}
+    let agentId;
+    for(let i=0;i<5;i++){const candidate=makeAgentId();const exists=await client.query(`SELECT 1 FROM agent_profiles WHERE agent_id=$1`,[candidate]);if(!exists.rows.length){agentId=candidate;break;}}
+    if(!agentId)throw new Error('Unable to create a unique Agent ID.');
+    const r=await client.query(`INSERT INTO agent_profiles(user_id,agent_id,status,tier,activated_at,updated_at) VALUES($1,$2,'active','standard',NOW(),NOW()) RETURNING user_id,agent_id,status,tier,activated_at,updated_at`,[user.user_id,agentId]);
+    const services=await client.query(`SELECT key FROM services ORDER BY key`);
+    for(const svc of services.rows){
+      await client.query(`INSERT INTO agent_services(user_id,service_key,enabled,updated_at) VALUES($1,$2,TRUE,NOW()) ON CONFLICT(user_id,service_key) DO NOTHING`,[user.user_id,svc.key]);
+    }
+    await client.query('COMMIT');
+    try{await addNotification(user.user_id,'BOLTIV Agent activated',`Your BOLTIV Agent account ${agentId} is now active. Your existing wallet balance remains available as working capital.`,'account');}catch{}
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) SELECT id,'agent_activation','user',$1,$2::jsonb,$3 FROM admins ORDER BY id LIMIT 1`,[user.user_id,JSON.stringify({agent_id:agentId,minimum_balance:10000}),requestIp(req)]).catch(()=>{});
+    return{success:true,agent:r.rows[0],message:'You are now a BOLTIV Agent.'};
+  }catch(e){try{await client.query('ROLLBACK')}catch{};throw e;}finally{client.release();}
+}
+
 async function processVTUTransaction(user,data){
 const userId=clean(user.user_id);const service=clean(data.service||data.providerPayload?.service).toLowerCase();const amount=Number(data.amount);
 if(!userId)return{success:false,statusCode:401,message:"Unauthorized."};
@@ -547,6 +593,8 @@ if(!["airtime","data","exam_pin","cable","electricity"].includes(service))return
 const serviceRecord=await getService(service);
 if(!serviceRecord||serviceRecord.enabled===false)return{success:false,statusCode:503,message:"This service is currently unavailable."};
 if(serviceRecord.maintenance===true)return{success:false,statusCode:503,message:"This service is currently under maintenance."};
+const agentService=await getEffectiveAgentService(userId,service);
+if(agentService.isAgent&&!agentService.enabled)return{success:false,statusCode:403,message:`${serviceRecord.name||service} is not enabled for your BOLTIV Agent account.`};
 if(!validAmount(amount))return{success:false,statusCode:400,message:"Invalid amount."};
 if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test(clean(data.phone||data.providerPayload?.phone||"08000000000")))return{success:false,statusCode:400,message:"Please enter a valid 11-digit phone number."};
 const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};const suppliedPin=String(data.transactionPin||"");if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
@@ -1099,6 +1147,26 @@ balance NUMERIC(14,2) NOT NULL DEFAULT 0,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
+
+await db(`
+CREATE TABLE IF NOT EXISTS agent_profiles(
+user_id TEXT PRIMARY KEY,
+agent_id TEXT UNIQUE NOT NULL,
+status TEXT NOT NULL DEFAULT 'active',
+tier TEXT NOT NULL DEFAULT 'standard',
+activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS agent_profiles_status_idx ON agent_profiles(status)`);
+await db(`
+CREATE TABLE IF NOT EXISTS agent_services(
+user_id TEXT NOT NULL,
+service_key TEXT NOT NULL,
+enabled BOOLEAN NOT NULL DEFAULT TRUE,
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+PRIMARY KEY(user_id,service_key)
+)`);
+await db(`CREATE INDEX IF NOT EXISTS agent_services_service_idx ON agent_services(service_key)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS transactions(
@@ -3363,6 +3431,52 @@ async function adminAuditResponse(req){
   return{success:true,logs:r.rows};
 }
 
+async function adminAgents(req,action,userIdParam){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==='list') {
+    const r=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance
+      FROM agent_profiles a LEFT JOIN users u ON u.user_id=a.user_id LEFT JOIN wallets w ON w.user_id=a.user_id ORDER BY a.activated_at DESC LIMIT 1000`);
+    return{success:true,agents:r.rows.map(x=>({...x,balance:Number(x.balance||0)}))};
+  }
+  const userId=clean(userIdParam);
+  if(!userId)return{success:false,statusCode:400,message:'Agent user ID is required.'};
+  if(action==='details'){
+    const a=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance FROM agent_profiles a LEFT JOIN users u ON u.user_id=a.user_id LEFT JOIN wallets w ON w.user_id=a.user_id WHERE a.user_id=$1 LIMIT 1`,[userId]);
+    if(!a.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
+    const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[userId]);
+    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},services:services.rows.map(x=>({...x,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)}))};
+  }
+  if(action==='services'){
+    const b=await body(req);
+    const services=Array.isArray(b.services)?b.services:[];
+    const agent=await db(`SELECT agent_id FROM agent_profiles WHERE user_id=$1 LIMIT 1`,[userId]);
+    if(!agent.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      for(const item of services){
+        const key=clean(item.key);if(!key)continue;
+        const exists=await client.query(`SELECT 1 FROM services WHERE key=$1`,[key]);if(!exists.rows.length)continue;
+        await client.query(`INSERT INTO agent_services(user_id,service_key,enabled,updated_at) VALUES($1,$2,$3,NOW()) ON CONFLICT(user_id,service_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=NOW()`,[userId,key,item.enabled!==false]);
+      }
+      await client.query('COMMIT');
+      await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_service_update','agent',$2,$3::jsonb,$4)`,[admin.id,userId,JSON.stringify({services:services.map(x=>({key:clean(x.key),enabled:x.enabled!==false}))}),requestIp(req)]);
+      return adminAgents(req,'details',userId);
+    }catch(e){try{await client.query('ROLLBACK')}catch{};throw e;}finally{client.release();}
+  }
+  if(action==='status'){
+    const b=await body(req);const status=clean(b.status).toLowerCase();
+    if(!['active','suspended'].includes(status))return{success:false,statusCode:400,message:'Invalid agent status.'};
+    const r=await db(`UPDATE agent_profiles SET status=$1,updated_at=NOW() WHERE user_id=$2 RETURNING user_id,agent_id,status,tier,activated_at,updated_at`,[status,userId]);
+    if(!r.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
+    try{await addNotification(userId,'Agent account updated',`Your BOLTIV Agent account is now ${status}.`,'account');}catch{}
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_status_update','agent',$2,$3::jsonb,$4)`,[admin.id,userId,JSON.stringify({status}),requestIp(req)]);
+    return{success:true,agent:r.rows[0]};
+  }
+  return{success:false,statusCode:400,message:'Unsupported agent action.'};
+}
+
 async function adminServices(req,action){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
@@ -3667,6 +3781,10 @@ if(req.method==="GET"&&path==="/api/admin/support"){const result=await adminSupp
 if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await adminSupport(req,"reply");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/agents"){const result=await adminAgents(req,'list');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/services")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/services".length));const result=await adminAgents(req,'details',userId);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/services")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/services".length));const result=await adminAgents(req,'services',userId);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/status")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/status".length));const result=await adminAgents(req,'status',userId);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/services"){const result=await adminServices(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/services"){const result=await adminServices(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/settings"){const result=await adminSettings(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
@@ -3958,7 +4076,8 @@ CURRENT USER
 if(req.method==="GET"&&path==="/api/auth/me"){
   const user=await userFromToken(req);
   if(!user)return send(res,401,{success:false,message:"Unauthorized."});
-  return send(res,200,{success:true,user:{id:user.user_id,userId:user.user_id,name:user.name||"",phone:user.phone||"",email:user.email||""}});
+  const agent=await getAgentProfile(user.user_id);
+  return send(res,200,{success:true,user:{id:user.user_id,userId:user.user_id,name:user.name||"",phone:user.phone||"",email:user.email||"",accountType:agent&&agent.status==='active'?'agent':'customer',agent}});
 }
 
 /*
@@ -4214,7 +4333,9 @@ id:user.user_id,
 userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
-email:user.email
+email:user.email,
+accountType:(await getAgentProfile(user.user_id))?.status==='active'?'agent':'customer',
+agent:await getAgentProfile(user.user_id)
 },
 wallet
 });
@@ -4229,6 +4350,16 @@ WALLET
 if(req.method==="POST"&&path==="/api/wallet/create"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+if(req.method==="GET"&&path==="/api/agent/status"){
+  const agent=await getAgentProfile(user.user_id);
+  const wallet=await getWallet(user.user_id);
+  const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[user.user_id]);
+  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:10000,currentBalance:Number(wallet?.balance||0),services:services.rows.map(x=>({...x,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)}))});
+}
+if(req.method==="POST"&&path==="/api/agent/activate"){
+  const rl=rateLimit(req,`agent-activate:${user.user_id}`,5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
+  try{const result=await activateAgentForUser(user,req);return send(res,result.success?200:(result.statusCode||400),result);}catch(e){console.error('AGENT ACTIVATION ERROR:',e?.stack||e?.message||e);return send(res,500,{success:false,message:'Unable to activate your Agent account right now.'});}
+}
 await createWallet(user.user_id);
 const wallet=await getWallet(user.user_id);
 return send(res,200,{success:true,wallet});

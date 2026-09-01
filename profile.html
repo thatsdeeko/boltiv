@@ -40,6 +40,7 @@ boltivRequireAuth();
 .legal-links{display:grid;gap:10px}.legal-link{min-height:64px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:18px;background:#fff;border:1px solid var(--pline);color:#242424;text-decoration:none;box-shadow:0 7px 20px rgba(30,30,20,.035);transition:transform .18s,border-color .18s,box-shadow .18s}.legal-link:active{transform:scale(.985);border-color:#d7bb59}.legal-title{font-size:11px;font-weight:900;color:#202020}.legal-sub{margin-top:4px;color:#85857f;font-size:8px;line-height:1.45}.legal-section{padding-bottom:18px}.legal-section .section-head h3{letter-spacing:.2px}.legal-link .action-arrow{font-size:18px;flex-shrink:0}
 .message{display:none;margin-top:12px;padding:12px;border-radius:11px;font-size:10px;line-height:1.5;text-align:center}.message.show{display:block}.message.error{background:#fff0f0;color:#b94c4c;border:1px solid #e07878}.message.success{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(18,18,14,.55);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:.25s}.modal.show{opacity:1;visibility:visible}.modal-box{width:100%;max-width:370px;padding:26px 22px;border-radius:24px;background:linear-gradient(145deg,#fffdf4,#fff);border:1px solid #d8bd55;text-align:center;transform:translateY(20px) scale(.95);transition:.25s}.modal.show .modal-box{transform:translateY(0) scale(1)}.modal-icon{width:58px;height:58px;margin:0 auto 15px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fffaf0;border:1px solid #d8bd55;color:#D4AF37;font-size:24px}.modal-title{color:#171717;font-size:19px;font-weight:1000}.modal-text{margin-top:7px;color:#777;font-size:11px;line-height:1.6}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}.modal-btn{width:100%;padding:13px;border-radius:12px;font-size:11px;font-weight:1000;cursor:pointer}.modal-btn.primary{border:0;background:#c9a227;color:#fff}.modal-btn.secondary{border:1px solid #e5e5e1;background:#fff;color:#777}.logout-modal .modal-box{border-color:#e7baba}.logout-modal .modal-icon{background:#fff4f4;border-color:#e7baba;color:#b44d4d}
+.agent-pill{font-size:8px;font-weight:1000;padding:6px 9px;border-radius:999px;background:#f4f4f4;color:#777;letter-spacing:.5px}.agent-pill.active{background:#eef9f1;color:#17833d}.agent-copy{display:grid;gap:6px;font-size:12px;line-height:1.55}.agent-copy span{font-size:10px;color:#888}.agent-requirement{margin:14px 0;padding:10px 12px;border-radius:10px;background:#fffaf0;border:1px solid #eadca8;font-size:9px;color:#777}.agent-services{display:grid;gap:7px;margin-top:13px}.agent-service{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border:1px solid #eee;border-radius:9px;font-size:9px}.agent-service.on{border-color:#d8eadc;background:#fbfffc}.agent-service.off{opacity:.55}.agent-service-dot{font-size:8px;font-weight:1000}.agent-service.on .agent-service-dot{color:#17833d}.agent-service.off .agent-service-dot{color:#999}
 @media(max-width:420px){.profile-title{font-size:23px}.identity-card{padding:21px 17px}.details-card{padding-left:15px;padding-right:15px}}
 @media(prefers-reduced-motion:reduce){.profile-page:before,.profile-page:after,.section,.identity-card{animation:none!important}.action{transition:none}}
 </style>
@@ -79,6 +80,22 @@ No email added
 ACCOUNT ACTIVE
 </div>
 </div>
+</div>
+</div>
+<!-- AGENT PROGRAM -->
+<div class="section" id="agentSection">
+<div class="section-head"><h3>BOLTIV Agent</h3><span class="agent-pill" id="agentStatusPill">CUSTOMER</span></div>
+<div class="details-card">
+<div id="agentCustomerView">
+<div class="agent-copy"><strong>Turn your BOLTIV account into a business account.</strong><span>Keep your existing wallet and use it as working capital to sell BOLTIV services to customers.</span></div>
+<div class="agent-requirement">Minimum wallet balance: <b>₦10,000</b></div>
+<button class="save-btn" id="becomeAgentBtn" type="button">BECOME A BOLTIV AGENT</button>
+</div>
+<div id="agentActiveView" style="display:none">
+<div class="agent-copy"><strong>You are a BOLTIV Agent.</strong><span id="agentIdText">Your Agent account is active.</span></div>
+<div class="agent-services" id="agentServicesList"></div>
+</div>
+<div aria-live="polite" class="message" id="agentMessage" role="status"></div>
 </div>
 </div>
 <!-- PERSONAL INFORMATION -->
@@ -814,6 +831,18 @@ location.href=item.dataset.page;
 });
 
 
+async function loadAgentStatus(){
+ const message=document.getElementById('agentMessage'),pill=document.getElementById('agentStatusPill'),customer=document.getElementById('agentCustomerView'),active=document.getElementById('agentActiveView'),btn=document.getElementById('becomeAgentBtn'),list=document.getElementById('agentServicesList');
+ if(!message)return;
+ try{
+  const r=await fetch('https://boltiv-backend.onrender.com/api/agent/status',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load Agent status.');
+  if(d.isAgent){pill.textContent='AGENT';pill.classList.add('active');customer.style.display='none';active.style.display='block';document.getElementById('agentIdText').textContent='Agent ID: '+(d.agent?.agent_id||'Active');list.innerHTML=(d.services||[]).map(s=>`<div class="agent-service ${(s.agent_enabled&&s.platform_enabled&&!s.maintenance)?'on':'off'}"><span>${escProfile(s.name)}</span><span class="agent-service-dot">${s.agent_enabled&&s.platform_enabled&&!s.maintenance?'AVAILABLE':'UNAVAILABLE'}</span></div>`).join('');}
+  else{pill.textContent='CUSTOMER';pill.classList.remove('active');customer.style.display='block';active.style.display='none';const balance=Number(d.currentBalance||0);btn.textContent=balance>=10000?'BECOME A BOLTIV AGENT':'ADD ₦'+Math.max(0,10000-balance).toLocaleString('en-NG')+' TO BECOME AN AGENT';}
+ }catch(e){message.textContent=e.message;message.className='message show error';}
+}
+function escProfile(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+if(document.getElementById('becomeAgentBtn'))document.getElementById('becomeAgentBtn').onclick=async()=>{const message=document.getElementById('agentMessage');try{const r=await fetch('https://boltiv-backend.onrender.com/api/agent/activate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'}});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success){if(d.code==='AGENT_MINIMUM_BALANCE'){message.textContent=d.message;message.className='message show error';setTimeout(()=>location.href='/wallet',700);return;}throw new Error(d.message||'Unable to activate Agent account.');}message.textContent=d.message||'Agent account activated.';message.className='message show success';await loadAgentStatus();}catch(e){message.textContent=e.message;message.className='message show error';}};
+
 /* =========================
    INITIAL LOAD
 ========================= */
@@ -823,6 +852,7 @@ location.href=item.dataset.page;
 // before /api/auth/me completed and left the default "User" / empty fields.
 window.boltivAuthReady.then((user)=>{
   if(user) loadProfile(user);
+  loadAgentStatus();
 });
 
 
@@ -830,6 +860,7 @@ window.boltivAuthReady.then((user)=>{
 
 window.addEventListener("pageshow",()=>{
   loadProfile();
+  loadAgentStatus();
 });
 
 </script>

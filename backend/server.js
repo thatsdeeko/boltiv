@@ -193,6 +193,19 @@ else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)
 return Number(price.toFixed(2));
 }
 
+// BOLTIV Agent wholesale pricing. Deliberately separate from pricingConfig() (the B2C customer
+// price): admin sets a per-service default Agent markup — normally lower than the B2C markup,
+// which is what makes the Agent price "wholesale" — plus an optional per-agent override (set on
+// agent_services.markup_pct_override) for individually negotiated rates. Agent pricing never
+// includes the flat B2C service_fee; it is purely a percentage over cost.
+function agentPricingConfig(service,overridePct){
+const config=service?.config&&typeof service.config==="object"?service.config:{};
+const agentPricing=config.agent_pricing&&typeof config.agent_pricing==="object"?config.agent_pricing:null;
+const defaultPct=Number(agentPricing?.markup_pct??0);
+const pct=Number.isFinite(overridePct)?overridePct:(Number.isFinite(defaultPct)?defaultPct:0);
+return {markup_mode:"markup_percentage",markup_pct:Math.min(500,Math.max(0,pct)),markup_fixed:0,service_fee:0};
+}
+
 function normalizeDataNetwork(value){const n=clean(value).toUpperCase().replace(/\s+/g,""); if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE"; return ["MTN","AIRTEL","GLO"].includes(n)?n:"";}
 // Nigerian MSISDN prefix → network map, mirrored from the airtime.html client-side
 // detector. Number portability (MNP, active since 2013) means a prefix no longer
@@ -541,10 +554,10 @@ async function getAgentProfile(userId){
 
 async function getEffectiveAgentService(userId,serviceKey){
   const agent=await getAgentProfile(userId);
-  if(!agent||String(agent.status).toLowerCase()!=='active')return {isAgent:false,enabled:true,agent:null};
-  const r=await db(`SELECT enabled FROM agent_services WHERE user_id=$1 AND service_key=$2 LIMIT 1`,[userId,serviceKey]);
+  if(!agent||String(agent.status).toLowerCase()!=='active')return {isAgent:false,enabled:true,agent:null,markupOverride:null};
+  const r=await db(`SELECT enabled,markup_pct_override FROM agent_services WHERE user_id=$1 AND service_key=$2 LIMIT 1`,[userId,serviceKey]);
   // Missing per-agent rows inherit the platform service availability.
-  return {isAgent:true,enabled:r.rows.length?Boolean(r.rows[0].enabled):true,agent};
+  return {isAgent:true,enabled:r.rows.length?Boolean(r.rows[0].enabled):true,agent,markupOverride:r.rows.length&&r.rows[0].markup_pct_override!=null?Number(r.rows[0].markup_pct_override):null};
 }
 
 function makeAgentId(){
@@ -559,6 +572,14 @@ async function activateAgentForUser(user,req){
   const wallet=await getWallet(user.user_id);
   const balance=Number(wallet?.balance||0);
   if(balance<10000)return{success:false,statusCode:400,code:'AGENT_MINIMUM_BALANCE',message:`You need at least ₦10,000 in your BOLTIV wallet to become an Agent. Your current balance is ₦${balance.toLocaleString('en-NG',{minimumFractionDigits:2})}.`,requiredBalance:10000,currentBalance:balance};
+  // KYC gate: BOLTIV does not treat "has a static account number" as proof of identity by
+  // itself — it relies on Flutterwave's own verification, which is what actually gates
+  // whether a permanent/static virtual account gets created at all (createFlutterwaveVirtualAccount
+  // requires a valid NIN or BVN and only succeeds if Flutterwave's API accepts it). So requiring
+  // an active static account here IS the KYC check, reusing the existing funding infrastructure
+  // rather than inventing a separate verification flow.
+  const staticAccount=await getFlutterwaveStaticFundingAccount(user);
+  if(!staticAccount.success||!staticAccount.account)return{success:false,statusCode:400,code:'AGENT_STATIC_ACCOUNT_REQUIRED',message:'Set up your dedicated BOLTIV funding account (requires NIN or BVN verification) before activating your Agent account.'};
   const client=await pool.connect();
   try{
     await client.query('BEGIN');
@@ -574,7 +595,7 @@ async function activateAgentForUser(user,req){
     }
     await client.query('COMMIT');
     try{await addNotification(user.user_id,'BOLTIV Agent activated',`Your BOLTIV Agent account ${agentId} is now active. Your existing wallet balance remains available as working capital.`,'account');}catch{}
-    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) SELECT id,'agent_activation','user',$1,$2::jsonb,$3 FROM admins ORDER BY id LIMIT 1`,[user.user_id,JSON.stringify({agent_id:agentId,minimum_balance:10000}),requestIp(req)]).catch(()=>{});
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) SELECT id,'agent_activation','user',$1,$2::jsonb,$3 FROM admins ORDER BY id LIMIT 1`,[user.user_id,JSON.stringify({agent_id:agentId,minimum_balance:10000,static_account:staticAccount.account.account_number}),requestIp(req)]).catch(()=>{});
     return{success:true,agent:r.rows[0],message:'You are now a BOLTIV Agent.'};
   }catch(e){try{await client.query('ROLLBACK')}catch{};throw e;}finally{client.release();}
 }
@@ -610,7 +631,28 @@ const providerName=clean(data.provider||data.providerPayload?.provider).toUpperC
 }else if(service==="electricity"){
 const disco=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity",disco);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the electricity service right now."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=disco.toUpperCase();pricingMeta.plan=meterType;
 }
-const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
+let debitAmount=amount;
+if(agentService.isAgent){
+  // The cost basis an Agent's wholesale price is built from: the real provider cost when one
+  // was established for this sale (data/exam_pin/cable/electricity all resolve a known VTUGATE
+  // cost above); airtime has no independent provider cost (VTUGATE recharges face value), so the
+  // requested face-value amount is used as the basis instead — the Agent still gets a lower
+  // markup than a walk-in customer would, which is what makes it a wholesale rate.
+  const costBasis=pricingMeta.providerCost!=null?Number(pricingMeta.providerCost):amount;
+  const agentPricing=agentPricingConfig(serviceRecord,agentService.markupOverride);
+  const agentPrice=customerPriceFromCost(costBasis,agentPricing);
+  if(agentPrice==null)return{success:false,statusCode:400,message:"Unable to price this Agent transaction."};
+  const customerSellingPrice=Number(data.customerSellingPrice??data.providerPayload?.customerSellingPrice);
+  if(!Number.isFinite(customerSellingPrice)||customerSellingPrice<=0)return{success:false,statusCode:400,message:"Enter the price you're charging your customer."};
+  debitAmount=agentPrice;
+  // BOLTIV's own gross profit on an Agent sale is the Agent price minus BOLTIV's real provider
+  // cost — NOT the B2C customerPrice-minus-cost figure computed above, since the Agent never
+  // paid the B2C price. Recomputing here keeps admin revenue/reconciliation reporting (which
+  // sums pricing.grossProfit) accurate instead of overstating agent-driven revenue.
+  const boltivGrossProfit=pricingMeta.providerCost!=null?Number((agentPrice-Number(pricingMeta.providerCost)).toFixed(2)):0;
+  pricingMeta={...pricingMeta,customerPrice:agentPrice,grossProfit:boltivGrossProfit,agentPrice,agentMarkupPct:agentPricing.markup_pct,customerSellingPrice:Number(customerSellingPrice.toFixed(2)),agentProfit:Number((customerSellingPrice-agentPrice).toFixed(2))};
+}
+const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount:debitAmount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
 let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
 let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
 if(!providerResult.success)console.error("VTUGATE TRANSACTION FAILED:",JSON.stringify({endpoint,sentPayload:{...providerPayload,ref:providerPayload.ref},providerMessage:providerResult.message,providerRawResponse:providerResult.data}));
@@ -1163,9 +1205,11 @@ CREATE TABLE IF NOT EXISTS agent_services(
 user_id TEXT NOT NULL,
 service_key TEXT NOT NULL,
 enabled BOOLEAN NOT NULL DEFAULT TRUE,
+markup_pct_override NUMERIC(6,2),
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 PRIMARY KEY(user_id,service_key)
 )`);
+await db(`ALTER TABLE agent_services ADD COLUMN IF NOT EXISTS markup_pct_override NUMERIC(6,2)`);
 await db(`CREATE INDEX IF NOT EXISTS agent_services_service_idx ON agent_services(service_key)`);
 
 await db(`
@@ -3435,17 +3479,19 @@ async function adminAgents(req,action,userIdParam){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
   if(action==='list') {
-    const r=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance
+    const r=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance,
+      EXISTS(SELECT 1 FROM flutterwave_virtual_accounts fva WHERE fva.owner_type='user' AND fva.owner_id=a.user_id AND fva.account_type='static' AND fva.status='active') AS kyc_verified
       FROM agent_profiles a LEFT JOIN users u ON u.user_id=a.user_id LEFT JOIN wallets w ON w.user_id=a.user_id ORDER BY a.activated_at DESC LIMIT 1000`);
-    return{success:true,agents:r.rows.map(x=>({...x,balance:Number(x.balance||0)}))};
+    return{success:true,agents:r.rows.map(x=>({...x,balance:Number(x.balance||0),kyc_verified:Boolean(x.kyc_verified)}))};
   }
   const userId=clean(userIdParam);
   if(!userId)return{success:false,statusCode:400,message:'Agent user ID is required.'};
   if(action==='details'){
     const a=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance FROM agent_profiles a LEFT JOIN users u ON u.user_id=a.user_id LEFT JOIN wallets w ON w.user_id=a.user_id WHERE a.user_id=$1 LIMIT 1`,[userId]);
     if(!a.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
-    const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[userId]);
-    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},services:services.rows.map(x=>({...x,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)}))};
+    const fva=await db(`SELECT account_number,bank_name,account_name FROM flutterwave_virtual_accounts WHERE owner_type='user' AND owner_id=$1 AND account_type='static' AND status='active' LIMIT 1`,[userId]);
+    const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,s.config,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[userId]);
+    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},staticAccount:fva.rows[0]||null,services:services.rows.map(x=>{const pricing=agentPricingConfig({config:x.config},x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled),markup_pct_override:x.markup_pct_override!=null?Number(x.markup_pct_override):null,effective_markup_pct:pricing.markup_pct};})};
   }
   if(action==='services'){
     const b=await body(req);
@@ -3458,10 +3504,12 @@ async function adminAgents(req,action,userIdParam){
       for(const item of services){
         const key=clean(item.key);if(!key)continue;
         const exists=await client.query(`SELECT 1 FROM services WHERE key=$1`,[key]);if(!exists.rows.length)continue;
-        await client.query(`INSERT INTO agent_services(user_id,service_key,enabled,updated_at) VALUES($1,$2,$3,NOW()) ON CONFLICT(user_id,service_key) DO UPDATE SET enabled=EXCLUDED.enabled,updated_at=NOW()`,[userId,key,item.enabled!==false]);
+        const overrideRaw=item.markup_pct_override;
+        const override=(overrideRaw===null||overrideRaw===''||overrideRaw===undefined)?null:Math.min(500,Math.max(0,Number(overrideRaw)));
+        await client.query(`INSERT INTO agent_services(user_id,service_key,enabled,markup_pct_override,updated_at) VALUES($1,$2,$3,$4,NOW()) ON CONFLICT(user_id,service_key) DO UPDATE SET enabled=EXCLUDED.enabled,markup_pct_override=EXCLUDED.markup_pct_override,updated_at=NOW()`,[userId,key,item.enabled!==false,Number.isFinite(override)?override:null]);
       }
       await client.query('COMMIT');
-      await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_service_update','agent',$2,$3::jsonb,$4)`,[admin.id,userId,JSON.stringify({services:services.map(x=>({key:clean(x.key),enabled:x.enabled!==false}))}),requestIp(req)]);
+      await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_service_update','agent',$2,$3::jsonb,$4)`,[admin.id,userId,JSON.stringify({services:services.map(x=>({key:clean(x.key),enabled:x.enabled!==false,markup_pct_override:x.markup_pct_override??null}))}),requestIp(req)]);
       return adminAgents(req,'details',userId);
     }catch(e){try{await client.query('ROLLBACK')}catch{};throw e;}finally{client.release();}
   }
@@ -4353,8 +4401,9 @@ if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 if(req.method==="GET"&&path==="/api/agent/status"){
   const agent=await getAgentProfile(user.user_id);
   const wallet=await getWallet(user.user_id);
-  const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[user.user_id]);
-  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:10000,currentBalance:Number(wallet?.balance||0),services:services.rows.map(x=>({...x,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)}))});
+  const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,s.config,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[user.user_id]);
+  let staticAccount=null;try{const sa=await getFlutterwaveStaticFundingAccount(user);staticAccount=sa.account||null;}catch{}
+  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:10000,currentBalance:Number(wallet?.balance||0),hasStaticAccount:Boolean(staticAccount),staticAccount:staticAccount?{accountNumber:staticAccount.account_number,bankName:staticAccount.bank_name,accountName:staticAccount.account_name}:null,services:services.rows.map(x=>{const pricing=agentPricingConfig({config:x.config},x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled),agent_markup_pct:pricing.markup_pct};})});
 }
 if(req.method==="POST"&&path==="/api/agent/activate"){
   const rl=rateLimit(req,`agent-activate:${user.user_id}`,5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);

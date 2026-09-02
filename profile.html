@@ -88,7 +88,7 @@ ACCOUNT ACTIVE
 <div class="details-card">
 <div id="agentCustomerView">
 <div class="agent-copy"><strong>Turn your BOLTIV account into a business account.</strong><span>Keep your existing wallet and use it as working capital to sell BOLTIV services to customers.</span></div>
-<div class="agent-requirement">Minimum wallet balance: <b>₦10,000</b></div>
+<div class="agent-requirement">Minimum wallet balance: <b>₦10,000</b> &middot; requires a verified BOLTIV funding account (NIN or BVN)</div>
 <button class="save-btn" id="becomeAgentBtn" type="button">BECOME A BOLTIV AGENT</button>
 </div>
 <div id="agentActiveView" style="display:none">
@@ -836,12 +836,12 @@ async function loadAgentStatus(){
  if(!message)return;
  try{
   const r=await fetch('https://boltiv-backend.onrender.com/api/agent/status',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load Agent status.');
-  if(d.isAgent){pill.textContent='AGENT';pill.classList.add('active');customer.style.display='none';active.style.display='block';document.getElementById('agentIdText').textContent='Agent ID: '+(d.agent?.agent_id||'Active');list.innerHTML=(d.services||[]).map(s=>`<div class="agent-service ${(s.agent_enabled&&s.platform_enabled&&!s.maintenance)?'on':'off'}"><span>${escProfile(s.name)}</span><span class="agent-service-dot">${s.agent_enabled&&s.platform_enabled&&!s.maintenance?'AVAILABLE':'UNAVAILABLE'}</span></div>`).join('');}
+  if(d.isAgent){pill.textContent='AGENT';pill.classList.add('active');customer.style.display='none';active.style.display='block';document.getElementById('agentIdText').textContent='Agent ID: '+(d.agent?.agent_id||'Active');list.innerHTML=(d.services||[]).map(s=>`<div class="agent-service ${(s.agent_enabled&&s.platform_enabled&&!s.maintenance)?'on':'off'}"><span>${escProfile(s.name)} <span style="color:#999">(+${Number(s.agent_markup_pct||0)}%)</span></span><span class="agent-service-dot">${s.agent_enabled&&s.platform_enabled&&!s.maintenance?'AVAILABLE':'UNAVAILABLE'}</span></div>`).join('');}
   else{pill.textContent='CUSTOMER';pill.classList.remove('active');customer.style.display='block';active.style.display='none';const balance=Number(d.currentBalance||0);btn.textContent=balance>=10000?'BECOME A BOLTIV AGENT':'ADD ₦'+Math.max(0,10000-balance).toLocaleString('en-NG')+' TO BECOME AN AGENT';}
  }catch(e){message.textContent=e.message;message.className='message show error';}
 }
 function escProfile(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-if(document.getElementById('becomeAgentBtn'))document.getElementById('becomeAgentBtn').onclick=async()=>{const message=document.getElementById('agentMessage');try{const r=await fetch('https://boltiv-backend.onrender.com/api/agent/activate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'}});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success){if(d.code==='AGENT_MINIMUM_BALANCE'){message.textContent=d.message;message.className='message show error';setTimeout(()=>location.href='/wallet',700);return;}throw new Error(d.message||'Unable to activate Agent account.');}message.textContent=d.message||'Agent account activated.';message.className='message show success';await loadAgentStatus();}catch(e){message.textContent=e.message;message.className='message show error';}};
+if(document.getElementById('becomeAgentBtn'))document.getElementById('becomeAgentBtn').onclick=async()=>{const message=document.getElementById('agentMessage');try{const r=await fetch('https://boltiv-backend.onrender.com/api/agent/activate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'}});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success){if(d.code==='AGENT_MINIMUM_BALANCE'){message.textContent=d.message;message.className='message show error';setTimeout(()=>location.href='/wallet',700);return;}if(d.code==='AGENT_STATIC_ACCOUNT_REQUIRED'){message.textContent=d.message+' Redirecting you to set one up \u2014 choose "Fund Wallet" then the PERMANENT \u00b7 STATIC option and enter your NIN or BVN.';message.className='message show error';setTimeout(()=>location.href='/wallet',1200);return;}throw new Error(d.message||'Unable to activate Agent account.');}message.textContent=d.message||'Agent account activated.';message.className='message show success';await loadAgentStatus();}catch(e){message.textContent=e.message;message.className='message show error';}};
 
 /* =========================
    INITIAL LOAD

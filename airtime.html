@@ -15,6 +15,12 @@
 <label class="airtime-label" for="customAmount">SELECT NETWORK</label><div class="network-grid"><button class="network-button" data-network="MTN">MTN</button><button class="network-button" data-network="AIRTEL">AIRTEL</button><button class="network-button" data-network="GLO">GLO</button><button class="network-button" data-network="9MOBILE">9MOBILE</button></div>
 <label class="airtime-label" for="customAmount">SELECT AMOUNT</label><div class="amount-grid"><button class="amount-button" data-amount="100">₦100</button><button class="amount-button" data-amount="200">₦200</button><button class="amount-button" data-amount="500">₦500</button><button class="amount-button" data-amount="1000">₦1,000</button><button class="amount-button" data-amount="2000">₦2,000</button><button class="amount-button" data-amount="5000">₦5,000</button></div>
 <label class="airtime-label" for="customAmount">OR ENTER AMOUNT</label><input aria-label="Custom amount" class="airtime-input" id="customAmount" inputmode="numeric" min="50" placeholder="Enter amount" type="number"/>
+<div id="agentPricingPanel" style="display:none;margin:-6px 0 17px;padding:14px;border-radius:13px;background:#fffdf4;border:1px solid #ead58a">
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#777;margin-bottom:8px"><span>YOUR BOLTIV PRICE</span><strong id="agentCostDisplay" style="color:#171717">₦0.00</strong></div>
+<label class="airtime-label" for="agentCustomerPrice" style="margin-bottom:6px">CUSTOMER PRICE</label>
+<input aria-label="Customer price" class="airtime-input" id="agentCustomerPrice" inputmode="numeric" placeholder="What you're charging your customer" style="margin-bottom:8px" type="number"/>
+<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:1000"><span style="color:#777;font-weight:800">YOUR PROFIT</span><strong id="agentProfitDisplay" style="color:#17833d">₦0.00</strong></div>
+</div>
 <button class="purchase-button" id="purchaseButton">BUY AIRTIME</button></div></div></div>
 <nav class="bottom-nav"><button class="nav-item" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button><button class="nav-item" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button><button class="nav-item" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button><button class="nav-item" onclick="location.href='/profile'"><span class="nav-icon">◉</span>Profile</button></nav>
 <div class="boltiv-modal" id="boltivModal"><div class="boltiv-modal-card"><div class="receipt-brand"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/></div><div class="modal-icon" id="modalIcon">!</div><div aria-live="polite" class="modal-status" id="modalStatus" role="status">NOTICE</div><div class="modal-title" id="modalTitle"></div><div aria-live="polite" class="modal-message" id="modalMessage" role="status"></div><div class="modal-details" id="modalDetails" style="display:none"></div><button class="modal-button" id="modalButton">GOT IT</button></div></div>
@@ -41,17 +47,54 @@ function close(){modal.classList.remove("show");mb.style.display="block";mb.text
 mb.onclick=()=>{if(pendingConfirmAction){const fn=pendingConfirmAction;pendingConfirmAction=null;mb.textContent="GOT IT";fn()}else close()};
 modal.onclick=e=>{if(e.target===modal)close()};
 document.querySelectorAll(".network-button").forEach(b=>b.onclick=()=>{networkPickedManually=true;selectNetworkButton(b.dataset.network);refreshNetworkHint()});
-document.querySelectorAll(".amount-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");amount=Number(b.dataset.amount);custom.value=""});
-custom.oninput=()=>{amount=Number(custom.value);document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"))};
+document.querySelectorAll(".amount-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");amount=Number(b.dataset.amount);custom.value="";refreshAgentPricing()});
+custom.oninput=()=>{amount=Number(custom.value);document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"));refreshAgentPricing()};
+
+// AGENT PRICING
+let isAgent=false,agentMarkupPct=0,agentEnabledForService=true,agentPrice=0;
+const agentPanel=document.getElementById("agentPricingPanel"),agentCostDisplay=document.getElementById("agentCostDisplay"),agentCustomerPriceInput=document.getElementById("agentCustomerPrice"),agentProfitDisplay=document.getElementById("agentProfitDisplay");
+async function loadAgentPricing(){
+try{
+const r=await fetch(API+"/api/agent/status",{credentials:"include",headers:{"Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},cache:"no-store"});
+const d=await r.json();
+if(!d.success||!d.isAgent)return;
+isAgent=true;
+const svc=(d.services||[]).find(s=>s.key==="airtime");
+agentMarkupPct=svc?Number(svc.agent_markup_pct||0):0;
+agentEnabledForService=svc?Boolean(svc.agent_enabled&&svc.platform_enabled&&!svc.maintenance):false;
+if(agentEnabledForService){agentPanel.style.display="block";refreshAgentPricing();}
+}catch(e){}
+}
+function refreshAgentPricing(){
+if(!isAgent||!agentEnabledForService)return;
+agentPrice=amount>0?Number((amount*(1+agentMarkupPct/100)).toFixed(2)):0;
+agentCostDisplay.textContent=money(agentPrice);
+if(!agentCustomerPriceInput.dataset.touched)agentCustomerPriceInput.value=agentPrice?agentPrice.toFixed(2):"";
+updateAgentProfit();
+}
+function updateAgentProfit(){
+const customerPrice=Number(agentCustomerPriceInput.value||0);
+agentProfitDisplay.textContent=money(customerPrice-agentPrice);
+agentProfitDisplay.style.color=(customerPrice-agentPrice)>=0?"#17833d":"#b94c4c";
+}
+agentCustomerPriceInput.addEventListener("input",()=>{agentCustomerPriceInput.dataset.touched="1";updateAgentProfit()});
+loadAgentPricing();
 
 // CHUNK 1 END
   function uid(){try{let u=JSON.parse(boltivMemoryStorage.getItem("boltivUser")||"{}");return String(u.id||u.userId||u.email||"")}catch(e){return""}}
-function details(){return`<div class="modal-detail"><span>Service</span><strong>Airtime</strong></div><div class="modal-detail"><span>Network</span><strong>${network}</strong></div><div class="modal-detail"><span>Phone</span><strong>${phone.value}</strong></div><div class="modal-detail"><span>Amount</span><strong>${money(amount)}</strong></div>`}
+function details(){const base=`<div class="modal-detail"><span>Service</span><strong>Airtime</strong></div><div class="modal-detail"><span>Network</span><strong>${network}</strong></div><div class="modal-detail"><span>Phone</span><strong>${phone.value}</strong></div>`;
+if(isAgent&&agentEnabledForService){const cp=Number(agentCustomerPriceInput.value||0);return base+`<div class="modal-detail"><span>Your BOLTIV Price</span><strong>${money(agentPrice)}</strong></div><div class="modal-detail"><span>Customer Price</span><strong>${money(cp)}</strong></div><div class="modal-detail"><span>Your Profit</span><strong>${money(cp-agentPrice)}</strong></div>`;}
+return base+`<div class="modal-detail"><span>Amount</span><strong>${money(amount)}</strong></div>`;}
 async function buy(){
 const p=phone.value.trim();
 if(!/^\d{11}$/.test(p))return show("warning","Check Your Number","Enter a valid 11-digit Nigerian phone number.");
 if(!network)return show("warning","Select Network","Choose MTN, Airtel, Glo or 9mobile.");
 if(!amount||amount<50)return show("warning","Invalid Amount","The minimum airtime purchase is ₦50.");
+let customerSellingPrice=null;
+if(isAgent&&agentEnabledForService){
+customerSellingPrice=Number(agentCustomerPriceInput.value||0);
+if(!customerSellingPrice||customerSellingPrice<=0)return show("warning","Enter Customer Price","Enter the price you're charging your customer.");
+}
 const detected=detectNetwork(p);
 if(detected&&detected!==network&&!networkConfirmed){
 show("warning","Confirm Network","This number looks like a "+detected+" line, but you selected "+network+". Numbers can be ported between networks — continue only if you're sure "+network+" is correct.",details());
@@ -66,14 +109,17 @@ if(!transactionPin){mb.style.display="block";return;}
 show("processing","Checking Service","Connecting to BOLTIV...");
 mb.style.display="none";
 try{
-const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network,amount,airtime_amount:amount,service:"airtime",networkConfirmed,providerPayload:{service:"airtime",phone:p,network,amount,airtime_amount:amount,networkConfirmed},idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now()),transactionPin:transactionPin})});
+const payload={phone:p,network,amount,airtime_amount:amount,service:"airtime",networkConfirmed,providerPayload:{service:"airtime",phone:p,network,amount,airtime_amount:amount,networkConfirmed},idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now()),transactionPin:transactionPin};
+if(customerSellingPrice!=null){payload.customerSellingPrice=customerSellingPrice;payload.providerPayload.customerSellingPrice=customerSellingPrice;}
+const r=await fetch(API+"/api/vtu/airtime",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify(payload)});
 let d={};
 try{d=await r.json()}catch(e){}
 if(d.success){
 const confirmedPhone=d.phone||d.transaction?.phone||p;
 const confirmedNetwork=d.network||d.transaction?.network||network;
-const confirmedAmount=Number(d.amount||amount);
-const receiptDetails=`<div class="modal-detail"><span>Service</span><strong>Airtime</strong></div><div class="modal-detail"><span>Network</span><strong>${confirmedNetwork||"—"}</strong></div><div class="modal-detail"><span>Phone</span><strong>${confirmedPhone||"—"}</strong></div><div class="modal-detail"><span>Amount</span><strong>${money(confirmedAmount)}</strong></div>`;
+let receiptDetails=`<div class="modal-detail"><span>Service</span><strong>Airtime</strong></div><div class="modal-detail"><span>Network</span><strong>${confirmedNetwork||"—"}</strong></div><div class="modal-detail"><span>Phone</span><strong>${confirmedPhone||"—"}</strong></div>`;
+if(customerSellingPrice!=null){receiptDetails+=`<div class="modal-detail"><span>Your BOLTIV Price</span><strong>${money(agentPrice)}</strong></div><div class="modal-detail"><span>Customer Price</span><strong>${money(customerSellingPrice)}</strong></div><div class="modal-detail"><span>Your Profit</span><strong>${money(customerSellingPrice-agentPrice)}</strong></div>`;}
+else{receiptDetails+=`<div class="modal-detail"><span>Amount</span><strong>${money(Number(d.amount||amount))}</strong></div>`;}
 show("success","Airtime Purchased",d.message||"Your airtime purchase was successful.",receiptDetails+(d.reference?`<div class="modal-detail"><span>Reference</span><strong>${d.reference}</strong></div>`:""));
 mb.style.display="block";
 }else{

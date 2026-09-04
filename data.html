@@ -37,14 +37,37 @@
   </div>
   <div class="buy-again-list" id="buyAgainList"></div>
 </div>
-<label class="data-label" id="select-data-plan-label">SELECT DATA PLAN</label><div class="plan-grid" id="planGrid"><div class="plan-loading" id="planLoading">Select a network to load available plans.</div></div><div class="data-subtitle" id="planHint" style="margin:-10px 0 18px"></div><div id="planWarning" style="display:none"></div><button class="purchase-button" id="purchaseButton" type="button">BUY DATA</button>
+<label class="data-label" id="select-data-plan-label">SELECT DATA PLAN</label><div class="plan-grid" id="planGrid"><div class="plan-loading" id="planLoading">Select a network to load available plans.</div></div><div class="data-subtitle" id="planHint" style="margin:-10px 0 18px"></div><div id="planWarning" style="display:none"></div>
+<div id="agentPricingPanel" style="display:none;margin:0 0 17px;padding:14px;border-radius:13px;background:#fffdf4;border:1px solid #ead58a">
+<div style="display:flex;justify-content:space-between;font-size:10px;color:#777;margin-bottom:8px"><span>YOUR BOLTIV PRICE</span><strong id="agentCostDisplay" style="color:#171717">₦0.00</strong></div>
+<label class="data-label" for="agentCustomerPrice" style="margin-bottom:6px">CUSTOMER PRICE</label>
+<input aria-label="Customer price" class="data-input" id="agentCustomerPrice" inputmode="numeric" placeholder="What you're charging your customer" style="margin-bottom:8px" type="number"/>
+<div style="display:flex;justify-content:space-between;font-size:11px;font-weight:1000"><span style="color:#777;font-weight:800">YOUR PROFIT</span><strong id="agentProfitDisplay" style="color:#17833d">₦0.00</strong></div>
+</div>
+<button class="purchase-button" id="purchaseButton" type="button">BUY DATA</button>
 </div></div></div>
 <nav class="bottom-nav"><button class="nav-item" data-page="/dashboard"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item" data-page="/wallet"><span class="nav-icon">₦</span><span>Wallet</span></button><button class="nav-item" data-page="/transactions"><span class="nav-icon">↯</span><span>Activity</span></button><button class="nav-item" data-page="/profile"><span class="nav-icon">◉</span><span>Profile</span></button></nav>
 <div class="boltiv-modal" id="boltivModal"><div class="boltiv-modal-card"><div class="receipt-brand"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/></div><div class="modal-icon" id="modalIcon">!</div><div aria-live="polite" class="modal-status" id="modalStatus" role="status">NOTICE</div><div class="modal-title" id="modalTitle">Complete Your Purchase</div><div aria-live="polite" class="modal-message" id="modalMessage" role="status">Please complete the required information.</div><div class="modal-details" id="modalDetails" style="display:none"></div><button class="modal-button" id="modalButton" type="button">GOT IT</button></div></div>
 <script>
 // Dynamic VTUGATE data catalog + purchase logic
 const API="https://boltiv-backend.onrender.com";
-let selectedNetwork="",selectedPlan=null,lastLoadedPlans=null;
+let selectedNetwork="",selectedPlan=null,lastLoadedPlans=null,isAgent=false,agentEnabled=true;
+const agentPanel=document.getElementById("agentPricingPanel"),agentCostDisplay=document.getElementById("agentCostDisplay"),agentCustomerPriceInput=document.getElementById("agentCustomerPrice"),agentProfitDisplay=document.getElementById("agentProfitDisplay");
+function refreshAgentPricing(){
+  if(!isAgent||!agentEnabled||!selectedPlan||selectedPlan.agent_price==null){agentPanel.style.display="none";return;}
+  agentPanel.style.display="block";
+  agentCostDisplay.textContent=money(selectedPlan.agent_price);
+  if(!agentCustomerPriceInput.dataset.touched||agentCustomerPriceInput.dataset.forPlan!==selectedPlan.lookup_key){agentCustomerPriceInput.value=Number(selectedPlan.agent_price).toFixed(2);agentCustomerPriceInput.dataset.forPlan=selectedPlan.lookup_key;delete agentCustomerPriceInput.dataset.touched;}
+  updateAgentProfit();
+}
+function updateAgentProfit(){
+  if(!selectedPlan)return;
+  const customerPrice=Number(agentCustomerPriceInput.value||0);
+  const diff=customerPrice-Number(selectedPlan.agent_price||0);
+  agentProfitDisplay.textContent=money(diff);
+  agentProfitDisplay.style.color=diff>=0?"#17833d":"#b94c4c";
+}
+agentCustomerPriceInput.addEventListener("input",()=>{agentCustomerPriceInput.dataset.touched="1";updateAgentProfit()});
 const $=id=>document.getElementById(id),phone=$("phoneNumber"),buyAgainSection=$("buyAgainSection"),buyAgainList=$("buyAgainList"),modal=$("boltivModal"),icon=$("modalIcon"),status=$("modalStatus"),title=$("modalTitle"),msg=$("modalMessage"),details=$("modalDetails"),modalBtn=$("modalButton"),planGrid=$("planGrid"),planLoading=$("planLoading"),planHint=$("planHint"),planWarning=$("planWarning");
 const money=v=>"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
 const BUY_AGAIN_KEY="boltivRecentDataPurchases";
@@ -268,8 +291,9 @@ function renderPlans(plans){
     const b=document.createElement("button");
     b.type="button";b.className="plan-button";
     const label=planLabel(plan), validity=formatValidity(plan.validity??plan.validity_period??plan.duration,plan.validity_days);
-    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+money(plan.customer_price)+'</div>';
-    b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;planWarning.innerHTML="";planWarning.style.display="none";};
+    const priceLine=(isAgent&&plan.agent_price!=null)?money(plan.agent_price):money(plan.customer_price);
+    b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+priceLine+'</div>';
+    b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;planWarning.innerHTML="";planWarning.style.display="none";refreshAgentPricing();};
     planGrid.appendChild(b);
   });
 }
@@ -283,6 +307,7 @@ async function loadPlans(network){
     const r=await fetch(API+"/api/vtu/data/plans",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({network})});
     const d=await r.json();
     if(!r.ok||!d.success)throw new Error(d.message||"Unable to load data plans.");
+    isAgent=Boolean(d.isAgent);agentEnabled=d.agentEnabled!==false;
     renderPlans(d.plans);
     lastLoadedPlans=d.plans||[];
     planHint.textContent=d.plans?.length?d.plans.length+" SME & Gifting plans (500MB+) available":"";
@@ -290,7 +315,10 @@ async function loadPlans(network){
     planGrid.innerHTML='<div class="plan-loading">'+esc(e.message||"Unable to load data plans.")+'</div>';
   }
 }
-function info(p,id="",bal=""){let h='<div class="modal-detail"><span>Service</span><strong>Data</strong></div><div class="modal-detail"><span>Network</span><strong>'+esc(selectedNetwork)+'</strong></div><div class="modal-detail"><span>Phone</span><strong>'+esc(p)+'</strong></div><div class="modal-detail"><span>Data Plan</span><strong>'+esc(planLabel(selectedPlan))+'</strong></div><div class="modal-detail"><span>Amount</span><strong>'+money(selectedPlan.customer_price)+'</strong></div>';if(id)h+='<div class="modal-detail"><span>Reference</span><strong>'+esc(id)+'</strong></div>';if(bal!=="")h+='<div class="modal-detail"><span>Wallet Balance</span><strong>'+money(bal)+'</strong></div>';return h}
+function info(p,id="",bal=""){let h='<div class="modal-detail"><span>Service</span><strong>Data</strong></div><div class="modal-detail"><span>Network</span><strong>'+esc(selectedNetwork)+'</strong></div><div class="modal-detail"><span>Phone</span><strong>'+esc(p)+'</strong></div><div class="modal-detail"><span>Data Plan</span><strong>'+esc(planLabel(selectedPlan))+'</strong></div>';
+if(isAgent&&agentEnabled&&selectedPlan.agent_price!=null){const cp=Number(agentCustomerPriceInput.value||selectedPlan.agent_price);h+='<div class="modal-detail"><span>Your BOLTIV Price</span><strong>'+money(selectedPlan.agent_price)+'</strong></div><div class="modal-detail"><span>Customer Price</span><strong>'+money(cp)+'</strong></div><div class="modal-detail"><span>Your Profit</span><strong>'+money(cp-selectedPlan.agent_price)+'</strong></div>';}
+else{h+='<div class="modal-detail"><span>Amount</span><strong>'+money(selectedPlan.customer_price)+'</strong></div>';}
+if(id)h+='<div class="modal-detail"><span>Reference</span><strong>'+esc(id)+'</strong></div>';if(bal!=="")h+='<div class="modal-detail"><span>Wallet Balance</span><strong>'+money(bal)+'</strong></div>';return h}
 document.querySelectorAll(".network-button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".network-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedNetwork=b.dataset.network;loadPlans(selectedNetwork)});
 $("purchaseButton").onclick=async()=>{
   const p=phone.value.trim();
@@ -298,11 +326,18 @@ $("purchaseButton").onclick=async()=>{
   if(p.length!==11||!/^[0-9]{11}$/.test(p))return show("warning","Check Your Number","Please enter a valid 11-digit Nigerian phone number.");
   if(!selectedNetwork)return show("warning","Select Your Network","Choose your network.");
   if(!selectedPlan)return show("warning","Select a Data Plan","Choose a data plan.");
+  let customerSellingPrice=null;
+  if(isAgent&&agentEnabled&&selectedPlan.agent_price!=null){
+    customerSellingPrice=Number(agentCustomerPriceInput.value||0);
+    if(!customerSellingPrice||customerSellingPrice<=0)return show("warning","Enter Customer Price","Enter the price you're charging your customer.");
+  }
   const transactionPin=await boltivGetTransactionPin();
   if(!transactionPin){modalBtn.style.display="block";return;}
   show("processing","Processing Data","Your request is being sent securely.","PLEASE WAIT",info(p));modalBtn.style.display="none";
   try{
-    const r=await fetch(API+"/api/vtu/data",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify({phone:p,network:selectedNetwork,plan_code:selectedPlan.plan_code||selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price),service:"data",providerPayload:{service:"data",phone:p,network:selectedNetwork,plan_code:selectedPlan.plan_code||selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price)},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin})});
+    const payload={phone:p,network:selectedNetwork,plan_code:selectedPlan.plan_code||selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price),service:"data",providerPayload:{service:"data",phone:p,network:selectedNetwork,plan_code:selectedPlan.plan_code||selectedPlan.code,bundle_id:selectedPlan.bundle_id,service_id:selectedPlan.service_id,plan_name:planLabel(selectedPlan),amount:Number(selectedPlan.customer_price)},idempotencyKey:(crypto.randomUUID?crypto.randomUUID():String(Date.now())),transactionPin};
+    if(customerSellingPrice!=null){payload.customerSellingPrice=customerSellingPrice;payload.providerPayload.customerSellingPrice=customerSellingPrice;}
+    const r=await fetch(API+"/api/vtu/data",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(boltivMemoryStorage.getItem("boltivAuthToken")||"")},body:JSON.stringify(payload)});
     const d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to process data purchase.");
     saveBuyAgain({
       network:selectedNetwork,

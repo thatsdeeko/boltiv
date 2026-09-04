@@ -206,6 +206,33 @@ const pct=Number.isFinite(overridePct)?overridePct:(Number.isFinite(defaultPct)?
 return {markup_mode:"markup_percentage",markup_pct:Math.min(500,Math.max(0,pct)),markup_fixed:0,service_fee:0};
 }
 
+const DEFAULT_AGENT_LIMITS={minWalletBalance:10000,maxTransaction:50000,dailyLimit:500000,dailyCount:100};
+async function getAgentLimits(agentProfile){
+  let global=DEFAULT_AGENT_LIMITS;
+  try{const r=await db(`SELECT value FROM platform_settings WHERE key='agent_limits' LIMIT 1`);if(r.rows.length)global={...DEFAULT_AGENT_LIMITS,...r.rows[0].value};}catch{}
+  return {
+    minWalletBalance:Number(global.minWalletBalance??DEFAULT_AGENT_LIMITS.minWalletBalance),
+    maxTransaction:agentProfile?.max_transaction_override!=null?Number(agentProfile.max_transaction_override):Number(global.maxTransaction??DEFAULT_AGENT_LIMITS.maxTransaction),
+    dailyLimit:agentProfile?.daily_limit_override!=null?Number(agentProfile.daily_limit_override):Number(global.dailyLimit??DEFAULT_AGENT_LIMITS.dailyLimit),
+    dailyCount:agentProfile?.daily_count_override!=null?Number(agentProfile.daily_count_override):Number(global.dailyCount??DEFAULT_AGENT_LIMITS.dailyCount)
+  };
+}
+// Enforced right before an Agent transaction is committed. All figures are checked against the
+// Agent's own wallet-debit amount (the wholesale price BOLTIV actually charges the Agent), since
+// that's the value that reflects real platform risk — not whatever the Agent tells their own
+// customer they're charging.
+async function checkAgentLimits(userId,agentProfile,thisTransactionAmount){
+  const limits=await getAgentLimits(agentProfile);
+  if(thisTransactionAmount>limits.maxTransaction)return{ok:false,message:`This transaction (₦${thisTransactionAmount.toLocaleString('en-NG',{minimumFractionDigits:2})}) exceeds your maximum per-transaction limit of ₦${limits.maxTransaction.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};
+  const wallet=await getWallet(userId);
+  if(Number(wallet?.balance||0)-thisTransactionAmount<limits.minWalletBalance)return{ok:false,message:`This transaction would take your wallet below the required minimum balance of ₦${limits.minWalletBalance.toLocaleString('en-NG',{minimumFractionDigits:2})}. Fund your wallet and try again.`};
+  const r=await db(`SELECT COALESCE(SUM(amount),0) AS total,COUNT(*)::int AS cnt FROM transactions WHERE user_id=$1 AND date::date=CURRENT_DATE AND status IN ('successful','pending','processing') AND metadata->'pricing'->>'agentPrice' IS NOT NULL`,[userId]);
+  const usedToday=Number(r.rows[0]?.total||0), countToday=Number(r.rows[0]?.cnt||0);
+  if(usedToday+thisTransactionAmount>limits.dailyLimit)return{ok:false,message:`This transaction would put you over your daily transaction limit of ₦${limits.dailyLimit.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};
+  if(countToday+1>limits.dailyCount)return{ok:false,message:`You've reached your daily transaction count limit of ${limits.dailyCount}.`};
+  return{ok:true};
+}
+
 function normalizeDataNetwork(value){const n=clean(value).toUpperCase().replace(/\s+/g,""); if(n==="9MOBILE"||n==="ETISALAT")return "9MOBILE"; return ["MTN","AIRTEL","GLO"].includes(n)?n:"";}
 // Nigerian MSISDN prefix → network map, mirrored from the airtime.html client-side
 // detector. Number portability (MNP, active since 2013) means a prefix no longer
@@ -547,7 +574,7 @@ return{success:true,checked:rows.length,finalized,unverified};
 async function reconcilePendingTransactions(){return reconcileVTUGATETransactions();}
 
 async function getAgentProfile(userId){
-  const r=await db(`SELECT user_id,agent_id,status,tier,activated_at,updated_at FROM agent_profiles WHERE user_id=$1 LIMIT 1`,[userId]);
+  const r=await db(`SELECT user_id,agent_id,status,tier,max_transaction_override,daily_limit_override,daily_count_override,activated_at,updated_at FROM agent_profiles WHERE user_id=$1 LIMIT 1`,[userId]);
   if(!r.rows.length)return null;
   return r.rows[0];
 }
@@ -645,6 +672,8 @@ if(agentService.isAgent){
   const customerSellingPrice=Number(data.customerSellingPrice??data.providerPayload?.customerSellingPrice);
   if(!Number.isFinite(customerSellingPrice)||customerSellingPrice<=0)return{success:false,statusCode:400,message:"Enter the price you're charging your customer."};
   debitAmount=agentPrice;
+  const limitCheck=await checkAgentLimits(userId,agentService.agent,agentPrice);
+  if(!limitCheck.ok)return{success:false,statusCode:400,message:limitCheck.message};
   // BOLTIV's own gross profit on an Agent sale is the Agent price minus BOLTIV's real provider
   // cost — NOT the B2C customerPrice-minus-cost figure computed above, since the Agent never
   // paid the B2C price. Recomputing here keeps admin revenue/reconciliation reporting (which
@@ -659,7 +688,17 @@ if(!providerResult.success)console.error("VTUGATE TRANSACTION FAILED:",JSON.stri
 const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||findTransactionField(providerData,["transaction_id","external_reference","reference","transactionId","id"])||referenceValue;const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);const wallet=await getWallet(userId);if(finalized.status==="refunded")return{success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};const delivery=providerData?.data?.delivery||providerData?.delivery||null;const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];const token=service==="electricity"?(findTransactionField(providerData,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||delivery?.token||""):"";const units=service==="electricity"?(findTransactionField(providerData,["units","kwh","unit"])||""):"";return{success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery,pins,token,units};
 }
 
-async function verifyVTUGATECable(req){const b=await body(req);const providerName=clean(b.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the cable TV service for this provider right now."};}const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const phoneVal=clean(b.phone||"08000000000");return vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:phoneVal,phone_number:phoneVal,msisdn:phoneVal});}
+async function verifyVTUGATECable(req,user){const b=await body(req);const providerName=clean(b.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the cable TV service for this provider right now."};}const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const phoneVal=clean(b.phone||"08000000000");const result=await vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:phoneVal,phone_number:phoneVal,msisdn:phoneVal});
+if(!result.success||!user)return result;
+const cableService=await getService("cable");
+const agentService=await getEffectiveAgentService(user.user_id,"cable");
+const agentPricing=(cableService&&agentService.isAgent)?agentPricingConfig(cableService,agentService.markupOverride):null;
+const providerPlans=CABLE_PLANS[providerName]||{};
+const plans={};
+for(const [planName,price] of Object.entries(providerPlans)){
+plans[planName]={customer_price:Number(price),agent_price:agentPricing?customerPriceFromCost(price,agentPricing):null};
+}
+return{...result,plans,isAgent:agentService.isAgent,agentEnabled:agentService.enabled};}
 async function verifyVTUGATEElectricity(req){const b=await body(req);const disco=clean(b.provider||b.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity",disco);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the electricity service right now."};}const meterNo=clean(b.meterNumber||b.meter_no||b.meternumber);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};const result=await vtugateRequest("api/v1/verifyelectricity",{service_id:serviceId,meter_no:meterNo,disco});if(!result.success)return result;const customerName=findTransactionField(result.data,["meter_name","customer_name","name"]);const address=findTransactionField(result.data,["cust_address","address"]);return{...result,customerName,address};}
 
 async function debitWallet(userId,amount){
@@ -1196,9 +1235,15 @@ user_id TEXT PRIMARY KEY,
 agent_id TEXT UNIQUE NOT NULL,
 status TEXT NOT NULL DEFAULT 'active',
 tier TEXT NOT NULL DEFAULT 'standard',
+max_transaction_override NUMERIC(14,2),
+daily_limit_override NUMERIC(14,2),
+daily_count_override INTEGER,
 activated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
+await db(`ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS max_transaction_override NUMERIC(14,2)`);
+await db(`ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS daily_limit_override NUMERIC(14,2)`);
+await db(`ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS daily_count_override INTEGER`);
 await db(`CREATE INDEX IF NOT EXISTS agent_profiles_status_idx ON agent_profiles(status)`);
 await db(`
 CREATE TABLE IF NOT EXISTS agent_services(
@@ -1211,6 +1256,17 @@ PRIMARY KEY(user_id,service_key)
 )`);
 await db(`ALTER TABLE agent_services ADD COLUMN IF NOT EXISTS markup_pct_override NUMERIC(6,2)`);
 await db(`CREATE INDEX IF NOT EXISTS agent_services_service_idx ON agent_services(service_key)`);
+await db(`
+CREATE TABLE IF NOT EXISTS agent_customers(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+name TEXT NOT NULL,
+phone TEXT NOT NULL,
+network TEXT,
+notes TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+await db(`CREATE INDEX IF NOT EXISTS agent_customers_user_idx ON agent_customers(user_id)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS transactions(
@@ -3098,6 +3154,7 @@ if(accountType==="static")payload[String(identityType).toLowerCase()]=String(ide
 const r=await flutterwaveRequest("/virtual-account-numbers",{method:"POST",body:JSON.stringify(payload)});if(!r.success)throw new Error(flutterwaveError(r,"Unable to create Flutterwave virtual account."));
 const account=extractFlutterwaveVA(r.data);if(!account.accountNumber)throw new Error("Flutterwave did not return a virtual account number.");
 const result=await db(`INSERT INTO flutterwave_virtual_accounts(owner_type,owner_id,account_type,account_number,account_name,bank_name,bank_code,currency,amount,status,provider_account_id,provider_customer_id,tx_ref,identity_type,expiry_date,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,'NGN',$8,'active',$9,$10,$11,$12,$13,$14) ON CONFLICT(account_number) DO UPDATE SET account_name=EXCLUDED.account_name,bank_name=EXCLUDED.bank_name,bank_code=EXCLUDED.bank_code,amount=EXCLUDED.amount,status='active',provider_account_id=EXCLUDED.provider_account_id,provider_customer_id=EXCLUDED.provider_customer_id,expiry_date=EXCLUDED.expiry_date,metadata=EXCLUDED.metadata,updated_at=NOW() RETURNING *`,[ownerType,ownerId,accountType,account.accountNumber,account.accountName||`${name.first} ${name.last}`,account.bankName,account.bankCode||null,Number(accountType==="static"?0:amount),account.providerAccountId||null,account.providerCustomerId||null,ref,accountType==="static"?String(identityType).toLowerCase():null,account.expiryDate,JSON.stringify(account.raw||{})]);
+if(accountType==="static"&&ownerType==="user"){try{await addNotification(ownerId,'Funding account verified',`Your dedicated BOLTIV funding account ${account.accountNumber} (${account.bankName||''}) is ready. Your identity has been verified.`,'account');}catch{}}
 return{success:true,account:result.rows[0],existing:false};
 }
 async function createCustomerFlutterwaveStaticAccount(user,identityType,identityNumber){return createFlutterwaveVirtualAccount({ownerType:"user",ownerId:user.user_id,user,accountType:"static",identityType,identityNumber});}
@@ -3329,10 +3386,13 @@ async function adminTransactionsResponse(req){
   const r=await db(`SELECT t.id,t.user_id,t.type,t.service,t.amount,t.reference,t.status,t.date,
     t.provider_reference,t.metadata,u.email,u.name,
     COALESCE((t.metadata->'pricing'->>'providerCost')::numeric,0) AS provider_cost,
-    COALESCE((t.metadata->'pricing'->>'grossProfit')::numeric,0) AS gross_profit
+    COALESCE((t.metadata->'pricing'->>'grossProfit')::numeric,0) AS gross_profit,
+    t.metadata->'pricing'->>'agentPrice' AS agent_price,
+    t.metadata->'pricing'->>'customerSellingPrice' AS customer_selling_price,
+    t.metadata->'pricing'->>'agentProfit' AS agent_profit
     FROM transactions t LEFT JOIN users u ON u.user_id=t.user_id
     ORDER BY t.date DESC LIMIT 1000`);
-  return{success:true,transactions:r.rows.map(x=>({...x,amount:Number(x.amount||0),providerCost:Number(x.provider_cost||0),grossProfit:Number(x.gross_profit||0)}))};
+  return{success:true,transactions:r.rows.map(x=>({...x,amount:Number(x.amount||0),providerCost:Number(x.provider_cost||0),grossProfit:Number(x.gross_profit||0),isAgentSale:x.agent_price!=null,agentPrice:x.agent_price!=null?Number(x.agent_price):null,customerSellingPrice:x.customer_selling_price!=null?Number(x.customer_selling_price):null,agentProfit:x.agent_profit!=null?Number(x.agent_profit):null}))};
 }
 
 async function adminPaymentsResponse(req){
@@ -3478,6 +3538,14 @@ async function adminAuditResponse(req){
 async function adminAgents(req,action,userIdParam){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==='analytics'){
+    const counts=await db(`SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE status='active')::int AS active,COUNT(*) FILTER(WHERE status='suspended')::int AS suspended,COUNT(*) FILTER(WHERE activated_at>=NOW()-INTERVAL '30 days')::int AS new_this_month FROM agent_profiles`);
+    const volume=await db(`SELECT COUNT(*)::int AS transactions,COALESCE(SUM(amount) FILTER(WHERE status='successful'),0) AS volume,COALESCE(SUM(COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0)) FILTER(WHERE status='successful'),0) AS revenue FROM transactions WHERE metadata->'pricing'->>'agentPrice' IS NOT NULL`);
+    const top=await db(`SELECT t.user_id,a.agent_id,u.name,COUNT(*)::int AS transactions,COALESCE(SUM(t.amount) FILTER(WHERE t.status='successful'),0) AS volume FROM transactions t JOIN agent_profiles a ON a.user_id=t.user_id LEFT JOIN users u ON u.user_id=t.user_id WHERE t.metadata->'pricing'->>'agentPrice' IS NOT NULL GROUP BY t.user_id,a.agent_id,u.name ORDER BY volume DESC LIMIT 10`);
+    const c=counts.rows[0]||{},v=volume.rows[0]||{};
+    const totalVolume=Number(v.volume||0),totalActive=Number(c.active||0);
+    return{success:true,totalAgents:Number(c.total||0),activeAgents:totalActive,suspendedAgents:Number(c.suspended||0),newThisMonth:Number(c.new_this_month||0),totalVolume,totalTransactions:Number(v.transactions||0),totalRevenue:Number(v.revenue||0),averageVolumePerAgent:totalActive>0?Number((totalVolume/totalActive).toFixed(2)):0,topAgents:top.rows.map(x=>({userId:x.user_id,agentId:x.agent_id,name:x.name,transactions:Number(x.transactions||0),volume:Number(x.volume||0)}))};
+  }
   if(action==='list') {
     const r=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance,
       EXISTS(SELECT 1 FROM flutterwave_virtual_accounts fva WHERE fva.owner_type='user' AND fva.owner_id=a.user_id AND fva.account_type='static' AND fva.status='active') AS kyc_verified
@@ -3487,11 +3555,22 @@ async function adminAgents(req,action,userIdParam){
   const userId=clean(userIdParam);
   if(!userId)return{success:false,statusCode:400,message:'Agent user ID is required.'};
   if(action==='details'){
-    const a=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance FROM agent_profiles a LEFT JOIN users u ON u.user_id=a.user_id LEFT JOIN wallets w ON w.user_id=a.user_id WHERE a.user_id=$1 LIMIT 1`,[userId]);
+    const a=await db(`SELECT a.user_id,a.agent_id,a.status,a.tier,a.max_transaction_override,a.daily_limit_override,a.daily_count_override,a.activated_at,a.updated_at,u.name,u.email,u.phone,COALESCE(w.balance,0) AS balance FROM agent_profiles a LEFT JOIN users u ON u.user_id=a.user_id LEFT JOIN wallets w ON w.user_id=a.user_id WHERE a.user_id=$1 LIMIT 1`,[userId]);
     if(!a.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
+    const effectiveLimits=await getAgentLimits(a.rows[0]);
     const fva=await db(`SELECT account_number,bank_name,account_name FROM flutterwave_virtual_accounts WHERE owner_type='user' AND owner_id=$1 AND account_type='static' AND status='active' LIMIT 1`,[userId]);
     const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,s.config,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[userId]);
-    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},staticAccount:fva.rows[0]||null,services:services.rows.map(x=>{const pricing=agentPricingConfig({config:x.config},x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled),markup_pct_override:x.markup_pct_override!=null?Number(x.markup_pct_override):null,effective_markup_pct:pricing.markup_pct};})};
+    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},staticAccount:fva.rows[0]||null,limits:effectiveLimits,limitOverrides:{maxTransaction:a.rows[0].max_transaction_override!=null?Number(a.rows[0].max_transaction_override):null,dailyLimit:a.rows[0].daily_limit_override!=null?Number(a.rows[0].daily_limit_override):null,dailyCount:a.rows[0].daily_count_override!=null?Number(a.rows[0].daily_count_override):null},services:services.rows.map(x=>{const pricing=agentPricingConfig({config:x.config},x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled),markup_pct_override:x.markup_pct_override!=null?Number(x.markup_pct_override):null,effective_markup_pct:pricing.markup_pct};})};
+  }
+  if(action==='limits'){
+    const b=await body(req);
+    const toVal=(v)=>(v===null||v===''||v===undefined)?null:Math.max(0,Number(v));
+    const maxTransaction=toVal(b.maxTransaction),dailyLimit=toVal(b.dailyLimit),dailyCount=toVal(b.dailyCount);
+    const exists=await db(`SELECT 1 FROM agent_profiles WHERE user_id=$1`,[userId]);
+    if(!exists.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
+    await db(`UPDATE agent_profiles SET max_transaction_override=$1,daily_limit_override=$2,daily_count_override=$3,updated_at=NOW() WHERE user_id=$4`,[maxTransaction,dailyLimit,dailyCount!=null?Math.floor(dailyCount):null,userId]);
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_limits_override','agent',$2,$3::jsonb,$4)`,[admin.id,userId,JSON.stringify({maxTransaction,dailyLimit,dailyCount}),requestIp(req)]);
+    return adminAgents(req,'details',userId);
   }
   if(action==='services'){
     const b=await body(req);
@@ -3510,6 +3589,7 @@ async function adminAgents(req,action,userIdParam){
       }
       await client.query('COMMIT');
       await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_service_update','agent',$2,$3::jsonb,$4)`,[admin.id,userId,JSON.stringify({services:services.map(x=>({key:clean(x.key),enabled:x.enabled!==false,markup_pct_override:x.markup_pct_override??null}))}),requestIp(req)]);
+      try{await addNotification(userId,'Agent services updated','BOLTIV has updated the services or pricing available on your Agent account. Check your profile for the latest details.','account');}catch{}
       return adminAgents(req,'details',userId);
     }catch(e){try{await client.query('ROLLBACK')}catch{};throw e;}finally{client.release();}
   }
@@ -3572,6 +3652,18 @@ async function adminSettings(req,action){
       await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW())
         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[key,JSON.stringify(value)]);
     }
+  }
+  if(Object.prototype.hasOwnProperty.call(b,"agent_limits")){
+    const raw=b.agent_limits||{};
+    const value={
+      minWalletBalance:Math.max(0,Number(raw.minWalletBalance??DEFAULT_AGENT_LIMITS.minWalletBalance)),
+      maxTransaction:Math.max(0,Number(raw.maxTransaction??DEFAULT_AGENT_LIMITS.maxTransaction)),
+      dailyLimit:Math.max(0,Number(raw.dailyLimit??DEFAULT_AGENT_LIMITS.dailyLimit)),
+      dailyCount:Math.max(1,Math.floor(Number(raw.dailyCount??DEFAULT_AGENT_LIMITS.dailyCount)))
+    };
+    await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES('agent_limits',$1::jsonb,NOW())
+      ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,[JSON.stringify(value)]);
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_limits_update','platform_settings','agent_limits',$2::jsonb,$3)`,[admin.id,JSON.stringify(value),requestIp(req)]);
   }
   return adminSettings(req,"get");
 }
@@ -3830,9 +3922,11 @@ if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await ad
 if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/agents"){const result=await adminAgents(req,'list');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/agents/analytics"){const result=await adminAgents(req,'analytics');return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/services")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/services".length));const result=await adminAgents(req,'details',userId);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/services")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/services".length));const result=await adminAgents(req,'services',userId);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/status")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/status".length));const result=await adminAgents(req,'status',userId);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/limits")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/limits".length));const result=await adminAgents(req,'limits',userId);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/services"){const result=await adminServices(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path==="/api/admin/services"){const result=await adminServices(req,"update");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/settings"){const result=await adminSettings(req,"get");return send(res,result.success?200:(result.statusCode||400),result);}
@@ -4398,6 +4492,17 @@ WALLET
 if(req.method==="POST"&&path==="/api/wallet/create"){
 const user=await userFromToken(req);
 if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+await createWallet(user.user_id);
+const wallet=await getWallet(user.user_id);
+return send(res,200,{success:true,wallet});
+}
+
+/*
+AGENT
+*/
+if(path==="/api/agent/status"||path==="/api/agent/activate"||path==="/api/agent/dashboard"||path==="/api/agent/transactions"||path==="/api/agent/transactions/export"||path==="/api/agent/customers"){
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 if(req.method==="GET"&&path==="/api/agent/status"){
   const agent=await getAgentProfile(user.user_id);
   const wallet=await getWallet(user.user_id);
@@ -4409,10 +4514,85 @@ if(req.method==="POST"&&path==="/api/agent/activate"){
   const rl=rateLimit(req,`agent-activate:${user.user_id}`,5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
   try{const result=await activateAgentForUser(user,req);return send(res,result.success?200:(result.statusCode||400),result);}catch(e){console.error('AGENT ACTIVATION ERROR:',e?.stack||e?.message||e);return send(res,500,{success:false,message:'Unable to activate your Agent account right now.'});}
 }
-await createWallet(user.user_id);
-const wallet=await getWallet(user.user_id);
-return send(res,200,{success:true,wallet});
+if(req.method==="GET"&&path==="/api/agent/dashboard"){
+  const agent=await getAgentProfile(user.user_id);
+  if(!agent||agent.status!=='active')return send(res,403,{success:false,message:'Your Agent account is not active.'});
+  const wallet=await getWallet(user.user_id);
+  // Only transactions that actually went through Agent pricing count here — a walk-in-style
+  // purchase an Agent might still make for themselves (if that ever happens) isn't "Agent sales".
+  const r=await db(`SELECT
+    COUNT(*) FILTER(WHERE date::date=CURRENT_DATE)::int AS today_count,
+    COALESCE(SUM(amount) FILTER(WHERE status='successful' AND date::date=CURRENT_DATE),0) AS today_sales,
+    COALESCE(SUM(COALESCE((metadata->'pricing'->>'agentProfit')::numeric,0)) FILTER(WHERE status='successful' AND date::date=CURRENT_DATE),0) AS today_profit,
+    COALESCE(SUM(amount) FILTER(WHERE status='successful'),0) AS total_sales,
+    COALESCE(SUM(COALESCE((metadata->'pricing'->>'agentProfit')::numeric,0)) FILTER(WHERE status='successful'),0) AS total_profit,
+    COUNT(*) FILTER(WHERE status IN ('pending','processing'))::int AS pending_count,
+    COUNT(*) FILTER(WHERE status='failed')::int AS failed_count,
+    COUNT(*) FILTER(WHERE status='successful')::int AS total_transactions
+    FROM transactions WHERE user_id=$1 AND metadata->'pricing'->>'agentPrice' IS NOT NULL`,[user.user_id]);
+  const s=r.rows[0]||{};
+  return send(res,200,{success:true,agent,walletBalance:Number(wallet?.balance||0),today:{transactions:Number(s.today_count||0),sales:Number(s.today_sales||0),profit:Number(s.today_profit||0)},total:{sales:Number(s.total_sales||0),profit:Number(s.total_profit||0),transactions:Number(s.total_transactions||0)},pendingTransactions:Number(s.pending_count||0),failedTransactions:Number(s.failed_count||0)});
 }
+if(req.method==="GET"&&path==="/api/agent/transactions"){
+  const agent=await getAgentProfile(user.user_id);
+  if(!agent||agent.status!=='active')return send(res,403,{success:false,message:'Your Agent account is not active.'});
+  const limit=Math.min(200,Math.max(1,Number(url.searchParams.get("limit"))||50));
+  const r=await db(`SELECT reference,service,amount,status,recipient,provider_reference,date,metadata FROM transactions WHERE user_id=$1 AND metadata->'pricing'->>'agentPrice' IS NOT NULL ORDER BY date DESC LIMIT $2`,[user.user_id,limit]);
+  return send(res,200,{success:true,transactions:r.rows.map(t=>{const p=t.metadata?.pricing||{};return{reference:t.reference,service:t.service,status:t.status,recipient:t.recipient,date:t.date,agentPrice:Number(p.agentPrice||t.amount||0),customerSellingPrice:Number(p.customerSellingPrice||0),profit:Number(p.agentProfit||0)};})});
+}
+if(req.method==="GET"&&path==="/api/agent/transactions/export"){
+  const agent=await getAgentProfile(user.user_id);
+  if(!agent||agent.status!=='active')return send(res,403,{success:false,message:'Your Agent account is not active.'});
+  const r=await db(`SELECT reference,service,amount,status,recipient,date,metadata FROM transactions WHERE user_id=$1 AND metadata->'pricing'->>'agentPrice' IS NOT NULL ORDER BY date DESC LIMIT 5000`,[user.user_id]);
+  const escCsv=(v)=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+  const header=['Date','Reference','Service','Recipient','Status','Your BOLTIV Price','Customer Price','Your Profit'];
+  const lines=[header.join(',')];
+  for(const t of r.rows){
+    const p=t.metadata?.pricing||{};
+    lines.push([new Date(t.date).toISOString(),t.reference,t.service,t.recipient||'',t.status,Number(p.agentPrice||t.amount||0).toFixed(2),Number(p.customerSellingPrice||0).toFixed(2),Number(p.agentProfit||0).toFixed(2)].map(escCsv).join(','));
+  }
+  const csv=lines.join('\n');
+  if(FRONTEND_URL.startsWith("https://"))res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
+  res.writeHead(200,{
+    "Content-Type":"text/csv; charset=utf-8",
+    "Content-Disposition":`attachment; filename="boltiv-agent-statement-${agent.agent_id}.csv"`,
+    "Access-Control-Allow-Origin":res.__corsOrigin||DEFAULT_FRONTEND_ORIGIN,
+    "Vary":"Origin",
+    "Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
+    "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key,X-Admin-CSRF",
+    "Access-Control-Allow-Credentials":"true",
+    "X-Content-Type-Options":"nosniff",
+    "X-Frame-Options":"DENY",
+    "Referrer-Policy":"strict-origin-when-cross-origin",
+    "Cache-Control":"no-store"
+  });
+  return res.end(csv);
+}
+if(path==="/api/agent/customers"){
+  const agent=await getAgentProfile(user.user_id);
+  if(!agent||agent.status!=='active')return send(res,403,{success:false,message:'Your Agent account is not active.'});
+  if(req.method==="GET"){
+    const r=await db(`SELECT id,name,phone,network,notes,created_at FROM agent_customers WHERE user_id=$1 ORDER BY created_at DESC LIMIT 500`,[user.user_id]);
+    return send(res,200,{success:true,customers:r.rows});
+  }
+  if(req.method==="POST"){
+    const b=await body(req);
+    const name=clean(b.name),phone=clean(b.phone),network=clean(b.network).toUpperCase(),notes=clean(b.notes);
+    if(!name)return send(res,400,{success:false,message:'Customer name is required.'});
+    if(!/^\d{11}$/.test(phone))return send(res,400,{success:false,message:'Enter a valid 11-digit phone number.'});
+    const r=await db(`INSERT INTO agent_customers(user_id,name,phone,network,notes) VALUES($1,$2,$3,$4,$5) RETURNING id,name,phone,network,notes,created_at`,[user.user_id,name,phone,network||null,notes||null]);
+    return send(res,200,{success:true,customer:r.rows[0]});
+  }
+  if(req.method==="DELETE"){
+    const b=await body(req);
+    const id=Number(b.id);
+    if(!Number.isFinite(id))return send(res,400,{success:false,message:'Customer ID is required.'});
+    await db(`DELETE FROM agent_customers WHERE id=$1 AND user_id=$2`,[id,user.user_id]);
+    return send(res,200,{success:true});
+  }
+}
+}
+
 
 if(
 req.method==="GET"&&
@@ -4670,19 +4850,22 @@ if(!service)return send(res,503,{success:false,message:"Data service is not conf
 if(service.enabled===false)return send(res,503,{success:false,message:"Data service is currently unavailable."});
 if(service.maintenance===true)return send(res,503,{success:false,message:"Data service is currently under maintenance."});
 const pricing=pricingConfig(service);
+const agentService=await getEffectiveAgentService(user.user_id,"data");
+const agentPricing=agentService.isAgent?agentPricingConfig(service,agentService.markupOverride):null;
 const byPlan=new Map();
 for(const plan of rawPlans){
 const planCode=clean(plan.plan_code||plan.code||""), providerPrice=Number(plan.price||0), planServiceId=Number(plan.service_id||0);
 if(!planCode||!Number.isFinite(providerPrice)||providerPrice<=0)continue;
 const customerPrice=customerPriceFromCost(providerPrice,pricing);
 if(customerPrice===null)continue;
+const agentPrice=agentPricing?customerPriceFromCost(providerPrice,agentPricing):null;
 const lookupKey=planLookupKey(planCode,planServiceId);
-byPlan.set(lookupKey,{code:planCode,plan_code:planCode,provider_code:planCode,lookup_key:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,sales_channel:clean(plan.sales_channel||''),service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
+byPlan.set(lookupKey,{code:planCode,plan_code:planCode,provider_code:planCode,lookup_key:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,agent_price:agentPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,sales_channel:clean(plan.sales_channel||''),service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values())
 .filter(plan=>['SME','Gifting'].includes(plan.sales_channel)&&Number(plan.size_mb||0)>=500)
 .sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
-return send(res,200,{success:true,network,plans});
+return send(res,200,{success:true,network,plans,isAgent:agentService.isAgent,agentEnabled:agentService.enabled});
 }catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}
 }
 
@@ -4704,7 +4887,7 @@ return send(res,200,{success:true,products});
 }catch(error){console.error("VTUGATE EDUCATION CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:error.message||"Unable to load education PIN products right now."});}
 }
 
-if(req.method==="POST"&&path==="/api/vtu/cable/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifyVTUGATECable(req);return send(res,r.success?200:(r.statusCode||400),r);}
+if(req.method==="POST"&&path==="/api/vtu/cable/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifyVTUGATECable(req,user);return send(res,r.success?200:(r.statusCode||400),r);}
 if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifyVTUGATEElectricity(req);return send(res,r.success?200:(r.statusCode||400),r);}
 
 /*

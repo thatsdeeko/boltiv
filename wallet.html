@@ -199,4 +199,5 @@ confirmFunding.onclick=async()=>{if(!pendingAmount)return;if(selectedAccountType
 modal.onclick=e=>{if(e.target===modal)closeModal()};document.onkeydown=e=>{if(e.key==="Escape")closeModal()};profileButton.onclick=()=>location.href="/profile";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);loadFundingAccount().finally(()=>loadWallet());loadWalletSummary();
 /* END OF BOLTIV WALLET */
 </script><script src="/boltiv-install.js?v=53"></script>
+<script src="boltiv-footer.js?v=1"></script>
 </body></html>

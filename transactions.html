@@ -123,6 +123,7 @@ window.addEventListener("pageshow",async()=>{await syncTransactions();render()})
 setInterval(async()=>{const hasPending=getTransactions().some(t=>["pending","processing","initiated"].includes(String(t.status||"").toLowerCase()));if(hasPending){await syncTransactions();render();}},15000);
 </script>
 <script src="/boltiv-install.js?v=53"></script>
+<script src="boltiv-footer.js?v=1"></script>
 </body>
 </html>
 <!-- END OF BOLTIV TRANSACTIONS -->

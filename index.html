@@ -294,11 +294,6 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <a class="seo-btn primary" href="/register">Create your BOLTIV account</a>
 </section>
 </main>
-<footer class="seo-footer">
-<strong>BOLTIV</strong>
-<div style="margin-top:10px"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms &amp; Conditions</a><a href="/contact">Contact</a></div>
-<div style="margin-top:12px">© 2026 BOLTIV. All rights reserved.</div>
-</footer>
 </div>
 </div>
 <div aria-label="Quick account actions" class="seo-mobile-cta">
@@ -312,5 +307,6 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 // keep-warm ping used on the rest of the app once someone's signed in.
 fetch('https://boltiv-backend.onrender.com/api/health',{cache:'no-store'}).catch(function(){});
 </script>
+<script src="boltiv-footer.js?v=1"></script>
 </body>
 </html>

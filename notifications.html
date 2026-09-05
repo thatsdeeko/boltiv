@@ -30,4 +30,5 @@ return '<article class="item '+(n.read?"":"unread")+'"><div style="display:flex;
 document.getElementById("markAll").onclick=async()=>{const r=await fetch(API+"/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({})});if(r.ok)load()};
 load();
 </script><script src="/boltiv-install.js?v=53"></script>
+<script src="boltiv-footer.js?v=1"></script>
 </body></html>

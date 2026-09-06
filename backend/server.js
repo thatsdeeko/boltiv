@@ -193,17 +193,33 @@ else if(p.markup_mode==="percentage_plus_fixed")price+=n*Number(p.markup_pct||0)
 return Number(price.toFixed(2));
 }
 
-// BOLTIV Agent wholesale pricing. Deliberately separate from pricingConfig() (the B2C customer
-// price): admin sets a per-service default Agent markup — normally lower than the B2C markup,
-// which is what makes the Agent price "wholesale" — plus an optional per-agent override (set on
-// agent_services.markup_pct_override) for individually negotiated rates. Agent pricing never
-// includes the flat B2C service_fee; it is purely a percentage over cost.
-function agentPricingConfig(service,overridePct){
-const config=service?.config&&typeof service.config==="object"?service.config:{};
-const agentPricing=config.agent_pricing&&typeof config.agent_pricing==="object"?config.agent_pricing:null;
-const defaultPct=Number(agentPricing?.markup_pct??0);
-const pct=Number.isFinite(overridePct)?overridePct:(Number.isFinite(defaultPct)?defaultPct:0);
-return {markup_mode:"markup_percentage",markup_pct:Math.min(500,Math.max(0,pct)),markup_fixed:0,service_fee:0};
+// BOLTIV Agent wholesale pricing — GLOBAL, one configuration per service, read from the
+// dedicated agent_pricing table (see getAgentPricingRow/getAllAgentPricing below). Deliberately
+// separate from pricingConfig() (the B2C customer price): this is normally a lower markup than
+// the B2C one, which is what makes the Agent price "wholesale". overridePct is the ONLY thing
+// that may vary per agent (an individually negotiated rate) — the fixed fee and active flag are
+// always the single global value, exactly as requested: no separate pricing records per agent.
+function agentPricingConfig(pricingRow,overridePct){
+  const row=pricingRow||{};
+  const defaultPct=Number(row.markup_percent??0);
+  const pct=Number.isFinite(overridePct)?overridePct:(Number.isFinite(defaultPct)?defaultPct:0);
+  const fixedFee=Number(row.fixed_fee??0);
+  return {markup_mode:"markup_percentage",markup_pct:Math.min(500,Math.max(0,pct)),markup_fixed:Number.isFinite(fixedFee)?Math.max(0,fixedFee):0,service_fee:0};
+}
+async function getAgentPricingRow(serviceKey){
+  const key=clean(serviceKey);
+  const r=await db(`SELECT service,markup_percent,fixed_fee,active,updated_at FROM agent_pricing WHERE service=$1 LIMIT 1`,[key]);
+  if(r.rows.length)return r.rows[0];
+  // Auto-provision a default row the first time a service is priced for Agents — this is what
+  // keeps the architecture extensible to services added later without any manual setup step.
+  await db(`INSERT INTO agent_pricing(service,markup_percent,fixed_fee,active) VALUES($1,0,0,true) ON CONFLICT(service) DO NOTHING`,[key]);
+  const retry=await db(`SELECT service,markup_percent,fixed_fee,active,updated_at FROM agent_pricing WHERE service=$1 LIMIT 1`,[key]);
+  return retry.rows[0]||{service:key,markup_percent:0,fixed_fee:0,active:true,updated_at:null};
+}
+async function getAllAgentPricing(){
+  for(const key of ['airtime','data','electricity','cable'])await getAgentPricingRow(key);
+  const r=await db(`SELECT ap.service,ap.markup_percent,ap.fixed_fee,ap.active,ap.updated_at,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance FROM agent_pricing ap LEFT JOIN services s ON s.key=ap.service ORDER BY ap.service`);
+  return r.rows.map(x=>({service:x.service,name:x.name||x.service,icon:x.icon||'⚙',markupPercent:Number(x.markup_percent||0),fixedFee:Number(x.fixed_fee||0),active:Boolean(x.active),platformEnabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),updatedAt:x.updated_at}));
 }
 
 const DEFAULT_AGENT_LIMITS={minWalletBalance:10000,maxTransaction:50000,dailyLimit:500000,dailyCount:100};
@@ -666,7 +682,9 @@ if(agentService.isAgent){
   // requested face-value amount is used as the basis instead — the Agent still gets a lower
   // markup than a walk-in customer would, which is what makes it a wholesale rate.
   const costBasis=pricingMeta.providerCost!=null?Number(pricingMeta.providerCost):amount;
-  const agentPricing=agentPricingConfig(serviceRecord,agentService.markupOverride);
+  const agentPricingRow=await getAgentPricingRow(service);
+  if(agentPricingRow.active===false)return{success:false,statusCode:403,message:"Agent pricing for this service is currently disabled."};
+  const agentPricing=agentPricingConfig(agentPricingRow,agentService.markupOverride);
   const agentPrice=customerPriceFromCost(costBasis,agentPricing);
   if(agentPrice==null)return{success:false,statusCode:400,message:"Unable to price this Agent transaction."};
   const customerSellingPrice=Number(data.customerSellingPrice??data.providerPayload?.customerSellingPrice);
@@ -690,9 +708,9 @@ const providerData=providerResult.data||{};const providerReference=providerResul
 
 async function verifyVTUGATECable(req,user){const b=await body(req);const providerName=clean(b.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){return{success:false,statusCode:503,message:e.message||"Unable to verify the cable TV service for this provider right now."};}const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const phoneVal=clean(b.phone||"08000000000");const result=await vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:phoneVal,phone_number:phoneVal,msisdn:phoneVal});
 if(!result.success||!user)return result;
-const cableService=await getService("cable");
 const agentService=await getEffectiveAgentService(user.user_id,"cable");
-const agentPricing=(cableService&&agentService.isAgent)?agentPricingConfig(cableService,agentService.markupOverride):null;
+const cablePricingRow=agentService.isAgent?await getAgentPricingRow("cable"):null;
+const agentPricing=(agentService.isAgent&&cablePricingRow&&cablePricingRow.active!==false)?agentPricingConfig(cablePricingRow,agentService.markupOverride):null;
 const providerPlans=CABLE_PLANS[providerName]||{};
 const plans={};
 for(const [planName,price] of Object.entries(providerPlans)){
@@ -1499,6 +1517,24 @@ await db(`DELETE FROM services WHERE key NOT IN ('airtime','data','electricity',
 await db(`UPDATE services SET config=jsonb_set(jsonb_set(config,'{pricing,mode}','"discount"'::jsonb,true),'{pricing,fixed_profit}','0'::jsonb,true),updated_at=NOW() WHERE config->'pricing'->>'mode' IN ('fixed','fixed_profit')`);
 await db(`DELETE FROM services WHERE key IN ('education','betting','sms')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true],['announcement_enabled',true],['announcement_text','Welcome to BOLTIV — Fast. Simple. Powerful.'],['announcement_items',[{text:'Welcome to BOLTIV — Fast. Simple. Powerful.',enabled:true}]]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
+
+// GLOBAL Agent pricing — one configuration row per service, applied identically to every
+// BOLTIV Agent. Deliberately a dedicated table (not folded into services.config) so it reads
+// as a proper pricing configuration in its own right, and so "active" can independently gate
+// Agent access to a service without touching that service's own B2C enabled/maintenance state.
+await db(`CREATE TABLE IF NOT EXISTS agent_pricing(
+id BIGSERIAL PRIMARY KEY,
+service TEXT UNIQUE NOT NULL,
+markup_percent NUMERIC(6,2) NOT NULL DEFAULT 0,
+fixed_fee NUMERIC(14,2) NOT NULL DEFAULT 0,
+active BOOLEAN NOT NULL DEFAULT TRUE,
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`);
+for(const key of ['airtime','data','electricity','cable']) await db(`INSERT INTO agent_pricing(service,markup_percent,fixed_fee,active) VALUES($1,0,0,true) ON CONFLICT(service) DO NOTHING`,[key]);
+// One-time migration: an earlier iteration stored the Agent markup percentage inside each
+// service's own config JSONB. Carry any value already set there into the new table so nothing
+// admins previously configured gets silently reset to zero.
+await db(`UPDATE agent_pricing ap SET markup_percent=LEAST(500,GREATEST(0,COALESCE((s.config->'agent_pricing'->>'markup_pct')::numeric,0))),updated_at=NOW() FROM services s WHERE s.key=ap.service AND s.config->'agent_pricing'->>'markup_pct' IS NOT NULL AND ap.markup_percent=0`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS password_reset_tokens(
@@ -3535,6 +3571,39 @@ async function adminAuditResponse(req){
   return{success:true,logs:r.rows};
 }
 
+// GLOBAL Agent Pricing admin API. One configuration per service, applied identically to every
+// BOLTIV Agent — this intentionally does NOT touch agent_services.markup_pct_override (the
+// existing per-agent negotiated-rate mechanism), which remains a separate, optional layer.
+async function adminAgentPricing(req,action,serviceParam){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(action==='list'){
+    const rows=await getAllAgentPricing();
+    return{success:true,pricing:rows};
+  }
+  const serviceKey=clean(serviceParam);
+  if(!serviceKey)return{success:false,statusCode:400,message:'Service is required.'};
+  if(action==='get'){
+    const exists=await db(`SELECT 1 FROM services WHERE key=$1`,[serviceKey]);
+    if(!exists.rows.length)return{success:false,statusCode:404,message:'Unknown service.'};
+    const row=await getAgentPricingRow(serviceKey);
+    return{success:true,pricing:{service:row.service,markupPercent:Number(row.markup_percent||0),fixedFee:Number(row.fixed_fee||0),active:Boolean(row.active),updatedAt:row.updated_at}};
+  }
+  if(action==='update'){
+    const exists=await db(`SELECT 1 FROM services WHERE key=$1`,[serviceKey]);
+    if(!exists.rows.length)return{success:false,statusCode:404,message:'Unknown service.'};
+    const b=await body(req);
+    const markupPercent=Math.min(500,Math.max(0,Number(b.markupPercent??b.markup_percent??0)));
+    const fixedFee=Math.max(0,Number(b.fixedFee??b.fixed_fee??0));
+    const active=b.active!==false;
+    if(!Number.isFinite(markupPercent)||!Number.isFinite(fixedFee))return{success:false,statusCode:400,message:'Markup and fee must be valid numbers.'};
+    await db(`INSERT INTO agent_pricing(service,markup_percent,fixed_fee,active,updated_at) VALUES($1,$2,$3,$4,NOW())
+      ON CONFLICT(service) DO UPDATE SET markup_percent=EXCLUDED.markup_percent,fixed_fee=EXCLUDED.fixed_fee,active=EXCLUDED.active,updated_at=NOW()`,[serviceKey,markupPercent,fixedFee,active]);
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'agent_pricing_update','service',$2,$3::jsonb,$4)`,[admin.id,serviceKey,JSON.stringify({markupPercent,fixedFee,active}),requestIp(req)]);
+    return adminAgentPricing(req,'get',serviceKey);
+  }
+  return{success:false,statusCode:400,message:'Unknown action.'};
+}
 async function adminAgents(req,action,userIdParam){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
@@ -3559,8 +3628,10 @@ async function adminAgents(req,action,userIdParam){
     if(!a.rows.length)return{success:false,statusCode:404,message:'Agent not found.'};
     const effectiveLimits=await getAgentLimits(a.rows[0]);
     const fva=await db(`SELECT account_number,bank_name,account_name FROM flutterwave_virtual_accounts WHERE owner_type='user' AND owner_id=$1 AND account_type='static' AND status='active' LIMIT 1`,[userId]);
-    const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,s.config,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[userId]);
-    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},staticAccount:fva.rows[0]||null,limits:effectiveLimits,limitOverrides:{maxTransaction:a.rows[0].max_transaction_override!=null?Number(a.rows[0].max_transaction_override):null,dailyLimit:a.rows[0].daily_limit_override!=null?Number(a.rows[0].daily_limit_override):null,dailyCount:a.rows[0].daily_count_override!=null?Number(a.rows[0].daily_count_override):null},services:services.rows.map(x=>{const pricing=agentPricingConfig({config:x.config},x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled),markup_pct_override:x.markup_pct_override!=null?Number(x.markup_pct_override):null,effective_markup_pct:pricing.markup_pct};})};
+    const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[userId]);
+    const pricingRows=await getAllAgentPricing();
+    const pricingByService=new Map(pricingRows.map(p=>[p.service,p]));
+    return{success:true,agent:{...a.rows[0],balance:Number(a.rows[0].balance||0)},staticAccount:fva.rows[0]||null,limits:effectiveLimits,limitOverrides:{maxTransaction:a.rows[0].max_transaction_override!=null?Number(a.rows[0].max_transaction_override):null,dailyLimit:a.rows[0].daily_limit_override!=null?Number(a.rows[0].daily_limit_override):null,dailyCount:a.rows[0].daily_count_override!=null?Number(a.rows[0].daily_count_override):null},services:services.rows.map(x=>{const globalRow=pricingByService.get(x.key);const pricing=agentPricingConfig(globalRow?{markup_percent:globalRow.markupPercent,fixed_fee:globalRow.fixedFee}:null,x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)&&Boolean(globalRow?globalRow.active:true),markup_pct_override:x.markup_pct_override!=null?Number(x.markup_pct_override):null,effective_markup_pct:pricing.markup_pct,effective_fixed_fee:pricing.markup_fixed};})};
   }
   if(action==='limits'){
     const b=await body(req);
@@ -3922,6 +3993,9 @@ if(req.method==="POST"&&path==="/api/admin/support/reply"){const result=await ad
 if(req.method==="POST"&&path==="/api/admin/support/status"){const result=await adminSupport(req,"status");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/audit"){const result=await adminAuditResponse(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/agents"){const result=await adminAgents(req,'list');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/agent-pricing"){const result=await adminAgentPricing(req,'list');return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path.startsWith("/api/admin/agent-pricing/")){const service=decodeURIComponent(path.slice("/api/admin/agent-pricing/".length));const result=await adminAgentPricing(req,'get',service);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="PATCH"&&path.startsWith("/api/admin/agent-pricing/")){const service=decodeURIComponent(path.slice("/api/admin/agent-pricing/".length));const result=await adminAgentPricing(req,'update',service);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/agents/analytics"){const result=await adminAgents(req,'analytics');return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/services")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/services".length));const result=await adminAgents(req,'details',userId);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="PATCH"&&path.startsWith("/api/admin/agents/")&&path.endsWith("/services")){const userId=decodeURIComponent(path.slice("/api/admin/agents/".length,-"/services".length));const result=await adminAgents(req,'services',userId);return send(res,result.success?200:(result.statusCode||400),result);}
@@ -4506,9 +4580,11 @@ if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 if(req.method==="GET"&&path==="/api/agent/status"){
   const agent=await getAgentProfile(user.user_id);
   const wallet=await getWallet(user.user_id);
-  const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,s.config,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[user.user_id]);
+  const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[user.user_id]);
+  const pricingRows=await getAllAgentPricing();
+  const pricingByService=new Map(pricingRows.map(p=>[p.service,p]));
   let staticAccount=null;try{const sa=await getFlutterwaveStaticFundingAccount(user);staticAccount=sa.account||null;}catch{}
-  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:10000,currentBalance:Number(wallet?.balance||0),hasStaticAccount:Boolean(staticAccount),staticAccount:staticAccount?{accountNumber:staticAccount.account_number,bankName:staticAccount.bank_name,accountName:staticAccount.account_name}:null,services:services.rows.map(x=>{const pricing=agentPricingConfig({config:x.config},x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled),agent_markup_pct:pricing.markup_pct};})});
+  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:10000,currentBalance:Number(wallet?.balance||0),hasStaticAccount:Boolean(staticAccount),staticAccount:staticAccount?{accountNumber:staticAccount.account_number,bankName:staticAccount.bank_name,accountName:staticAccount.account_name}:null,services:services.rows.map(x=>{const globalRow=pricingByService.get(x.key);const pricing=agentPricingConfig(globalRow?{markup_percent:globalRow.markupPercent,fixed_fee:globalRow.fixedFee}:null,x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)&&Boolean(globalRow?globalRow.active:true),agent_markup_pct:pricing.markup_pct,agent_fixed_fee:pricing.markup_fixed};})});
 }
 if(req.method==="POST"&&path==="/api/agent/activate"){
   const rl=rateLimit(req,`agent-activate:${user.user_id}`,5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
@@ -4851,7 +4927,8 @@ if(service.enabled===false)return send(res,503,{success:false,message:"Data serv
 if(service.maintenance===true)return send(res,503,{success:false,message:"Data service is currently under maintenance."});
 const pricing=pricingConfig(service);
 const agentService=await getEffectiveAgentService(user.user_id,"data");
-const agentPricing=agentService.isAgent?agentPricingConfig(service,agentService.markupOverride):null;
+const dataPricingRow=agentService.isAgent?await getAgentPricingRow("data"):null;
+const agentPricing=(agentService.isAgent&&dataPricingRow&&dataPricingRow.active!==false)?agentPricingConfig(dataPricingRow,agentService.markupOverride):null;
 const byPlan=new Map();
 for(const plan of rawPlans){
 const planCode=clean(plan.plan_code||plan.code||""), providerPrice=Number(plan.price||0), planServiceId=Number(plan.service_id||0);

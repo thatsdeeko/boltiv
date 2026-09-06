@@ -51,7 +51,7 @@ document.querySelectorAll(".amount-button").forEach(b=>b.onclick=()=>{document.q
 custom.oninput=()=>{amount=Number(custom.value);document.querySelectorAll(".amount-button").forEach(x=>x.classList.remove("active"));refreshAgentPricing()};
 
 // AGENT PRICING
-let isAgent=false,agentMarkupPct=0,agentEnabledForService=true,agentPrice=0;
+let isAgent=false,agentMarkupPct=0,agentFixedFee=0,agentEnabledForService=true,agentPrice=0;
 const agentPanel=document.getElementById("agentPricingPanel"),agentCostDisplay=document.getElementById("agentCostDisplay"),agentCustomerPriceInput=document.getElementById("agentCustomerPrice"),agentProfitDisplay=document.getElementById("agentProfitDisplay");
 async function loadAgentPricing(){
 try{
@@ -61,13 +61,14 @@ if(!d.success||!d.isAgent)return;
 isAgent=true;
 const svc=(d.services||[]).find(s=>s.key==="airtime");
 agentMarkupPct=svc?Number(svc.agent_markup_pct||0):0;
+agentFixedFee=svc?Number(svc.agent_fixed_fee||0):0;
 agentEnabledForService=svc?Boolean(svc.agent_enabled&&svc.platform_enabled&&!svc.maintenance):false;
 if(agentEnabledForService){agentPanel.style.display="block";refreshAgentPricing();}
 }catch(e){}
 }
 function refreshAgentPricing(){
 if(!isAgent||!agentEnabledForService)return;
-agentPrice=amount>0?Number((amount*(1+agentMarkupPct/100)).toFixed(2)):0;
+agentPrice=amount>0?Number((amount*(1+agentMarkupPct/100)+agentFixedFee).toFixed(2)):0;
 agentCostDisplay.textContent=money(agentPrice);
 if(!agentCustomerPriceInput.dataset.touched)agentCustomerPriceInput.value=agentPrice?agentPrice.toFixed(2):"";
 updateAgentProfit();

@@ -84,7 +84,7 @@ function showModal(type,title,message,details=""){modal.className="boltiv-modal 
 function closeModal(){modal.classList.remove("show");mb.style.display="block"}
 mb.onclick=closeModal;modal.onclick=e=>{if(e.target===modal)closeModal()};
 function check(){let v=Number($("amount").value);$("pay").disabled=!(verified&&v>=100);if(verified&&v>=100)$("sumAmount").textContent=money(v);refreshAgentPricing(v)}
-let isAgent=false,agentMarkupPct=0,agentEnabledForService=true;
+let isAgent=false,agentMarkupPct=0,agentFixedFee=0,agentEnabledForService=true;
 const agentPanel=$("agentPricingPanel"),agentCostDisplay=$("agentCostDisplay"),agentCustomerPriceInput=$("agentCustomerPrice"),agentProfitDisplay=$("agentProfitDisplay");
 async function loadAgentPricing(){
 try{
@@ -94,13 +94,14 @@ if(!d.success||!d.isAgent)return;
 isAgent=true;
 const svc=(d.services||[]).find(s=>s.key==="electricity");
 agentMarkupPct=svc?Number(svc.agent_markup_pct||0):0;
+agentFixedFee=svc?Number(svc.agent_fixed_fee||0):0;
 agentEnabledForService=svc?Boolean(svc.agent_enabled&&svc.platform_enabled&&!svc.maintenance):false;
 }catch(e){}
 }
 function refreshAgentPricing(v){
 if(!isAgent||!agentEnabledForService||!verified||!(v>=100)){agentPanel.style.display="none";return;}
 agentPanel.style.display="block";
-const agentPrice=Number((v*(1+agentMarkupPct/100)).toFixed(2));
+const agentPrice=Number((v*(1+agentMarkupPct/100)+agentFixedFee).toFixed(2));
 agentCostDisplay.textContent=money(agentPrice);
 agentCostDisplay.dataset.value=agentPrice;
 if(!agentCustomerPriceInput.dataset.touched)agentCustomerPriceInput.value=agentPrice.toFixed(2);

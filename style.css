@@ -917,49 +917,15 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   .boltiv-home .home-balance-card{border-radius:22px!important}
 }
 
-/* BOLTIV dashboard refinement: premium gold wallet + service icons */
-.home-balance-card{
-  background:linear-gradient(135deg,#b98a12 0%,#d7ad32 45%,#f0d36a 100%);
-  border:1px solid rgba(165,120,8,.5);
-  box-shadow:0 16px 34px rgba(173,129,17,.20);
-  color:#fff;
-}
-.home-balance-card .balance-label{color:rgba(255,255,255,.78)}
-.home-balance-card .balance-value{color:#fff}
-.home-balance-card .balance-mark{
-  background:rgba(255,255,255,.18);
-  border:1px solid rgba(255,255,255,.34);
-  color:#fff;
-  box-shadow:none;
-}
-.home-balance-card .balance-visibility-toggle{
-  background:rgba(255,255,255,.16);
-  border-color:rgba(255,255,255,.35);
-  color:#fff;
-}
-.home-balance-card .balance-visibility-toggle:hover{
-  background:rgba(255,255,255,.25);
-  border-color:rgba(255,255,255,.55);
-}
-.home-balance-card .home-balance-actions .btn-primary{
-  background:#fff;
-  color:#a4770c;
-  border-color:#fff;
-  box-shadow:0 6px 16px rgba(80,55,0,.12);
-}
-.home-balance-card .home-balance-actions .btn-light{
-  background:rgba(255,255,255,.14);
-  color:#fff;
-  border-color:rgba(255,255,255,.42);
-}
-.service-icon svg{
-  width:20px;
-  height:20px;
-  display:block;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.8;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-.home-service-card.coming-soon .service-icon{opacity:.72}
+/* BOLTIV dashboard refinements: golden wallet + service icons */
+.golden-wallet-card{background:linear-gradient(135deg,#c99700 0%,#e2bd32 52%,#cfa61b 100%) !important;border:none !important;border-radius:28px !important;box-shadow:0 18px 42px rgba(190,145,0,.20) !important;color:#fff !important;position:relative;overflow:hidden}
+.golden-wallet-card:after{content:"";position:absolute;right:-80px;top:-90px;width:340px;height:340px;border:1px solid rgba(255,255,255,.16);border-radius:50%;pointer-events:none}
+.golden-wallet-card .home-balance-top,.golden-wallet-card .home-balance-actions{position:relative;z-index:1}
+.golden-wallet-card .balance-label,.golden-wallet-card .balance-value{color:#fff !important}
+.golden-wallet-card .balance-visibility-toggle{color:#fff !important;border-color:rgba(255,255,255,.35) !important}
+.golden-wallet-card .balance-mark{color:#fff !important;border-color:rgba(255,255,255,.38) !important;background:rgba(255,255,255,.04) !important}
+.golden-wallet-card .btn-primary{background:#fff !important;color:#222 !important;border-color:#fff !important}
+.golden-wallet-card .btn-light{background:rgba(255,255,255,.06) !important;color:#fff !important;border-color:rgba(255,255,255,.48) !important}
+.home-service-card .service-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.home-service-card.coming-soon .service-icon{opacity:.62}
+.home-service-card.coming-soon strong,.home-service-card.coming-soon small{opacity:.72}

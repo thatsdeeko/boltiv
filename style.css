@@ -917,15 +917,10 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   .boltiv-home .home-balance-card{border-radius:22px!important}
 }
 
-/* BOLTIV dashboard refinements: golden wallet + service icons */
-.golden-wallet-card{background:linear-gradient(135deg,#c99700 0%,#e2bd32 52%,#cfa61b 100%) !important;border:none !important;border-radius:28px !important;box-shadow:0 18px 42px rgba(190,145,0,.20) !important;color:#fff !important;position:relative;overflow:hidden}
-.golden-wallet-card:after{content:"";position:absolute;right:-80px;top:-90px;width:340px;height:340px;border:1px solid rgba(255,255,255,.16);border-radius:50%;pointer-events:none}
-.golden-wallet-card .home-balance-top,.golden-wallet-card .home-balance-actions{position:relative;z-index:1}
-.golden-wallet-card .balance-label,.golden-wallet-card .balance-value{color:#fff !important}
-.golden-wallet-card .balance-visibility-toggle{color:#fff !important;border-color:rgba(255,255,255,.35) !important}
-.golden-wallet-card .balance-mark{color:#fff !important;border-color:rgba(255,255,255,.38) !important;background:rgba(255,255,255,.04) !important}
-.golden-wallet-card .btn-primary{background:#fff !important;color:#222 !important;border-color:#fff !important}
-.golden-wallet-card .btn-light{background:rgba(255,255,255,.06) !important;color:#fff !important;border-color:rgba(255,255,255,.48) !important}
-.home-service-card .service-icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.home-service-card.coming-soon .service-icon{opacity:.62}
-.home-service-card.coming-soon strong,.home-service-card.coming-soon small{opacity:.72}
+
+/* BOLTIV DASHBOARD — BETTING ICON REFINEMENT ONLY */
+.boltiv-home .betting-service-icon svg{
+  width:20px;
+  height:20px;
+  display:block;
+}

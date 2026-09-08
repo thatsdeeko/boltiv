@@ -614,7 +614,9 @@ async function activateAgentForUser(user,req){
   if(existing)return{success:true,alreadyAgent:true,agent:existing,message:'Your BOLTIV Agent account is already active.'};
   const wallet=await getWallet(user.user_id);
   const balance=Number(wallet?.balance||0);
-  if(balance<10000)return{success:false,statusCode:400,code:'AGENT_MINIMUM_BALANCE',message:`You need at least ₦10,000 in your BOLTIV wallet to become an Agent. Your current balance is ₦${balance.toLocaleString('en-NG',{minimumFractionDigits:2})}.`,requiredBalance:10000,currentBalance:balance};
+  const limits=await getAgentLimits(null);
+  const minWalletBalance=limits.minWalletBalance;
+  if(balance<minWalletBalance)return{success:false,statusCode:400,code:'AGENT_MINIMUM_BALANCE',message:`You need at least ₦${minWalletBalance.toLocaleString('en-NG',{minimumFractionDigits:2})} in your BOLTIV wallet to become an Agent. Your current balance is ₦${balance.toLocaleString('en-NG',{minimumFractionDigits:2})}.`,requiredBalance:minWalletBalance,currentBalance:balance};
   // KYC gate: BOLTIV does not treat "has a static account number" as proof of identity by
   // itself — it relies on Flutterwave's own verification, which is what actually gates
   // whether a permanent/static virtual account gets created at all (createFlutterwaveVirtualAccount
@@ -638,7 +640,7 @@ async function activateAgentForUser(user,req){
     }
     await client.query('COMMIT');
     try{await addNotification(user.user_id,'BOLTIV Agent activated',`Your BOLTIV Agent account ${agentId} is now active. Your existing wallet balance remains available as working capital.`,'account');}catch{}
-    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) SELECT id,'agent_activation','user',$1,$2::jsonb,$3 FROM admins ORDER BY id LIMIT 1`,[user.user_id,JSON.stringify({agent_id:agentId,minimum_balance:10000,static_account:staticAccount.account.account_number}),requestIp(req)]).catch(()=>{});
+    await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) SELECT id,'agent_activation','user',$1,$2::jsonb,$3 FROM admins ORDER BY id LIMIT 1`,[user.user_id,JSON.stringify({agent_id:agentId,minimum_balance:minWalletBalance,static_account:staticAccount.account.account_number}),requestIp(req)]).catch(()=>{});
     return{success:true,agent:r.rows[0],message:'You are now a BOLTIV Agent.'};
   }catch(e){try{await client.query('ROLLBACK')}catch{};throw e;}finally{client.release();}
 }
@@ -4580,11 +4582,12 @@ if(!user)return send(res,401,{success:false,message:"Unauthorized."});
 if(req.method==="GET"&&path==="/api/agent/status"){
   const agent=await getAgentProfile(user.user_id);
   const wallet=await getWallet(user.user_id);
+  const limits=await getAgentLimits(agent);
   const services=await db(`SELECT s.key,s.name,s.icon,s.enabled AS platform_enabled,s.maintenance,COALESCE(a.enabled,TRUE) AS agent_enabled,a.markup_pct_override FROM services s LEFT JOIN agent_services a ON a.user_id=$1 AND a.service_key=s.key ORDER BY s.name`,[user.user_id]);
   const pricingRows=await getAllAgentPricing();
   const pricingByService=new Map(pricingRows.map(p=>[p.service,p]));
   let staticAccount=null;try{const sa=await getFlutterwaveStaticFundingAccount(user);staticAccount=sa.account||null;}catch{}
-  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:10000,currentBalance:Number(wallet?.balance||0),hasStaticAccount:Boolean(staticAccount),staticAccount:staticAccount?{accountNumber:staticAccount.account_number,bankName:staticAccount.bank_name,accountName:staticAccount.account_name}:null,services:services.rows.map(x=>{const globalRow=pricingByService.get(x.key);const pricing=agentPricingConfig(globalRow?{markup_percent:globalRow.markupPercent,fixed_fee:globalRow.fixedFee}:null,x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)&&Boolean(globalRow?globalRow.active:true),agent_markup_pct:pricing.markup_pct,agent_fixed_fee:pricing.markup_fixed};})});
+  return send(res,200,{success:true,isAgent:Boolean(agent&&agent.status==='active'),agent,minimumBalance:limits.minWalletBalance,currentBalance:Number(wallet?.balance||0),hasStaticAccount:Boolean(staticAccount),staticAccount:staticAccount?{accountNumber:staticAccount.account_number,bankName:staticAccount.bank_name,accountName:staticAccount.account_name}:null,services:services.rows.map(x=>{const globalRow=pricingByService.get(x.key);const pricing=agentPricingConfig(globalRow?{markup_percent:globalRow.markupPercent,fixed_fee:globalRow.fixedFee}:null,x.markup_pct_override!=null?Number(x.markup_pct_override):undefined);return {key:x.key,name:x.name,icon:x.icon,platform_enabled:Boolean(x.platform_enabled),maintenance:Boolean(x.maintenance),agent_enabled:Boolean(x.agent_enabled)&&Boolean(globalRow?globalRow.active:true),agent_markup_pct:pricing.markup_pct,agent_fixed_fee:pricing.markup_fixed};})});
 }
 if(req.method==="POST"&&path==="/api/agent/activate"){
   const rl=rateLimit(req,`agent-activate:${user.user_id}`,5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);

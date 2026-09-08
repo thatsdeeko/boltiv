@@ -851,3 +851,14 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
 @media(min-width:700px){.boltiv-install-prompt{left:auto;right:22px;bottom:22px;width:380px}.boltiv-install-action{grid-column:auto;min-width:120px}.boltiv-install-copy{padding-right:12px}}
 .boltiv-install-ios-icon{display:inline-flex;vertical-align:-2px;color:#bd920b;margin:0 1px}
 @media(prefers-reduced-motion:reduce){.boltiv-install-prompt{transition:none}}
+
+
+/* BOLTIV DASHBOARD REFINEMENTS — requested UI-only adjustments */
+@media(max-width:899px){
+  .home-welcome{padding:18px 2px 14px}
+  .home-balance-card{padding:18px}
+  .notification-button{width:36px;height:36px;font-size:18px}
+  .home-service-card.coming-soon{opacity:.58;filter:saturate(.55)}
+  .nav-item.active{position:relative}
+  .nav-item.active::after{content:"";position:absolute;bottom:6px;left:50%;width:22px;height:3px;border-radius:999px;background:var(--gold2);transform:translateX(-50%)}
+}

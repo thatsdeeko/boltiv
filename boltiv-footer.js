@@ -1,7 +1,7 @@
 /*
 BOLTIV — global footer component.
 One shared implementation, included on every page via:
-  <script src="boltiv-footer.js?v=1"></script>
+  <script src="boltiv-footer.js?v=2"></script>
 Do not duplicate this markup on individual pages — add/adjust it here only,
 and every page picks up the change automatically.
 */
@@ -14,19 +14,19 @@ and every page picks up the change automatically.
   if (document.getElementById(FOOTER_ID)) return; // idempotent: never inject twice
 
   var CSS =
-    ".boltiv-global-footer{background:#0c0c0c;color:#bdbdbb;margin-top:44px;padding:30px 20px 26px;font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;position:relative;z-index:1}" +
+    ".boltiv-global-footer{background:#fffdf6;color:#6b6a63;margin-top:44px;padding:28px 20px 24px;border-top:1px solid #ead58a;font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}" +
     ".boltiv-global-footer *{box-sizing:border-box}" +
     ".boltiv-global-footer-inner{max-width:960px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}" +
     ".boltiv-global-footer-brand{display:flex;align-items:center;gap:8px}" +
     ".boltiv-global-footer-brand img{width:20px;height:22px;object-fit:contain;display:block}" +
-    ".boltiv-global-footer-brand span{font-size:13px;font-weight:1000;letter-spacing:.16em;color:#D4AF37}" +
+    ".boltiv-global-footer-brand span{font-size:13px;font-weight:1000;letter-spacing:.16em;color:#b8860b}" +
     ".boltiv-global-footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin:2px 0}" +
-    ".boltiv-global-footer-links a{color:#9a9a97;font-size:10.5px;font-weight:700;text-decoration:none}" +
-    ".boltiv-global-footer-links a:hover{color:#D4AF37}" +
-    ".boltiv-global-footer-divider{width:34px;height:1px;background:#2a2a28;margin:2px 0}" +
-    ".boltiv-global-footer-legal p{margin:3px 0;font-size:11px;line-height:1.65;color:#a3a39f}" +
-    ".boltiv-global-footer-legal strong{color:#e8c766;font-weight:800}" +
-    "@media(min-width:640px){.boltiv-global-footer{padding:34px 24px 30px}.boltiv-global-footer-legal p{font-size:11.5px}}";
+    ".boltiv-global-footer-links a{color:#8a8a83;font-size:10.5px;font-weight:700;text-decoration:none}" +
+    ".boltiv-global-footer-links a:hover{color:#b8860b}" +
+    ".boltiv-global-footer-divider{width:34px;height:1px;background:#ead58a;margin:2px 0}" +
+    ".boltiv-global-footer-legal p{margin:3px 0;font-size:11px;line-height:1.65;color:#7a7970}" +
+    ".boltiv-global-footer-legal strong{color:#8a6d0a;font-weight:800}" +
+    "@media(min-width:640px){.boltiv-global-footer{padding:32px 24px 28px}.boltiv-global-footer-legal p{font-size:11.5px}}";
 
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -55,7 +55,7 @@ and every page picks up the change automatically.
         '<div class="boltiv-global-footer-divider"></div>' +
         '<div class="boltiv-global-footer-legal">' +
           "<p>&copy; 2026 BOLTIV. All rights reserved.</p>" +
-          "<p>Powered by <strong>Boltiv Technologies Limited</strong>.</p>" +
+          "<p>Powered by <strong>BOLTIV TECHNOLOGIES LIMITED</strong>.</p>" +
         "</div>" +
       "</div>";
     return footer;
@@ -90,13 +90,14 @@ and every page picks up the change automatically.
   }
 
   function ensureBodyIsBlockFlow() {
-    // A couple of screens set display:flex directly on <body> itself to center a single card
-    // (e.g. the email-verification screen). Appending the footer straight into such a body
-    // would make it a second flex item — sitting beside the existing content instead of below
-    // it. Rather than leaving a gap or fighting the flex algorithm, move body's existing
-    // children into a new wrapper that inherits the same layout properties, then reset body to
-    // plain block flow. The page looks exactly the same (the centering just now happens one
-    // level down), and body becomes a safe, predictable place to append the footer afterwards.
+    // A couple of screens set display:flex (or grid) directly on <body> itself to center a
+    // single card (e.g. the email-verification screen). Appending the footer straight into
+    // such a body would make it a second flex/grid item — sitting beside the existing content
+    // instead of below it. Rather than leaving a gap or fighting the layout algorithm, move
+    // body's existing children into a new wrapper that inherits the same layout properties,
+    // then reset body to plain block flow. The page looks exactly the same (the centering just
+    // now happens one level down), and body becomes a safe, predictable place to append the
+    // footer afterwards.
     var bodyStyle = window.getComputedStyle(document.body);
     if (bodyStyle.display !== "flex" && bodyStyle.display !== "grid") return;
     var wrapper = document.createElement("div");
@@ -108,34 +109,18 @@ and every page picks up the change automatically.
     document.body.style.display = "block";
   }
 
-  function findContentHost() {
-    // A number of BOLTIV screens wrap their content in a shell forced to at least full
-    // viewport height (various class names — .page, .airtime-page, .exam-page, etc.). If the
-    // footer were appended as a sibling *after* such a shell, on any page whose real content is
-    // shorter than one screen it would end up a full viewport-height below the visible content,
-    // behind a blank gap. Detecting this by computed style (rather than guessing class names)
-    // lets the footer render directly under the real content on such pages.
-    // This only ever applies to a plain block-flow shell. A flex/grid shell (e.g. a full-screen
-    // centering layout like the admin login screen) would instead lay the footer out as another
-    // flex/grid item alongside the existing content — exactly the kind of visual interference
-    // the footer must never cause — so those fall back to a plain body-append instead.
-    var children = document.body.children;
-    for (var i = 0; i < children.length; i++) {
-      var el = children[i];
-      if (el.tagName === "SCRIPT" || el.tagName === "STYLE" || el.tagName === "LINK") continue;
-      var cs = window.getComputedStyle(el);
-      var minH = parseFloat(cs.minHeight) || 0;
-      if (minH >= window.innerHeight * 0.9 && cs.display === "block") return el;
-    }
-    return document.body;
-  }
-
   function inject() {
     if (document.getElementById(FOOTER_ID)) return;
     injectStyle();
     ensureBodyIsBlockFlow();
+    // Deliberately always appended as the very last child of <body> — no attempt to detect
+    // and inject "inside" some other container. An earlier version tried to be clever about
+    // that (to avoid a blank gap on tall, mostly-empty screens) but that heuristic ended up
+    // misfiring on a purely decorative background element on one screen, making the footer
+    // invisible there. Simple and predictable beats clever and occasionally wrong: the footer
+    // is always the last thing in the document, full stop.
     var footer = buildFooter();
-    findContentHost().appendChild(footer);
+    document.body.appendChild(footer);
     reserveSpaceAroundFixedChrome(footer);
   }
 

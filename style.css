@@ -924,3 +924,6 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   height:20px;
   display:block;
 }
+
+/* BOLTIV dashboard service icon sizing */
+.service-icon svg{width:21px;height:21px;display:block}

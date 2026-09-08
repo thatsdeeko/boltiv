@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head><base href="/"><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<meta content="#ffffff" name="theme-color"/>
+<meta content="BOLTIV — fast, simple digital services." name="description"/>
+<title>BOLTIV Dashboard — Digital Services</title>
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
+<script>
+boltivRequireAuth();
+</script>
+<style id="boltiv-coming-modal-inline">
+body.modal-open{overflow:hidden!important}
+.coming-modal{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important;visibility:visible!important;pointer-events:none!important}
+.coming-modal[hidden]{display:none!important}
+.coming-modal.is-open{pointer-events:auto!important}
+.coming-modal-backdrop{position:absolute!important;inset:0!important;background:rgba(15,14,11,.62)!important;backdrop-filter:blur(6px)!important;opacity:0!important;transition:opacity .2s ease!important}
+.coming-modal-card{position:relative!important;z-index:2!important;width:min(100%,360px)!important;padding:30px 24px 24px!important;border:1px solid rgba(201,159,22,.32)!important;border-radius:28px!important;background:#fffdf7!important;box-shadow:0 28px 80px rgba(0,0,0,.28)!important;text-align:center!important;transform:translateY(20px) scale(.96)!important;opacity:0!important;transition:transform .22s ease,opacity .2s ease!important}
+.coming-modal.is-open .coming-modal-backdrop{opacity:1!important}
+.coming-modal.is-open .coming-modal-card{transform:translateY(0) scale(1)!important;opacity:1!important}
+.coming-modal-close{position:absolute!important;right:14px!important;top:12px!important;width:38px!important;height:38px!important;border:1px solid #eadfba!important;border-radius:50%!important;background:#fff!important;color:#9a7510!important;font-size:25px!important;line-height:1!important;cursor:pointer!important}
+.coming-modal-icon{width:66px!important;height:66px!important;margin:0 auto 15px!important;border-radius:20px!important;display:grid!important;place-items:center!important;background:linear-gradient(145deg,#f5d55f,#c79a16)!important;color:#fff!important;font-size:26px!important}
+.coming-modal-kicker{font-size:11px!important;font-weight:800!important;letter-spacing:.18em!important;color:#a27b0b!important;margin-bottom:7px!important}
+.coming-modal-card h2{margin:0!important;font-size:24px!important;line-height:1.15!important;color:#171717!important}
+.coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:#716e68!important;font-size:14px!important;line-height:1.55!important}
+.coming-modal-button{width:100%!important;min-height:50px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#e1bf43,#bd920b)!important;color:#fff!important;font-weight:800!important;cursor:pointer!important}
+</style>
+<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* Balance privacy toggle */
+.balance-label-row{display:flex;align-items:center;gap:8px;min-height:18px}
+.balance-label-row .balance-label{margin:0}
+.balance-visibility-toggle{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--gold3);border-radius:50%;background:var(--gold-soft);color:var(--gold2);cursor:pointer;transition:transform .18s ease,background .18s ease,border-color .18s ease}
+.balance-visibility-toggle:hover{background:#fff;border-color:var(--gold);transform:translateY(-1px)}
+.balance-visibility-toggle:active{transform:scale(.94)}
+.balance-visibility-toggle svg{width:12px;height:12px;display:block}
+.balance-value.is-hidden{letter-spacing:2px;font-size:31px}
+@media (max-width:420px){.balance-visibility-toggle{width:22px;height:22px}.balance-value.is-hidden{font-size:29px;letter-spacing:2px}}
+</style>
+<style id="boltiv-dashboard-insights-inline">
+.dashboard-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.insight-card{background:linear-gradient(145deg,#fff,#fffdf7);border:1px solid rgba(197,154,28,.20);border-radius:20px;padding:17px;box-shadow:0 10px 28px rgba(30,24,10,.055)}
+.insight-card.full{grid-column:1/-1}
+.insight-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
+.insight-title{font-size:12px;letter-spacing:.12em;font-weight:800;color:#6f654f}
+.insight-link{border:0;background:none;color:#a17b13;font-size:12px;font-weight:800;padding:0;cursor:pointer}
+.insight-main{font-size:22px;font-weight:850;color:#171717;line-height:1.15}
+.insight-sub{font-size:11px;color:#817b70;margin-top:5px}
+.insight-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+.insight-stat{padding:10px;border-radius:13px;background:#faf8f0;border:1px solid #eee7d5;min-width:0}
+.insight-stat b{display:block;font-size:12px;color:#26231e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.insight-stat small{display:block;font-size:10px;color:#8b8477;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.repeat-list{display:grid;gap:8px}
+.repeat-item{display:flex;align-items:center;gap:10px;width:100%;border:1px solid #eee8d9;background:#fff;border-radius:14px;padding:10px;text-align:left;cursor:pointer}
+.repeat-icon{width:34px;height:34px;border-radius:11px;background:#faf3d9;color:#a17b13;display:grid;place-items:center;font-weight:900;flex:0 0 auto}
+.repeat-main{min-width:0;flex:1}
+.repeat-main strong{display:block;font-size:12px;color:#24211d}
+.repeat-main small{display:block;font-size:10px;color:#888174;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.repeat-arrow{color:#a17b13;font-size:17px}
+.insight-empty{font-size:12px;color:#878073;padding:4px 0}
+@media (max-width:560px){.dashboard-insights{grid-template-columns:1fr}.insight-card.full{grid-column:auto}.insight-stats{grid-template-columns:repeat(3,1fr)}}
+</style>
+
+<style id="boltiv-loading-state">
+/* While the very first data fetch is pending, these elements show an honest
+   "still loading" shimmer instead of placeholder values that look like real,
+   final data (e.g. a bare "₦0.00" that's indistinguishable from an actual
+   zero balance). If the backend has been idle and is cold-starting, this can
+   legitimately take up to a minute — the shimmer plus the delayed status
+   line below make that read as "loading" rather than "broken". */
+.boltiv-skeleton{position:relative;color:transparent!important;background:linear-gradient(90deg,#efe9d8 25%,#faf6ea 37%,#efe9d8 63%);background-size:400% 100%;animation:boltivShimmer 1.4s ease infinite;border-radius:7px}
+@keyframes boltivShimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media (prefers-reduced-motion:reduce){.boltiv-skeleton{animation:none;background:#efe9d8}}
+.boltiv-connecting-note{display:none;margin-top:8px;font-size:11px;color:#a17b13;font-weight:700}
+.boltiv-connecting-note.is-visible{display:block}
+</style>
+
+<style id="boltiv-announcement-ticker">
+.boltiv-announcement{margin:24px 0 0;border:1px solid rgba(197,154,28,.22);border-radius:14px;background:#fffdf7;overflow:hidden;box-shadow:0 6px 18px rgba(30,24,10,.04)}
+.boltiv-announcement-track{display:flex;align-items:center;min-width:max-content;animation:boltivTicker 22s linear infinite;padding:10px 0;will-change:transform}
+.boltiv-announcement:hover .boltiv-announcement-track{animation-play-state:paused}
+.boltiv-announcement-mark{display:inline-flex;align-items:center;gap:7px;padding:0 18px;color:#a17b13;font-size:10px;font-weight:900;letter-spacing:.1em;white-space:nowrap}
+.boltiv-announcement-dot{width:6px;height:6px;border-radius:50%;background:#d4af37;box-shadow:0 0 0 4px rgba(212,175,55,.12)}
+.boltiv-announcement-copy{padding-right:34px;color:#4e493f;font-size:11px;font-weight:700;white-space:nowrap}
+@keyframes boltivTicker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.boltiv-announcement-track{animation:none;min-width:100%}.boltiv-announcement-copy:nth-of-type(n+3){display:none}}
+</style>
+<link rel="manifest" href="/manifest.webmanifest">
+</head>
+<body class="boltiv-animated-home">
+<div aria-hidden="true" class="home-ambient">
+<span class="ambient-orb ambient-orb-one"></span>
+<span class="ambient-orb ambient-orb-two"></span>
+<span class="ambient-orb ambient-orb-three"></span>
+<span class="ambient-ring ambient-ring-one"></span>
+<span class="ambient-ring ambient-ring-two"></span>
+<span class="ambient-spark spark-one">✦</span>
+<span class="ambient-spark spark-two">·</span>
+<span class="ambient-spark spark-three">✦</span>
+<span class="ambient-spark spark-four">·</span>
+</div>
+<div class="page boltiv-home">
+<div class="container">
+<header class="header home-header">
+<a aria-label="BOLTIV dashboard" class="home-brand" href="/dashboard"><img alt="BOLTIV" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></a>
+<div class="home-header-actions">
+<button aria-label="Notifications" class="icon-button notification-button" onclick="location.href='/notifications'">
+<svg aria-hidden="true" class="notification-icon" viewbox="0 0 24 24">
+<path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+<b class="notification-badge" hidden="" id="notificationBadge">0</b>
+</button>
+<button class="profile-mini" id="profileButton" onclick="location.href='/profile'">U</button>
+</div>
+</header><div class="boltiv-announcement" id="boltivAnnouncement" aria-label="BOLTIV announcement">
+<div class="boltiv-announcement-track" id="boltivAnnouncementTrack"><span class="boltiv-announcement-mark"><span class="boltiv-announcement-dot"></span>BOLTIV UPDATE</span><span class="boltiv-announcement-copy">Welcome to BOLTIV — Fast. Simple. Powerful.</span><span class="boltiv-announcement-mark"><span class="boltiv-announcement-dot"></span>BOLTIV UPDATE</span><span class="boltiv-announcement-copy">Welcome to BOLTIV — Fast. Simple. Powerful.</span></div>
+</div>
+
+<main>
+<section class="home-welcome">
+<div>
+<div class="eyebrow">WELCOME BACK</div>
+<h1>Hello, <span class="boltiv-skeleton" id="userName">User</span></h1>
+<p>Your everyday digital services, in one place.</p>
+<div class="boltiv-connecting-note" id="boltivConnectingNote" role="status" aria-live="polite">Still connecting to BOLTIV — this can take up to a minute if the app has been idle.</div>
+</div>
+</section>
+<section class="home-balance-card">
+<div class="home-balance-top">
+<div><div class="balance-label-row"><div class="balance-label">AVAILABLE BALANCE</div><button aria-label="Hide balance" aria-pressed="false" class="balance-visibility-toggle" id="balanceVisibilityToggle" title="Hide balance" type="button">
+<svg aria-hidden="true" class="balance-eye balance-eye-open" fill="none" viewBox="0 0 24 24"><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path><circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="1.8"></circle></svg>
+<svg aria-hidden="true" class="balance-eye balance-eye-closed" fill="none" viewBox="0 0 24 24" hidden><path d="m3 3 18 18M10.6 6.8A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a18 18 0 0 1-3.2 3.6M6.5 6.6C4 8.2 2.8 12 2.8 12s3.4 5.5 9.2 5.5c1.3 0 2.5-.3 3.5-.8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg>
+</button></div><div class="balance-value boltiv-skeleton" id="walletBalance">₦0.00</div></div>
+<div class="balance-mark">₦</div>
+</div>
+<div class="home-balance-actions">
+<button class="btn btn-primary" onclick="location.href='/wallet'">+ FUND WALLET</button>
+<button class="btn btn-light" onclick="location.href='/transactions'">VIEW ACTIVITY</button>
+</div>
+</section>
+<section class="section home-services-section">
+<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions">Activity →</a></div>
+<div class="home-service-grid">
+<a class="home-service-card" href="/airtime"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
+<a class="home-service-card" href="/data"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
+<a class="home-service-card" href="/cable"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
+<a class="home-service-card" href="/electricity"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
+<a class="home-service-card" href="/exam-pin"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
+<button class="home-service-card coming-soon" data-service="Betting" type="button"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Recharge PIN" type="button"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="SMS" type="button"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Bulk SMS" type="button"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Gift Cards" type="button"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Insurance" type="button"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="International Airtime" type="button"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
+</div>
+</section>
+<section class="section home-recent-section">
+<div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
+<div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
+</section>
+<section class="dashboard-insights" aria-label="Wallet insights">
+<section class="insight-card">
+<div class="insight-head"><span class="insight-title">SPENDING OVERVIEW</span><button class="insight-link" onclick="location.href='/transactions'" type="button">View →</button></div>
+<div class="insight-main boltiv-skeleton" id="monthlySpent">₦0.00</div>
+<div class="insight-sub" id="monthlySpentLabel">Spent this month</div>
+<div class="insight-stats">
+<div class="insight-stat"><b id="spentAirtime">₦0</b><small>Airtime</small></div>
+<div class="insight-stat"><b id="spentData">₦0</b><small>Data</small></div>
+<div class="insight-stat"><b id="spentOther">₦0</b><small>Other</small></div>
+</div>
+</section>
+<section class="insight-card">
+<div class="insight-head"><span class="insight-title">WALLET ACTIVITY</span><button class="insight-link" onclick="location.href='/wallet'" type="button">Wallet →</button></div>
+<div class="insight-main boltiv-skeleton" id="walletActivityBalance">₦0.00</div>
+<div class="insight-sub">Current balance</div>
+<div class="insight-stats insight-stats-3">
+<div class="insight-stat"><b id="walletAdded">₦0</b><small>Added</small></div>
+<div class="insight-stat"><b id="walletSpent">₦0</b><small>Spent</small></div>
+<div class="insight-stat"><b id="walletPending">₦0</b><small>Pending</small></div>
+</div>
+</section>
+<section class="insight-card full">
+<div class="insight-head"><span class="insight-title">QUICK REPEAT</span><button class="insight-link" onclick="location.href='/transactions'" type="button">See activity →</button></div>
+<div class="repeat-list" id="quickRepeatList"><div class="insight-empty">Your successful services will appear here for quick access.</div></div>
+</section>
+</section>
+<section class="section home-trust-card">
+<div class="trust-icon">✓</div>
+<div><strong>Simple, secure payments</strong><p>Fund your wallet once and use it across BOLTIV services. Every purchase gets a transaction reference.</p></div>
+</section>
+</main>
+</div>
+</div>
+<div aria-hidden="true" class="coming-modal" hidden="" id="comingModal">
+<div class="coming-modal-backdrop" data-close-coming=""></div>
+<section aria-labelledby="comingTitle" aria-modal="true" class="coming-modal-card" role="dialog">
+<button aria-label="Close" class="coming-modal-close" data-close-coming="" type="button">×</button>
+<div aria-hidden="true" class="coming-modal-icon"><span>✦</span></div>
+<div class="coming-modal-kicker">COMING SOON</div>
+<h2 id="comingTitle">Service is on the way</h2>
+<p aria-live="polite" id="comingMessage" role="status">We're preparing this service for BOLTIV. You'll be able to use it here once it's ready.</p>
+<button class="coming-modal-button" data-close-coming="" type="button">GOT IT</button>
+</section>
+</div>
+<nav class="bottom-nav">
+<button class="nav-item active" data-page="/dashboard"><span class="nav-icon">⌂</span><span>Home</span></button>
+<button class="nav-item" data-page="/wallet"><span class="nav-icon">₦</span><span>Wallet</span></button>
+<button class="nav-item" data-page="/transactions"><span class="nav-icon">↯</span><span>Activity</span></button>
+<button class="nav-item" data-page="/profile"><span class="nav-icon">◉</span><span>Profile</span></button>
+</nav>
+<script>
+const API_BASE='https://boltiv-backend.onrender.com';
+const TOKEN_KEY='boltivAuthToken';
+const USER_KEY='boltivUser';
+const money=v=>'₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});
+const BALANCE_HIDDEN_PREFIX='boltivBalanceHidden:';
+let currentWalletBalance='0';
+let balanceHidden=false;
+let balanceStorageKey='';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+function setBalanceVisibility(hidden){
+ balanceHidden=Boolean(hidden);
+ const el=document.getElementById('walletBalance');
+ const toggle=document.getElementById('balanceVisibilityToggle');
+ const openIcon=toggle?.querySelector('.balance-eye-open');
+ const closedIcon=toggle?.querySelector('.balance-eye-closed');
+ if(el){el.textContent=balanceHidden?'₦••••••':money(currentWalletBalance);el.classList.toggle('is-hidden',balanceHidden);}
+ if(toggle){toggle.setAttribute('aria-pressed',String(balanceHidden));toggle.setAttribute('aria-label',balanceHidden?'Show balance':'Hide balance');toggle.title=balanceHidden?'Show balance':'Hide balance';}
+ if(openIcon)openIcon.hidden=balanceHidden;
+ if(closedIcon)closedIcon.hidden=!balanceHidden;
+}
+function setupBalancePrivacy(user){
+ const email=String(user?.email||'').trim().toLowerCase();
+ balanceStorageKey=BALANCE_HIDDEN_PREFIX+(email||'default');
+ const saved=boltivMemoryStorage.getItem(balanceStorageKey)==='1';
+ setBalanceVisibility(saved);
+}
+const balanceToggle=document.getElementById('balanceVisibilityToggle');
+if(balanceToggle){balanceToggle.addEventListener('click',()=>{
+ const next=!balanceHidden;
+ if(balanceStorageKey)boltivMemoryStorage.setItem(balanceStorageKey,next?'1':'0');
+ setBalanceVisibility(next);
+});}
+
+const typeInfo=t=>{const s=String(t.service||'').toLowerCase();if(s.includes('airtime'))return['airtime','Airtime','☎'];if(s.includes('data'))return['data','Data','⌁'];if(s.includes('electric'))return['electricity','Electricity','ϟ'];if(s.includes('cable')||s.includes('tv'))return['cable','Cable TV','▣'];if(s.includes('wallet')||s.includes('fund'))return['wallet','Wallet Funding','₦'];return['other','Transaction','•']};
+const formatDate=v=>{const d=new Date(v);return isNaN(d)?'Recent':d.toLocaleDateString('en-NG',{day:'numeric',month:'short'})+' · '+d.toLocaleTimeString('en-NG',{hour:'2-digit',minute:'2-digit'})};
+async function loadHome(){
+ const connectingTimer=setTimeout(()=>{
+   const note=document.getElementById('boltivConnectingNote');
+   if(note)note.classList.add('is-visible');
+ },4000);
+ await window.boltivAuthReady;
+ const token=boltivMemoryStorage.getItem(TOKEN_KEY);
+ try{
+  const authInit={credentials:'include'};
+  if(token) authInit.headers={Authorization:'Bearer '+token};
+  const [meRes,walletRes,txRes,noteRes,summaryRes]=await Promise.all([
+   fetch(API_BASE+'/api/me',authInit),
+   fetch(API_BASE+'/api/wallet',authInit),
+   fetch(API_BASE+'/api/transactions',Object.assign({},authInit,{cache:'no-store'})),
+   fetch(API_BASE+'/api/notifications',Object.assign({},authInit,{cache:'no-store'})),
+   fetch(API_BASE+'/api/wallet/summary',Object.assign({},authInit,{cache:'no-store'}))
+  ]);
+  if(meRes.status===401||walletRes.status===401){throw new Error('SESSION_EXPIRED');}
+  const me=await meRes.json(); const wallet=await walletRes.json(); const tx=txRes.ok?await txRes.json():{transactions:[]}; const notes=noteRes.ok?await noteRes.json():{unreadCount:0}; const summaryRaw=summaryRes.ok?await summaryRes.json():{success:false};
+  if(me.user){boltivMemoryStorage.setItem(USER_KEY,JSON.stringify(me.user));document.getElementById('userName').textContent=(me.user.name||'User').split(' ')[0];document.getElementById('profileButton').textContent=(me.user.name||'U').trim().charAt(0).toUpperCase();setupBalancePrivacy(me.user);}
+  const walletBalance=wallet.success&&wallet.wallet?Number(wallet.wallet.balance||0):Number(currentWalletBalance||0);
+  if(wallet.success&&wallet.wallet){const b=walletBalance;currentWalletBalance=String(b);setBalanceVisibility(balanceHidden);boltivMemoryStorage.setItem('boltivBalance',String(b));boltivMemoryStorage.setItem('boltivWalletBalance',String(b));}
+  const transactions=Array.isArray(tx.transactions)?tx.transactions:[];
+  const summary=summaryRaw.success&&summaryRaw.summary?summaryRaw.summary:null;
+  renderRecent(transactions); renderDashboardInsights(transactions,walletBalance,summary); const badge=document.getElementById("notificationBadge"); const unread=Number(notes.unreadCount||0); badge.hidden=!unread; badge.textContent=unread>9?"9+":String(unread);
+  document.querySelectorAll('.boltiv-skeleton').forEach(el=>el.classList.remove('boltiv-skeleton'));
+ }catch(e){if(e.message==='SESSION_EXPIRED'){boltivMemoryStorage.clear();location.replace('/login');}else{document.getElementById('recentList').innerHTML='<div class="home-empty">Unable to load recent activity right now.</div>';document.querySelectorAll('.boltiv-skeleton').forEach(el=>el.classList.remove('boltiv-skeleton'));}
+ }finally{
+  clearTimeout(connectingTimer);
+  const note=document.getElementById('boltivConnectingNote');
+  if(note)note.classList.remove('is-visible');
+ }
+}
+function normalizeStatus(t){return String(t?.status||'successful').toLowerCase();}
+function isSuccessful(t){const s=normalizeStatus(t);return !s.includes('fail')&&!s.includes('cancel')&&!s.includes('pending')&&!s.includes('process')&&!s.includes('refund');}
+function transactionDate(t){return new Date(t?.date||t?.createdAt||0);}
+function servicePath(t){const s=String(t?.service||'').toLowerCase();if(s.includes('airtime'))return'/airtime';if(s.includes('data'))return'/data';if(s.includes('electric'))return'/electricity';if(s.includes('cable')||s.includes('tv'))return'/cable';if(s.includes('exam'))return'/exam-pin';return'/transactions';}
+function renderDashboardInsights(items,balance,summary){
+ const valid=Array.isArray(items)?items:[];
+ // Figures come from the server-side wallet summary (a full-table SQL
+ // aggregate) rather than being computed from this recent-activity list,
+ // which the API caps to the latest 100 rows and would otherwise silently
+ // under-count totals once a user passes that many transactions.
+ const s=summary||{};
+ document.getElementById('monthlySpent').textContent=money(s.spentThisMonth||0);
+ document.getElementById('spentAirtime').textContent=money(s.spentThisMonthAirtime||0).replace('.00','');
+ document.getElementById('spentData').textContent=money(s.spentThisMonthData||0).replace('.00','');
+ document.getElementById('spentOther').textContent=money(s.spentThisMonthOther||0).replace('.00','');
+ document.getElementById('walletActivityBalance').textContent=money(balance);
+ document.getElementById('walletAdded').textContent=money(s.totalDeposited||0).replace('.00','');
+ document.getElementById('walletSpent').textContent=money(s.totalSpent||0).replace('.00','');
+ document.getElementById('walletPending').textContent=money(s.pendingAmount||0).replace('.00','');
+ renderQuickRepeat(valid);
+}
+function renderQuickRepeat(items){
+ const list=document.getElementById('quickRepeatList');
+ const seen=new Set(); const candidates=[];
+ const sorted=items.slice().sort((a,b)=>transactionDate(b)-transactionDate(a));
+ for(const t of sorted){
+   if(!isSuccessful(t)||typeInfo(t)[0]==='wallet')continue;
+   const [type,name,icon]=typeInfo(t); const recipient=String(t.recipient||t.phone||t.accountNumber||t.meterNumber||t.reference||'').trim();
+   const key=type+'|'+recipient; if(seen.has(key))continue; seen.add(key); candidates.push({t,name,icon,recipient,path:servicePath(t)}); if(candidates.length>=3)break;
+ }
+ if(!candidates.length){list.innerHTML='<div class="insight-empty">Your successful services will appear here for quick access.</div>';return;}
+ list.innerHTML=candidates.map(x=>`<button class="repeat-item" type="button" onclick="location.href='${x.path}'"><span class="repeat-icon">${x.icon}</span><span class="repeat-main"><strong>${esc(x.name)}</strong><small>${esc(x.recipient||'Open service')}</small></span><span class="repeat-arrow">›</span></button>`).join('');
+}
+function renderRecent(items){
+ const list=document.getElementById('recentList'); if(!items.length){list.innerHTML='<div class="home-empty"><span>↯</span><strong>No transactions yet</strong><small>Your purchases and wallet funding will appear here.</small></div>';return;}
+ list.innerHTML=items.slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,4).map(t=>{const [type,name,icon]=typeInfo(t);const status=String(t.status||'successful');const credit=type==='wallet';return `<button class="home-transaction" onclick="location.href='/transactions'"><span class="transaction-icon">${icon}</span><span class="home-tx-main"><strong>${name}</strong><small>${esc(t.recipient||t.phone||t.reference||'BOLTIV transaction')} · ${formatDate(t.date||t.createdAt)}</small></span><span class="home-tx-right"><b class="${credit?'credit':'debit'}">${credit?'+':'−'}${money(t.amount)}</b><small class="status-pill ${status.toLowerCase().includes('fail')?'failed':status.toLowerCase().includes('refund')?'failed':status.toLowerCase().includes('process')?'processing':status.toLowerCase().includes('pending')?'pending':'success'}">${esc(status)}</small></span></button>`;}).join('');
+}
+document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);
+const comingModal=document.getElementById('comingModal');
+const comingTitle=document.getElementById('comingTitle');
+const comingMessage=document.getElementById('comingMessage');
+let lastComingTrigger=null;
+function openComingModal(name,trigger){
+  if(!comingModal)return;
+  lastComingTrigger=trigger||null;
+  comingTitle.textContent=String(name||'This service')+' is coming soon';
+  comingMessage.textContent='We are preparing '+String(name||'this service')+' for BOLTIV. It will be available here once the service is ready.';
+  comingModal.hidden=false;
+  comingModal.setAttribute('aria-hidden','false');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>comingModal.classList.add('is-open')));
+}
+function closeComingModal(){
+  if(!comingModal)return;
+  comingModal.classList.remove('is-open');
+  comingModal.setAttribute('aria-hidden','true');
+  document.body.classList.remove('modal-open');
+  setTimeout(()=>{comingModal.hidden=true;if(lastComingTrigger&&lastComingTrigger.focus)lastComingTrigger.focus();},220);
+}
+// Event delegation makes the Coming Soon cards reliable even if other page scripts rerender content.
+document.addEventListener('click',e=>{
+  const card=e.target.closest('.coming-soon');
+  if(card){e.preventDefault();e.stopPropagation();openComingModal(card.dataset.service||'This service',card);return;}
+  if(e.target.closest('[data-close-coming]')){e.preventDefault();closeComingModal();}
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&comingModal&&!comingModal.hidden)closeComingModal();});
+loadHome();
+setInterval(loadHome,30000);
+</script>
+
+<script>
+(async function loadBoltivAnnouncement(){
+  const box=document.getElementById('boltivAnnouncement'),track=document.getElementById('boltivAnnouncementTrack');
+  if(!box||!track)return;
+  const fallback='Welcome to BOLTIV — Fast. Simple. Powerful.';
+  const render=(text)=>{
+    const safe=String(text||fallback).trim()||fallback;
+    track.replaceChildren();
+    for(let i=0;i<2;i++){
+      const mark=document.createElement('span'); mark.className='boltiv-announcement-mark';
+      const dot=document.createElement('span'); dot.className='boltiv-announcement-dot'; mark.append(dot,document.createTextNode('BOLTIV UPDATE'));
+      const copy=document.createElement('span'); copy.className='boltiv-announcement-copy'; copy.textContent=safe;
+      track.append(mark,copy);
+    }
+    box.hidden=false;
+  };
+  render(fallback);
+  try{
+    const r=await fetch(API_BASE+'/api/platform/settings',{cache:'no-store'});
+    if(!r.ok)throw new Error('announcement settings unavailable');
+    const d=await r.json(); const s=d&&d.settings||{};
+    if(s.announcement_enabled===false){box.hidden=true;return;}
+    const items=Array.isArray(s.announcement_items)?s.announcement_items.filter(x=>x&&x.text&&x.enabled!==false):[];
+    const messages=items.length?items.map(x=>String(x.text).trim()).filter(Boolean):[String(s.announcement_text||fallback)];
+    track.replaceChildren();
+    const sequence=[...messages,...messages];
+    sequence.forEach((msg)=>{
+      const mark=document.createElement('span'); mark.className='boltiv-announcement-mark';
+      const dot=document.createElement('span'); dot.className='boltiv-announcement-dot'; mark.append(dot,document.createTextNode('BOLTIV UPDATE'));
+      const copy=document.createElement('span'); copy.className='boltiv-announcement-copy'; copy.textContent=msg;
+      track.append(mark,copy);
+    });
+    box.hidden=false;
+  }catch(e){
+    // Keep the fallback announcement visible if the settings endpoint is unavailable.
+    render(fallback);
+  }
+})();
+</script>
+<script src="/boltiv-install.js?v=53"></script>
+<script src="boltiv-footer.js?v=2"></script>
+</body>
+</html>

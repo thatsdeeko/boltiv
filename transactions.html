@@ -43,7 +43,7 @@
 const list=document.getElementById("transactionList"),empty=document.getElementById("emptyState"),emptyTitle=document.getElementById("emptyTitle"),emptyText=document.getElementById("emptyText"),count=document.getElementById("transactionCount"),search=document.getElementById("transactionSearch"),clear=document.getElementById("clearSearch"),modal=document.getElementById("transactionModal"),modalIcon=document.getElementById("modalIcon"),modalService=document.getElementById("modalService"),modalStatus=document.getElementById("modalStatus"),modalDetails=document.getElementById("modalDetails");
 let filter="all",term="";
 
-const API="window.BOLTIV_API_BASE";
+const API=window.BOLTIV_API_BASE;
 function getTransactions(){try{const x=JSON.parse(boltivMemoryStorage.getItem("boltivTransactions")||"[]");return Array.isArray(x)?x:[]}catch(e){return[]}}
 function normalizeTransaction(t){
   const service=String(t.service||"").toLowerCase();

@@ -13,7 +13,7 @@ BOLTIV now uses Flutterwave as the payment provider for:
 DATABASE_URL=
 FRONTEND_URL=https://boltiv.ng
 FRONTEND_ORIGIN=https://boltiv.ng
-BACKEND_PUBLIC_URL=https://boltiv-backend.onrender.com
+BACKEND_PUBLIC_URL=https://your-railway-domain
 ADMIN_EMAIL=
 ADMIN_PASSWORD=
 ADMIN_PHONE=
@@ -29,7 +29,7 @@ Keep the Flutterwave secret key and webhook secret hash server-side only.
 
 Configure this URL in Flutterwave Dashboard → Settings → Webhooks:
 
-`https://<your-render-service>.onrender.com/api/flutterwave/webhook`
+`https://<your-railway-domain>/api/flutterwave/webhook`
 
 Set the same random secret hash in `FLW_SECRET_HASH`. The backend accepts Flutterwave's current `flutterwave-signature` HMAC format and the v3 `verif-hash` format.
 

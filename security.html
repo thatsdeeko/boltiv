@@ -645,7 +645,7 @@ message.className=
    PIN STATUS (SERVER-SIDE)
 ========================= */
 
-const API_BASE="window.BOLTIV_API_BASE";
+const API_BASE=window.BOLTIV_API_BASE;
 
 // New users without a Transaction PIN are sent here as a mandatory setup step.
 const setupRequired=new URLSearchParams(location.search).get("setup")==="required";

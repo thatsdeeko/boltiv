@@ -514,7 +514,7 @@ async function syncTransactions(){
 try{
 const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
 if(!token)return;
-const r=await fetch("window.BOLTIV_API_BASE/api/transactions",{headers:{Authorization:"Bearer "+token}});
+const r=await fetch(window.BOLTIV_API_BASE+"/api/transactions",{headers:{Authorization:"Bearer "+token}});
 const d=await r.json();
 if(!r.ok||!d.success)return;
 const mapped=(d.transactions||[]).map(t=>({

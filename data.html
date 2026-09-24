@@ -50,7 +50,7 @@
 <div class="boltiv-modal" id="boltivModal"><div class="boltiv-modal-card"><div class="receipt-brand"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/></div><div class="modal-icon" id="modalIcon">!</div><div aria-live="polite" class="modal-status" id="modalStatus" role="status">NOTICE</div><div class="modal-title" id="modalTitle">Complete Your Purchase</div><div aria-live="polite" class="modal-message" id="modalMessage" role="status">Please complete the required information.</div><div class="modal-details" id="modalDetails" style="display:none"></div><button class="modal-button" id="modalButton" type="button">GOT IT</button></div></div>
 <script>
 // Dynamic VTUGATE data catalog + purchase logic
-const API="window.BOLTIV_API_BASE";
+const API=window.BOLTIV_API_BASE;
 let selectedNetwork="",selectedPlan=null,lastLoadedPlans=null,isAgent=false,agentEnabled=true;
 const agentPanel=document.getElementById("agentPricingPanel"),agentCostDisplay=document.getElementById("agentCostDisplay"),agentCustomerPriceInput=document.getElementById("agentCustomerPrice"),agentProfitDisplay=document.getElementById("agentProfitDisplay");
 function refreshAgentPricing(){

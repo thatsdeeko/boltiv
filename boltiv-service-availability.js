@@ -1,5 +1,5 @@
 (function(){
-  const API_BASE='window.BOLTIV_API_BASE';
+  const API_BASE=window.BOLTIV_API_BASE;
   const KEY_MAP={'/airtime':'airtime','/data':'data','/cable':'cable','/electricity':'electricity','/exam-pin':'exam_pin'};
   function normalizePath(){
     const p=window.location.pathname.replace(/\/+$/,'')||'/';

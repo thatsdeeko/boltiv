@@ -1,7 +1,7 @@
 # BOLTIV Deployment Security — Phase 1
 
 ## Completed
-- Removed the real `backend/.env` from the deployment package. Production secrets must be configured in the hosting provider environment (for example, Render Environment Variables).
+- Removed the real `backend/.env` from the deployment package. Production secrets must be configured in the hosting provider environment (for example, Railway environment variables).
 - Kept `backend/.env.example` as the safe configuration template.
 - Fixed the History page JavaScript regex syntax error.
 - Removed unavailable/private transactional routes from `sitemap.xml`; only public pages are listed for indexing.

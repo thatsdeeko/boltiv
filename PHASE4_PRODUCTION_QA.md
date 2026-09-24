@@ -27,7 +27,7 @@
 17. Support ticket creation/reply/status.
 18. Mobile browser testing on Android Chrome.
 19. CORS verification from `https://boltiv.ng` and rejection of untrusted origins.
-20. Confirm Render environment variables are populated; never commit real secrets.
+20. Confirm Railway environment variables are populated; never commit real secrets.
 
 ## Live-only checks
 The live provider/database/payment tests require BOLTIV's production credentials and cannot be truthfully marked PASS from the local source package alone.

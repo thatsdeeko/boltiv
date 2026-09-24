@@ -10,5 +10,5 @@ Implemented:
 - Re-ran JavaScript syntax validation.
 
 QA notes:
-- Authentication and financial transaction flows still require live Render/provider testing with production environment variables.
+- Authentication and financial transaction flows still require live Railway/provider testing with production environment variables.
 - Google Search Console and GA4 IDs remain account-specific and were intentionally not fabricated.

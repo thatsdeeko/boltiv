@@ -305,7 +305,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 // Fire-and-forget: nudge the backend awake as early as possible for anyone
 // landing here before they log in. See boltiv-client.js for the recurring
 // keep-warm ping used on the rest of the app once someone's signed in.
-fetch('window.BOLTIV_API_BASE/api/health',{cache:'no-store'}).catch(function(){});
+fetch(window.BOLTIV_API_BASE+'/api/health',{cache:'no-store'}).catch(function(){});
 </script>
 <script src="boltiv-footer.js?v=2"></script>
 </body>

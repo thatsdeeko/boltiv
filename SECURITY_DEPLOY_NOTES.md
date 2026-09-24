@@ -12,8 +12,8 @@ Security changes included:
 - CORS explicitly permits the `X-Admin-CSRF` header.
 
 Before deployment:
-1. Set all secrets in Render Environment Variables. Never commit `.env` files or real API keys.
+1. Set all secrets in Railway environment variables. Never commit `.env` files or real API keys.
 2. Keep `VTU_PROVIDER=vtugate` and configure the VTUGATE service IDs/API key for the services you actually enable.
 3. Set `FRONTEND_URL=https://boltiv.ng` and `FRONTEND_ORIGIN=https://boltiv.ng`.
-4. Keep the Render service on HTTPS.
+4. Keep the Railway service on HTTPS.
 5. Rotate any secret that may previously have been exposed in screenshots, repositories, logs, or chat.

@@ -1,6 +1,6 @@
 /* BOLTIV client security layer. Auth uses an HttpOnly cookie, with a
    localStorage-backed bearer token as a fallback for browsers/devices that
-   block cross-site cookies between boltiv.ng and the Render backend. */
+   block cross-site cookies between boltiv.ng and the Railway backend. */
 (function(){
   let persistentStorageOk=true;
   const mem=new Map();
@@ -43,7 +43,7 @@
   };
   window.boltivAuthReady=(async function(){
     try{
-      const api=window.BOLTIV_API_BASE || 'window.BOLTIV_API_BASE';
+      const api=window.BOLTIV_API_BASE;
       const r=await nativeFetch(api+'/api/auth/me',{credentials:'include',cache:'no-store'});
       const d=await r.json().catch(()=>({}));
       if(r.ok && d.success && d.user){
@@ -52,7 +52,7 @@
         mem.set('boltivLoggedIn','true');
         return d.user;
       }
-      // Fallback for deployments where the Render domain cannot persist a cross-site HttpOnly cookie.
+      // Fallback for deployments where the Railway domain cannot persist a cross-site HttpOnly cookie.
       const token=mem.get('boltivAuthToken');
       if(token){
         const rr=await nativeFetch(api+'/api/me',{credentials:'include',headers:{Authorization:'Bearer '+token},cache:'no-store'});
@@ -77,7 +77,7 @@
     const exemptPaths=['/security','/login','/register','/forgot-password','/reset-password','/verify-email'];
     if(!exemptPaths.includes(path)){
       try{
-        const api=window.BOLTIV_API_BASE || 'window.BOLTIV_API_BASE';
+        const api=window.BOLTIV_API_BASE;
         // Same cookie-first, bearer-token-fallback pattern as boltivAuthReady above —
         // otherwise this check silently no-ops on browsers that block the cross-site
         // cookie, and the PIN-setup gate never fires for those users.
@@ -103,10 +103,10 @@
   // open and the backend is already awake to serve it; it cannot run while
   // the Render service is fully spun down, since no app code executes in
   // that state at all. What it DOES help with: as long as anyone has the
-  // app open, this resets Render's idle timer, reducing how often the
+  // app open, this resets the backend's idle timer, reducing how often the
   // backend goes cold in the first place during normal usage hours.
   (function(){
-    const api=window.BOLTIV_API_BASE || 'window.BOLTIV_API_BASE';
+    const api=window.BOLTIV_API_BASE;
     function ping(){
       if(document.visibilityState!=='visible') return;
       nativeFetch(api+'/api/health',{cache:'no-store'}).catch(()=>{});

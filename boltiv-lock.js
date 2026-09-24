@@ -7,7 +7,7 @@
 
   const LOCK_TIMEOUT_MS=10*60*1000;
   const LAST_ACTIVE_KEY="boltivLastActive";
-  const API=window.BOLTIV_API_BASE||"window.BOLTIV_API_BASE";
+  const API=window.BOLTIV_API_BASE;
   const mem=window.boltivMemoryStorage;
 
   function now(){return Date.now();}

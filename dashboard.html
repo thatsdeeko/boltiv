@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><base href="/"><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
+<head><script src="/boltiv-api-config.js?v=1"></script><base href="/"><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#ffffff" name="theme-color"/>
@@ -212,7 +212,7 @@ body.modal-open{overflow:hidden!important}
 <button class="nav-item" data-page="/profile"><span class="nav-icon">◉</span><span>Profile</span></button>
 </nav>
 <script>
-const API_BASE='https://boltiv-backend.onrender.com';
+const API_BASE='window.BOLTIV_API_BASE';
 const TOKEN_KEY='boltivAuthToken';
 const USER_KEY='boltivUser';
 const money=v=>'₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});

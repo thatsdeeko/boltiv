@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="/boltiv-api-config.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BOLTIV — Verify Email</title>
@@ -24,7 +24,7 @@ a{color:#a77d0b}
 <div id="action"></div>
 </div>
 <script>
-const API_BASE="https://boltiv-backend.onrender.com";
+const API_BASE="window.BOLTIV_API_BASE";
 (async()=>{
   const token=new URLSearchParams(location.search).get("token");
   const title=document.getElementById("title");

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><base href="/">
+<head><script src="/boltiv-api-config.js?v=1"></script><base href="/">
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#C9A227" name="theme-color"/>
@@ -233,7 +233,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 </div>
 <script src="/boltiv-install.js?v=53"></script>
 <script>
-fetch('https://boltiv-backend.onrender.com/api/health',{cache:'no-store'}).catch(function(){});
+fetch('window.BOLTIV_API_BASE/api/health',{cache:'no-store'}).catch(function(){});
 </script>
 <script src="boltiv-footer.js?v=2"></script>
 </body>

@@ -43,7 +43,7 @@
   };
   window.boltivAuthReady=(async function(){
     try{
-      const api=window.BOLTIV_API_BASE || 'https://boltiv-production.up.railway.app';
+      const api=window.BOLTIV_API_BASE || 'window.BOLTIV_API_BASE';
       const r=await nativeFetch(api+'/api/auth/me',{credentials:'include',cache:'no-store'});
       const d=await r.json().catch(()=>({}));
       if(r.ok && d.success && d.user){
@@ -77,7 +77,7 @@
     const exemptPaths=['/security','/login','/register','/forgot-password','/reset-password','/verify-email'];
     if(!exemptPaths.includes(path)){
       try{
-        const api=window.BOLTIV_API_BASE || 'https://boltiv-production.up.railway.app';
+        const api=window.BOLTIV_API_BASE || 'window.BOLTIV_API_BASE';
         // Same cookie-first, bearer-token-fallback pattern as boltivAuthReady above —
         // otherwise this check silently no-ops on browsers that block the cross-site
         // cookie, and the PIN-setup gate never fires for those users.
@@ -106,7 +106,7 @@
   // app open, this resets Render's idle timer, reducing how often the
   // backend goes cold in the first place during normal usage hours.
   (function(){
-    const api=window.BOLTIV_API_BASE || 'https://boltiv-production.up.railway.app';
+    const api=window.BOLTIV_API_BASE || 'window.BOLTIV_API_BASE';
     function ping(){
       if(document.visibilityState!=='visible') return;
       nativeFetch(api+'/api/health',{cache:'no-store'}).catch(()=>{});

@@ -1,6 +1,6 @@
 /* BOLTIV API + TRANSACTION UI */
 
-const API_URL="https://boltiv-backend.onrender.com";
+const API_URL="window.BOLTIV_API_BASE";
 
 const BoltivAPI={
     async request(endpoint,options={}){

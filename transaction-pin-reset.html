@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="/boltiv-api-config.js?v=1"></script>
 <base href="/">
 <meta name="robots" content="noindex,nofollow">
 <meta charset="utf-8">
@@ -70,7 +70,7 @@ body{background:#fff;color:#171717}
 </div>
 </div></div></div></div>
 <script>
-const API_BASE="https://boltiv-backend.onrender.com";
+const API_BASE="window.BOLTIV_API_BASE";
 const emailInput=document.getElementById("emailInput"),codeInput=document.getElementById("codeInput"),newPinInput=document.getElementById("newPinInput"),confirmPinInput=document.getElementById("confirmPinInput");
 const statusMessage=document.getElementById("statusMessage"),stepEmail=document.getElementById("stepEmail"),stepCode=document.getElementById("stepCode"),successArea=document.getElementById("successArea"),formArea=document.getElementById("formArea");
 let sending=false;

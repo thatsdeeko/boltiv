@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
+<head><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
@@ -645,7 +645,7 @@ message.className=
    PIN STATUS (SERVER-SIDE)
 ========================= */
 
-const API_BASE="https://boltiv-backend.onrender.com";
+const API_BASE="window.BOLTIV_API_BASE";
 
 // New users without a Transaction PIN are sent here as a mandatory setup step.
 const setupRequired=new URLSearchParams(location.search).get("setup")==="required";

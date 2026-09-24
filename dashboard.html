@@ -88,6 +88,25 @@ body.modal-open{overflow:hidden!important}
 @media (prefers-reduced-motion:reduce){.boltiv-announcement-track{animation:none;min-width:100%}.boltiv-announcement-copy:nth-of-type(n+3){display:none}}
 </style>
 <link rel="manifest" href="/manifest.webmanifest">
+
+<style id="boltiv-premium-dashboard-visuals">
+/* Visual-only polish: preserves dashboard behavior and existing data/transaction logic. */
+.home-balance-card{background:linear-gradient(145deg,#e4c34a 0%,#c9a227 48%,#b88b12 100%)!important;border:1px solid rgba(157,115,5,.42)!important;border-radius:24px!important;box-shadow:0 18px 42px rgba(158,122,18,.22),inset 0 1px 0 rgba(255,255,255,.32)!important;color:#171717!important;position:relative;overflow:hidden}
+.home-balance-card:before{content:"";position:absolute;inset:-45% 35% 35% -20%;background:radial-gradient(circle,rgba(255,255,255,.26),transparent 58%);pointer-events:none}
+.home-balance-card>*{position:relative;z-index:1}
+.home-balance-card .balance-label{color:rgba(32,27,13,.72)!important}
+.home-balance-card .balance-value{color:#171717!important;text-shadow:0 1px 0 rgba(255,255,255,.2)}
+.home-balance-card .balance-visibility-toggle{background:rgba(255,255,255,.18)!important;border-color:rgba(40,30,5,.18)!important;color:#171717!important}
+.home-balance-card .balance-mark{background:rgba(255,255,255,.18)!important;border-color:rgba(255,255,255,.28)!important;color:#fff!important;box-shadow:0 12px 24px rgba(90,65,0,.16)!important}
+.home-balance-card .btn-primary{background:#171717!important;color:#fff!important;border-color:#171717!important;box-shadow:0 8px 18px rgba(0,0,0,.13)}
+.home-balance-card .btn-light{background:rgba(255,255,255,.94)!important;color:#28251d!important;border-color:rgba(255,255,255,.7)!important}
+.home-service-card{border-radius:20px!important;box-shadow:0 8px 24px rgba(25,25,20,.045)!important}
+.home-service-card .service-icon{background:#fbf4d9!important;border-color:#e4ce7a!important;color:#b48a12!important;box-shadow:0 4px 10px rgba(178,137,17,.08)}
+.service-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bottom-nav .nav-icon{display:grid;place-items:center;width:21px;height:21px;font-size:0}
+.bottom-nav .nav-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:899px){.home-balance-card{border-radius:22px!important}.home-service-card .service-icon{width:38px;height:38px;border-radius:12px}.service-icon svg{width:18px;height:18px}}
+</style>
 </head>
 <body class="boltiv-animated-home">
 <div aria-hidden="true" class="home-ambient">
@@ -143,18 +162,18 @@ body.modal-open{overflow:hidden!important}
 <section class="section home-services-section">
 <div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions">Activity →</a></div>
 <div class="home-service-grid">
-<a class="home-service-card" href="/airtime"><span class="service-icon">☎</span><strong>Airtime</strong><small>Recharge any network</small></a>
-<a class="home-service-card" href="/data"><span class="service-icon">⌁</span><strong>Data</strong><small>Choose a live bundle</small></a>
-<a class="home-service-card" href="/cable"><span class="service-icon">▣</span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-<a class="home-service-card" href="/electricity"><span class="service-icon">ϟ</span><strong>Electricity</strong><small>Pay your meter</small></a>
-<a class="home-service-card" href="/exam-pin"><span class="service-icon">◆</span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
-<button class="home-service-card coming-soon" data-service="Betting" type="button"><span class="service-icon">●</span><strong>Betting</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Recharge PIN" type="button"><span class="service-icon">▤</span><strong>Recharge PIN</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="SMS" type="button"><span class="service-icon">✉</span><strong>SMS</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Bulk SMS" type="button"><span class="service-icon">✉</span><strong>Bulk SMS</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Gift Cards" type="button"><span class="service-icon">◇</span><strong>Gift Cards</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Insurance" type="button"><span class="service-icon">✓</span><strong>Insurance</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="International Airtime" type="button"><span class="service-icon">◎</span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
+<a class="home-service-card" href="/airtime"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.2"></rect><path d="M10 6h4M11 18h2"></path></svg></span><strong>Airtime</strong><small>Recharge any network</small></a>
+<a class="home-service-card" href="/data"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5a11 11 0 0 1 16 0M7 12.5a7 7 0 0 1 10 0M10 15.5a3 3 0 0 1 4 0"></path><circle cx="12" cy="18" r="1"></circle></svg></span><strong>Data</strong><small>Choose a live bundle</small></a>
+<a class="home-service-card" href="/cable"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="12" rx="2"></rect><path d="M8 21h8M12 17v4M9 3l3 3 3-3"></path></svg></span><strong>Cable TV</strong><small>Renew your subscription</small></a>
+<a class="home-service-card" href="/electricity"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.8 5.8 13h5.3l-.8 8.2L18.2 11h-5.1l.4-8.2Z"></path></svg></span><strong>Electricity</strong><small>Pay your meter</small></a>
+<a class="home-service-card" href="/exam-pin"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20.5H7z"></path><path d="M14 3.5v4h4M9.5 12h5M9.5 15h5"></path></svg></span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
+<button class="home-service-card coming-soon" data-service="Betting" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8.5h10a4 4 0 0 1 3.7 5.5l-1.1 3a2 2 0 0 1-3.6.4L14.7 15H9.3l-1.3 2.4a2 2 0 0 1-3.6-.4l-1.1-3A4 4 0 0 1 7 8.5Z"></path><path d="M7.5 11v4M5.5 13h4M16.5 12.5h.01M18.5 11.5h.01"></path></svg></span><strong>Betting</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Recharge PIN" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 13h5M16 16h.01"></path></svg></span><strong>Recharge PIN</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="SMS" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H8l-4 3v-14Z"></path><path d="M7.5 9h9M7.5 12h6"></path></svg></span><strong>SMS</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Bulk SMS" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v9H9l-4 3V6Z"></path><path d="M8 4h12v9M8 9h8M8 12h5"></path></svg></span><strong>Bulk SMS</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Gift Cards" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="11" rx="2"></rect><path d="M12 7v11M3.5 11h17M12 7c-2.5 0-4-1.1-4-2.5S9.1 2 10.4 3.3L12 7ZM12 7c2.5 0 4-1.1 4-2.5S14.9 2 13.6 3.3L12 7Z"></path></svg></span><strong>Gift Cards</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="Insurance" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.5c0 4.2-2.7 7.5-7 9-4.3-1.5-7-4.8-7-9V6l7-2.5Z"></path><path d="m8.5 12 2.2 2.2 4.8-5"></path></svg></span><strong>Insurance</strong><small>Coming soon</small></button>
+<button class="home-service-card coming-soon" data-service="International Airtime" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M3.8 12h16.4M12 3.5c2.1 2.3 3.2 5.1 3.2 8.5s-1.1 6.2-3.2 8.5c-2.1-2.3-3.2-5.1-3.2-8.5S9.9 5.8 12 3.5Z"></path></svg></span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
 </div>
 </section>
 <section class="section home-recent-section">
@@ -206,10 +225,10 @@ body.modal-open{overflow:hidden!important}
 </section>
 </div>
 <nav class="bottom-nav">
-<button class="nav-item active" data-page="/dashboard"><span class="nav-icon">⌂</span><span>Home</span></button>
-<button class="nav-item" data-page="/wallet"><span class="nav-icon">₦</span><span>Wallet</span></button>
-<button class="nav-item" data-page="/transactions"><span class="nav-icon">↯</span><span>Activity</span></button>
-<button class="nav-item" data-page="/profile"><span class="nav-icon">◉</span><span>Profile</span></button>
+<button class="nav-item active" data-page="/dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10.5 8.5-7 8.5 7v9a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1z"></path><path d="M9.5 20.5v-6h5v6"></path></svg></span><span>Home</span></button>
+<button class="nav-item" data-page="/wallet"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M17 5v14M5 8h14M5 16h14M7 5l10 14M17 5 7 19"></path></svg></span><span>Wallet</span></button>
+<button class="nav-item" data-page="/transactions"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"></path></svg></span><span>Activity</span></button>
+<button class="nav-item" data-page="/profile"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span><span>Profile</span></button>
 </nav>
 <script>
 const API_BASE=window.BOLTIV_API_BASE;

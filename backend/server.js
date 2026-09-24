@@ -4,7 +4,7 @@ const {Pool}=require("pg");
 
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
-const BACKEND_PUBLIC_URL=(process.env.BACKEND_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||"").replace(/\/+$/,"");
+const BACKEND_PUBLIC_URL=(process.env.BACKEND_PUBLIC_URL||"").replace(/\/+$/,"");
 
 const FLW_SECRET_KEY=process.env.FLW_SECRET_KEY||"";
 const FLW_BASE_URL=(process.env.FLW_BASE_URL||"https://api.flutterwave.com/v3").replace(/\/+$/,"");

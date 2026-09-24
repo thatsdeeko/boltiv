@@ -4800,8 +4800,21 @@ try{const b=await body(req),accountType=String(b.accountType||"static").toLowerC
 }
 
 if(req.method==="POST"&&path==="/api/flutterwave/webhook"){
-let rawBody="";req.on("data",chunk=>{rawBody+=chunk;});req.on("end",async()=>{
+let rawBody="";
 try{
+rawBody=await new Promise((resolve,reject)=>{
+let data="";
+req.on("data",chunk=>{
+data+=chunk;
+if(data.length>1024*1024){
+req.destroy();
+reject(new Error("Request body too large."));
+}
+});
+req.on("end",()=>resolve(data));
+req.on("error",reject);
+});
+
 const directSignature=String(req.headers["verif-hash"]||"");
 const hmacSignature=String(req.headers["flutterwave-signature"]||"");
 let valid=false;
@@ -4818,12 +4831,16 @@ if(!valid)return send(res,401,{success:false,message:"Invalid Flutterwave webhoo
 let payload;try{payload=JSON.parse(rawBody||"{}");}catch{return send(res,400,{success:false,message:"Invalid JSON payload."});}
 const event=String(payload?.event||payload?.type||payload?.event_type||"").toLowerCase();
 if(event==="charge.completed"||event==="account_transaction"||event==="bank_transfer_transaction"||payload?.["event.type"]==="BANK_TRANSFER_TRANSACTION"){
-const result=await creditFlutterwaveVirtualAccount(payload);return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Flutterwave funding webhook processed.",...result});
+const result=await creditFlutterwaveVirtualAccount(payload);
+return send(res,200,{success:true,message:result.duplicate?"Webhook already processed.":"Flutterwave funding webhook processed.",...result});
 }
 return send(res,200,{success:true,message:"Flutterwave webhook received."});
-}catch(error){console.error("FLUTTERWAVE WEBHOOK ERROR:",error);return send(res,500,{success:false,message:error.message||"Webhook processing failed."});}
-});return;
+}catch(error){
+console.error("FLUTTERWAVE WEBHOOK ERROR:",error);
+return send(res,500,{success:false,message:error.message||"Webhook processing failed."});
 }
+}
+
 
 if(
 req.method==="POST"&&

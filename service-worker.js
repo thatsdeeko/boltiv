@@ -2,7 +2,7 @@ const CACHE = 'boltiv-shell-v54';
 const SHELL = [
   '/', '/index.html', '/login.html', '/register.html', '/dashboard.html',
   '/wallet.html', '/airtime.html', '/data.html', '/cable.html', '/electricity.html',
-  '/history.html', '/transactions.html', '/profile.html', '/security.html',
+  '/history.html', '/transactions.html', '/profile.html', '/agent-home.html', '/agent-sell.html', '/agent-wallet.html', '/agent-activity.html', '/agent-earnings.html', '/agent-profile.html', '/security.html',
   '/contact.html', '/manifest.webmanifest', '/style.css', '/boltiv-ui.js',
   '/boltiv-client.js', '/boltiv-lock.js', '/boltiv-install.js', '/assets/boltiv-icon.png', '/assets/boltiv-icon.webp'
 ];

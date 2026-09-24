@@ -529,10 +529,7 @@ async function login(){
 
 
         setTimeout(()=>{
-
-            location.href =
-                "/dashboard";
-
+            location.href = data.user?.accountType === "agent" ? "/agent-home" : "/dashboard";
         },500);
 
 

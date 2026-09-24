@@ -86,31 +86,10 @@ ACCOUNT ACTIVE
 <div class="section" id="agentSection">
 <div class="section-head"><h3>BOLTIV Agent</h3><span class="agent-pill" id="agentStatusPill">CUSTOMER</span></div>
 <div class="details-card">
-<div id="agentCustomerView">
-<div class="agent-copy"><strong>Turn your BOLTIV account into a business account.</strong><span>Keep your existing wallet and use it as working capital to sell BOLTIV services to customers.</span></div>
-<div class="agent-requirement" id="agentRequirementText">Minimum wallet balance: <b>₦10,000</b> &middot; requires a verified BOLTIV funding account (NIN or BVN)</div>
-<button class="agent-cta-btn" id="becomeAgentBtn" type="button">BECOME A BOLTIV AGENT</button>
-</div>
-<div id="agentActiveView" style="display:none">
-<div class="agent-copy"><strong>You are a BOLTIV Agent.</strong><span id="agentIdText">Your Agent account is active.</span></div>
-<div class="agent-requirement" id="agentProfileMeta"></div>
-<div class="agent-stats" id="agentStatsGrid"></div>
-<div class="agent-services" id="agentServicesList"></div>
-<div class="agent-section-title">RECENT TRANSACTIONS</div>
-<button id="agentDownloadReportBtn" style="margin-bottom:10px;padding:9px 13px;border:1px solid #e5e5e1;border-radius:9px;background:#fff;font-size:9px;font-weight:900;color:#555" type="button">DOWNLOAD STATEMENT (CSV)</button>
-<div class="agent-tx-list" id="agentTxList"><div class="agent-empty">Loading…</div></div>
-<div class="agent-section-title">SAVED CUSTOMERS</div>
-<div class="agent-customer-form">
-<input aria-label="Customer name" id="agentCustName" placeholder="Name" type="text"/>
-<input aria-label="Customer phone" id="agentCustPhone" inputmode="numeric" placeholder="Phone (11 digits)" type="tel"/>
-<input aria-label="Customer network" id="agentCustNetwork" placeholder="Network (optional, e.g. MTN)" type="text"/>
-<button id="agentAddCustomerBtn" type="button">SAVE CUSTOMER</button>
-</div>
-<div class="agent-customers-list" id="agentCustomersList"><div class="agent-empty">Loading…</div></div>
-</div>
+<div id="agentCustomerView"><div class="agent-copy"><strong>Turn your BOLTIV account into a business account.</strong><span>Use your existing wallet as working capital to sell BOLTIV services to customers.</span></div><div class="agent-requirement" id="agentRequirementText">Minimum wallet balance: <b>₦10,000</b> · requires a verified BOLTIV funding account.</div><button class="agent-cta-btn" id="becomeAgentBtn" type="button">BECOME A BOLTIV AGENT</button></div>
+<div id="agentActiveView" style="display:none"><div class="agent-copy"><strong>Your Agent account is active.</strong><span id="agentIdText">Your dedicated business workspace is ready.</span></div><button class="agent-cta-btn" id="openAgentBtn" type="button">OPEN BOLTIV AGENT</button></div>
 <div aria-live="polite" class="message" id="agentMessage" role="status"></div>
-</div>
-</div>
+</div></div>
 <!-- PERSONAL INFORMATION -->
 <div class="section">
 <div class="section-head">
@@ -845,74 +824,14 @@ location.href=item.dataset.page;
 
 
 async function loadAgentStatus(){
- const message=document.getElementById('agentMessage'),pill=document.getElementById('agentStatusPill'),customer=document.getElementById('agentCustomerView'),active=document.getElementById('agentActiveView'),btn=document.getElementById('becomeAgentBtn'),list=document.getElementById('agentServicesList');
- if(!message)return;
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/status',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load Agent status.');
-  if(d.isAgent){pill.textContent='AGENT';pill.classList.add('active');customer.style.display='none';active.style.display='block';document.getElementById('agentIdText').textContent='Agent ID: '+(d.agent?.agent_id||'Active');const regDate=d.agent?.activated_at?new Date(d.agent.activated_at).toLocaleDateString('en-NG',{day:'numeric',month:'short',year:'numeric'}):'—';document.getElementById('agentProfileMeta').textContent=`Tier: ${(d.agent?.tier||'standard').toUpperCase()} · Registered ${regDate} · Funding account: ${d.staticAccount?d.staticAccount.accountNumber+' ('+(d.staticAccount.bankName||'')+')':'Not linked'}`;list.innerHTML=(d.services||[]).map(s=>`<div class="agent-service ${(s.agent_enabled&&s.platform_enabled&&!s.maintenance)?'on':'off'}"><span>${escProfile(s.name)} <span style="color:#999">(+${Number(s.agent_markup_pct||0)}%)</span></span><span class="agent-service-dot">${s.agent_enabled&&s.platform_enabled&&!s.maintenance?'AVAILABLE':'UNAVAILABLE'}</span></div>`).join('');loadAgentDashboard();loadAgentTransactions();loadAgentCustomers();}
-  else{pill.textContent='CUSTOMER';pill.classList.remove('active');customer.style.display='block';active.style.display='none';const balance=Number(d.currentBalance||0);const minBalance=Number(d.minimumBalance||0);const reqText=document.getElementById('agentRequirementText');if(reqText)reqText.innerHTML='Minimum wallet balance: <b>'+moneyProfile(minBalance).replace(/\.00$/,'')+'</b> &middot; requires a verified BOLTIV funding account (NIN or BVN)';btn.textContent=balance>=minBalance?'BECOME A BOLTIV AGENT':'ADD '+moneyProfile(Math.max(0,minBalance-balance)).replace(/\.00$/,'')+' TO BECOME AN AGENT';}
+ const message=document.getElementById('agentMessage'),pill=document.getElementById('agentStatusPill'),customer=document.getElementById('agentCustomerView'),active=document.getElementById('agentActiveView'),btn=document.getElementById('becomeAgentBtn'); if(!message)return;
+ try{const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/status',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load Agent status.');
+ if(d.isAgent){pill.textContent='AGENT';pill.classList.add('active');customer.style.display='none';active.style.display='block';document.getElementById('agentIdText').textContent='Agent ID: '+(d.agent?.agent_id||'Active');document.getElementById('openAgentBtn').onclick=()=>location.href='/agent-home';}
+ else{pill.textContent='CUSTOMER';pill.classList.remove('active');customer.style.display='block';active.style.display='none';const balance=Number(d.currentBalance||0),min=Number(d.minimumBalance||0);document.getElementById('agentRequirementText').innerHTML='Minimum wallet balance: <b>'+moneyProfile(min).replace(/\.00$/,'')+'</b> · requires a verified BOLTIV funding account.';btn.textContent=balance>=min?'BECOME A BOLTIV AGENT':'ADD '+moneyProfile(Math.max(0,min-balance)).replace(/\.00$/,'')+' TO BECOME AN AGENT';}
  }catch(e){message.textContent=e.message;message.className='message show error';}
 }
-function escProfile(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function moneyProfile(v){return '₦'+Number(v||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});}
-async function loadAgentDashboard(){
- const grid=document.getElementById('agentStatsGrid');if(!grid)return;
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/dashboard',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load dashboard.');
-  grid.innerHTML=`<div class="agent-stat"><span>WALLET BALANCE</span><strong>${moneyProfile(d.walletBalance)}</strong></div><div class="agent-stat"><span>TODAY'S SALES</span><strong>${moneyProfile(d.today.sales)}</strong></div><div class="agent-stat"><span>TODAY'S PROFIT</span><strong>${moneyProfile(d.today.profit)}</strong></div><div class="agent-stat"><span>TODAY'S TRANSACTIONS</span><strong>${d.today.transactions}</strong></div><div class="agent-stat"><span>TOTAL SALES</span><strong>${moneyProfile(d.total.sales)}</strong></div><div class="agent-stat"><span>TOTAL PROFIT</span><strong>${moneyProfile(d.total.profit)}</strong></div><div class="agent-stat"><span>PENDING</span><strong>${d.pendingTransactions}</strong></div><div class="agent-stat"><span>FAILED</span><strong>${d.failedTransactions}</strong></div>`;
- }catch(e){grid.innerHTML=`<div class="agent-empty">${escProfile(e.message)}</div>`;}
-}
-async function loadAgentTransactions(){
- const list=document.getElementById('agentTxList');if(!list)return;
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/transactions?limit=15',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load transactions.');
-  const rows=d.transactions||[];
-  list.innerHTML=rows.length?rows.map(t=>`<div class="agent-tx-row"><span>${escProfile(t.service)}<br><span style="color:#999">${escProfile(t.recipient||'')} &middot; ${escProfile(t.status)}</span></span><span class="profit ${t.profit<0?'neg':''}">${moneyProfile(t.profit)}</span></div>`).join(''):'<div class="agent-empty">No Agent transactions yet.</div>';
- }catch(e){list.innerHTML=`<div class="agent-empty">${escProfile(e.message)}</div>`;}
-}
-async function loadAgentCustomers(){
- const list=document.getElementById('agentCustomersList');if(!list)return;
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/customers',{credentials:'include',cache:'no-store'});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to load customers.');
-  const rows=d.customers||[];
-  list.innerHTML=rows.length?rows.map(c=>`<div class="agent-customer-row"><span>${escProfile(c.name)}<br><span style="color:#999">${escProfile(c.phone)}${c.network?' &middot; '+escProfile(c.network):''}</span></span><button data-id="${c.id}" onclick="deleteAgentCustomer(${c.id})" type="button">REMOVE</button></div>`).join(''):'<div class="agent-empty">No saved customers yet.</div>';
- }catch(e){list.innerHTML=`<div class="agent-empty">${escProfile(e.message)}</div>`;}
-}
-async function addAgentCustomer(){
- const message=document.getElementById('agentMessage');
- const name=document.getElementById('agentCustName').value.trim(),phone=document.getElementById('agentCustPhone').value.trim(),network=document.getElementById('agentCustNetwork').value.trim();
- if(!name){message.textContent='Enter the customer\'s name.';message.className='message show error';return;}
- if(!/^\d{11}$/.test(phone)){message.textContent='Enter a valid 11-digit phone number.';message.className='message show error';return;}
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/customers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,network})});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to save customer.');
-  document.getElementById('agentCustName').value='';document.getElementById('agentCustPhone').value='';document.getElementById('agentCustNetwork').value='';
-  message.textContent='Customer saved.';message.className='message show success';
-  await loadAgentCustomers();
- }catch(e){message.textContent=e.message;message.className='message show error';}
-}
-async function deleteAgentCustomer(id){
- const message=document.getElementById('agentMessage');
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/customers',{method:'DELETE',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success)throw new Error(d.message||'Unable to remove customer.');
-  await loadAgentCustomers();
- }catch(e){message.textContent=e.message;message.className='message show error';}
-}
-if(document.getElementById('agentAddCustomerBtn'))document.getElementById('agentAddCustomerBtn').onclick=addAgentCustomer;
-if(document.getElementById('agentDownloadReportBtn'))document.getElementById('agentDownloadReportBtn').onclick=async()=>{
- const btn=document.getElementById('agentDownloadReportBtn'),message=document.getElementById('agentMessage');
- btn.disabled=true;const originalText=btn.textContent;btn.textContent='PREPARING…';
- try{
-  const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/transactions/export',{credentials:'include',headers:{'Authorization':'Bearer '+(boltivMemoryStorage.getItem('boltivAuthToken')||'')}});
-  if(!r.ok)throw new Error('Unable to download your statement right now.');
-  const blob=await r.blob();
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='boltiv-agent-statement.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
- }catch(e){message.textContent=e.message;message.className='message show error';}
- finally{btn.disabled=false;btn.textContent=originalText;}
-};
-if(document.getElementById('becomeAgentBtn'))document.getElementById('becomeAgentBtn').onclick=async()=>{const message=document.getElementById('agentMessage');try{const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/activate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'}});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success){if(d.code==='AGENT_MINIMUM_BALANCE'){message.textContent=d.message;message.className='message show error';setTimeout(()=>location.href='/wallet',700);return;}if(d.code==='AGENT_STATIC_ACCOUNT_REQUIRED'){message.textContent=d.message+' Redirecting you to set one up \u2014 choose "Fund Wallet" then the PERMANENT \u00b7 STATIC option and enter your NIN or BVN.';message.className='message show error';setTimeout(()=>location.href='/wallet',1200);return;}throw new Error(d.message||'Unable to activate Agent account.');}message.textContent=d.message||'Agent account activated.';message.className='message show success';await loadAgentStatus();}catch(e){message.textContent=e.message;message.className='message show error';}};
+if(document.getElementById('becomeAgentBtn'))document.getElementById('becomeAgentBtn').onclick=async()=>{const message=document.getElementById('agentMessage');try{const r=await fetch(window.BOLTIV_API_BASE+'/api/agent/activate',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'}});let d={};try{d=await r.json()}catch{};if(!r.ok||!d.success){if(d.code==='AGENT_MINIMUM_BALANCE'||d.code==='AGENT_STATIC_ACCOUNT_REQUIRED'){message.textContent=d.message;message.className='message show error';return;}throw new Error(d.message||'Unable to activate Agent account.');}location.href='/agent-home';}catch(e){message.textContent=e.message;message.className='message show error';}};
 
 /* =========================
    INITIAL LOAD

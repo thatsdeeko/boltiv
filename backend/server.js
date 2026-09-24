@@ -240,8 +240,11 @@ async function getAgentLimits(agentProfile){
 async function checkAgentLimits(userId,agentProfile,thisTransactionAmount){
   const limits=await getAgentLimits(agentProfile);
   if(thisTransactionAmount>limits.maxTransaction)return{ok:false,message:`This transaction (₦${thisTransactionAmount.toLocaleString('en-NG',{minimumFractionDigits:2})}) exceeds your maximum per-transaction limit of ₦${limits.maxTransaction.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};
-  const wallet=await getWallet(userId);
-  if(Number(wallet?.balance||0)-thisTransactionAmount<limits.minWalletBalance)return{ok:false,message:`This transaction would take your wallet below the required minimum balance of ₦${limits.minWalletBalance.toLocaleString('en-NG',{minimumFractionDigits:2})}. Fund your wallet and try again.`};
+  // NOTE: There is intentionally NO minimum-balance check here. The ₦10,000 figure
+  // (limits.minWalletBalance) is only the Agent ACTIVATION requirement, enforced in
+  // activateAgentForUser(). Once active, an Agent may spend any available wallet balance;
+  // insufficient funds are rejected atomically by createVTUTransactionAndDebit
+  // (UPDATE ... WHERE balance>=amount).
   const r=await db(`SELECT COALESCE(SUM(amount),0) AS total,COUNT(*)::int AS cnt FROM transactions WHERE user_id=$1 AND date::date=CURRENT_DATE AND status IN ('successful','pending','processing') AND metadata->'pricing'->>'agentPrice' IS NOT NULL`,[userId]);
   const usedToday=Number(r.rows[0]?.total||0), countToday=Number(r.rows[0]?.cnt||0);
   if(usedToday+thisTransactionAmount>limits.dailyLimit)return{ok:false,message:`This transaction would put you over your daily transaction limit of ₦${limits.dailyLimit.toLocaleString('en-NG',{minimumFractionDigits:2})}.`};
@@ -498,6 +501,10 @@ if(!ids.length)throw new Error(`VTUGATE service ID for ${selected} data is not c
 return ids;
 }
 
+// Smallest data bundle offered (SME and Gifting). 1GB is stored as 1024MB when parsed from a "1GB" name/unit,
+// but some providers report it as 1000 in an MB field, so 1000 is the cutoff: it keeps every 1GB plan
+// and excludes anything smaller (e.g. 500MB, 750MB).
+const MIN_DATA_PLAN_MB=1000;
 async function fetchVTUGATEDataPlans(network){
 const selected=normalizeDataNetwork(network);
 if(!selected)throw new Error('Unsupported network.');
@@ -550,7 +557,7 @@ const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean))
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
 const nonRetailTerms=['thryve','msme','fibrenet','hynetflex','mifi','router','learning bundle'];
 const isNonRetail=name=>{const lower=String(name||'').toLowerCase();return nonRetailTerms.some(term=>lower.includes(term));};
-const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&['SME','Gifting'].includes(p.sales_channel)&&Number(p.size_mb||0)>=500&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
+const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&['SME','Gifting'].includes(p.sales_channel)&&Number(p.size_mb||0)>=MIN_DATA_PLAN_MB&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
 // Multiple sales channels (SME, Gifting, Awoof, Transfer, Direct, Data Share) often sell the exact same
 // bundle size+validity at different prices and reliability. Keep only the best one per (size, validity):
 // prefer the most reliable delivery track record, and use price as the tiebreaker.
@@ -4960,7 +4967,7 @@ const lookupKey=planLookupKey(planCode,planServiceId);
 byPlan.set(lookupKey,{code:planCode,plan_code:planCode,provider_code:planCode,lookup_key:lookupKey,bundle_id:lookupKey,name:clean(plan.name||planCode),customer_price:customerPrice,agent_price:agentPrice,provider_price:Number(providerPrice.toFixed(2)),network_name:network,sales_channel:clean(plan.sales_channel||''),service_id:planServiceId,size_mb:Number(plan.size_mb||0),validity_days:Number(plan.validity_days||0),validity:clean(plan.validity||plan.validity_period||plan.duration||"") ,validity_period:clean(plan.validity_period||plan.validity||plan.duration||"") ,duration:clean(plan.duration||plan.validity||plan.validity_period||"")});
 }
 const plans=Array.from(byPlan.values())
-.filter(plan=>['SME','Gifting'].includes(plan.sales_channel)&&Number(plan.size_mb||0)>=500)
+.filter(plan=>['SME','Gifting'].includes(plan.sales_channel)&&Number(plan.size_mb||0)>=MIN_DATA_PLAN_MB)
 .sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
 return send(res,200,{success:true,network,plans,isAgent:agentService.isAgent,agentEnabled:agentService.enabled});
 }catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}

@@ -7,4 +7,4 @@ async function agentFetch(path,opts={}){const r=await fetch(AGENT_API+path,{cred
 async function requireAgent(){try{const d=await agentFetch("/api/me");if(d.user?.accountType!=="agent"){location.href="/dashboard";return null;}return d;}catch(e){if(!location.pathname.includes("login"))setTimeout(()=>location.href="/dashboard",250);return null;}}
 function agentNav(active){document.querySelectorAll(".agent-nav a").forEach(a=>a.classList.toggle("active",a.dataset.page===active));}
 async function getPin(){if(typeof boltivGetTransactionPin!=="function")return null;return await boltivGetTransactionPin();}
-function showAgentMessage(text,type="error"){const el=document.getElementById("agentMessage");if(!el)return;el.textContent=text;el.className="agent-message show "+type;}
+let agentMessageTimer=null;function showAgentMessage(text,type="error"){const el=document.getElementById("agentMessage");if(!el)return;el.textContent=text;el.className="agent-message show "+type;clearTimeout(agentMessageTimer);agentMessageTimer=setTimeout(()=>{el.classList.remove("show");},4200);}

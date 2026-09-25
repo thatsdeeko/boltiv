@@ -17,3 +17,44 @@
 .wallet-card{background:linear-gradient(145deg,#e4c34a 0%,#c9a227 48%,#b88b12 100%)!important;color:#171717!important;border:1px solid rgba(157,115,5,.42)!important;box-shadow:0 18px 42px rgba(158,122,18,.22),inset 0 1px 0 rgba(255,255,255,.32)!important;position:relative;overflow:hidden}
 .wallet-card:before{content:"";position:absolute;inset:-45% 35% 35% -20%;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 58%);pointer-events:none}.wallet-card>*{position:relative;z-index:1}.wallet-card .label{color:rgba(32,27,13,.7)}.wallet-card .wallet-amount{color:#171717;text-shadow:0 1px 0 rgba(255,255,255,.2)}.wallet-card .wallet-actions a{background:rgba(255,255,255,.94);color:#28251d;border-color:rgba(255,255,255,.7)}.wallet-card .wallet-actions a:first-child{background:#171717;color:#fff;border-color:#171717}
 @media(max-width:520px){.hero-gold{border-radius:22px!important}.quick-grid{gap:10px}}
+
+
+/* BOLTIV Agent Activity — premium fintech polish; presentation only. */
+.agent-top{padding:22px 2px 14px}
+.agent-top .title{font-size:32px;letter-spacing:-1.4px}
+.statement-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;border:1px solid #e2d49d;border-radius:11px;background:#fffdf5;color:#9a7812;text-decoration:none;font-size:9px;font-weight:1000;letter-spacing:.15px;box-shadow:0 4px 12px rgba(157,123,25,.07)}
+.statement-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabs{gap:8px;margin:13px 0 14px;padding:2px 1px 5px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{min-height:38px;padding:0 15px;border:1px solid #e4e4de;background:#fff;border-radius:12px;color:#565650;font-size:9px;letter-spacing:.05px;box-shadow:0 3px 10px rgba(20,20,16,.025)}
+.tab:hover{border-color:#d8c678}
+.tab.active{background:#171717;color:#fff;border-color:#171717;box-shadow:0 7px 16px rgba(23,23,23,.12)}
+.card{padding:7px 14px 8px;border:1px solid #e6e5df;border-radius:22px;box-shadow:0 12px 32px rgba(26,24,15,.045)}
+.activity-row{min-height:76px;padding:13px 2px;gap:10px;border-bottom:1px solid #efeee8;border-radius:0;transition:background .18s ease,transform .18s ease}
+.activity-row:first-child{padding-top:12px}
+.activity-row:hover{background:#fffdf6}
+.activity-row:active{background:#fbf7e8;transform:scale(.995)}
+.activity-left{gap:12px;flex:1;min-width:0}
+.activity-icon{width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#fffdf2,#fbf4d9);border:1px solid #eadca9;color:#b58b13;box-shadow:0 5px 13px rgba(180,139,19,.08)}
+.activity-icon svg{width:19px;height:19px;stroke-width:1.75}
+.activity-main strong{font-size:11px;letter-spacing:-.1px}
+.activity-main small{font-size:8.5px;margin-top:5px;color:#8a8a83;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.activity-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:92px}
+.activity-amount{font-size:11px!important;line-height:1.15;letter-spacing:-.1px;color:#1b1b19}
+.profit{display:block;font-size:8.5px!important;line-height:1.2;font-weight:900}
+.profit span{font-weight:700;opacity:.72}
+.status{margin-top:2px;padding:4px 8px;font-size:6.5px;letter-spacing:.45px;border:1px solid transparent}
+.status.successful{background:#eff9f1;color:#1c8143;border-color:#d5ecd9}
+.status.pending,.status.processing{background:#fff9e7;color:#9a7812;border-color:#f0dfaa}
+.status.failed,.status.refunded{background:#fff2f2;color:#b94c4c;border-color:#efd2d2}
+.activity-chevron{font-size:19px;color:#b9b9b2;margin-left:0}
+.section-head{margin:25px 2px 10px}
+.section-head h2{font-size:15px;letter-spacing:-.25px}
+.section-head .link{font-size:9px}
+.summary-grid{gap:10px;margin-top:11px}
+.summary-box{position:relative;overflow:hidden;border:1px solid #e7e5dc;border-radius:18px;padding:16px;background:#fff;box-shadow:0 8px 24px rgba(25,25,20,.035)}
+.summary-box:after{content:"";position:absolute;right:-22px;top:-22px;width:68px;height:68px;border-radius:50%;background:#fbf4d9;opacity:.55}
+.summary-box .label,.summary-box strong{position:relative;z-index:1}
+.summary-box .label{font-size:8px;letter-spacing:.9px;color:#8b8b83}
+.summary-box strong{font-size:18px;margin-top:8px;letter-spacing:-.35px}
+@media(max-width:390px){.agent-top .title{font-size:29px}.statement-btn{padding:8px 9px}.tab{padding:0 13px}.activity-main small{max-width:125px}.activity-right{min-width:86px}.activity-amount{font-size:10px!important}}

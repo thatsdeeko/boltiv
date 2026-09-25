@@ -4624,7 +4624,16 @@ if(req.method==="GET"&&path==="/api/agent/transactions"){
   if(!agent||agent.status!=='active')return send(res,403,{success:false,message:'Your Agent account is not active.'});
   const limit=Math.min(200,Math.max(1,Number(url.searchParams.get("limit"))||50));
   const r=await db(`SELECT reference,service,amount,status,recipient,provider_reference,date,metadata FROM transactions WHERE user_id=$1 AND metadata->'pricing'->>'agentPrice' IS NOT NULL ORDER BY date DESC LIMIT $2`,[user.user_id,limit]);
-  return send(res,200,{success:true,transactions:r.rows.map(t=>{const p=t.metadata?.pricing||{};return{reference:t.reference,service:t.service,status:t.status,recipient:t.recipient,date:t.date,agentPrice:Number(p.agentPrice||t.amount||0),customerSellingPrice:Number(p.customerSellingPrice||0),profit:Number(p.agentProfit||0)};})});
+  return send(res,200,{success:true,transactions:r.rows.map(t=>{
+    const p=t.metadata?.pricing||{};
+    const req2=t.metadata?.request||{};
+    const providerData=t.metadata?.provider_response||{};
+    const delivery=providerData?.data?.delivery||providerData?.delivery||null;
+    const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];
+    const token=findTransactionField(providerData,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||delivery?.token||"";
+    const units=findTransactionField(providerData,["units","kwh","unit"])||"";
+    return{reference:t.reference,providerReference:t.provider_reference,service:t.service,status:t.status,recipient:t.recipient,date:t.date,agentPrice:Number(p.agentPrice||t.amount||0),customerSellingPrice:Number(p.customerSellingPrice||0),profit:Number(p.agentProfit||0),network:req2.network||null,phone:req2.phone||null,provider:req2.provider||null,plan:req2.plan||req2.plan_name||null,smartcard:req2.smartcard||null,meterNumber:req2.meterNumber||null,meterType:req2.meterType||null,examLabel:req2.examLabel||req2.product_code||null,quantity:req2.quantity||null,token,units,pins};
+  })});
 }
 if(req.method==="GET"&&path==="/api/agent/transactions/export"){
   const agent=await getAgentProfile(user.user_id);

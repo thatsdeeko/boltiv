@@ -351,6 +351,45 @@ if(!candidates.length){const seenTypes=Array.from(new Set(vtugateServiceCache.da
 return Number(candidates[0].service_id);
 }
 
+// VTUGATE's electricity catalog does not key every DISCO by its common abbreviation the
+// way the BOLTIV electricity page's provider buttons do. IKEDC, EKEDC, AEDC and KEDCO
+// happen to match their lowercased abbreviation, but PHED, IBEDC, EEDC, JED, KAEDCO,
+// BEDC and YEDC are keyed by a city/region name instead (portharcourt, ibadan, enugu,
+// jos, kaduna, benin, yola). Sending the plain lowercased abbreviation for those seven
+// never matches a catalog row, so verification/purchase fails for most DISCOs even
+// though the request is well-formed. This alias table lists every code seen for each
+// abbreviation; resolveElectricityDisco tries each in turn against the live catalog so
+// a future VTUGATE naming change doesn't silently reintroduce this failure, and it
+// returns the matched catalog code so callers send VTUGATE the value it actually
+// recognizes rather than the display abbreviation.
+const ELECTRICITY_DISCO_ALIASES={
+  ikedc:["ikedc"],ekedc:["ekedc"],aedc:["aedc"],kedco:["kedco"],
+  phed:["portharcourt","phed"],ibedc:["ibadan","ibedc"],eedc:["enugu","eedc"],
+  jed:["jos","jed"],kaedco:["kaduna","kaedco"],bedc:["benin","bedc"],
+  yedc:["yola","yedc"],abedc:["aba","abedc"]
+};
+async function resolveElectricityDisco(discoInput){
+  const abbrev=clean(discoInput).toLowerCase();
+  if(!abbrev)throw new Error("Electricity provider is required.");
+  const explicit=VTUGATE_SERVICE_MAP?.[abbrev]??VTUGATE_SERVICE_MAP?.[abbrev.toUpperCase()];
+  if(Number(explicit)>0)return{serviceId:Number(explicit),disco:abbrev};
+  if(Date.now()-vtugateServiceCache.at>300000){
+    const r=await fetchVTUGATEServices(true);
+    if(!r.success)throw new Error(r.message||"Unable to load VTUGATE services.");
+    const root=r.data?.data??r.data;
+    vtugateServiceCache.data=Array.isArray(root)?root:[];
+    vtugateServiceCache.at=Date.now();
+  }
+  const candidates=vtugateServiceCache.data.filter(row=>clean(row.service_type).toLowerCase()==="electricity");
+  const aliases=ELECTRICITY_DISCO_ALIASES[abbrev]||[abbrev];
+  for(const alias of aliases){
+    const match=candidates.find(row=>clean(row.disco).toLowerCase()===alias);
+    if(match)return{serviceId:Number(match.service_id),disco:alias};
+  }
+  const seen=Array.from(new Set(candidates.map(row=>clean(row.disco)||'(blank)')));
+  throw new Error(`VTUGATE service ID for ${abbrev} electricity could not be confirmed \u2014 none of the known codes (${aliases.join(", ")}) matched the live catalog. Discos VTUGATE currently reports: ${seen.join(", ")||'(none)'}. Check the VTUGATE dashboard/catalog or set VTUGATE_SERVICE_MAP.`);
+}
+
 function parseCatalogNumber(value){
   if(value===undefined||value===null)return NaN;
   if(typeof value==='number')return Number(value);
@@ -681,7 +720,7 @@ const network=normalizeDataNetwork(data.network||data.providerPayload?.network);
 }else if(service==="cable"){
 const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){console.error("VTUGATE unavailable (Unable to verify the cable TV service for this provider right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const expectedPrice=getCablePlanPrice(providerName,plan);if(expectedPrice===null)return{success:false,statusCode:400,message:"The selected cable TV plan is not recognized."};if(Math.abs(amount-expectedPrice)>.009)return{success:false,statusCode:400,message:"The selected cable TV plan price has changed. Please refresh and try again."};pricingMeta={providerCost:expectedPrice,customerPrice:expectedPrice,grossProfit:0,network:providerName,plan};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,phone_number:recipient,msisdn:recipient,plan,package:plan,amount,ref:null};
 }else if(service==="electricity"){
-const disco=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity",disco);}catch(e){console.error("VTUGATE unavailable (Unable to verify the electricity service right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=disco.toUpperCase();pricingMeta.plan=meterType;
+const discoAbbrev=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!discoAbbrev)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId,providerDisco;try{({serviceId,disco:providerDisco}=await resolveElectricityDisco(discoAbbrev));}catch(e){console.error("VTUGATE unavailable (Unable to verify the electricity service right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco:providerDisco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=discoAbbrev.toUpperCase();pricingMeta.plan=meterType;
 }
 let debitAmount=amount;
 if(agentService.isAgent){
@@ -726,7 +765,7 @@ for(const [planName,price] of Object.entries(providerPlans)){
 plans[planName]={customer_price:Number(price),agent_price:agentPricing?customerPriceFromCost(price,agentPricing):null};
 }
 return{...result,plans,isAgent:agentService.isAgent,agentEnabled:agentService.enabled};}
-async function verifyVTUGATEElectricity(req){const b=await body(req);const disco=clean(b.provider||b.disco).toLowerCase();if(!disco)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId;try{serviceId=await getVTUGATEServiceId("electricity",disco);}catch(e){console.error("VTUGATE unavailable (Unable to verify the electricity service right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const meterNo=clean(b.meterNumber||b.meter_no||b.meternumber);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};const result=await vtugateRequest("api/v1/verifyelectricity",{service_id:serviceId,meter_no:meterNo,disco});if(!result.success)return result;const customerName=findTransactionField(result.data,["meter_name","customer_name","name"]);const address=findTransactionField(result.data,["cust_address","address"]);return{...result,customerName,address};}
+async function verifyVTUGATEElectricity(req){const b=await body(req);const discoAbbrev=clean(b.provider||b.disco).toLowerCase();if(!discoAbbrev)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId,disco;try{({serviceId,disco}=await resolveElectricityDisco(discoAbbrev));}catch(e){console.error("VTUGATE unavailable (Unable to verify the electricity service right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const meterNo=clean(b.meterNumber||b.meter_no||b.meternumber);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};const result=await vtugateRequest("api/v1/verifyelectricity",{service_id:serviceId,meter_no:meterNo,disco});if(!result.success)return result;const customerName=findTransactionField(result.data,["meter_name","customer_name","name"]);const address=findTransactionField(result.data,["cust_address","address"]);return{...result,customerName,address};}
 
 async function debitWallet(userId,amount){
 const client=await pool.connect();

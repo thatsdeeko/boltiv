@@ -294,6 +294,9 @@ finally{clearTimeout(timer);}}
 async function fetchVTUGATEServices(all=true){return vtugateRequest(all?"api/v1/fetchallservices":"api/v1/fetchservices",{});}
 async function getVTUGATEAccountDetails(){return vtugateRequest("api/v1/accountdetails",{});}
 const vtugateServiceCache={at:0,data:[]};
+// Dedicated cache for getVTUGATEDataServiceIds — see the comment inside that function for why
+// it can't safely share vtugateServiceCache with the other resolvers.
+const vtugateDataServiceCache={at:0,data:[]};
 // Cable TV plans aren't exposed through a live VTUGATE pricing endpoint the way data
 // and education PINs are, so — unlike those services — cable had no server-side price
 // source to check against: the client-supplied amount was trusted as-is. That let a
@@ -501,7 +504,15 @@ const add=v=>{const n=Number(v);if(Number.isInteger(n)&&n>0&&!ids.includes(n))id
 for(const key of [selected,selected.toUpperCase(),selected.toLowerCase(),'data','DATA'])add(VTUGATE_SERVICE_MAP?.[key]);
 add(process.env.VTUGATE_DATA_SERVICE_ID);
 // Build a complete Data-service candidate list from VTUGATE.
-if(Date.now()-vtugateServiceCache.at>300000){
+// This function keeps its own cache (vtugateDataServiceCache) rather than reusing the shared
+// vtugateServiceCache that getVTUGATEServiceId/getVTUGATEEducationProducts/resolveElectricityDisco
+// populate with raw catalog rows. Those functions and this one store incompatible shapes under
+// the same 5-minute freshness window — whichever populated the cache last "wins" for everyone
+// else reading it within that window. When a raw-row populate won, structuredMatches here always
+// came back empty (raw rows use x.service_type/x.network_name, not x.serviceType/x.networkName),
+// which fell through to the alias fallback below and crashed on x.hay being undefined (raw rows
+// don't have a .hay field at all). A private cache removes the collision entirely.
+if(Date.now()-vtugateDataServiceCache.at>300000){
   const r=await fetchVTUGATEServices(true);
   if(r.success){
     const root=r.data?.data??r.data;
@@ -510,7 +521,7 @@ if(Date.now()-vtugateServiceCache.at>300000){
       if(!value||depth>8)return;
       if(Array.isArray(value)){for(const item of value)visit(item,depth+1);return;}
       if(typeof value!=='object')return;
-      const id=Number(value.service_id??value.serviceId??value.serviceID??value.id??value.service?.id??value.service?.service_id??value.service?.serviceId??0);
+      const id=Number(value.service_id??value.serviceId??value.serviceID??value.id??value.service?.id??value.service?.serviceId??0);
       const hay=[value.name,value.service_name,value.serviceName,value.service_title,value.title,value.label,value.code,value.service_code,value.serviceCode,value.slug,value.type,value.category,value.service_type,value.serviceType,value.provider,value.network,value.network_name,value.networkName,value.data_type,value.dataType,value.description,value.service?.name,value.service?.service_name,value.service?.code].filter(v=>v!==undefined&&v!==null).join(' ').toLowerCase();
       const serviceType=String(value.service_type||value.serviceType||'').toLowerCase();
       const networkName=String(value.network_name||value.networkName||value.network||'').toLowerCase();
@@ -518,21 +529,21 @@ if(Date.now()-vtugateServiceCache.at>300000){
       for(const [k,v] of Object.entries(value)){if(['raw','meta','pagination'].includes(k))continue;visit(v,depth+1);}
     };
     visit(root);
-    vtugateServiceCache.data=records;
-    vtugateServiceCache.at=Date.now();
+    vtugateDataServiceCache.data=records;
+    vtugateDataServiceCache.at=Date.now();
   }
 }
 // Primary, precise match: VTUGATE tags each service with an explicit service_type
 // and network_name — use those directly rather than scanning free text, which can
 // accidentally pull in other networks' services or unrelated business/broadband products.
-const structuredMatches=vtugateServiceCache.data.filter(x=>x.serviceType==='data'&&x.networkName===selected.toLowerCase());
+const structuredMatches=vtugateDataServiceCache.data.filter(x=>x.serviceType==='data'&&x.networkName===selected.toLowerCase());
 if(structuredMatches.length){
   for(const x of structuredMatches)add(x.id);
 }else{
   // Fallback for older/differently-shaped VTUGATE responses that lack service_type/network_name.
   const aliases=['data','mobile data','internet data','data bundle','data bundles','data plan','data plans','mobile data bundle'];
-  const has=(hay,w)=>{const t=String(w).toLowerCase();return hay===t||hay.includes(` ${t} `)||hay.startsWith(`${t} `)||hay.endsWith(` ${t}`)||hay.includes(t);};
-  const matches=vtugateServiceCache.data.filter(x=>aliases.some(w=>has(x.hay,w)));
+  const has=(hay,w)=>{const safeHay=String(hay||'');const t=String(w).toLowerCase();return safeHay===t||safeHay.includes(` ${t} `)||safeHay.startsWith(`${t} `)||safeHay.endsWith(` ${t}`)||safeHay.includes(t);};
+  const matches=vtugateDataServiceCache.data.filter(x=>aliases.some(w=>has(x.hay,w)));
   const networkMatches=matches.filter(x=>has(x.hay,selected.toLowerCase()));
   for(const x of networkMatches)add(x.id);
 }

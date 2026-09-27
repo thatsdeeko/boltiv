@@ -1760,17 +1760,52 @@ async function addNotificationOnce(userId,title,message,type="info",dedupeKey=""
 }
 async function adminNotifications(req){
   const admin=await adminFromToken(req); if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  const b=await body(req),recipient=clean(b.recipient||"all").toLowerCase(),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general"),priority=clean(b.priority||"normal");
+  const b=await body(req),recipient=clean(b.recipient||"all").toLowerCase(),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general"),priority=clean(b.priority||"normal"),alsoEmail=Boolean(b.sendEmail);
   if(title.length<2||message.length<2)return{success:false,statusCode:400,message:"Notification title and message are required."};
-  let userIds=[];
+  let recipients=[];
   if(recipient==="selected"){
     const id=clean(b.userId||b.user_id); if(!id)return{success:false,statusCode:400,message:"Select a user."};
-    const u=await db(`SELECT user_id FROM users WHERE user_id=$1 OR LOWER(email)=LOWER($1) LIMIT 1`,[id]); if(!u.rows.length)return{success:false,statusCode:404,message:"User not found."}; userIds=[u.rows[0].user_id];
-  }else if(recipient==="active"){userIds=(await db(`SELECT user_id FROM users WHERE status='active' ORDER BY created_at ASC`)).rows.map(x=>x.user_id);}
-  else{userIds=(await db(`SELECT user_id FROM users ORDER BY created_at ASC`)).rows.map(x=>x.user_id);}
-  if(!userIds.length)return{success:false,statusCode:400,message:"No eligible users found."};
+    const u=await db(`SELECT user_id,email,name FROM users WHERE user_id=$1 OR LOWER(email)=LOWER($1) LIMIT 1`,[id]); if(!u.rows.length)return{success:false,statusCode:404,message:"User not found."}; recipients=u.rows;
+  }else if(recipient==="active"){recipients=(await db(`SELECT user_id,email,name FROM users WHERE status='active' ORDER BY created_at ASC`)).rows;}
+  else{recipients=(await db(`SELECT user_id,email,name FROM users ORDER BY created_at ASC`)).rows;}
+  if(!recipients.length)return{success:false,statusCode:400,message:"No eligible users found."};
+  const userIds=recipients.map(x=>x.user_id);
   const batchId=crypto.randomUUID();
-  const client=await pool.connect(); try{await client.query("BEGIN");for(const uid of userIds)await client.query(`INSERT INTO notifications(user_id,title,message,type,batch_id,priority) VALUES($1,$2,$3,$4,$5,$6)`,[uid,title,message,type,batchId,priority]);await client.query("COMMIT");try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({recipient,count:userIds.length,title,type}),requestIp(req)]);}catch{}return{success:true,sent:userIds.length,message:`Notification sent to ${userIds.length} user(s).`};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    for(const uid of userIds)await client.query(`INSERT INTO notifications(user_id,title,message,type,batch_id,priority) VALUES($1,$2,$3,$4,$5,$6)`,[uid,title,message,type,batchId,priority]);
+    await client.query("COMMIT");
+  }catch(e){try{await client.query("ROLLBACK")}catch{} throw e;}
+  finally{client.release();}
+  try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({recipient,count:userIds.length,title,type,alsoEmail}),requestIp(req)]);}catch{}
+  let emailResult=null;
+  if(alsoEmail){
+    const withEmail=recipients.filter(x=>clean(x.email));
+    emailResult=await sendBulkNotificationEmails(withEmail,title,message,priority);
+    try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_email_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({batchId,attempted:withEmail.length,sent:emailResult.sent,failed:emailResult.failed}),requestIp(req)]);}catch{}
+  }
+  return{success:true,sent:userIds.length,emailed:emailResult?emailResult.sent:0,emailFailed:emailResult?emailResult.failed:0,message:`Notification sent to ${userIds.length} user(s).`+(alsoEmail?` Email delivered to ${emailResult.sent} of ${emailResult.sent+emailResult.failed}.`:"")};
+}
+async function sendBulkNotificationEmails(recipients,title,message,priority){
+  let sent=0,failed=0;
+  const concurrency=5;
+  const queue=[...recipients];
+  async function worker(){
+    while(queue.length){
+      const u=queue.shift();
+      try{
+        const r=await sendEmail({
+          to:u.email,
+          subject:`${priority==="urgent"?"[URGENT] ":priority==="high"?"[Important] ":""}${title}`,
+          html:`<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto"><h2 style="margin-bottom:4px">${title}</h2><p style="color:#333;line-height:1.6">${String(message).replace(/\n/g,"<br>")}</p><p style="margin-top:24px;font-size:12px;color:#999">BOLTIV${u.name?` &middot; Hi ${u.name}`:""}</p></div>`
+        });
+        if(r&&r.success)sent++;else failed++;
+      }catch{failed++;}
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(concurrency,recipients.length)},worker));
+  return{sent,failed};
 }
 async function adminNotificationsOverview(req){
   const admin=await adminFromToken(req); if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};

@@ -2213,6 +2213,9 @@ user.id
 ]
 );
 
+const agent=await getAgentProfile(user.user_id);
+const isAgent=agent&&agent.status==='active';
+
 return{
 success:true,
 message:
@@ -2223,7 +2226,10 @@ id:user.user_id,
 userId:user.user_id,
 name:user.name||"",
 phone:user.phone||"",
-email:user.email
+email:user.email,
+accountType:isAgent?'agent':'customer',
+isAgent:!!isAgent,
+agent
 }
 };
 

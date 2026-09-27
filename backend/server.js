@@ -1431,6 +1431,9 @@ read BOOLEAN NOT NULL DEFAULT FALSE,
 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`);
 await db(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS dedupe_key TEXT`);
+await db(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS batch_id TEXT`);
+await db(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal'`);
+await db(`CREATE INDEX IF NOT EXISTS notifications_batch_idx ON notifications(batch_id) WHERE batch_id IS NOT NULL`);
 // Ensure the dedupe index can be created even if an earlier deployment inserted
 // duplicate backfill keys. Keep the oldest notification for each key.
 await db(`
@@ -1757,15 +1760,34 @@ async function addNotificationOnce(userId,title,message,type="info",dedupeKey=""
 }
 async function adminNotifications(req){
   const admin=await adminFromToken(req); if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
-  const b=await body(req),recipient=clean(b.recipient||"all").toLowerCase(),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general");
+  const b=await body(req),recipient=clean(b.recipient||"all").toLowerCase(),title=clean(b.title),message=clean(b.message),type=clean(b.type||"general"),priority=clean(b.priority||"normal");
   if(title.length<2||message.length<2)return{success:false,statusCode:400,message:"Notification title and message are required."};
   let userIds=[];
   if(recipient==="selected"){
     const id=clean(b.userId||b.user_id); if(!id)return{success:false,statusCode:400,message:"Select a user."};
-    const u=await db(`SELECT user_id FROM users WHERE user_id=$1 LIMIT 1`,[id]); if(!u.rows.length)return{success:false,statusCode:404,message:"User not found."}; userIds=[u.rows[0].user_id];
-  }else{userIds=(await db(`SELECT user_id FROM users WHERE status='active' ORDER BY created_at ASC`)).rows.map(x=>x.user_id);}
+    const u=await db(`SELECT user_id FROM users WHERE user_id=$1 OR LOWER(email)=LOWER($1) LIMIT 1`,[id]); if(!u.rows.length)return{success:false,statusCode:404,message:"User not found."}; userIds=[u.rows[0].user_id];
+  }else if(recipient==="active"){userIds=(await db(`SELECT user_id FROM users WHERE status='active' ORDER BY created_at ASC`)).rows.map(x=>x.user_id);}
+  else{userIds=(await db(`SELECT user_id FROM users ORDER BY created_at ASC`)).rows.map(x=>x.user_id);}
   if(!userIds.length)return{success:false,statusCode:400,message:"No eligible users found."};
-  const client=await pool.connect(); try{await client.query("BEGIN");for(const uid of userIds)await client.query(`INSERT INTO notifications(user_id,title,message,type) VALUES($1,$2,$3,$4)`,[uid,title,message,type]);await client.query("COMMIT");try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({recipient,count:userIds.length,title,type}),requestIp(req)]);}catch{}return{success:true,sent:userIds.length,message:`Notification sent to ${userIds.length} user(s).`};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
+  const batchId=crypto.randomUUID();
+  const client=await pool.connect(); try{await client.query("BEGIN");for(const uid of userIds)await client.query(`INSERT INTO notifications(user_id,title,message,type,batch_id,priority) VALUES($1,$2,$3,$4,$5,$6)`,[uid,title,message,type,batchId,priority]);await client.query("COMMIT");try{await db(`INSERT INTO admin_audit_logs(admin_id,action,target_type,target_id,details,ip) VALUES($1,'notification_send','user','broadcast',$2::jsonb,$3)`,[admin.id,JSON.stringify({recipient,count:userIds.length,title,type}),requestIp(req)]);}catch{}return{success:true,sent:userIds.length,message:`Notification sent to ${userIds.length} user(s).`};}catch(e){try{await client.query("ROLLBACK")}catch{}throw e;}finally{client.release();}
+}
+async function adminNotificationsOverview(req){
+  const admin=await adminFromToken(req); if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const totalR=await db(`SELECT COUNT(*)::int AS c FROM notifications`);
+  const todayR=await db(`SELECT COUNT(*)::int AS c FROM notifications WHERE created_at>=date_trunc('day',NOW())`);
+  const readR=await db(`SELECT COUNT(*)::int AS c FROM notifications WHERE read=TRUE`);
+  const unreadR=await db(`SELECT COUNT(*)::int AS c FROM notifications WHERE read=FALSE`);
+  const histR=await db(`
+    SELECT COALESCE(batch_id,'legacy-'||id::text) AS batch_id, title, message, type, MAX(priority) AS priority,
+      MIN(created_at) AS created_at, COUNT(*)::int AS recipients,
+      SUM(CASE WHEN read THEN 1 ELSE 0 END)::int AS read_count
+    FROM notifications
+    GROUP BY COALESCE(batch_id,'legacy-'||id::text), title, message, type
+    ORDER BY MIN(created_at) DESC
+    LIMIT 100
+  `);
+  return{success:true,stats:{total:totalR.rows[0].c,today:todayR.rows[0].c,read:readR.rows[0].c,unread:unreadR.rows[0].c},history:histR.rows};
 }
 
 async function getWalletSummary(userId){
@@ -4050,6 +4072,7 @@ if(req.method==="POST"&&path==="/api/admin/wallet/debit"){const result=await adm
 if(req.method==="GET"&&path==="/api/admin/transactions/pending"){const admin=await requireAdmin(req); if(!admin)return; const result=await reconcilePendingTransactions(admin,req); return send(res,200,result);}
 if(req.method==="POST"&&path==="/api/admin/transactions/refund"){const result=await adminRefund(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="POST"&&path==="/api/admin/notifications"){const result=await adminNotifications(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/notifications"){const result=await adminNotificationsOverview(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminMonitoring(req);return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/vtugate/account"){const result=await adminVTUGATEProvider(req,"account");return send(res,result.success?200:(result.statusCode||400),result);}if(req.method==="GET"&&path==="/api/admin/vtugate/services"){const result=await adminVTUGATEProvider(req,"services");return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/vtugate/rawplans"){const qNetwork=new URL(req.url,"http://localhost").searchParams.get("network");const result=await adminVTUGATEProvider(req,"rawplans",qNetwork);return send(res,result.statusCode||200,result);}
 if(req.method==="GET"&&path==="/api/admin/diagnostics/funding"){const result=await adminFundingDiagnostics(req);return send(res,result.statusCode||200,result);}

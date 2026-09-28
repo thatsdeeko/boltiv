@@ -1,5 +1,6 @@
 const http=require("node:http");
 const crypto=require("node:crypto");
+const zlib=require("node:zlib");
 const {Pool}=require("pg");
 
 const PORT=process.env.PORT||3000;
@@ -36,7 +37,10 @@ return DEFAULT_FRONTEND_ORIGIN;
 
 const pool=new Pool({
 connectionString:DATABASE_URL,
-ssl:DATABASE_URL?{rejectUnauthorized:false}:false
+ssl:DATABASE_URL?{rejectUnauthorized:false}:false,
+max:Number(process.env.DB_POOL_MAX||10),
+idleTimeoutMillis:30000,
+connectionTimeoutMillis:5000
 });
 
 // Lightweight in-process abuse protection. For multi-instance deployments,
@@ -63,10 +67,22 @@ setInterval(()=>{const now=Date.now();for(const [k,v] of rateBuckets){if(v.reset
 
 function send(res,status,data){
 if(FRONTEND_URL.startsWith("https://"))res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
+// Gzip larger JSON responses (e.g. data plan lists) when the browser supports it.
+let body=JSON.stringify(data);
+let payload=body;
+const extraHeaders={};
+try{
+const ae=String(res.req?.headers?.["accept-encoding"]||"");
+if(/\bgzip\b/i.test(ae)&&body.length>1024&&body.length<5*1024*1024){
+payload=zlib.gzipSync(body,{level:4});
+extraHeaders["Content-Encoding"]="gzip";
+}
+}catch{payload=body;delete extraHeaders["Content-Encoding"];}
 res.writeHead(status,{
+...extraHeaders,
 "Content-Type":"application/json",
 "Access-Control-Allow-Origin":res.__corsOrigin||DEFAULT_FRONTEND_ORIGIN,
-"Vary":"Origin",
+"Vary":"Origin, Accept-Encoding",
 "Access-Control-Allow-Methods":"GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":"Content-Type,Authorization,X-Idempotency-Key,X-Admin-CSRF",
 "Access-Control-Allow-Credentials":"true",
@@ -75,7 +91,7 @@ res.writeHead(status,{
 "Referrer-Policy":"strict-origin-when-cross-origin",
 "Cache-Control":"no-store"
 });
-res.end(JSON.stringify(data));
+res.end(payload);
 return true;
 }
 
@@ -5183,7 +5199,8 @@ res.writeHead(204,{
 "GET,POST,PATCH,OPTIONS",
 "Access-Control-Allow-Headers":
 "Content-Type,Authorization,X-Idempotency-Key,X-Admin-CSRF",
-"Access-Control-Allow-Credentials":"true"
+"Access-Control-Allow-Credentials":"true",
+"Access-Control-Max-Age":"86400"
 });
 
 return res.end();

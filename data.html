@@ -48,6 +48,7 @@
 </div></div></div>
 <nav class="bottom-nav"><button class="nav-item" data-page="/dashboard"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item" data-page="/wallet"><span class="nav-icon">₦</span><span>Wallet</span></button><button class="nav-item" data-page="/transactions"><span class="nav-icon">↯</span><span>Activity</span></button><button class="nav-item" data-page="/profile"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span><span>Profile</span></button></nav>
 <div class="boltiv-modal" id="boltivModal"><div class="boltiv-modal-card"><div class="receipt-brand"><img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/></div><div class="modal-icon" id="modalIcon">!</div><div aria-live="polite" class="modal-status" id="modalStatus" role="status">NOTICE</div><div class="modal-title" id="modalTitle">Complete Your Purchase</div><div aria-live="polite" class="modal-message" id="modalMessage" role="status">Please complete the required information.</div><div class="modal-details" id="modalDetails" style="display:none"></div><button class="modal-button" id="modalButton" type="button">GOT IT</button></div></div>
+<div class="boltiv-modal warning" id="planConfirmModal"><div class="boltiv-modal-card"><div class="modal-icon" id="planConfirmIcon">?</div><div aria-live="polite" class="modal-status" id="planConfirmStatus" role="status">CONFIRM BUNDLE</div><div class="modal-title">Confirm This Bundle</div><div class="modal-message">Please confirm this is the data bundle you want to buy.</div><div class="modal-details" id="planConfirmDetails"></div><div style="display:flex;gap:10px"><button class="modal-button" id="planConfirmCancelBtn" type="button" style="margin-top:18px;background:#fafaf8;color:#171717;border:1px solid #e5e5e1">CANCEL</button><button class="modal-button" id="planConfirmOkBtn" type="button" style="margin-top:18px">YES, BUY THIS</button></div></div></div>
 <script>
 // Dynamic VTUGATE data catalog + purchase logic
 const API=window.BOLTIV_API_BASE;
@@ -69,6 +70,28 @@ function updateAgentProfit(){
 }
 agentCustomerPriceInput.addEventListener("input",()=>{agentCustomerPriceInput.dataset.touched="1";updateAgentProfit()});
 const $=id=>document.getElementById(id),phone=$("phoneNumber"),buyAgainSection=$("buyAgainSection"),buyAgainList=$("buyAgainList"),modal=$("boltivModal"),icon=$("modalIcon"),status=$("modalStatus"),title=$("modalTitle"),msg=$("modalMessage"),details=$("modalDetails"),modalBtn=$("modalButton"),planGrid=$("planGrid"),planLoading=$("planLoading"),planHint=$("planHint"),planWarning=$("planWarning");
+const planConfirmModal=$("planConfirmModal"),planConfirmDetails=$("planConfirmDetails"),planConfirmCancelBtn=$("planConfirmCancelBtn"),planConfirmOkBtn=$("planConfirmOkBtn");
+let pendingPlanConfirm=null;
+function closePlanConfirm(){planConfirmModal.classList.remove("show");pendingPlanConfirm=null;}
+planConfirmCancelBtn.onclick=closePlanConfirm;
+planConfirmModal.onclick=e=>{if(e.target===planConfirmModal)closePlanConfirm();};
+planConfirmOkBtn.onclick=()=>{
+  if(!pendingPlanConfirm)return closePlanConfirm();
+  const{plan,button}=pendingPlanConfirm;
+  document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));
+  button.classList.add("active");
+  selectedPlan=plan;
+  planWarning.innerHTML="";planWarning.style.display="none";
+  refreshAgentPricing();
+  closePlanConfirm();
+};
+function askPlanConfirm(plan,button){
+  pendingPlanConfirm={plan,button};
+  const label=planLabel(plan),validity=formatValidity(plan.validity??plan.validity_period??plan.duration,plan.validity_days);
+  const priceLine=(isAgent&&plan.agent_price!=null)?money(plan.agent_price):money(plan.customer_price);
+  planConfirmDetails.innerHTML='<div class="modal-detail"><span>Network</span><strong>'+esc(selectedNetwork)+'</strong></div><div class="modal-detail"><span>Bundle</span><strong>'+esc(label)+'</strong></div><div class="modal-detail"><span>Validity</span><strong>'+esc(validity)+'</strong></div><div class="modal-detail"><span>Price</span><strong>'+priceLine+'</strong></div>';
+  planConfirmModal.classList.add("show");
+}
 const money=v=>"₦"+Number(v||0).toLocaleString("en-NG",{minimumFractionDigits:2,maximumFractionDigits:2});
 const BUY_AGAIN_KEY="boltivRecentDataPurchases";
 
@@ -280,11 +303,16 @@ function renderPlans(plans){
   selectedPlan=null;
   planGrid.innerHTML="";
   const filtered=(Array.isArray(plans)?plans:[]).filter(plan=>{
-    const text=[plan?.sales_channel,plan?.plan_type,plan?.planType,plan?.data_type,plan?.dataType,plan?.bundle_type,plan?.bundleType,plan?.category,plan?.channel,plan?.channel_name,plan?.channelName,plan?.name,plan?.description].filter(Boolean).join(" ").toLowerCase();
+    // Show every SME/Gifting bundle the backend returns, from 1GB and up. Plans no
+    // longer carry a reliable sales-channel/category tag from the provider, so
+    // requiring the words "sme" or "gifting" to appear in the plan text was
+    // silently hiding real 1GB+ bundles that simply don't spell that out in their
+    // name. Size (1GB minimum) is the only filter needed here - the backend has
+    // already restricted the catalog to SME & Gifting bundles.
     const sizeText=[plan?.size_mb,plan?.sizeMb,plan?.data_mb,plan?.dataMb,plan?.volume,plan?.size,plan?.quantity,plan?.data_size,plan?.dataSize,plan?.name].filter(Boolean).join(" ");
     const match=sizeText.match(/(\d+(?:\.\d+)?)\s*(gb|mb)\b/i);
     const explicitSize=match?(Number(match[2].toLowerCase()==="gb"?Number(match[1])*1024:Number(match[1]))):(Number(plan?.size_mb)||0);
-    return /\b(sme|gifting)\b/.test(text)&&explicitSize>=1000; // 1GB minimum (1GB may be 1000 or 1024MB)
+    return explicitSize>=1000; // 1GB minimum (1GB may be 1000 or 1024MB)
   });
   if(!filtered.length){planGrid.innerHTML='<div class="plan-loading">No data plans are currently available for this network.</div>';return;}
   filtered.forEach(plan=>{
@@ -293,7 +321,7 @@ function renderPlans(plans){
     const label=planLabel(plan), validity=formatValidity(plan.validity??plan.validity_period??plan.duration,plan.validity_days);
     const priceLine=(isAgent&&plan.agent_price!=null)?money(plan.agent_price):money(plan.customer_price);
     b.innerHTML='<div class="plan-size">'+esc(label)+'</div><div class="plan-validity">'+esc(validity)+'</div><div class="plan-price">'+priceLine+'</div>';
-    b.onclick=()=>{document.querySelectorAll(".plan-button").forEach(x=>x.classList.remove("active"));b.classList.add("active");selectedPlan=plan;planWarning.innerHTML="";planWarning.style.display="none";refreshAgentPricing();};
+    b.onclick=()=>{askPlanConfirm(plan,b);};
     planGrid.appendChild(b);
   });
 }
@@ -310,7 +338,7 @@ async function loadPlans(network){
     isAgent=Boolean(d.isAgent);agentEnabled=d.agentEnabled!==false;
     renderPlans(d.plans);
     lastLoadedPlans=d.plans||[];
-    planHint.textContent=d.plans?.length?d.plans.length+" SME & Gifting plans (1GB+) available":"";
+    planHint.textContent=d.plans?.length?d.plans.length+" data plans (1GB+) available":"";
   }catch(e){
     planGrid.innerHTML='<div class="plan-loading">'+esc(e.message||"Unable to load data plans.")+'</div>';
   }

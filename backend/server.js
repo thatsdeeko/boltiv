@@ -5097,7 +5097,7 @@ byPlan.set(lookupKey,{code:planCode,plan_code:planCode,provider_code:planCode,lo
 }
 const plans=Array.from(byPlan.values())
 .filter(plan=>Number(plan.size_mb||0)>=MIN_DATA_PLAN_MB)
-.sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,50);
+.sort((a,b)=>Number(a.customer_price)-Number(b.customer_price)).slice(0,500);
 return send(res,200,{success:true,network,plans,isAgent:agentService.isAgent,agentEnabled:agentService.enabled});
 }catch(error){console.error("VTUGATE DATA PLAN CATALOG ERROR:",error?.stack||error?.message||error);return send(res,502,{success:false,message:"Unable to load VTUGATE data plans right now."});}
 }

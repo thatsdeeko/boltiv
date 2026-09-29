@@ -524,7 +524,11 @@ direction:t.type==="credit"?"credit":"debit",
 type:(/airtime/i.test(t.service||""))?"airtime":(/data/i.test(t.service||""))?"data":(/cable/i.test(t.service||""))?"cable":(/electric/i.test(t.service||""))?"electricity":"wallet",
 phone:t.recipient||"",
 id:t.reference||t.id,
-provider:t.provider_reference||""
+provider:(/electric/i.test(t.service||"")?(t.disco||t.provider_reference):t.provider_reference)||"",
+meter:t.meterNumber||"",
+meterType:t.meterType||"",
+token:t.token||"",
+units:t.units||""
 }));
 boltivMemoryStorage.setItem("boltivTransactions",JSON.stringify(mapped));
 renderHistory();
@@ -862,6 +866,12 @@ rows.push(["Meter Number",tx.meter]);
 
 if(tx.meterType)
 rows.push(["Meter Type",tx.meterType]);
+
+if(tx.token)
+rows.push(["Token",tx.token]);
+
+if(tx.units)
+rows.push(["Units",tx.units]);
 
 if(tx.date)
 rows.push(["Date",tx.date]);

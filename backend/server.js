@@ -167,6 +167,29 @@ function validAmount(amount){
 return Number.isFinite(amount)&&amount>0;
 }
 
+// Minimum electricity purchase (₦). Enforced server-side in processVTUTransaction and shown on electricity.html.
+const MIN_ELECTRICITY_AMOUNT=2000;
+
+// Pulls the meter/token details of an electricity transaction out of its stored metadata so the
+// history/receipt screens can show them. Works for old rows too: the request (meter_no, disco) and the
+// full VTUGATE response are already saved in transactions.metadata at purchase time.
+function electricityDetailsFromMetadata(meta){
+  meta=meta&&typeof meta==="object"?meta:{};
+  const req=meta.request&&typeof meta.request==="object"?meta.request:{};
+  const pricing=meta.pricing&&typeof meta.pricing==="object"?meta.pricing:{};
+  const resp=meta.provider_response&&typeof meta.provider_response==="object"?meta.provider_response:{};
+  const delivery=resp?.data?.delivery||resp?.delivery||null;
+  const token=meta.token||findTransactionField(resp,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||(delivery&&delivery.token)||"";
+  const units=meta.units||findTransactionField(resp,["units","kwh","unit"])||"";
+  return {
+    disco:clean(pricing.network||req.disco||""),
+    meterNumber:clean(meta.meterNumber||req.meter_no||""),
+    meterType:clean(meta.meterType||pricing.plan||""),
+    token:clean(token),
+    units:clean(units)
+  };
+}
+
 
 /* =========================================================
    VTUGATE DATA CATALOG + SERVICE PRICING
@@ -753,9 +776,12 @@ const network=normalizeDataNetwork(data.network||data.providerPayload?.network);
 }else if(service==="cable"){
 const providerName=clean(data.provider||data.providerPayload?.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){console.error("VTUGATE unavailable (Unable to verify the cable TV service for this provider right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const plan=clean(data.plan||data.providerPayload?.plan);const iucnumber=clean(data.smartcard||data.providerPayload?.smartcard);if(!plan)return{success:false,statusCode:400,message:"Cable TV plan is required."};if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const expectedPrice=getCablePlanPrice(providerName,plan);if(expectedPrice===null)return{success:false,statusCode:400,message:"The selected cable TV plan is not recognized."};if(Math.abs(amount-expectedPrice)>.009)return{success:false,statusCode:400,message:"The selected cable TV plan price has changed. Please refresh and try again."};pricingMeta={providerCost:expectedPrice,customerPrice:expectedPrice,grossProfit:0,network:providerName,plan};providerPayload={service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:recipient,phone_number:recipient,msisdn:recipient,plan,package:plan,amount,ref:null};
 }else if(service==="electricity"){
-const discoAbbrev=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!discoAbbrev)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId,providerDisco;try{({serviceId,disco:providerDisco}=await resolveElectricityDisco(discoAbbrev));}catch(e){console.error("VTUGATE unavailable (Unable to verify the electricity service right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};providerPayload={service_id:serviceId,meter_no:meterNo,disco:providerDisco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=discoAbbrev.toUpperCase();pricingMeta.plan=meterType;
+const discoAbbrev=clean(data.provider||data.providerPayload?.provider||data.disco||data.providerPayload?.disco).toLowerCase();if(!discoAbbrev)return{success:false,statusCode:400,message:"Electricity provider is required."};let serviceId,providerDisco;try{({serviceId,disco:providerDisco}=await resolveElectricityDisco(discoAbbrev));}catch(e){console.error("VTUGATE unavailable (Unable to verify the electricity service right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const meterTypeRaw=clean(data.meterType||data.providerPayload?.meterType||"Prepaid");const meterType=/^postpaid$/i.test(meterTypeRaw)?"Postpaid":"Prepaid";const meterNo=clean(data.meterNumber||data.providerPayload?.meterNumber||data.meter_no);if(meterNo.length<8)return{success:false,statusCode:400,message:"Invalid meter number."};if(amount<MIN_ELECTRICITY_AMOUNT)return{success:false,statusCode:400,message:`Minimum electricity purchase is \u20a6${MIN_ELECTRICITY_AMOUNT.toLocaleString("en-NG")}.`};providerPayload={service_id:serviceId,meter_no:meterNo,disco:providerDisco,amount,phone_number:recipient||"08000000000",ref:null};pricingMeta.network=discoAbbrev.toUpperCase();pricingMeta.plan=meterType;
+// Electricity markup: the meter is vended for exactly `amount` (the provider cost), and the customer
+// is charged that amount plus the admin-set markup % / service fee for the electricity service.
+const elecCustomerPrice=customerPriceFromCost(amount,pricingConfig(serviceRecord));if(elecCustomerPrice==null)return{success:false,statusCode:400,message:"Unable to price this electricity purchase."};pricingMeta={...pricingMeta,providerCost:Number(amount.toFixed(2)),customerPrice:elecCustomerPrice,grossProfit:Number((elecCustomerPrice-amount).toFixed(2))};
 }
-let debitAmount=amount;
+let debitAmount=(service==="electricity"&&Number(pricingMeta.customerPrice)>0)?Number(pricingMeta.customerPrice):amount;
 if(agentService.isAgent){
   // The cost basis an Agent's wholesale price is built from: the real provider cost when one
   // was established for this sale (data/exam_pin/cable/electricity all resolve a known VTUGATE
@@ -784,7 +810,7 @@ const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;c
 let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
 let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
 if(!providerResult.success)console.error("VTUGATE TRANSACTION FAILED:",JSON.stringify({endpoint,sentPayload:{...providerPayload,ref:providerPayload.ref},providerMessage:providerResult.message,providerRawResponse:providerResult.data}));
-const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||findTransactionField(providerData,["transaction_id","external_reference","reference","transactionId","id"])||referenceValue;const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);const wallet=await getWallet(userId);if(finalized.status==="refunded")return{success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};const delivery=providerData?.data?.delivery||providerData?.delivery||null;const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];const token=service==="electricity"?(findTransactionField(providerData,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||delivery?.token||""):"";const units=service==="electricity"?(findTransactionField(providerData,["units","kwh","unit"])||""):"";return{success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery,pins,token,units};
+const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||findTransactionField(providerData,["transaction_id","external_reference","reference","transactionId","id"])||referenceValue;const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);const wallet=await getWallet(userId);if(finalized.status==="refunded")return{success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};const delivery=providerData?.data?.delivery||providerData?.delivery||null;const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];const token=service==="electricity"?(findTransactionField(providerData,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||delivery?.token||""):"";const units=service==="electricity"?(findTransactionField(providerData,["units","kwh","unit"])||""):"";return{success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery,pins,token,units,amountCharged:debitAmount};
 }
 
 async function verifyVTUGATECable(req,user){const b=await body(req);const providerName=clean(b.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){console.error("VTUGATE unavailable (Unable to verify the cable TV service for this provider right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const phoneVal=clean(b.phone||"08000000000");const result=await vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:phoneVal,phone_number:phoneVal,msisdn:phoneVal});
@@ -1920,7 +1946,8 @@ return rows.map(item=>{
   const network=clean(meta.network||meta.network_provider||pricing.network||pricing.network_name||requestMeta.network||requestMeta.network_provider||item.network||"");
   const plan=clean(meta.plan||meta.plan_name||pricing.plan||pricing.plan_name||requestMeta.plan_name||requestMeta.plan||item.plan||"");
   const phone=clean(item.recipient||meta.phone||requestMeta.phone||requestMeta.phone_number||item.phone||"");
-  return {...item,amount:Number(item.amount),phone,network,plan};
+  const elec=String(item.service||"").toLowerCase().includes("electric")?electricityDetailsFromMetadata(meta):{};
+  return {...item,amount:Number(item.amount),phone,network,plan,...elec};
 });
 
 }
@@ -4548,7 +4575,8 @@ if(String(t.service).toLowerCase().includes("data") && (/^Plan \d+$/i.test(Strin
   if(resolved)enrichedMeta.plan=resolved;
 }
 if(!enrichedMeta.phone)enrichedMeta.phone=t.recipient||requestMeta.phone||requestMeta.phone_number||"";
-return send(res,200,{success:true,transaction:{...t,metadata:enrichedMeta,amount:Number(t.amount)}});
+const elecDetails=String(t.service||"").toLowerCase().includes("electric")?electricityDetailsFromMetadata(meta):{};
+return send(res,200,{success:true,transaction:{...t,...elecDetails,metadata:enrichedMeta,amount:Number(t.amount)}});
 }
 if(req.method==="GET"&&path==="/api/notifications"){
 // Backfill transaction notifications for successful purchases that may have
@@ -5347,7 +5375,7 @@ PUBLIC PLATFORM CONFIGURATION
 if(req.method==='GET'&&path==='/api/pricing'){
   const keys=['airtime','data','cable','electricity','exam_pin'];
   const out={};
-  for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={available:Boolean(svc&&svc.enabled!==false&&svc.maintenance!==true)};}
+  for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={available:Boolean(svc&&svc.enabled!==false&&svc.maintenance!==true)};if(key==='electricity')Object.assign(out[key],{markupPct:Number(p.markup_pct||0),serviceFee:Number(p.service_fee||0),minAmount:MIN_ELECTRICITY_AMOUNT});}
   return send(res,200,{success:true,pricing:out});
 }
 

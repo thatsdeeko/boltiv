@@ -70,7 +70,7 @@ body.modal-open{overflow:hidden!important}
    zero balance). If the backend has been idle and is cold-starting, this can
    legitimately take up to a minute — the shimmer plus the delayed status
    line below make that read as "loading" rather than "broken". */
-.boltiv-skeleton{position:relative;color:transparent!important;background:linear-gradient(90deg,#efe9d8 25%,#faf6ea 37%,#efe9d8 63%);background-size:400% 100%;animation:boltivShimmer 1.4s ease infinite;border-radius:7px}
+.boltiv-skeleton,.home-balance-card .balance-value.boltiv-skeleton,.insight-main.boltiv-skeleton{position:relative;color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;background:linear-gradient(90deg,#efe9d8 25%,#faf6ea 37%,#efe9d8 63%);background-size:400% 100%;animation:boltivShimmer 1.4s ease infinite;border-radius:7px}
 @keyframes boltivShimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
 @media (prefers-reduced-motion:reduce){.boltiv-skeleton{animation:none;background:#efe9d8}}
 .boltiv-connecting-note{display:none;margin-top:8px;font-size:11px;color:#a17b13;font-weight:700}

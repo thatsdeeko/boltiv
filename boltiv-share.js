@@ -40,6 +40,7 @@
     if(status)lines.push('Status: '+status);
     lines.push('');
     lines.push('Fast. Simple. Powerful. '+SITE);
+    if(window.boltivReferralLink)lines.push('Join me on BOLTIV: '+window.boltivReferralLink);
     return lines.join('\n');
   }
   function shareText(text){
@@ -211,7 +212,7 @@
       var file=null;
       try{file=new File([blob],'BOLTIV-receipt-'+ref+'.png',{type:'image/png'});}catch(e){}
       if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
-        return navigator.share({files:[file],text:'BOLTIV receipt \u2022 boltiv.ng'});
+        return navigator.share({files:[file],text:window.boltivReferralLink?('BOLTIV receipt\nJoin me on BOLTIV: '+window.boltivReferralLink):'BOLTIV receipt \u2022 boltiv.ng'});
       }
       if(file){downloadBlob(blob,file.name);return;}
       shareText(text);

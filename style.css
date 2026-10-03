@@ -851,3 +851,90 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
 @media(min-width:700px){.boltiv-install-prompt{left:auto;right:22px;bottom:22px;width:380px}.boltiv-install-action{grid-column:auto;min-width:120px}.boltiv-install-copy{padding-right:12px}}
 .boltiv-install-ios-icon{display:inline-flex;vertical-align:-2px;color:#bd920b;margin:0 1px}
 @media(prefers-reduced-motion:reduce){.boltiv-install-prompt{transition:none}}
+
+
+/* -------------------------------------------------------------------------
+   BOLTIV HOME DASHBOARD — centralized layout layer
+   Structure lives in dashboard.html. Feature modules only render into their
+   dedicated mount points (#bonusSection / #referralSection). Business rules,
+   API calls and reward calculations remain in their existing JS modules.
+   ------------------------------------------------------------------------- */
+.boltiv-home .home-welcome{padding:24px 0 16px}
+.boltiv-home .home-welcome h1{font-size:31px;line-height:1.12;letter-spacing:-.8px}
+.boltiv-home .home-welcome p{font-size:13px;margin-top:8px;line-height:1.45}
+.boltiv-home .home-balance-card{margin:0;padding:20px;border-radius:22px!important;min-height:0}
+.boltiv-home .home-balance-actions{gap:10px;margin-top:20px}
+.boltiv-home .home-balance-actions .btn{min-height:48px;border-radius:15px}
+.boltiv-home .home-services-section{margin-top:18px}
+.boltiv-home .home-services-section .section-link{border:0;background:none;color:#a17b13;cursor:pointer;font:inherit;font-size:10.2px;font-weight:900;padding:6px 0 6px 8px}
+.boltiv-home .home-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.boltiv-home .home-service-card{min-height:116px;padding:13px 9px 11px;border-radius:17px!important}
+.boltiv-home .home-service-card .service-icon{width:40px;height:40px;margin-bottom:10px!important}
+.boltiv-home .home-services-more{margin-top:10px;padding-top:11px;border-top:1px solid rgba(212,175,55,.16)}
+.boltiv-home .home-services-more-label{margin-bottom:9px;font-size:9px;font-weight:900;letter-spacing:.12em;color:#8c8064}
+.boltiv-home .home-services-more .home-service-card{display:flex}
+.boltiv-home .home-services-more .home-service-card + .home-service-card{margin-top:10px}
+.boltiv-home .home-repeat-section,
+.boltiv-home .home-bonus-slot,
+.boltiv-home .home-referral-slot{margin-top:16px}
+.boltiv-home .home-repeat-section .section-head{margin-bottom:10px}
+.boltiv-home .home-repeat-section .repeat-list{display:grid;grid-template-columns:1fr;gap:8px}
+.boltiv-home .home-repeat-section .repeat-item{min-height:58px}
+.boltiv-home .home-bonus-slot:empty,
+.boltiv-home .home-referral-slot:empty{display:none}
+
+/* Bonus module presentation. The module owns data and rules; these classes own layout. */
+.boltiv-home .bonus-card{background:linear-gradient(145deg,#fffdf7,#fff);border:1px solid #e8d9a8;border-radius:20px;padding:16px 18px;box-shadow:0 8px 24px rgba(30,24,10,.045)}
+.boltiv-home .bonus-label,.boltiv-home .referral-label{font-size:10px;font-weight:900;letter-spacing:.08em;color:#777}
+.boltiv-home .bonus-value{margin-top:4px;font-size:25px;font-weight:900;line-height:1.1;color:#171717}
+.boltiv-home .bonus-expiry{margin-top:5px;font-size:11px;color:#8a6a07}
+.boltiv-home .bonus-paused,.boltiv-home .referral-paused{margin-top:7px;font-size:11px;color:#b94c4c;font-weight:700}
+.boltiv-home .bonus-details,.boltiv-home .referral-details{margin-top:12px}
+.boltiv-home .bonus-details summary,.boltiv-home .referral-details summary{cursor:pointer;font-size:12px;font-weight:900;color:#b8860b}
+.boltiv-home .bonus-details ul,.boltiv-home .referral-details ul{margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.7;color:#444}
+
+/* Referral module presentation. The module still owns referral data/actions. */
+.boltiv-home .referral-card{background:linear-gradient(145deg,#fffdf7,#fff);border:1px solid #e8d9a8;border-radius:20px;padding:17px 18px;box-shadow:0 8px 24px rgba(30,24,10,.045)}
+.boltiv-home .referral-title{margin-top:5px;font-size:16px;font-weight:900;color:#171717;line-height:1.4}
+.boltiv-home .referral-friend-progress{margin-top:12px;padding:12px;border-radius:14px;background:#fff;border:1px solid #efe6c4}
+.boltiv-home .referral-friend-title{font-size:12px;font-weight:900;color:#171717}
+.boltiv-home .referral-friend-copy{font-size:11px;color:#777;margin-top:3px;line-height:1.45}
+.boltiv-home .referral-progress-track{height:8px;border-radius:8px;background:#eee;margin-top:8px;overflow:hidden}
+.boltiv-home .referral-progress-fill{height:100%;background:#b8860b;border-radius:inherit}
+.boltiv-home .referral-friend-meta{font-size:10px;color:#999;margin-top:4px}
+.boltiv-home .referral-code-row{display:flex;align-items:center;gap:10px;margin-top:13px}
+.boltiv-home .referral-code{flex:1;min-width:0;padding:12px;border:1px dashed #d4af37;border-radius:12px;background:#fff;font-weight:900;letter-spacing:.14em;font-size:15px;text-align:center;color:#8a6a07;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.boltiv-home .referral-copy{border:1px solid #d4af37;background:#fffdf4;color:#8a6d00;border-radius:12px;padding:12px 14px;min-height:44px;font-size:11px;font-weight:900;cursor:pointer;white-space:nowrap}
+.boltiv-home .referral-share{width:100%;margin-top:10px;border:0;border-radius:13px;padding:13px;min-height:48px;background:#25D366;color:#fff;font-weight:900;font-size:12px;letter-spacing:.04em;cursor:pointer}
+.boltiv-home .referral-stats{display:flex;gap:8px;margin-top:13px;text-align:center}
+.boltiv-home .referral-stats>div{flex:1;min-width:0}
+.boltiv-home .referral-stats>div+div{border-left:1px solid #eadfbe}
+.boltiv-home .referral-stats b{display:block;font-size:16px;color:#171717}
+.boltiv-home .referral-stats span{display:block;font-size:10px;color:#888;margin-top:2px}
+
+/* Keep the dashboard readable on narrow Android screens. */
+@media(max-width:380px){
+  .boltiv-home .home-welcome h1{font-size:28px}
+  .boltiv-home .home-balance-card{padding:18px}
+  .boltiv-home .home-balance-actions .btn{font-size:10px;padding-left:10px;padding-right:10px}
+  .boltiv-home .home-service-card{min-height:108px}
+  .boltiv-home .referral-card{padding:15px}
+  .boltiv-home .referral-title{font-size:15px}
+  .boltiv-home .referral-code-row{gap:7px}
+  .boltiv-home .referral-copy{padding-left:10px;padding-right:10px}
+}
+
+@media(min-width:900px){
+  .boltiv-home .home-services-section,
+  .boltiv-home .home-repeat-section,
+  .boltiv-home .home-bonus-slot,
+  .boltiv-home .home-referral-slot,
+  .boltiv-home .home-recent-section,
+  .boltiv-home .home-trust-card{max-width:760px}
+  .boltiv-home .home-service-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .boltiv-home .home-services-more{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .boltiv-home .home-services-more-label{grid-column:1/-1}
+  .boltiv-home .home-services-more .home-service-card + .home-service-card{margin-top:0}
+}
+
+.boltiv-home .home-services-more[hidden]{display:none!important}

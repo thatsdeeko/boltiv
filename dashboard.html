@@ -8,7 +8,7 @@
 <meta content="BOLTIV — fast, simple digital services." name="description"/>
 <title>BOLTIV Dashboard — Digital Services</title>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
+<link href="style.css?v=20261003-dashboard" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
@@ -159,8 +159,8 @@ body.modal-open{overflow:hidden!important}
 <button class="btn btn-light" onclick="location.href='/transactions'">VIEW ACTIVITY</button>
 </div>
 </section>
-<section class="section home-services-section">
-<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/transactions">Activity →</a></div>
+<section class="section home-services-section" id="quickServicesSection">
+<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><button class="section-link home-services-toggle" id="homeServicesToggle" type="button" aria-expanded="false">More services →</button></div>
 <div class="home-service-grid">
 <a class="home-service-card" href="/airtime"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.2"></rect><path d="M10 6h4M11 18h2"></path></svg></span><strong>Airtime</strong><small>Recharge any network</small></a>
 <a class="home-service-card" href="/data"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5a11 11 0 0 1 16 0M7 12.5a7 7 0 0 1 10 0M10 15.5a3 3 0 0 1 4 0"></path><circle cx="12" cy="18" r="1"></circle></svg></span><strong>Data</strong><small>Choose a live bundle</small></a>
@@ -175,7 +175,16 @@ body.modal-open{overflow:hidden!important}
 <button class="home-service-card coming-soon" data-service="Insurance" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.5c0 4.2-2.7 7.5-7 9-4.3-1.5-7-4.8-7-9V6l7-2.5Z"></path><path d="m8.5 12 2.2 2.2 4.8-5"></path></svg></span><strong>Insurance</strong><small>Coming soon</small></button>
 <button class="home-service-card coming-soon" data-service="International Airtime" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M3.8 12h16.4M12 3.5c2.1 2.3 3.2 5.1 3.2 8.5s-1.1 6.2-3.2 8.5c-2.1-2.3-3.2-5.1-3.2-8.5S9.9 5.8 12 3.5Z"></path></svg></span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
 </div>
+<div class="home-services-more" id="homeServicesMore" hidden aria-hidden="true">
+<div class="home-services-more-label">MORE SERVICES</div>
+</div>
 </section>
+<section class="section home-repeat-section" aria-label="Buy again">
+<div class="section-head"><h2 class="section-title">BUY AGAIN</h2><a class="section-link" href="/transactions">See all →</a></div>
+<div class="repeat-list" id="quickRepeatList"><div class="insight-empty">Your successful services will appear here for quick access.</div></div>
+</section>
+<section class="section home-bonus-slot" id="bonusSection" aria-label="Bonus balance"></section>
+<section class="section home-referral-slot" id="referralSection" aria-label="Refer and earn"></section>
 <section class="section home-recent-section">
 <div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
 <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
@@ -200,10 +209,6 @@ body.modal-open{overflow:hidden!important}
 <div class="insight-stat"><b id="walletSpent">₦0</b><small>Spent</small></div>
 <div class="insight-stat"><b id="walletPending">₦0</b><small>Pending</small></div>
 </div>
-</section>
-<section class="insight-card full">
-<div class="insight-head"><span class="insight-title">QUICK REPEAT</span><button class="insight-link" onclick="location.href='/transactions'" type="button">See activity →</button></div>
-<div class="repeat-list" id="quickRepeatList"><div class="insight-empty">Your successful services will appear here for quick access.</div></div>
 </section>
 </section>
 <section class="section home-trust-card">
@@ -408,9 +413,35 @@ setInterval(loadHome,30000);
   }
 })();
 </script>
-<script src="boltiv-bonus.js?v=2"></script>
+<script>
+(function(){
+  'use strict';
+  var grid=document.querySelector('.home-service-grid');
+  var toggle=document.getElementById('homeServicesToggle');
+  var more=document.getElementById('homeServicesMore');
+  if(!grid||!toggle||!more)return;
+  var cards=Array.prototype.slice.call(grid.children);
+  // Keep the first four services as the primary dashboard shortcuts.
+  // All existing service cards remain in the DOM so their links and Coming Soon behavior are unchanged.
+  cards.forEach(function(card,index){
+    if(index>=4) card.classList.add('home-service-secondary');
+  });
+  var extra=cards.slice(4);
+  if(!extra.length){toggle.hidden=true;return;}
+  extra.forEach(function(card){more.appendChild(card);});
+  function setOpen(open){
+    toggle.setAttribute('aria-expanded',String(open));
+    more.hidden=!open;
+    more.setAttribute('aria-hidden',String(!open));
+    toggle.textContent=open?'Show fewer ←':'More services →';
+  }
+  toggle.addEventListener('click',function(){setOpen(toggle.getAttribute('aria-expanded')!=='true');});
+  setOpen(false);
+})();
+</script>
+<script src="boltiv-bonus.js?v=3"></script>
 <script src="boltiv-share.js?v=3"></script>
-<script src="boltiv-referral.js?v=1"></script>
+<script src="boltiv-referral.js?v=2"></script>
 <script src="/boltiv-install.js?v=53"></script>
 <script src="boltiv-footer.js?v=2"></script>
 </body>

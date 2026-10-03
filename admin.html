@@ -605,6 +605,16 @@ ACTIVE
 </div>
 <div class="activity">
 <div>
+<strong>Cashback &amp; Bonus</strong>
+<br/>
+<small>Turn data cashback on or off. Existing bonus stays spendable and keeps expiring.</small>
+<br/>
+<small id="bonusStats"></small>
+</div>
+<button class="btn" id="cashbackBtn" onclick="toggleCashback()">LOADING</button>
+</div>
+<div class="activity">
+<div>
 <strong>Wallet Transactions</strong>
 <br/>
 <small>Allow users to fund and spend wallet balance.</small>
@@ -937,10 +947,13 @@ async function saveAgentPricing(service){
   alert('Global agent pricing updated. This now applies to every BOLTIV agent.');
  }catch(e){alert(e.message)}
 }
-async function loadSettings(){try{const d=await api('/api/admin/settings');const s=d.settings||{};const m=$('maintenanceBtn'),r=$('registrationBtn');if(m){m.textContent=s.maintenance_mode?'ENABLED':'DISABLED';m.classList.toggle('primary',!s.maintenance_mode)}if(r){r.textContent=s.registration_enabled?'ENABLED':'DISABLED';r.classList.toggle('primary',s.registration_enabled)}}catch(e){console.error(e)}}
-async function updateSettings(patch){try{const d=await api('/api/admin/settings',{method:'PATCH',body:JSON.stringify(patch)});const s=d.settings||{};if($('maintenanceBtn'))$('maintenanceBtn').textContent=s.maintenance_mode?'ENABLED':'DISABLED';if($('registrationBtn'))$('registrationBtn').textContent=s.registration_enabled?'ENABLED':'DISABLED';return s}catch(e){alert(e.message);throw e}}
+async function loadSettings(){try{const d=await api('/api/admin/settings');const s=d.settings||{};const m=$('maintenanceBtn'),r=$('registrationBtn');if(m){m.textContent=s.maintenance_mode?'ENABLED':'DISABLED';m.classList.toggle('primary',!s.maintenance_mode)}if(r){r.textContent=s.registration_enabled?'ENABLED':'DISABLED';r.classList.toggle('primary',s.registration_enabled)}renderCashbackSetting(s)}catch(e){console.error(e)}}
+async function updateSettings(patch){try{const d=await api('/api/admin/settings',{method:'PATCH',body:JSON.stringify(patch)});const s=d.settings||{};if($('maintenanceBtn'))$('maintenanceBtn').textContent=s.maintenance_mode?'ENABLED':'DISABLED';if($('registrationBtn'))$('registrationBtn').textContent=s.registration_enabled?'ENABLED':'DISABLED';renderCashbackSetting(s);return s}catch(e){alert(e.message);throw e}}
 async function toggleMaintenance(){const d=await api('/api/admin/settings');await updateSettings({maintenance_mode:!d.settings.maintenance_mode});}
 async function toggleRegistration(){const d=await api('/api/admin/settings');await updateSettings({registration_enabled:!d.settings.registration_enabled});}
+function renderCashbackSetting(s){const b=$('cashbackBtn');if(!b||!s)return;const on=s.cashback_enabled!==false;b.textContent=on?'ENABLED':'DISABLED';b.classList.toggle('primary',on);loadBonusStats();}
+async function toggleCashback(){const d=await api('/api/admin/settings');const on=d.settings.cashback_enabled!==false;await updateSettings({cashback_enabled:!on});}
+async function loadBonusStats(){try{const d=await api('/api/admin/revenue');const b=d&&d.summary&&d.summary.bonus;const el=$('bonusStats');if(!el||!b)return;const f=n=>'\u20A6'+Number(n||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});el.textContent='Issued '+f(b.issued)+' | Used '+f(b.spent)+' | Expired '+f(b.expired)+' | Outstanding '+f(b.outstanding);}catch(e){}}
 async function loadSecurity(){try{const [e,s]=await Promise.all([api('/api/admin/security/events'),api('/api/admin/security/sessions')]);const events=e.events||[],sessions=s.sessions||[];$('securityEventsCount').textContent=events.length;$('activeSessionsCount').textContent=sessions.length;$('securityEvents').innerHTML=events.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>EVENT</th><th>SEVERITY</th><th>ADMIN</th><th>DETAILS</th></tr></thead><tbody>'+events.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.event_type)}</td><td>${esc(x.severity)}</td><td>${esc(x.email||x.admin_id||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">No security events available.</div>'}catch(e){$('securityEvents').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}
 async function revokeOtherSessions(){if(!confirm('Revoke all other administrator sessions?'))return;try{const d=await api('/api/admin/security/revoke-sessions',{method:'POST'});await loadSecurity();alert(`${d.revoked||0} other session(s) revoked.`)}catch(e){alert(e.message)}}
 async function loadAudit(){

@@ -110,6 +110,39 @@
     section.parentNode.insertBefore(card,section.nextSibling);
   }
 
+  /* ---------- data page: "You'll earn" line in the plan confirmation popup ---------- */
+  function cashbackFor(amount){
+    var a=Number(amount);
+    if(!isFinite(a)||a<100)return 0;
+    var c=Math.round(a*(a>1000?0.02:0.01)*100)/100;
+    return Math.min(c,Number(bonus&&bonus.maxCashback)||200);
+  }
+  function mountCashbackPreview(){
+    var box=document.getElementById('planConfirmDetails');
+    if(!box||typeof MutationObserver==='undefined')return;
+    var busy=false;
+    function addLine(){
+      if(busy||!bonus||bonus.enabled===false)return;
+      try{if(typeof isAgent!=='undefined'&&isAgent)return;}catch(e){}
+      if(box.querySelector('.boltiv-cashback-line'))return;
+      var rows=box.querySelectorAll('.modal-detail');
+      var priceRow=null;
+      for(var i=0;i<rows.length;i++){var l=rows[i].querySelector('span');if(l&&l.textContent.trim()==='Price')priceRow=rows[i];}
+      if(!priceRow)return;
+      var strong=priceRow.querySelector('strong');
+      var amount=strong?Number(String(strong.textContent).replace(/[^0-9.]/g,'')):0;
+      var cb=cashbackFor(amount);
+      if(!(cb>0))return;
+      busy=true;
+      var row=document.createElement('div');
+      row.className='modal-detail boltiv-cashback-line';
+      row.innerHTML='<span>Cashback</span><strong style="color:#8a6a07">+'+money(cb)+'</strong>';
+      priceRow.parentNode.insertBefore(row,priceRow.nextSibling);
+      busy=false;
+    }
+    new MutationObserver(addLine).observe(box,{childList:true});
+  }
+
   function start(){
     var onPurchasePage=!!(document.getElementById('purchaseButton')||document.getElementById('pay')||document.getElementById('buy'));
     var onDashboard=!!document.querySelector('.home-balance-card');
@@ -120,6 +153,7 @@
       if(!b)return;
       try{if(onPurchasePage)mountSwitch(b);}catch(e){}
       try{if(onDashboard)mountDashboardCard(b);}catch(e){}
+      try{if(location.pathname.replace(/\/$/,'').replace(/\.html$/,'')==='/data')mountCashbackPreview();}catch(e){}
     }).catch(function(){});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();

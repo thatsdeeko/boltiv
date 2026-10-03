@@ -936,3 +936,40 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   }
 
 .boltiv-home .home-services-more[hidden]{display:none!important}
+
+/* BOLTIV wallet funding account polish — visual only; funding/API logic is unchanged. */
+.funding-account-card{
+  margin:14px 0 4px;
+  padding:18px;
+  border:1px solid #ead99b;
+  border-radius:18px;
+  background:linear-gradient(145deg,#fffdf7 0%,#fff9e8 100%);
+  box-shadow:0 10px 28px rgba(30,24,10,.06);
+}
+.funding-account-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.funding-account-eyebrow{font-size:9px;font-weight:900;letter-spacing:1.15px;color:#a17b13}
+.funding-account-title{margin-top:5px;font-size:16px;line-height:1.3;font-weight:1000;color:#171717;letter-spacing:-.2px}
+.funding-account-status{flex:0 0 auto;padding:6px 8px;border-radius:999px;background:#f4ecd0;border:1px solid #e4cf82;color:#8f6d0c;font-size:8px;font-weight:900;letter-spacing:.7px}
+.funding-account-description{margin:8px 0 15px;color:#6f6a60;font-size:11px;line-height:1.55}
+.funding-account-detail{padding:11px 0;border-top:1px solid rgba(194,164,76,.22);display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.funding-detail-label{font-size:9px;font-weight:900;letter-spacing:.85px;color:#8a8170}
+.funding-detail-value{max-width:66%;text-align:right;color:#171717;font-size:12px;line-height:1.4;word-break:break-word}
+.funding-detail-value small{font-size:9px;color:#817762;font-weight:800}
+.funding-account-number-wrap{margin-top:3px;padding:13px;border:1px solid #e5cf7f;border-radius:14px;background:#fff}
+.funding-account-number-wrap .funding-detail-label{display:block;margin-bottom:5px}
+.funding-account-number-wrap .static-account-copy{margin:0}
+.funding-account-number-wrap .static-account-number{font-size:clamp(25px,7vw,34px);letter-spacing:1.2px}
+.funding-account-number-wrap .static-copy-label{padding:8px 10px}
+.funding-account-note{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px 11px;border:1px solid #dcefe3;border-radius:11px;background:#f7fbf8;color:#52635a;font-size:10px;line-height:1.5}
+.funding-account-note>span:first-child{color:#16834d;font-weight:1000}
+.funding-account-result-card{margin:0;border-radius:16px}
+.funding-account-copy.funding-result-copy{margin-top:0}
+.funding-account-copy.funding-result-copy .funding-account-number{font-size:clamp(25px,7vw,34px);letter-spacing:1.2px}
+@media(max-width:420px){
+  .funding-account-card{padding:15px;border-radius:16px}
+  .funding-account-header{gap:8px}
+  .funding-account-title{font-size:15px}
+  .funding-detail-value{max-width:62%;font-size:11.5px}
+  .funding-account-number-wrap{padding:11px}
+  .funding-account-number-wrap .static-account-number,.funding-account-copy.funding-result-copy .funding-account-number{font-size:24px}
+}

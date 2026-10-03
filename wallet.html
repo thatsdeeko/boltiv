@@ -132,7 +132,32 @@ function renderFundingAccount(account){
 if(!account)return;
 let box=document.getElementById("fundingAccountBox");
 if(!box){box=document.createElement("div");box.id="fundingAccountBox";box.style="margin:14px 0;padding:16px;border:1px solid #ead99b;border-radius:12px;background:#fffdf8";const target=document.querySelector(".section");target?.appendChild(box);}
-box.innerHTML=`<strong style="letter-spacing:.5px">YOUR BOLTIV FUNDING ACCOUNT</strong><button type="button" class="static-account-copy" data-account-number="${String(account.account_number||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")}" aria-label="Copy BOLTIV funding account number"><span class="static-account-number">${account.account_number||""}</span><span class="static-copy-label">COPY</span></button><div style="margin-top:5px">${account.bank_name||"Bank"}${account.bank_code?` (${account.bank_code})`:""}</div><div style="margin-top:5px;color:#666">${account.account_name||""}</div><div style="margin-top:10px;font-size:13px;color:#555">Permanent Flutterwave account. Transfer money here anytime; your BOLTIV wallet is credited automatically after confirmation.</div>`;
+box.innerHTML=`<div class="funding-account-card">
+  <div class="funding-account-header">
+    <div>
+      <div class="funding-account-eyebrow">WALLET FUNDING ACCOUNT</div>
+      <div class="funding-account-title">Transfer directly to your BOLTIV wallet</div>
+    </div>
+    <span class="funding-account-status">ACTIVE</span>
+  </div>
+  <p class="funding-account-description">Use these dedicated account details when funding your wallet by bank transfer.</p>
+  <div class="funding-account-detail">
+    <span class="funding-detail-label">ACCOUNT NAME</span>
+    <strong class="funding-detail-value">${account.account_name||"BOLTIV Wallet"}</strong>
+  </div>
+  <div class="funding-account-detail">
+    <span class="funding-detail-label">BANK</span>
+    <strong class="funding-detail-value">${account.bank_name||"Bank"}${account.bank_code?` <small>(${account.bank_code})</small>`:""}</strong>
+  </div>
+  <div class="funding-account-number-wrap">
+    <div class="funding-detail-label">ACCOUNT NUMBER</div>
+    <button type="button" class="static-account-copy funding-static-copy" data-account-number="${String(account.account_number||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;")}" aria-label="Copy BOLTIV funding account number">
+      <span class="static-account-number">${account.account_number||""}</span>
+      <span class="static-copy-label">COPY</span>
+    </button>
+  </div>
+  <div class="funding-account-note"><span>✓</span><span>Permanent account — reuse it anytime. Your wallet is credited automatically after the transfer is confirmed.</span></div>
+</div>`;
 }
 async function loadFundingAccount(){const r=await API.request("/api/funding-account");if(r.success&&r.account){fundingAccount=r.account;renderFundingAccount(r.account);}return r;}
 async function activateFundingAccount(payload){toast("pending","Creating account","Setting up your Flutterwave funding account...");const r=await API.request("/api/funding-account/activate",{method:"POST",body:JSON.stringify(payload)});if(!r.success){const msg=typeof r.message==="string"?r.message:(r.message?.message||r.message?.error||"Unable to create funding account.");toast("error","Activation Failed",msg);return null}fundingAccount=r.account;showFundingResult(r.account);toast("success","Account Ready","Your Flutterwave funding account is ready.");return r;}
@@ -142,14 +167,32 @@ function showFundingResult(account){
   const accountNumber=String(account.account_number||"").trim();
   box.style.display="block";
   box.innerHTML=`
-    <strong>TRANSFER TO THIS ACCOUNT</strong>
-    <button type="button" id="copyFundingAccount" class="funding-account-copy" aria-label="Copy account number">
-      <span class="funding-account-number">${accountNumber}</span>
-      <span class="funding-copy-label">COPY</span>
-    </button>
-    <div style="margin-top:4px">${account.bank_name||"Bank"}</div>
-    <div style="margin-top:4px;color:#666">${account.account_name||""}</div>
-    <div style="font-size:11px;color:#777;margin-top:9px">${account.account_type==="static"?"Permanent account — reuse it anytime.":"Dynamic account — use it for this deposit only."}</div>
+    <div class="funding-account-card funding-account-result-card">
+      <div class="funding-account-header">
+        <div>
+          <div class="funding-account-eyebrow">TRANSFER TO THIS ACCOUNT</div>
+          <div class="funding-account-title">Fund your BOLTIV wallet</div>
+        </div>
+        <span class="funding-account-status">READY</span>
+      </div>
+      <p class="funding-account-description">Transfer the amount shown above to these details. Your wallet will be credited automatically after confirmation.</p>
+      <div class="funding-account-detail">
+        <span class="funding-detail-label">ACCOUNT NAME</span>
+        <strong class="funding-detail-value">${account.account_name||"BOLTIV Wallet"}</strong>
+      </div>
+      <div class="funding-account-detail">
+        <span class="funding-detail-label">BANK</span>
+        <strong class="funding-detail-value">${account.bank_name||"Bank"}${account.bank_code?` <small>(${account.bank_code})</small>`:""}</strong>
+      </div>
+      <div class="funding-account-number-wrap">
+        <div class="funding-detail-label">ACCOUNT NUMBER</div>
+        <button type="button" id="copyFundingAccount" class="funding-account-copy funding-result-copy" aria-label="Copy account number">
+          <span class="funding-account-number">${accountNumber}</span>
+          <span class="funding-copy-label">COPY</span>
+        </button>
+      </div>
+      <div class="funding-account-note"><span>✓</span><span>${account.account_type==="static"?"Permanent account — reuse it anytime.":"Dynamic account — use it for this deposit only."}</span></div>
+    </div>
   `;
   const copyButton=document.getElementById("copyFundingAccount");
   if(copyButton){

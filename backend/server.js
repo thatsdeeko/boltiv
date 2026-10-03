@@ -1023,6 +1023,137 @@ async function adminBonusSummary(){
   return{enabled:await cashbackEnabled(),issued:Number(r.rows[0].issued||0),spent:Number(sp.rows[0].spent||0),expired:Number(ex.rows[0].expired||0),outstanding:Number(r.rows[0].outstanding||0)};
 }
 
+/* ===================== BOLTIV REFERRALS =====================
+   A friend who signs up with a code must spend REFERRAL_THRESHOLD (wallet-paid, successful purchases)
+   within REFERRAL_WINDOW_DAYS. Then BOTH people receive bonus balance (same lots as cashback: 90-day
+   expiry, spendable, never withdrawable). Isolated: a referral failure must never break a purchase
+   or a sign-up. */
+const REFERRAL_THRESHOLD=3000;
+const REFERRAL_REFERRER_REWARD=100;
+const REFERRAL_FRIEND_REWARD=50;
+const REFERRAL_WINDOW_DAYS=30;
+const REFERRAL_MONTHLY_CAP=20;
+async function referralEnabled(){
+  const v=await getPlatformSetting("referral_enabled",true);
+  return v!==false&&v!=="false";
+}
+function makeReferralCode(){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes=crypto.randomBytes(7);
+  let out="";
+  for(let i=0;i<7;i++)out+=chars[bytes[i]%chars.length];
+  return out;
+}
+async function getOrCreateReferralCode(userId){
+  const existing=await db(`SELECT code FROM referral_codes WHERE user_id=$1`,[String(userId)]);
+  if(existing.rows.length)return existing.rows[0].code;
+  for(let i=0;i<6;i++){
+    const ins=await db(`INSERT INTO referral_codes(user_id,code) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING code`,[String(userId),makeReferralCode()]);
+    if(ins.rows.length)return ins.rows[0].code;
+    const again=await db(`SELECT code FROM referral_codes WHERE user_id=$1`,[String(userId)]);
+    if(again.rows.length)return again.rows[0].code;
+  }
+  throw new Error("Could not create a referral code.");
+}
+async function linkReferralOnSignup(user,rawCode){
+  try{
+    const code=String(rawCode||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(code.length<4||code.length>12)return;
+    if(!(await referralEnabled()))return;
+    const r=await db(`SELECT user_id FROM referral_codes WHERE code=$1`,[code]);
+    if(!r.rows.length)return;
+    const referrerId=String(r.rows[0].user_id);
+    if(referrerId===String(user.user_id))return;
+    const samePhone=await db(`SELECT 1 FROM users WHERE user_id=$1 AND phone=$2`,[referrerId,user.phone]);
+    if(samePhone.rows.length)return; // same phone number = treated as self-referral
+    await db(`INSERT INTO referrals(referrer_id,referred_id,code,status,window_ends_at) VALUES($1,$2,$3,'pending',NOW()+INTERVAL '${REFERRAL_WINDOW_DAYS} days') ON CONFLICT(referred_id) DO NOTHING`,[referrerId,String(user.user_id),code]);
+  }catch(error){console.error("REFERRAL LINK ERROR:",error?.stack||error?.message||error);}
+}
+// Wallet-paid value of successful purchases since the referral started (bonus-paid part does not count).
+async function referralSpentTx(client,userId,since){
+  const r=await client.query(`SELECT COALESCE(SUM(amount-COALESCE((metadata->'bonus'->>'used')::numeric,0)),0) AS spent FROM transactions WHERE user_id=$1 AND type='debit' AND status='successful' AND date>=$2`,[String(userId),since]);
+  return Number(r.rows[0]?.spent||0);
+}
+async function referralLotTx(client,{userId,sourceReference,transactionReference,amount,ledgerReference,description,referralId,transactionId}){
+  const ins=await client.query(`INSERT INTO bonus_lots(user_id,source_reference,transaction_reference,amount,remaining,expires_at) VALUES($1,$2,$3,$4::numeric,$4::numeric,NOW()+INTERVAL '${BONUS_EXPIRY_DAYS} days') ON CONFLICT(source_reference) DO NOTHING RETURNING id`,[String(userId),sourceReference,String(transactionReference),amount]);
+  if(!ins.rows.length)return 0;
+  const after=await bonusAvailableFor(client,userId);
+  await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:userId,direction:"credit",amount,balanceAfter:after,reference:ledgerReference,transactionId,category:"referral_reward",description,metadata:{referral_id:referralId}});
+  return amount;
+}
+// Returns {referrerId,referredId,referrerPaid,friendPaid} when rewards were just paid, else null. Never throws.
+async function checkReferralQualificationTx(client,tx){
+  try{
+    if(!(await referralEnabled()))return null;
+    await client.query("SAVEPOINT referral_check");
+    try{
+      const ref=await client.query(`SELECT * FROM referrals WHERE referred_id=$1 AND status='pending' AND window_ends_at>NOW() FOR UPDATE`,[String(tx.user_id)]);
+      if(!ref.rows.length){await client.query("RELEASE SAVEPOINT referral_check");return null;}
+      const row=ref.rows[0];
+      const spent=await referralSpentTx(client,tx.user_id,row.created_at);
+      if(spent<REFERRAL_THRESHOLD){await client.query("RELEASE SAVEPOINT referral_check");return null;}
+      const cnt=await client.query(`SELECT COUNT(*)::int AS n FROM referrals WHERE referrer_id=$1 AND status='rewarded' AND qualified_at>NOW()-INTERVAL '30 days'`,[row.referrer_id]);
+      const referrerCapped=Number(cnt.rows[0]?.n||0)>=REFERRAL_MONTHLY_CAP;
+      const friendPaid=await referralLotTx(client,{userId:row.referred_id,sourceReference:`REFERRAL-FRIEND-${row.id}`,transactionReference:tx.reference,amount:REFERRAL_FRIEND_REWARD,ledgerReference:`BONUS-REFERRAL-FRIEND-${row.id}`,description:"Referral welcome bonus",referralId:row.id,transactionId:tx.id});
+      const referrerPaid=referrerCapped?0:await referralLotTx(client,{userId:row.referrer_id,sourceReference:`REFERRAL-REFERRER-${row.id}`,transactionReference:tx.reference,amount:REFERRAL_REFERRER_REWARD,ledgerReference:`BONUS-REFERRAL-REFERRER-${row.id}`,description:"Referral reward",referralId:row.id,transactionId:tx.id});
+      await client.query(`UPDATE referrals SET status='rewarded',qualified_at=NOW(),referrer_reward=$2,friend_reward=$3 WHERE id=$1`,[row.id,referrerPaid,friendPaid]);
+      await client.query("RELEASE SAVEPOINT referral_check");
+      return{referrerId:row.referrer_id,referredId:row.referred_id,referrerPaid,friendPaid};
+    }catch(error){
+      await client.query("ROLLBACK TO SAVEPOINT referral_check");
+      console.error("REFERRAL QUALIFY ERROR:",error?.stack||error?.message||error);
+      return null;
+    }
+  }catch(error){console.error("REFERRAL QUALIFY ERROR:",error?.stack||error?.message||error);return null;}
+}
+// If a refund drops the friend below the threshold, take back whatever is left of both rewards.
+async function reverseReferralIfUnqualifiedTx(client,userId){
+  try{
+    await client.query("SAVEPOINT referral_reverse");
+    try{
+      const ref=await client.query(`SELECT * FROM referrals WHERE referred_id=$1 AND status='rewarded' FOR UPDATE`,[String(userId)]);
+      if(!ref.rows.length){await client.query("RELEASE SAVEPOINT referral_reverse");return 0;}
+      const row=ref.rows[0];
+      const spent=await referralSpentTx(client,userId,row.created_at);
+      if(spent>=REFERRAL_THRESHOLD){await client.query("RELEASE SAVEPOINT referral_reverse");return 0;}
+      let total=0;
+      for(const tag of ["FRIEND","REFERRER"]){
+        const lot=await client.query(`SELECT id,user_id,remaining FROM bonus_lots WHERE source_reference=$1 FOR UPDATE`,[`REFERRAL-${tag}-${row.id}`]);
+        if(!lot.rows.length||toKobo(lot.rows[0].remaining)<=0)continue;
+        const left=Number(lot.rows[0].remaining);
+        await client.query(`UPDATE bonus_lots SET remaining=0,status='reversed',updated_at=NOW() WHERE id=$1`,[lot.rows[0].id]);
+        const after=await bonusAvailableFor(client,lot.rows[0].user_id);
+        await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:lot.rows[0].user_id,direction:"debit",amount:-left,balanceAfter:after,reference:`BONUS-REFERRAL-REVERSE-${tag}-${row.id}`,category:"referral_reversed",description:"Referral reward reversed after refund",metadata:{referral_id:row.id}});
+        total+=left;
+      }
+      await client.query(`UPDATE referrals SET status='reversed' WHERE id=$1`,[row.id]);
+      await client.query("RELEASE SAVEPOINT referral_reverse");
+      return total;
+    }catch(error){
+      await client.query("ROLLBACK TO SAVEPOINT referral_reverse");
+      console.error("REFERRAL REVERSE ERROR:",error?.stack||error?.message||error);
+      return 0;
+    }
+  }catch(error){console.error("REFERRAL REVERSE ERROR:",error?.stack||error?.message||error);return 0;}
+}
+async function referralSummaryForUser(userId){
+  const enabled=await referralEnabled();
+  const code=await getOrCreateReferralCode(userId);
+  const mine=await db(`SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE status='pending')::int AS pending,COUNT(*) FILTER(WHERE status='rewarded')::int AS rewarded,COALESCE(SUM(referrer_reward) FILTER(WHERE status='rewarded'),0) AS earned FROM referrals WHERE referrer_id=$1`,[String(userId)]);
+  const asFriendRow=(await db(`SELECT status,created_at,window_ends_at,friend_reward FROM referrals WHERE referred_id=$1 LIMIT 1`,[String(userId)])).rows[0];
+  let asFriend=null;
+  if(asFriendRow){
+    const sp=await db(`SELECT COALESCE(SUM(amount-COALESCE((metadata->'bonus'->>'used')::numeric,0)),0) AS spent FROM transactions WHERE user_id=$1 AND type='debit' AND status='successful' AND date>=$2`,[String(userId),asFriendRow.created_at]);
+    asFriend={status:asFriendRow.status,spent:Number(sp.rows[0]?.spent||0),endsAt:asFriendRow.window_ends_at,reward:Number(asFriendRow.friend_reward||0)||REFERRAL_FRIEND_REWARD,expired:asFriendRow.status==="pending"&&new Date(asFriendRow.window_ends_at).getTime()<Date.now()};
+  }
+  const m=mine.rows[0]||{};
+  return{enabled,code,link:`${String(FRONTEND_URL).replace(/\/+$/,"")}/register?ref=${code}`,threshold:REFERRAL_THRESHOLD,referrerReward:REFERRAL_REFERRER_REWARD,friendReward:REFERRAL_FRIEND_REWARD,windowDays:REFERRAL_WINDOW_DAYS,monthlyCap:REFERRAL_MONTHLY_CAP,stats:{total:Number(m.total||0),pending:Number(m.pending||0),rewarded:Number(m.rewarded||0),earned:Number(m.earned||0)},asFriend};
+}
+async function adminReferralSummary(){
+  const r=await db(`SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE status='rewarded')::int AS rewarded,COALESCE(SUM(referrer_reward+friend_reward) FILTER(WHERE status='rewarded'),0) AS paid FROM referrals`);
+  return{enabled:await referralEnabled(),total:Number(r.rows[0]?.total||0),rewarded:Number(r.rows[0]?.rewarded||0),paid:Number(r.rows[0]?.paid||0)};
+}
+
 async function finalizeVTUTransaction(transactionId,outcome,providerData={},providerReference=null){
 const client=await pool.connect();
 try{
@@ -1038,6 +1169,7 @@ await client.query(`UPDATE transactions SET status='successful',provider_referen
 const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
 await recordRevenueSale(client,fresh);
 const cashbackEarned=await awardCashbackTx(client,fresh);
+const referralResult=await checkReferralQualificationTx(client,fresh);
 await client.query("COMMIT");
 // Notifications are created after the transaction commit so a notification
 // failure can never roll back a successful customer purchase.
@@ -1053,6 +1185,10 @@ try{
 }catch(error){console.error("TRANSACTION NOTIFICATION ERROR:",error?.stack||error?.message||error);}
 try{ await sendTransactionEmail(fresh.user_id,fresh,"successful"); }catch(error){ console.error("TRANSACTION EMAIL HOOK ERROR:",error?.stack||error?.message||error); }
 if(cashbackEarned>0){try{await addNotificationOnce(fresh.user_id,"Cashback earned",`You earned ₦${Number(cashbackEarned).toLocaleString("en-NG",{minimumFractionDigits:2})} cashback on your data purchase. It is in your Bonus Balance and expires in ${BONUS_EXPIRY_DAYS} days.`,"transaction",`cashback-${fresh.id}`);}catch(error){console.error("CASHBACK NOTIFICATION ERROR:",error?.stack||error?.message||error);}}
+if(referralResult){try{
+if(referralResult.friendPaid>0)await addNotificationOnce(referralResult.referredId,"Referral bonus unlocked",`You unlocked a \u20A6${referralResult.friendPaid} welcome bonus. It is in your Bonus Balance and expires in ${BONUS_EXPIRY_DAYS} days.`,"info",`referral-friend-${fresh.id}`);
+if(referralResult.referrerPaid>0)await addNotificationOnce(referralResult.referrerId,"Referral reward earned",`Your friend completed \u20A6${REFERRAL_THRESHOLD.toLocaleString("en-NG")} in purchases. \u20A6${referralResult.referrerPaid} was added to your Bonus Balance.`,"info",`referral-referrer-${fresh.id}`);
+}catch(error){console.error("REFERRAL NOTIFICATION ERROR:",error?.stack||error?.message||error);}}
 return {success:true,status:"successful"};
 }
 if(outcome==="failed"||outcome==="refunded"){
@@ -1088,7 +1224,7 @@ const check=await requireAdminCsrf(req);if(!check.success)return check;
 const b=await body(req);const ref=clean(b.reference);const reason=clean(b.reason)||"Admin approved refund";
 if(!ref)return {success:false,statusCode:400,message:"Transaction reference is required."};
 const client=await pool.connect();
-try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){const bonusRestored=await restoreBonusForTx(client,tx);const walletRefund=Number((Number(tx.amount)-bonusRestored).toFixed(2));if(tx.status==="successful")await reverseCashbackTx(client,tx);const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[walletRefund,tx.user_id]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:walletRefund,balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-ADMIN-REFUND-${tx.reference}`,transactionId:tx.id,category:"admin_refund",description:`Admin refund for ${tx.service}`,metadata:{reason,admin_id:check.admin.id}});await recordRevenueRefund(client,tx);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
+try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){const bonusRestored=await restoreBonusForTx(client,tx);const walletRefund=Number((Number(tx.amount)-bonusRestored).toFixed(2));if(tx.status==="successful")await reverseCashbackTx(client,tx);const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[walletRefund,tx.user_id]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:walletRefund,balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-ADMIN-REFUND-${tx.reference}`,transactionId:tx.id,category:"admin_refund",description:`Admin refund for ${tx.service}`,metadata:{reason,admin_id:check.admin.id}});await recordRevenueRefund(client,tx);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);await reverseReferralIfUnqualifiedTx(client,tx.user_id);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
 }
 
 function token(){
@@ -1902,6 +2038,12 @@ await db(`CREATE INDEX IF NOT EXISTS bonus_lots_user_idx ON bonus_lots(user_id,s
 await db(`CREATE TABLE IF NOT EXISTS bonus_spends(id BIGSERIAL PRIMARY KEY,lot_id BIGINT NOT NULL,user_id TEXT NOT NULL,transaction_reference TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,restored BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS bonus_spends_tx_idx ON bonus_spends(transaction_reference)`);
 }catch(error){console.error("BONUS SCHEMA ERROR:",error?.stack||error?.message||error);}
+// REFERRALS (additive tables)
+try{
+await db(`CREATE TABLE IF NOT EXISTS referral_codes(user_id TEXT PRIMARY KEY,code TEXT UNIQUE NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE TABLE IF NOT EXISTS referrals(id BIGSERIAL PRIMARY KEY,referrer_id TEXT NOT NULL,referred_id TEXT UNIQUE NOT NULL,code TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',referrer_reward NUMERIC(14,2) NOT NULL DEFAULT 0,friend_reward NUMERIC(14,2) NOT NULL DEFAULT 0,window_ends_at TIMESTAMPTZ NOT NULL,qualified_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS referrals_referrer_idx ON referrals(referrer_id,status)`);
+}catch(error){console.error("REFERRAL SCHEMA ERROR:",error?.stack||error?.message||error);}
 await db(`CREATE INDEX IF NOT EXISTS financial_ledger_account_idx ON financial_ledger(account_type,owner_id,created_at DESC)`);
 await db(`CREATE INDEX IF NOT EXISTS financial_ledger_transaction_idx ON financial_ledger(transaction_id)`);
 await db(`CREATE INDEX IF NOT EXISTS financial_ledger_category_idx ON financial_ledger(category,created_at DESC)`);
@@ -2229,7 +2371,8 @@ email,
 password,
 name,
 phone,
-termsAccepted
+termsAccepted,
+referralCode
 ){
 
 email=
@@ -2355,6 +2498,8 @@ result.rows[0];
 await createWallet(
 user.user_id
 );
+
+await linkReferralOnSignup(user,referralCode);
 
 let verificationEmailSent=true;
 try{
@@ -3608,7 +3753,7 @@ await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CO
 const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
 const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
 const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
-let bonus=null;try{bonus=await adminBonusSummary();}catch(error){console.error("ADMIN BONUS SUMMARY ERROR:",error?.message||error);}
+let bonus=null;try{bonus=await adminBonusSummary();if(bonus)bonus.referral=await adminReferralSummary();}catch(error){console.error("ADMIN BONUS SUMMARY ERROR:",error?.message||error);}
 return{success:true,summary:{balance:Number(w?.balance||0),sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),bonus},withdrawalsDisabled:true,withdrawalInstructions:"Withdrawals are handled directly in the Flutterwave dashboard."};
 }
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
@@ -4053,7 +4198,7 @@ async function adminSettings(req,action){
     return{success:true,settings};
   }
   const b=await body(req);
-  for(const key of ["maintenance_mode","registration_enabled","cashback_enabled"]){
+  for(const key of ["maintenance_mode","registration_enabled","cashback_enabled","referral_enabled"]){
     if(Object.prototype.hasOwnProperty.call(b,key)){
       await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW())
         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,
@@ -4574,7 +4719,8 @@ b.email,
 b.password,
 b.name,
 b.phone,
-b.termsAccepted
+b.termsAccepted,
+b.ref||b.referralCode
 );
 if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); result.sessionToken=result._sessionToken; delete result._sessionToken; }
 return send(
@@ -5031,6 +5177,21 @@ if(path==="/api/agent/customers"){
 }
 }
 
+
+if(
+req.method==="GET"&&
+path==="/api/referral"
+){
+const user=await userFromToken(req);
+if(!user){return send(res,401,{success:false,message:"Unauthorized."});}
+try{
+const referral=await referralSummaryForUser(user.user_id);
+return send(res,200,{success:true,referral});
+}catch(error){
+console.error("REFERRAL SUMMARY ERROR:",error?.stack||error?.message||error);
+return send(res,200,{success:false,message:"Referral information is unavailable right now."});
+}
+}
 
 if(
 req.method==="GET"&&

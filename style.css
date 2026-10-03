@@ -870,10 +870,9 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
 .boltiv-home .home-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .boltiv-home .home-service-card{min-height:116px;padding:13px 9px 11px;border-radius:17px!important}
 .boltiv-home .home-service-card .service-icon{width:40px;height:40px;margin-bottom:10px!important}
-.boltiv-home .home-services-more{margin-top:10px;padding-top:11px;border-top:1px solid rgba(212,175,55,.16)}
-.boltiv-home .home-services-more-label{margin-bottom:9px;font-size:9px;font-weight:900;letter-spacing:.12em;color:#8c8064}
-.boltiv-home .home-services-more .home-service-card{display:flex}
-.boltiv-home .home-services-more .home-service-card + .home-service-card{margin-top:10px}
+.boltiv-home .home-services-more{margin-top:10px;padding-top:11px;border-top:1px solid rgba(212,175,55,.16);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.boltiv-home .home-services-more-label{grid-column:1/-1;margin-bottom:0;font-size:9px;font-weight:900;letter-spacing:.12em;color:#8c8064}
+.boltiv-home .home-services-more .home-service-card{display:flex;width:100%;min-width:0;box-sizing:border-box;margin:0!important}
 .boltiv-home .home-repeat-section,
 .boltiv-home .home-bonus-slot,
 .boltiv-home .home-referral-slot{margin-top:16px}
@@ -932,9 +931,8 @@ button:disabled, input:disabled, select:disabled, textarea:disabled {
   .boltiv-home .home-recent-section,
   .boltiv-home .home-trust-card{max-width:760px}
   .boltiv-home .home-service-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .boltiv-home .home-services-more{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .boltiv-home .home-services-more{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
   .boltiv-home .home-services-more-label{grid-column:1/-1}
-  .boltiv-home .home-services-more .home-service-card + .home-service-card{margin-top:0}
-}
+  }
 
 .boltiv-home .home-services-more[hidden]{display:none!important}

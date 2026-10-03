@@ -841,7 +841,7 @@ if(agentService.isAgent){
   const boltivGrossProfit=pricingMeta.providerCost!=null?Number((agentPrice-Number(pricingMeta.providerCost)).toFixed(2)):0;
   pricingMeta={...pricingMeta,customerPrice:agentPrice,grossProfit:boltivGrossProfit,agentPrice,agentMarkupPct:agentPricing.markup_pct,customerSellingPrice:Number(customerSellingPrice.toFixed(2)),agentProfit:Number((customerSellingPrice-agentPrice).toFixed(2))};
 }
-const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount:debitAmount,reference:referenceValue,recipient,idempotencyKey:idem,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
+const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount:debitAmount,reference:referenceValue,recipient,idempotencyKey:idem,useBonus:data.useBonus===true,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
 let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
 let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
 if(!providerResult.success)console.error("VTUGATE TRANSACTION NOT CONFIRMED:",JSON.stringify({endpoint,outcome:providerResult.outcome,sentPayload:{...providerPayload,ref:providerPayload.ref},providerMessage:providerResult.message,providerRawResponse:providerResult.data}));
@@ -875,12 +875,15 @@ if(data.idempotencyKey){
 const existing=await client.query(`SELECT id,reference,status,amount,provider_reference FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1 FOR UPDATE`,[data.userId,data.idempotencyKey]);
 if(existing.rows.length){await client.query("COMMIT");return {success:true,existing:true,transaction:existing.rows[0]};}
 }
-const wallet=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[data.amount,data.userId]);
+let bonusUsed=0;
+if(data.useBonus===true){bonusUsed=await spendBonusTx(client,{userId:data.userId,reference:data.reference,maxAmount:data.amount});}
+const walletDebit=Number((Number(data.amount)-bonusUsed).toFixed(2));
+const wallet=await client.query(`UPDATE wallets SET balance=balance-$1,updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`,[walletDebit,data.userId]);
 if(!wallet.rows.length){await client.query("ROLLBACK");return {success:false,message:"Insufficient wallet balance."};}
-await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:data.userId,direction:"debit",amount:-Number(data.amount),balanceAfter:Number(wallet.rows[0].balance),reference:`WALLET-DEBIT-${data.reference}`,category:"vtu_debit",description:`Wallet debit for ${data.service}`,metadata:{service:data.service,recipient:data.recipient||null}});
+await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:data.userId,direction:"debit",amount:-walletDebit,balanceAfter:Number(wallet.rows[0].balance),reference:`WALLET-DEBIT-${data.reference}`,category:"vtu_debit",description:`Wallet debit for ${data.service}`,metadata:{service:data.service,recipient:data.recipient||null}});
 let inserted;
 try{
-inserted=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference) VALUES($1,'debit',$2,$3,$4,'processing',$5,$6::jsonb,$7,$8) RETURNING id,reference,status,amount,provider_reference`,[data.userId,data.service,data.amount,data.reference,data.recipient||null,JSON.stringify(data.metadata||{}),data.idempotencyKey||null,data.providerReference||null]);
+inserted=await client.query(`INSERT INTO transactions(user_id,type,service,amount,reference,status,recipient,metadata,idempotency_key,provider_reference) VALUES($1,'debit',$2,$3,$4,'processing',$5,$6::jsonb,$7,$8) RETURNING id,reference,status,amount,provider_reference`,[data.userId,data.service,data.amount,data.reference,data.recipient||null,JSON.stringify(bonusUsed>0?{...(data.metadata||{}),bonus:{used:bonusUsed,wallet_paid:walletDebit}}:(data.metadata||{})),data.idempotencyKey||null,data.providerReference||null]);
 await client.query(`UPDATE financial_ledger SET transaction_id=$1 WHERE reference=$2`,[inserted.rows[0].id,`WALLET-DEBIT-${data.reference}`]);
 }catch(e){
 if(e.code==="23505"&&data.idempotencyKey){const existing=await client.query(`SELECT id,reference,status,amount,provider_reference FROM transactions WHERE user_id=$1 AND idempotency_key=$2 LIMIT 1 FOR UPDATE`,[data.userId,data.idempotencyKey]);if(existing.rows.length){await client.query("ROLLBACK");return {success:true,existing:true,transaction:existing.rows[0]};}}
@@ -889,6 +892,135 @@ throw e;
 await client.query("COMMIT");
 return {success:true,existing:false,transaction:inserted.rows[0],balance:Number(wallet.rows[0].balance)};
 }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
+}
+
+/* ===================== BOLTIV BONUS / CASHBACK =====================
+   Cashback is earned on successful DATA purchases only, lands in a separate bonus balance
+   (lots, each with its own 90-day expiry), can pay any part of any purchase, and is never
+   withdrawable. All bonus code is isolated: a bonus failure must never break a purchase. */
+const BONUS_EXPIRY_DAYS=90;
+const BONUS_MAX_CASHBACK=200;
+const toKobo=n=>Math.round(Number(n||0)*100);
+const fromKobo=k=>Number((k/100).toFixed(2));
+function cashbackForAmount(amount){
+  const a=Number(amount);
+  if(!Number.isFinite(a)||a<100)return 0;
+  const rate=a>1000?0.02:0.01;
+  return Math.min(fromKobo(Math.round(a*rate*100)),BONUS_MAX_CASHBACK);
+}
+async function cashbackEnabled(){
+  const v=await getPlatformSetting("cashback_enabled",true);
+  return v!==false&&v!=="false";
+}
+async function bonusAvailableFor(client,userId){
+  const r=await client.query(`SELECT COALESCE(SUM(remaining),0) AS total FROM bonus_lots WHERE user_id=$1 AND status='active' AND remaining>0 AND expires_at>NOW()`,[String(userId)]);
+  return Number(r.rows[0]?.total||0);
+}
+async function spendBonusTx(client,{userId,reference,maxAmount}){
+  const lots=await client.query(`SELECT id,remaining FROM bonus_lots WHERE user_id=$1 AND status='active' AND remaining>0 AND expires_at>NOW() ORDER BY expires_at ASC,id ASC FOR UPDATE`,[String(userId)]);
+  let need=toKobo(maxAmount),used=0;
+  for(const lot of lots.rows){
+    if(need<=0)break;
+    const have=toKobo(lot.remaining),take=Math.min(have,need);
+    if(take<=0)continue;
+    await client.query(`UPDATE bonus_lots SET remaining=remaining-$1,status=CASE WHEN remaining-$1<=0 THEN 'used' ELSE 'active' END,updated_at=NOW() WHERE id=$2`,[fromKobo(take),lot.id]);
+    await client.query(`INSERT INTO bonus_spends(lot_id,user_id,transaction_reference,amount) VALUES($1,$2,$3,$4)`,[lot.id,String(userId),String(reference),fromKobo(take)]);
+    need-=take;used+=take;
+  }
+  if(used>0){
+    const after=await bonusAvailableFor(client,userId);
+    await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:userId,direction:"debit",amount:-fromKobo(used),balanceAfter:after,reference:`BONUS-SPEND-${reference}`,category:"bonus_spend",description:"Bonus used for purchase",metadata:{transaction_reference:reference}});
+  }
+  return fromKobo(used);
+}
+async function restoreBonusForTx(client,tx){
+  const meta=tx.metadata&&typeof tx.metadata==="object"?tx.metadata:{};
+  if(!(Number(meta.bonus?.used)>0))return 0;
+  const spends=await client.query(`SELECT id,lot_id,amount FROM bonus_spends WHERE transaction_reference=$1 AND restored=FALSE FOR UPDATE`,[String(tx.reference)]);
+  let total=0;
+  for(const sp of spends.rows){
+    await client.query(`UPDATE bonus_lots SET remaining=remaining+$1,status='active',expires_at=GREATEST(expires_at,NOW()+INTERVAL '7 days'),updated_at=NOW() WHERE id=$2`,[sp.amount,sp.lot_id]);
+    await client.query(`UPDATE bonus_spends SET restored=TRUE WHERE id=$1`,[sp.id]);
+    total+=toKobo(sp.amount);
+  }
+  if(total>0){
+    const after=await bonusAvailableFor(client,tx.user_id);
+    await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:tx.user_id,direction:"credit",amount:fromKobo(total),balanceAfter:after,reference:`BONUS-RESTORE-${tx.reference}`,transactionId:tx.id,category:"bonus_restore",description:"Bonus returned after refund",metadata:{transaction_reference:tx.reference}});
+  }
+  return fromKobo(total);
+}
+// Never throws and never poisons the surrounding DB transaction (SAVEPOINT).
+async function awardCashbackTx(client,tx){
+  try{
+    if(String(tx.service||"").toLowerCase()!=="data")return 0;
+    const meta=tx.metadata&&typeof tx.metadata==="object"?tx.metadata:{};
+    if(meta.pricing&&meta.pricing.agentPrice!=null)return 0; // agent wholesale sales earn no cashback
+    if(!(await cashbackEnabled()))return 0;
+    const amount=cashbackForAmount(tx.amount);
+    if(!(amount>0))return 0;
+    await client.query("SAVEPOINT bonus_award");
+    try{
+      const ins=await client.query(`INSERT INTO bonus_lots(user_id,source_reference,transaction_reference,amount,remaining,expires_at) VALUES($1,$2,$3,$4::numeric,$4::numeric,NOW()+INTERVAL '${BONUS_EXPIRY_DAYS} days') ON CONFLICT(source_reference) DO NOTHING RETURNING id`,[String(tx.user_id),`CASHBACK-${tx.reference}`,String(tx.reference),amount]);
+      if(!ins.rows.length){await client.query("RELEASE SAVEPOINT bonus_award");return 0;}
+      const after=await bonusAvailableFor(client,tx.user_id);
+      await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:tx.user_id,direction:"credit",amount,balanceAfter:after,reference:`BONUS-EARN-${tx.reference}`,transactionId:tx.id,category:"cashback",description:"Cashback earned on data purchase",metadata:{transaction_reference:tx.reference}});
+      await client.query("RELEASE SAVEPOINT bonus_award");
+      return amount;
+    }catch(error){
+      await client.query("ROLLBACK TO SAVEPOINT bonus_award");
+      console.error("CASHBACK AWARD ERROR:",error?.stack||error?.message||error);
+      return 0;
+    }
+  }catch(error){console.error("CASHBACK AWARD ERROR:",error?.stack||error?.message||error);return 0;}
+}
+// Takes back whatever is left of the cashback earned on a purchase that is later refunded.
+async function reverseCashbackTx(client,tx){
+  try{
+    if(String(tx.service||"").toLowerCase()!=="data")return 0;
+    await client.query("SAVEPOINT bonus_reverse");
+    try{
+      const lot=await client.query(`SELECT id,remaining FROM bonus_lots WHERE source_reference=$1 FOR UPDATE`,[`CASHBACK-${tx.reference}`]);
+      if(!lot.rows.length||toKobo(lot.rows[0].remaining)<=0){await client.query("RELEASE SAVEPOINT bonus_reverse");return 0;}
+      const left=Number(lot.rows[0].remaining);
+      await client.query(`UPDATE bonus_lots SET remaining=0,status='reversed',updated_at=NOW() WHERE id=$1`,[lot.rows[0].id]);
+      const after=await bonusAvailableFor(client,tx.user_id);
+      await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:tx.user_id,direction:"debit",amount:-left,balanceAfter:after,reference:`BONUS-REVERSE-${tx.reference}`,transactionId:tx.id,category:"cashback_reversed",description:"Cashback reversed after refund",metadata:{transaction_reference:tx.reference}});
+      await client.query("RELEASE SAVEPOINT bonus_reverse");
+      return left;
+    }catch(error){
+      await client.query("ROLLBACK TO SAVEPOINT bonus_reverse");
+      console.error("CASHBACK REVERSE ERROR:",error?.stack||error?.message||error);
+      return 0;
+    }
+  }catch(error){console.error("CASHBACK REVERSE ERROR:",error?.stack||error?.message||error);return 0;}
+}
+async function expireBonusLots(){
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const r=await client.query(`SELECT id,user_id,remaining,source_reference FROM bonus_lots WHERE status='active' AND remaining>0 AND expires_at<=NOW() ORDER BY id ASC LIMIT 500 FOR UPDATE SKIP LOCKED`);
+    for(const lot of r.rows){
+      await client.query(`UPDATE bonus_lots SET remaining=0,status='expired',updated_at=NOW() WHERE id=$1`,[lot.id]);
+      const after=await bonusAvailableFor(client,lot.user_id);
+      await addFinancialLedger(client,{accountType:"customer_bonus",ownerId:lot.user_id,direction:"debit",amount:-Number(lot.remaining),balanceAfter:after,reference:`BONUS-EXPIRE-${lot.id}`,category:"bonus_expired",description:"Bonus expired",metadata:{lot_id:lot.id,source_reference:lot.source_reference}});
+    }
+    await client.query("COMMIT");
+    return r.rows.length;
+  }catch(error){try{await client.query("ROLLBACK")}catch{};console.error("BONUS EXPIRY ERROR:",error?.stack||error?.message||error);return 0;}
+  finally{client.release();}
+}
+async function bonusSummaryForUser(userId){
+  const enabled=await cashbackEnabled();
+  const bal=await db(`SELECT COALESCE(SUM(remaining),0) AS total FROM bonus_lots WHERE user_id=$1 AND status='active' AND remaining>0 AND expires_at>NOW()`,[String(userId)]);
+  const next=await db(`SELECT expires_at,SUM(remaining) AS amount FROM bonus_lots WHERE user_id=$1 AND status='active' AND remaining>0 AND expires_at>NOW() GROUP BY expires_at ORDER BY expires_at ASC LIMIT 1`,[String(userId)]);
+  const earned=await db(`SELECT COALESCE(SUM(amount),0) AS total FROM bonus_lots WHERE user_id=$1`,[String(userId)]);
+  return{enabled,balance:Number(bal.rows[0]?.total||0),nextExpiry:next.rows[0]?.expires_at?{amount:Number(next.rows[0].amount||0),date:next.rows[0].expires_at}:null,totalEarned:Number(earned.rows[0]?.total||0),expiryDays:BONUS_EXPIRY_DAYS,maxCashback:BONUS_MAX_CASHBACK};
+}
+async function adminBonusSummary(){
+  const r=await db(`SELECT COALESCE(SUM(amount),0) AS issued,COALESCE(SUM(remaining) FILTER(WHERE status='active' AND expires_at>NOW()),0) AS outstanding,COALESCE(SUM(amount) FILTER(WHERE status='expired'),0) AS expired_lots FROM bonus_lots`);
+  const sp=await db(`SELECT COALESCE(SUM(amount) FILTER(WHERE restored=FALSE),0) AS spent FROM bonus_spends`);
+  const ex=await db(`SELECT COALESCE(SUM(-amount),0) AS expired FROM financial_ledger WHERE account_type='customer_bonus' AND category='bonus_expired'`);
+  return{enabled:await cashbackEnabled(),issued:Number(r.rows[0].issued||0),spent:Number(sp.rows[0].spent||0),expired:Number(ex.rows[0].expired||0),outstanding:Number(r.rows[0].outstanding||0)};
 }
 
 async function finalizeVTUTransaction(transactionId,outcome,providerData={},providerReference=null){
@@ -905,6 +1037,7 @@ if(outcome==="successful"){
 await client.query(`UPDATE transactions SET status='successful',provider_reference=COALESCE(provider_reference,$2),completed_at=NOW(),last_provider_status='successful',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
 const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
 await recordRevenueSale(client,fresh);
+const cashbackEarned=await awardCashbackTx(client,fresh);
 await client.query("COMMIT");
 // Notifications are created after the transaction commit so a notification
 // failure can never roll back a successful customer purchase.
@@ -919,13 +1052,16 @@ try{
   await addNotificationOnce(fresh.user_id,"Transaction successful",detail,"transaction",`tx-success-${fresh.id}`);
 }catch(error){console.error("TRANSACTION NOTIFICATION ERROR:",error?.stack||error?.message||error);}
 try{ await sendTransactionEmail(fresh.user_id,fresh,"successful"); }catch(error){ console.error("TRANSACTION EMAIL HOOK ERROR:",error?.stack||error?.message||error); }
+if(cashbackEarned>0){try{await addNotificationOnce(fresh.user_id,"Cashback earned",`You earned ₦${Number(cashbackEarned).toLocaleString("en-NG",{minimumFractionDigits:2})} cashback on your data purchase. It is in your Bonus Balance and expires in ${BONUS_EXPIRY_DAYS} days.`,"transaction",`cashback-${fresh.id}`);}catch(error){console.error("CASHBACK NOTIFICATION ERROR:",error?.stack||error?.message||error);}}
 return {success:true,status:"successful"};
 }
 if(outcome==="failed"||outcome==="refunded"){
 if(!tx.refunded_at){
-const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(tx.amount),tx.user_id]);
+const bonusRestored=await restoreBonusForTx(client,tx);
+const walletRefund=Number((Number(tx.amount)-bonusRestored).toFixed(2));
+const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[walletRefund,tx.user_id]);
 if(!wr.rows.length)throw new Error("Wallet could not be credited for refund.");
-await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:Number(tx.amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-REFUND-${tx.reference}`,transactionId:tx.id,category:"vtu_refund",description:`Refund for ${tx.service}`,metadata:{reason:outcome}});
+await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:walletRefund,balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-REFUND-${tx.reference}`,transactionId:tx.id,category:"vtu_refund",description:`Refund for ${tx.service}`,metadata:{reason:outcome}});
 }
 await client.query(`UPDATE transactions SET status='refunded',provider_reference=COALESCE(provider_reference,$2),refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),last_provider_status=$4,refund_reason=$5,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData,refund_reason:outcome}),outcome,outcome]);
 const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
@@ -952,7 +1088,7 @@ const check=await requireAdminCsrf(req);if(!check.success)return check;
 const b=await body(req);const ref=clean(b.reference);const reason=clean(b.reason)||"Admin approved refund";
 if(!ref)return {success:false,statusCode:400,message:"Transaction reference is required."};
 const client=await pool.connect();
-try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[Number(tx.amount),tx.user_id]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:Number(tx.amount),balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-ADMIN-REFUND-${tx.reference}`,transactionId:tx.id,category:"admin_refund",description:`Admin refund for ${tx.service}`,metadata:{reason,admin_id:check.admin.id}});await recordRevenueRefund(client,tx);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
+try{await client.query("BEGIN");const q=await client.query(`SELECT * FROM transactions WHERE reference=$1 FOR UPDATE`,[ref]);if(!q.rows.length){await client.query("ROLLBACK");return {success:false,statusCode:404,message:"Transaction not found."};}const tx=q.rows[0];if(tx.type!=="debit"){await client.query("ROLLBACK");return {success:false,statusCode:400,message:"Only debit transactions can be refunded."};}if(tx.status==="successful"||tx.status==="pending"||tx.status==="processing"){if(!tx.refunded_at){const bonusRestored=await restoreBonusForTx(client,tx);const walletRefund=Number((Number(tx.amount)-bonusRestored).toFixed(2));if(tx.status==="successful")await reverseCashbackTx(client,tx);const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[walletRefund,tx.user_id]);if(!wr.rows.length)throw new Error("Wallet could not be credited.");await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:walletRefund,balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-ADMIN-REFUND-${tx.reference}`,transactionId:tx.id,category:"admin_refund",description:`Admin refund for ${tx.service}`,metadata:{reason,admin_id:check.admin.id}});await recordRevenueRefund(client,tx);}await client.query(`UPDATE transactions SET status='refunded',refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[tx.id,JSON.stringify({admin_refund:true,reason,admin_id:check.admin.id})]);}else if(tx.status==="refunded"){await client.query("COMMIT");return {success:true,alreadyRefunded:true,message:"Transaction was already refunded."};}else{await client.query("ROLLBACK");return {success:false,statusCode:400,message:"This transaction cannot be refunded in its current state."};}await client.query("COMMIT");return {success:true,message:"Transaction refunded successfully."};}catch(e){try{await client.query("ROLLBACK")}catch{};return {success:false,statusCode:500,message:"Refund failed."};}finally{client.release();}
 }
 
 function token(){
@@ -1759,6 +1895,13 @@ ON password_reset_tokens(expires_at)`
 );
 
 await db(`CREATE TABLE IF NOT EXISTS financial_ledger( id BIGSERIAL PRIMARY KEY, account_type TEXT NOT NULL, owner_id TEXT NOT NULL, direction TEXT NOT NULL CHECK(direction IN ('credit','debit','opening')), amount NUMERIC(14,2) NOT NULL, balance_after NUMERIC(14,2) NOT NULL, reference TEXT UNIQUE NOT NULL, transaction_id BIGINT, category TEXT NOT NULL, description TEXT NOT NULL, metadata JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+// BONUS / CASHBACK (additive tables - nothing existing is altered)
+try{
+await db(`CREATE TABLE IF NOT EXISTS bonus_lots(id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL,source_reference TEXT UNIQUE NOT NULL,transaction_reference TEXT,amount NUMERIC(14,2) NOT NULL,remaining NUMERIC(14,2) NOT NULL,status TEXT NOT NULL DEFAULT 'active',expires_at TIMESTAMPTZ NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS bonus_lots_user_idx ON bonus_lots(user_id,status,expires_at)`);
+await db(`CREATE TABLE IF NOT EXISTS bonus_spends(id BIGSERIAL PRIMARY KEY,lot_id BIGINT NOT NULL,user_id TEXT NOT NULL,transaction_reference TEXT NOT NULL,amount NUMERIC(14,2) NOT NULL,restored BOOLEAN NOT NULL DEFAULT FALSE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS bonus_spends_tx_idx ON bonus_spends(transaction_reference)`);
+}catch(error){console.error("BONUS SCHEMA ERROR:",error?.stack||error?.message||error);}
 await db(`CREATE INDEX IF NOT EXISTS financial_ledger_account_idx ON financial_ledger(account_type,owner_id,created_at DESC)`);
 await db(`CREATE INDEX IF NOT EXISTS financial_ledger_transaction_idx ON financial_ledger(transaction_id)`);
 await db(`CREATE INDEX IF NOT EXISTS financial_ledger_category_idx ON financial_ledger(category,created_at DESC)`);
@@ -3465,7 +3608,8 @@ await db(`INSERT INTO admin_revenue_wallets(admin_id,balance) VALUES($1,0) ON CO
 const w=(await db(`SELECT balance FROM admin_revenue_wallets WHERE admin_id=$1`,[admin.id])).rows[0];
 const r=(await db(`SELECT COALESCE(SUM(CASE WHEN type='sale' THEN amount ELSE 0 END),0) AS sales,COALESCE(SUM(CASE WHEN type='refund' THEN ABS(amount) ELSE 0 END),0) AS refunds FROM admin_revenue_ledger WHERE admin_id=$1`,[admin.id])).rows[0];
 const gross=(await db(`SELECT COALESCE(SUM(CASE WHEN type='debit' AND status='successful' THEN COALESCE((metadata->'pricing'->>'grossProfit')::numeric,0) ELSE 0 END),0) AS gross_profit FROM transactions`)).rows[0];
-return{success:true,summary:{balance:Number(w?.balance||0),sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0)},withdrawalsDisabled:true,withdrawalInstructions:"Withdrawals are handled directly in the Flutterwave dashboard."};
+let bonus=null;try{bonus=await adminBonusSummary();}catch(error){console.error("ADMIN BONUS SUMMARY ERROR:",error?.message||error);}
+return{success:true,summary:{balance:Number(w?.balance||0),sales:Number(r?.sales||0),refunds:Number(r?.refunds||0),grossProfit:Number(gross?.gross_profit||0),bonus},withdrawalsDisabled:true,withdrawalInstructions:"Withdrawals are handled directly in the Flutterwave dashboard."};
 }
 async function adminWalletInfo(req){const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};const wallet=await getAdminWallet(admin.id);const ledger=(await db(`SELECT id,type,amount,balance_after,reference,description,created_at FROM admin_wallet_ledger WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 100`,[admin.id])).rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}));return{success:true,wallet,ledger};}
 async function initializeAdminWalletFunding(req){
@@ -3909,7 +4053,7 @@ async function adminSettings(req,action){
     return{success:true,settings};
   }
   const b=await body(req);
-  for(const key of ["maintenance_mode","registration_enabled"]){
+  for(const key of ["maintenance_mode","registration_enabled","cashback_enabled"]){
     if(Object.prototype.hasOwnProperty.call(b,key)){
       await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW())
         ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()`,
@@ -4890,6 +5034,21 @@ if(path==="/api/agent/customers"){
 
 if(
 req.method==="GET"&&
+path==="/api/bonus"
+){
+const user=await userFromToken(req);
+if(!user){return send(res,401,{success:false,message:"Unauthorized."});}
+try{
+const summary=await bonusSummaryForUser(user.user_id);
+return send(res,200,{success:true,bonus:summary});
+}catch(error){
+console.error("BONUS SUMMARY ERROR:",error?.stack||error?.message||error);
+return send(res,200,{success:true,bonus:{enabled:false,balance:0,nextExpiry:null,totalEarned:0,expiryDays:BONUS_EXPIRY_DAYS,maxCashback:BONUS_MAX_CASHBACK}});
+}
+}
+
+if(
+req.method==="GET"&&
 path==="/api/wallet"
 ){
 
@@ -5490,6 +5649,9 @@ try{
 await setup();
 setTimeout(()=>runPlatformAlerts().catch(e=>console.error("INITIAL ALERT CHECK ERROR",e)),5000).unref();
 setInterval(()=>runPlatformAlerts().catch(e=>console.error("ALERT CHECK ERROR",e)),300000).unref();
+// Bonus expiry sweep: shortly after boot, then every 30 minutes.
+setTimeout(()=>expireBonusLots().catch(e=>console.error("BONUS EXPIRY ERROR",e)),20000).unref();
+setInterval(()=>expireBonusLots().catch(e=>console.error("BONUS EXPIRY ERROR",e)),30*60*1000).unref();
 
 await cleanupPasswordResetTokens();
 cleanupTransactionPinResetTokens();

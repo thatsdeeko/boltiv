@@ -131,4 +131,4 @@ html[data-theme="dark"][data-page="verify-email"] button:disabled{--t-bd-171717:
 .boltiv-seg button:focus-visible{outline:2px solid #D4AF37;outline-offset:1px}
 
 /* Dark mode uses a cleaned copy of the logo (the original has a white halo baked into its edge that shows on dark). Same size, so layout is unchanged. */
-@media screen{html[data-theme="dark"] img[src*="boltiv-logo.webp"]{content:url("/assets/boltiv-logo-dark.webp")}}
+@media screen{html[data-theme="dark"] img[src*="boltiv-logo.webp"]{content:url("/assets/boltiv-logo-dark-2.webp")}}

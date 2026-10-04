@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><script src="/boltiv-api-config.js?v=1"></script><base href="/"><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
+<head><script src="/boltiv-theme.js?v=20261004-dark"></script><link href="/boltiv-theme.css?v=20261004-dark" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/"><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=20261004-dark"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#ffffff" name="theme-color"/>
 <meta content="BOLTIV — fast, simple digital services." name="description"/>
 <title>BOLTIV Dashboard — Digital Services</title>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
-<link href="style.css?v=20261003-dashboard" rel="stylesheet"/>
+<link href="style.css?v=20261004-dark" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
@@ -18,14 +18,14 @@ body.modal-open{overflow:hidden!important}
 .coming-modal[hidden]{display:none!important}
 .coming-modal.is-open{pointer-events:auto!important}
 .coming-modal-backdrop{position:absolute!important;inset:0!important;background:rgba(15,14,11,.62)!important;backdrop-filter:blur(6px)!important;opacity:0!important;transition:opacity .2s ease!important}
-.coming-modal-card{position:relative!important;z-index:2!important;width:min(100%,360px)!important;padding:30px 24px 24px!important;border:1px solid rgba(201,159,22,.32)!important;border-radius:28px!important;background:#fffdf7!important;box-shadow:0 28px 80px rgba(0,0,0,.28)!important;text-align:center!important;transform:translateY(20px) scale(.96)!important;opacity:0!important;transition:transform .22s ease,opacity .2s ease!important}
+.coming-modal-card{position:relative!important;z-index:2!important;width:min(100%,360px)!important;padding:30px 24px 24px!important;border:1px solid rgba(201,159,22,.32)!important;border-radius:28px!important;background:var(--t-bg-fffdf7)!important;box-shadow:0 28px 80px rgba(0,0,0,.28)!important;text-align:center!important;transform:translateY(20px) scale(.96)!important;opacity:0!important;transition:transform .22s ease,opacity .2s ease!important}
 .coming-modal.is-open .coming-modal-backdrop{opacity:1!important}
 .coming-modal.is-open .coming-modal-card{transform:translateY(0) scale(1)!important;opacity:1!important}
-.coming-modal-close{position:absolute!important;right:14px!important;top:12px!important;width:38px!important;height:38px!important;border:1px solid #eadfba!important;border-radius:50%!important;background:#fff!important;color:#9a7510!important;font-size:25px!important;line-height:1!important;cursor:pointer!important}
+.coming-modal-close{position:absolute!important;right:14px!important;top:12px!important;width:38px!important;height:38px!important;border:1px solid var(--t-bd-eadfba)!important;border-radius:50%!important;background:var(--t-bg-ffffff)!important;color:var(--t-fg-9a7510)!important;font-size:25px!important;line-height:1!important;cursor:pointer!important}
 .coming-modal-icon{width:66px!important;height:66px!important;margin:0 auto 15px!important;border-radius:20px!important;display:grid!important;place-items:center!important;background:linear-gradient(145deg,#f5d55f,#c79a16)!important;color:#fff!important;font-size:26px!important}
-.coming-modal-kicker{font-size:11px!important;font-weight:800!important;letter-spacing:.18em!important;color:#a27b0b!important;margin-bottom:7px!important}
-.coming-modal-card h2{margin:0!important;font-size:24px!important;line-height:1.15!important;color:#171717!important}
-.coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:#716e68!important;font-size:14px!important;line-height:1.55!important}
+.coming-modal-kicker{font-size:11px!important;font-weight:800!important;letter-spacing:.18em!important;color:var(--t-fg-a27b0b)!important;margin-bottom:7px!important}
+.coming-modal-card h2{margin:0!important;font-size:24px!important;line-height:1.15!important;color:var(--t-fg-171717)!important}
+.coming-modal-card p{margin:10px auto 22px!important;max-width:290px!important;color:var(--t-fg-716e68)!important;font-size:14px!important;line-height:1.55!important}
 .coming-modal-button{width:100%!important;min-height:50px!important;border:0!important;border-radius:15px!important;background:linear-gradient(135deg,#e1bf43,#bd920b)!important;color:#fff!important;font-weight:800!important;cursor:pointer!important}
 </style>
 <style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #D4AF37;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
@@ -33,7 +33,7 @@ body.modal-open{overflow:hidden!important}
 .balance-label-row{display:flex;align-items:center;gap:8px;min-height:18px}
 .balance-label-row .balance-label{margin:0}
 .balance-visibility-toggle{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--gold3);border-radius:50%;background:var(--gold-soft);color:var(--gold2);cursor:pointer;transition:transform .18s ease,background .18s ease,border-color .18s ease}
-.balance-visibility-toggle:hover{background:#fff;border-color:var(--gold);transform:translateY(-1px)}
+.balance-visibility-toggle:hover{background:var(--t-bg-ffffff);border-color:var(--gold);transform:translateY(-1px)}
 .balance-visibility-toggle:active{transform:scale(.94)}
 .balance-visibility-toggle svg{width:12px;height:12px;display:block}
 .balance-value.is-hidden{letter-spacing:2px;font-size:31px}
@@ -41,25 +41,25 @@ body.modal-open{overflow:hidden!important}
 </style>
 <style id="boltiv-dashboard-insights-inline">
 .dashboard-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
-.insight-card{background:linear-gradient(145deg,#fff,#fffdf7);border:1px solid rgba(197,154,28,.20);border-radius:20px;padding:17px;box-shadow:0 10px 28px rgba(30,24,10,.055)}
+.insight-card{background:linear-gradient(145deg,var(--t-bg-ffffff),var(--t-bg-fffdf7));border:1px solid rgba(197,154,28,.20);border-radius:20px;padding:17px;box-shadow:0 10px 28px rgba(30,24,10,.055)}
 .insight-card.full{grid-column:1/-1}
 .insight-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}
-.insight-title{font-size:12px;letter-spacing:.12em;font-weight:800;color:#6f654f}
-.insight-link{border:0;background:none;color:#a17b13;font-size:12px;font-weight:800;padding:0;cursor:pointer}
-.insight-main{font-size:22px;font-weight:850;color:#171717;line-height:1.15}
-.insight-sub{font-size:11px;color:#817b70;margin-top:5px}
+.insight-title{font-size:12px;letter-spacing:.12em;font-weight:800;color:var(--t-fg-6f654f)}
+.insight-link{border:0;background:none;color:var(--t-fg-a17b13);font-size:12px;font-weight:800;padding:0;cursor:pointer}
+.insight-main{font-size:22px;font-weight:850;color:var(--t-fg-171717);line-height:1.15}
+.insight-sub{font-size:11px;color:var(--t-fg-817b70);margin-top:5px}
 .insight-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
-.insight-stat{padding:10px;border-radius:13px;background:#faf8f0;border:1px solid #eee7d5;min-width:0}
-.insight-stat b{display:block;font-size:12px;color:#26231e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.insight-stat small{display:block;font-size:10px;color:#8b8477;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.insight-stat{padding:10px;border-radius:13px;background:var(--t-bg-faf8f0);border:1px solid var(--t-bd-eee7d5);min-width:0}
+.insight-stat b{display:block;font-size:12px;color:var(--t-fg-26231e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.insight-stat small{display:block;font-size:10px;color:var(--t-fg-8b8477);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .repeat-list{display:grid;gap:8px}
-.repeat-item{display:flex;align-items:center;gap:10px;width:100%;border:1px solid #eee8d9;background:#fff;border-radius:14px;padding:10px;text-align:left;cursor:pointer}
-.repeat-icon{width:34px;height:34px;border-radius:11px;background:#faf3d9;color:#a17b13;display:grid;place-items:center;font-weight:900;flex:0 0 auto}
+.repeat-item{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--t-bd-eee8d9);background:var(--t-bg-ffffff);border-radius:14px;padding:10px;text-align:left;cursor:pointer}
+.repeat-icon{width:34px;height:34px;border-radius:11px;background:var(--t-bg-faf3d9);color:var(--t-fg-a17b13);display:grid;place-items:center;font-weight:900;flex:0 0 auto}
 .repeat-main{min-width:0;flex:1}
-.repeat-main strong{display:block;font-size:12px;color:#24211d}
-.repeat-main small{display:block;font-size:10px;color:#888174;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.repeat-arrow{color:#a17b13;font-size:17px}
-.insight-empty{font-size:12px;color:#878073;padding:4px 0}
+.repeat-main strong{display:block;font-size:12px;color:var(--t-fg-24211d)}
+.repeat-main small{display:block;font-size:10px;color:var(--t-fg-888174);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.repeat-arrow{color:var(--t-fg-a17b13);font-size:17px}
+.insight-empty{font-size:12px;color:var(--t-fg-878073);padding:4px 0}
 @media (max-width:560px){.dashboard-insights{grid-template-columns:1fr}.insight-card.full{grid-column:auto}.insight-stats{grid-template-columns:repeat(3,1fr)}}
 </style>
 
@@ -70,20 +70,20 @@ body.modal-open{overflow:hidden!important}
    zero balance). If the backend has been idle and is cold-starting, this can
    legitimately take up to a minute — the shimmer plus the delayed status
    line below make that read as "loading" rather than "broken". */
-.boltiv-skeleton,.home-balance-card .balance-value.boltiv-skeleton,.insight-main.boltiv-skeleton{position:relative;color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;background:linear-gradient(90deg,#efe9d8 25%,#faf6ea 37%,#efe9d8 63%);background-size:400% 100%;animation:boltivShimmer 1.4s ease infinite;border-radius:7px}
+.boltiv-skeleton,.home-balance-card .balance-value.boltiv-skeleton,.insight-main.boltiv-skeleton{position:relative;color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;background:linear-gradient(90deg,var(--t-bg-efe9d8) 25%,var(--t-bg-faf6ea) 37%,var(--t-bg-efe9d8) 63%);background-size:400% 100%;animation:boltivShimmer 1.4s ease infinite;border-radius:7px}
 @keyframes boltivShimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
-@media (prefers-reduced-motion:reduce){.boltiv-skeleton{animation:none;background:#efe9d8}}
-.boltiv-connecting-note{display:none;margin-top:8px;font-size:11px;color:#a17b13;font-weight:700}
+@media (prefers-reduced-motion:reduce){.boltiv-skeleton{animation:none;background:var(--t-bg-efe9d8)}}
+.boltiv-connecting-note{display:none;margin-top:8px;font-size:11px;color:var(--t-fg-a17b13);font-weight:700}
 .boltiv-connecting-note.is-visible{display:block}
 </style>
 
 <style id="boltiv-announcement-ticker">
-.boltiv-announcement{margin:24px 0 0;border:1px solid rgba(197,154,28,.22);border-radius:14px;background:#fffdf7;overflow:hidden;box-shadow:0 6px 18px rgba(30,24,10,.04)}
+.boltiv-announcement{margin:24px 0 0;border:1px solid rgba(197,154,28,.22);border-radius:14px;background:var(--t-bg-fffdf7);overflow:hidden;box-shadow:0 6px 18px rgba(30,24,10,.04)}
 .boltiv-announcement-track{display:flex;align-items:center;min-width:max-content;animation:boltivTicker 60s linear infinite;padding:10px 0;will-change:transform}
 .boltiv-announcement:hover .boltiv-announcement-track{animation-play-state:paused}
-.boltiv-announcement-mark{display:inline-flex;align-items:center;gap:7px;padding:0 18px;color:#a17b13;font-size:10px;font-weight:900;letter-spacing:.1em;white-space:nowrap}
+.boltiv-announcement-mark{display:inline-flex;align-items:center;gap:7px;padding:0 18px;color:var(--t-fg-a17b13);font-size:10px;font-weight:900;letter-spacing:.1em;white-space:nowrap}
 .boltiv-announcement-dot{width:6px;height:6px;border-radius:50%;background:#d4af37;box-shadow:0 0 0 4px rgba(212,175,55,.12)}
-.boltiv-announcement-copy{padding-right:34px;color:#4e493f;font-size:11px;font-weight:700;white-space:nowrap}
+.boltiv-announcement-copy{padding-right:34px;color:var(--t-fg-4e493f);font-size:11px;font-weight:700;white-space:nowrap}
 @keyframes boltivTicker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){.boltiv-announcement-track{animation:none;min-width:100%}.boltiv-announcement-copy:nth-of-type(n+3){display:none}}
 </style>
@@ -94,14 +94,14 @@ body.modal-open{overflow:hidden!important}
 .home-balance-card{background:linear-gradient(145deg,#e4c34a 0%,#c9a227 48%,#b88b12 100%)!important;border:1px solid rgba(157,115,5,.42)!important;border-radius:24px!important;box-shadow:0 18px 42px rgba(158,122,18,.22),inset 0 1px 0 rgba(255,255,255,.32)!important;color:#171717!important;position:relative;overflow:hidden}
 .home-balance-card:before{content:"";position:absolute;inset:-45% 35% 35% -20%;background:radial-gradient(circle,rgba(255,255,255,.26),transparent 58%);pointer-events:none}
 .home-balance-card>*{position:relative;z-index:1}
-.home-balance-card .balance-label{color:rgba(32,27,13,.72)!important}
-.home-balance-card .balance-value{color:#171717!important;text-shadow:0 1px 0 rgba(255,255,255,.2)}
+.home-balance-card .balance-label{color:var(--t-fg-rgba-32-27-13-0p72)!important}
+.home-balance-card .balance-value{color:var(--t-fg-171717)!important;text-shadow:0 1px 0 rgba(255,255,255,.2)}
 .home-balance-card .balance-visibility-toggle{background:rgba(255,255,255,.18)!important;border-color:rgba(40,30,5,.18)!important;color:#171717!important}
 .home-balance-card .balance-mark{background:rgba(255,255,255,.18)!important;border-color:rgba(255,255,255,.28)!important;color:#fff!important;box-shadow:0 12px 24px rgba(90,65,0,.16)!important}
-.home-balance-card .btn-primary{background:#171717!important;color:#fff!important;border-color:#171717!important;box-shadow:0 8px 18px rgba(0,0,0,.13)}
-.home-balance-card .btn-light{background:rgba(255,255,255,.94)!important;color:#28251d!important;border-color:rgba(255,255,255,.7)!important}
+.home-balance-card .btn-primary{background:var(--t-bg-171717)!important;color:#fff!important;border-color:#171717!important;box-shadow:0 8px 18px rgba(0,0,0,.13)}
+.home-balance-card .btn-light{background:var(--t-bg-rgba-255-255-255-0p94)!important;color:var(--t-fg-28251d)!important;border-color:var(--t-bd-rgba-255-255-255-0p7)!important}
 .home-service-card{border-radius:20px!important;box-shadow:0 8px 24px rgba(25,25,20,.045)!important}
-.home-service-card .service-icon{background:#fbf4d9!important;border-color:#e4ce7a!important;color:#b48a12!important;box-shadow:0 4px 10px rgba(178,137,17,.08)}
+.home-service-card .service-icon{background:var(--t-bg-fbf4d9)!important;border-color:#e4ce7a!important;color:var(--t-fg-b48a12)!important;box-shadow:0 4px 10px rgba(178,137,17,.08)}
 .service-icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .bottom-nav .nav-icon{display:grid;place-items:center;width:21px;height:21px;font-size:0}
 .bottom-nav .nav-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.bottom-nav .nav-icon.nav-icon-text{font-size:18px!important;font-weight:900}
@@ -124,7 +124,7 @@ body.modal-open{overflow:hidden!important}
 <div class="container">
 <header class="header home-header">
 <a aria-label="BOLTIV dashboard" class="home-brand" href="/dashboard"><img alt="BOLTIV" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></a>
-<div class="home-header-actions">
+<div class="home-header-actions"> <button aria-label="Switch to dark mode" class="icon-button theme-toggle" data-theme-toggle="" type="button"><svg class="tt-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"></path></svg><svg class="tt-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"></path></svg></button> 
 <button aria-label="Notifications" class="icon-button notification-button" onclick="location.href='/notifications'">
 <svg aria-hidden="true" class="notification-icon" viewbox="0 0 24 24">
 <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
@@ -439,10 +439,10 @@ setInterval(loadHome,30000);
   setOpen(false);
 })();
 </script>
-<script src="boltiv-bonus.js?v=3"></script>
-<script src="boltiv-share.js?v=3"></script>
-<script src="boltiv-referral.js?v=2"></script>
-<script src="/boltiv-install.js?v=53"></script>
-<script src="boltiv-footer.js?v=2"></script>
+<script src="boltiv-bonus.js?v=20261004-dark"></script>
+<script src="boltiv-share.js?v=20261004-dark"></script>
+<script src="boltiv-referral.js?v=20261004-dark"></script>
+<script src="/boltiv-install.js?v=20261004-dark"></script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
 </body>
 </html>

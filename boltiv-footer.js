@@ -14,18 +14,18 @@ and every page picks up the change automatically.
   if (document.getElementById(FOOTER_ID)) return; // idempotent: never inject twice
 
   var CSS =
-    ".boltiv-global-footer{background:#fffdf6;color:#6b6a63;margin-top:44px;padding:28px 20px 24px;border-top:1px solid #ead58a;font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}" +
+    ".boltiv-global-footer{background:var(--t-bg-fffdf6);color:var(--t-fg-6b6a63);margin-top:44px;padding:28px 20px 24px;border-top:1px solid var(--t-bd-ead58a);font-family:Arial,Helvetica,sans-serif;box-sizing:border-box}" +
     ".boltiv-global-footer *{box-sizing:border-box}" +
     ".boltiv-global-footer-inner{max-width:960px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}" +
     ".boltiv-global-footer-brand{display:flex;align-items:center;gap:8px}" +
     ".boltiv-global-footer-brand img{width:20px;height:22px;object-fit:contain;display:block}" +
-    ".boltiv-global-footer-brand span{font-size:13px;font-weight:1000;letter-spacing:.16em;color:#b8860b}" +
+    ".boltiv-global-footer-brand span{font-size:13px;font-weight:1000;letter-spacing:.16em;color:var(--t-fg-b8860b)}" +
     ".boltiv-global-footer-links{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin:2px 0}" +
-    ".boltiv-global-footer-links a{color:#8a8a83;font-size:10.5px;font-weight:700;text-decoration:none}" +
-    ".boltiv-global-footer-links a:hover{color:#b8860b}" +
+    ".boltiv-global-footer-links a{color:var(--t-fg-8a8a83);font-size:10.5px;font-weight:700;text-decoration:none}" +
+    ".boltiv-global-footer-links a:hover{color:var(--t-fg-b8860b)}" +
     ".boltiv-global-footer-divider{width:34px;height:1px;background:#ead58a;margin:2px 0}" +
-    ".boltiv-global-footer-legal p{margin:3px 0;font-size:11px;line-height:1.65;color:#7a7970}" +
-    ".boltiv-global-footer-legal strong{color:#8a6d0a;font-weight:800}" +
+    ".boltiv-global-footer-legal p{margin:3px 0;font-size:11px;line-height:1.65;color:var(--t-fg-7a7970)}" +
+    ".boltiv-global-footer-legal strong{color:var(--t-fg-8a6d0a);font-weight:800}" +
     "@media(min-width:640px){.boltiv-global-footer{padding:32px 24px 28px}.boltiv-global-footer-legal p{font-size:11.5px}}";
 
   function injectStyle() {

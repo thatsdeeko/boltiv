@@ -51,17 +51,17 @@
     var soon=b.nextExpiry?('Soonest expiry: '+money(b.nextExpiry.amount)+' on '+dateText(b.nextExpiry.date)):'';
     var card=document.createElement('div');
     card.id='boltivBonusSwitch';
-    card.style.cssText='margin:14px 0;padding:14px 16px;border:1px solid #e8d9a8;border-radius:16px;background:#fffdf4;display:flex;align-items:center;gap:12px;';
+    card.style.cssText='margin:14px 0;padding:14px 16px;border:1px solid var(--t-bd-e8d9a8);border-radius:16px;background:var(--t-bg-fffdf4);display:flex;align-items:center;gap:12px;';
     card.innerHTML=
       '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:13px;font-weight:900;color:#171717">Use my Bonus Balance</div>'+
-        '<div style="font-size:11px;color:#777;margin-top:3px;line-height:1.5">'+money(b.balance)+' available'+(soon?' &middot; '+soon:'')+'</div>'+
-        '<div id="boltivBonusHint" style="font-size:11px;color:#8a6a07;margin-top:4px;line-height:1.5"></div>'+
+        '<div style="font-size:13px;font-weight:900;color:var(--t-fg-171717)">Use my Bonus Balance</div>'+
+        '<div style="font-size:11px;color:var(--t-fg-777777);margin-top:3px;line-height:1.5">'+money(b.balance)+' available'+(soon?' &middot; '+soon:'')+'</div>'+
+        '<div id="boltivBonusHint" style="font-size:11px;color:var(--t-fg-8a6a07);margin-top:4px;line-height:1.5"></div>'+
       '</div>'+
       '<label style="position:relative;display:inline-block;width:46px;height:26px;flex:none;cursor:pointer">'+
         '<input id="boltivBonusToggle" type="checkbox" style="opacity:0;width:0;height:0;position:absolute">'+
-        '<span id="boltivBonusTrack" style="position:absolute;inset:0;border-radius:26px;background:#d9d9d2;transition:.2s"></span>'+
-        '<span id="boltivBonusKnob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>'+
+        '<span id="boltivBonusTrack" style="position:absolute;inset:0;border-radius:26px;background:var(--t-bg-d9d9d2);transition:.2s"></span>'+
+        '<span id="boltivBonusKnob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--t-bg-ffffff);transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>'+
       '</label>';
     button.parentNode.insertBefore(card,button);
     var toggle=document.getElementById('boltivBonusToggle');
@@ -70,7 +70,7 @@
     var hint=document.getElementById('boltivBonusHint');
     function paint(){
       useBonus=toggle.checked;
-      track.style.background=toggle.checked?'#b8860b':'#d9d9d2';
+      track.style.background=toggle.checked?'#b8860b':'var(--t-bg-d9d9d2)';
       knob.style.left=toggle.checked?'23px':'3px';
       hint.textContent=toggle.checked
         ?'Your bonus is used first (it can cover all or part of this purchase). Your wallet pays the rest.'
@@ -134,7 +134,7 @@
       busy=true;
       var row=document.createElement('div');
       row.className='modal-detail boltiv-cashback-line';
-      row.innerHTML='<span>Cashback</span><strong style="color:#8a6a07">+'+money(cb)+'</strong>';
+      row.innerHTML='<span>Cashback</span><strong style="color:var(--t-fg-8a6a07)">+'+money(cb)+'</strong>';
       priceRow.parentNode.insertBefore(row,priceRow.nextSibling);
       busy=false;
     }

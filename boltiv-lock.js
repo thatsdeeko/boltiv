@@ -67,27 +67,27 @@
     el.id="boltivLockOverlay";
     el.innerHTML=`
       <style>
-        #boltivLockOverlay{position:fixed;inset:0;z-index:2147483647;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:48px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:#171717;overflow-y:auto;text-align:center}
+        #boltivLockOverlay{position:fixed;inset:0;z-index:2147483647;background:var(--t-bg-ffffff);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:48px 24px 40px;font-family:Arial,Helvetica,sans-serif;color:var(--t-fg-171717);overflow-y:auto;text-align:center}
         #boltivLockOverlay *{box-sizing:border-box}
-        .boltiv-lock-avatar{width:72px;height:72px;border-radius:50%;background:#fff9e6;border:1px solid #ead58a;display:flex;align-items:center;justify-content:center;align-self:center;margin:0 auto}
+        .boltiv-lock-avatar{width:72px;height:72px;border-radius:50%;background:var(--t-bg-fff9e6);border:1px solid var(--t-bd-ead58a);display:flex;align-items:center;justify-content:center;align-self:center;margin:0 auto}
         .boltiv-lock-avatar img{width:34px;height:39px;object-fit:contain;display:block}
         .boltiv-lock-title{width:100%;margin-top:26px;font-size:26px;font-weight:1000;text-align:center}
         .boltiv-lock-title .gold{color:#D4AF37}
-        .boltiv-lock-title .name{color:#171717}
-        .boltiv-lock-sub{width:100%;margin-top:6px;font-size:13px;color:#777;text-align:center}
+        .boltiv-lock-title .name{color:var(--t-fg-171717)}
+        .boltiv-lock-sub{width:100%;margin-top:6px;font-size:13px;color:var(--t-fg-777777);text-align:center}
         .boltiv-lock-boxes{display:flex;gap:14px;margin-top:28px;width:100%;justify-content:center}
-        .boltiv-lock-box{width:54px;height:54px;border:1.5px solid #e5e5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000}
+        .boltiv-lock-box{width:54px;height:54px;border:1.5px solid var(--t-bd-e5e5e1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000}
         .boltiv-lock-box.filled{border-color:#D4AF37}
-        .boltiv-lock-box.active{border-color:#171717}
+        .boltiv-lock-box.active{border-color:var(--t-bd-171717)}
         .boltiv-lock-box span{width:10px;height:10px;border-radius:50%;background:#D4AF37;display:none}
         .boltiv-lock-box.filled span{display:block}
-        .boltiv-lock-error{width:100%;margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:#b42318;text-align:center;max-width:320px;align-self:center}
+        .boltiv-lock-error{width:100%;margin-top:16px;min-height:16px;font-size:11px;font-weight:800;color:var(--t-fg-b42318);text-align:center;max-width:320px;align-self:center}
         .boltiv-lock-keypad{margin-top:auto;padding-top:40px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;max-width:320px}
-        .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:#171717;border-radius:50%;display:flex;align-items:center;justify-content:center}
-        .boltiv-lock-key:active{background:#fdf6e0}
-        .boltiv-lock-key.boltiv-lock-bio{color:#b8860b;font-size:19px}
-        .boltiv-lock-key.boltiv-lock-back{color:#c0392b;font-size:19px}
-        .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:#b8860b;font-size:13px;font-weight:700;text-decoration:underline;padding:10px;align-self:center}
+        .boltiv-lock-key{height:64px;border:0;background:transparent;font-size:24px;font-weight:800;color:var(--t-fg-171717);border-radius:50%;display:flex;align-items:center;justify-content:center}
+        .boltiv-lock-key:active{background:var(--t-bg-fdf6e0)}
+        .boltiv-lock-key.boltiv-lock-bio{color:var(--t-fg-b8860b);font-size:19px}
+        .boltiv-lock-key.boltiv-lock-back{color:var(--t-fg-c0392b);font-size:19px}
+        .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:var(--t-fg-b8860b);font-size:13px;font-weight:700;text-decoration:underline;padding:10px;align-self:center}
         @media(max-width:360px){.boltiv-lock-box{width:46px;height:46px}.boltiv-lock-key{height:56px}}
       </style>
       <div class="boltiv-lock-avatar"><img src="/assets/boltiv-logo.webp" alt="BOLTIV"/></div>

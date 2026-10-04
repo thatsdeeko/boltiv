@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
+<head><script src="/boltiv-theme.js?v=20261004-dark"></script><link href="/boltiv-theme.css?v=20261004-dark" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=20261004-dark"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <title>BOLTIV — Security</title>
-<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
+<link href="style.css?v=20261004-dark" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
@@ -14,8 +14,8 @@ boltivRequireAuth();
 *{box-sizing:border-box}
 
 body{
-background:#ffffff;
-color:#171717;
+background:var(--t-pg-ffffff);
+color:var(--t-fg-171717);
 }
 
 .security-page{
@@ -33,9 +33,9 @@ padding:18px 0 24px;
 .security-back{
 width:40px;
 height:40px;
-border:1px solid #e5e5e1;
+border:1px solid var(--t-bd-e5e5e1);
 border-radius:12px;
-background:#ffffff;
+background:var(--t-bg-ffffff);
 color:#D4AF37;
 font-size:22px;
 }
@@ -47,7 +47,7 @@ font-weight:1000;
 
 .security-subtitle{
 margin-top:4px;
-color:#666;
+color:var(--t-fg-666666);
 font-size:10px;
 }
 
@@ -56,8 +56,8 @@ padding:22px;
 border-radius:22px;
 background:
 radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 38%),
-linear-gradient(145deg,#fffdf4,#ffffff);
-border:1px solid #e5e5e1;
+linear-gradient(145deg,var(--t-bg-fffdf4),var(--t-bg-ffffff));
+border:1px solid var(--t-bd-e5e5e1);
 margin-bottom:20px;
 }
 
@@ -68,7 +68,7 @@ border-radius:15px;
 display:flex;
 align-items:center;
 justify-content:center;
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #403513;
 color:#D4AF37;
 font-size:22px;
@@ -82,7 +82,7 @@ font-weight:1000;
 
 .hero-text{
 margin-top:6px;
-color:#777;
+color:var(--t-fg-777777);
 font-size:10px;
 line-height:1.6;
 }
@@ -90,8 +90,8 @@ line-height:1.6;
 .security-card{
 padding:20px;
 border-radius:20px;
-background:#ffffff;
-border:1px solid #e5e5e1;
+background:var(--t-bg-ffffff);
+border:1px solid var(--t-bd-e5e5e1);
 }
 
 .security-status{
@@ -100,8 +100,8 @@ align-items:center;
 justify-content:space-between;
 padding:15px;
 border-radius:15px;
-background:#fafaf8;
-border:1px solid #e5e5e1;
+background:var(--t-bg-fafaf8);
+border:1px solid var(--t-bd-e5e5e1);
 margin-bottom:20px;
 }
 
@@ -131,7 +131,7 @@ font-weight:1000;
 
 .status-text{
 margin-top:3px;
-color:#666;
+color:var(--t-fg-666666);
 font-size:7.7px;
 }
 
@@ -145,12 +145,12 @@ color:#70d47b;
 }
 
 .status-off{
-color:#777;
+color:var(--t-fg-777777);
 }
 
 .security-label{
 display:block;
-color:#777;
+color:var(--t-fg-777777);
 font-size:10px;
 font-weight:900;
 letter-spacing:.6px;
@@ -161,10 +161,10 @@ margin-bottom:8px;
 width:100%;
 height:48px;
 padding:0 50px 0 14px;
-border:1px solid #e5e5e1;
+border:1px solid var(--t-bd-e5e5e1);
 border-radius:12px;
-background:#ffffff;
-color:#171717;
+background:var(--t-bg-ffffff);
+color:var(--t-fg-171717);
 outline:0;
 font-size:14.3px;
 font-weight:800;
@@ -187,7 +187,7 @@ right:12px;
 top:14px;
 border:0;
 background:transparent;
-color:#777;
+color:var(--t-fg-777777);
 font-size:10px;
 font-weight:900;
 }
@@ -213,8 +213,8 @@ transform:scale(.98);
 }
 
 .security-button:disabled{
-background:#333;
-color:#777;
+background:var(--t-bg-333333);
+color:var(--t-fd-777777);
 }
 
 .message{
@@ -232,7 +232,7 @@ display:block;
 }
 
 .message.error{
-background:#fff0f0;
+background:var(--t-bg-fff0f0);
 color:#e07878;
 border:1px solid #b94c4c;
 }
@@ -247,7 +247,7 @@ border:1px solid #56b866;
 margin-top:15px;
 padding:12px;
 border-radius:12px;
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #332b16;
 color:#a88b39;
 font-size:7.7px;
@@ -270,8 +270,8 @@ height:68px;
 display:flex;
 justify-content:center;
 padding:8px 12px;
-background:rgba(255,255,255,.97);
-border-top:1px solid #222;
+background:var(--t-bg-rgba-255-255-255-0p97);
+border-top:1px solid var(--t-bd-222222);
 }
 
 .nav-item{
@@ -279,7 +279,7 @@ width:25%;
 max-width:110px;
 border:0;
 background:transparent;
-color:#555;
+color:var(--t-fg-555555);
 font-size:7.7px;
 font-weight:900;
 }
@@ -321,7 +321,7 @@ width:100%;
 max-width:370px;
 padding:25px 20px;
 border-radius:24px;
-background:linear-gradient(145deg,#fffdf4,#ffffff);
+background:linear-gradient(145deg,var(--t-bg-fffdf4),var(--t-bg-ffffff));
 border:1px solid #D4AF37;
 text-align:center;
 transform:translateY(20px) scale(.96);
@@ -340,7 +340,7 @@ border-radius:50%;
 display:flex;
 align-items:center;
 justify-content:center;
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #D4AF37;
 color:#D4AF37;
 font-size:23.1px;
@@ -353,7 +353,7 @@ font-weight:1000;
 
 .pin-modal-text{
 margin-top:7px;
-color:#777;
+color:var(--t-fg-777777);
 font-size:10px;
 line-height:1.6;
 }
@@ -373,9 +373,9 @@ font-weight:1000;
 }
 
 .modal-cancel{
-border:1px solid #e5e5e1;
-background:#ffffff;
-color:#777;
+border:1px solid var(--t-bd-e5e5e1);
+background:var(--t-bg-ffffff);
+color:var(--t-fg-777777);
 }
 
 .modal-confirm{
@@ -493,7 +493,7 @@ SHOW
 <button class="security-button" id="changePinBtn" type="button">
 CHANGE TRANSACTION PIN
 </button>
-<div style="text-align:center;margin-top:12px"><a href="/transaction-pin-reset.html" style="color:#b8860b;font-size:11px;font-weight:900;text-decoration:none">Forgot Transaction PIN?</a></div>
+<div style="text-align:center;margin-top:12px"><a href="/transaction-pin-reset.html" style="color:var(--t-fg-b8860b);font-size:11px;font-weight:900;text-decoration:none">Forgot Transaction PIN?</a></div>
 </div>
 <!-- MESSAGE -->
 <div aria-live="polite" class="message" id="message" role="status">
@@ -1032,8 +1032,8 @@ if(biometricEnrollAnotherBtn)biometricEnrollAnotherBtn.onclick=enrollBiometric;
 loadBiometricState();
 
 </script>
-<script src="/boltiv-install.js?v=53"></script>
-<script src="boltiv-footer.js?v=2"></script>
+<script src="/boltiv-install.js?v=20261004-dark"></script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
 </body>
 </html>
 <!-- BOLTIV SECURITY -->

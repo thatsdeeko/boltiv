@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><script src="/boltiv-api-config.js?v=1"></script><base href="/">
+<head><script src="/boltiv-theme.js?v=20261004-dark"></script><link href="/boltiv-theme.css?v=20261004-dark" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/">
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#C9A227" name="theme-color"/>
@@ -24,7 +24,7 @@
 <meta content="BOLTIV is a digital services and payments platform in Nigeria for airtime, data, electricity bills and cable TV. Fast, convenient and secure everyday payments in one account." name="twitter:description"/>
 <meta content="https://boltiv.ng/assets/boltiv-social.webp" name="twitter:image"/>
 <meta content="BOLTIV — Digital Services &amp; Payments in Nigeria" name="twitter:image:alt"/>
-<link href="style.css?v=20260821-homeplus" rel="stylesheet"/>
+<link href="style.css?v=20261004-dark" rel="stylesheet"/>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Organization","name":"BOLTIV","alternateName":"BOLTIV Nigeria","url":"https://boltiv.ng/","logo":"https://boltiv.ng/assets/boltiv-logo.webp","description":"BOLTIV is a Nigerian digital services and payments platform for airtime, data, electricity bills and cable TV."}
 </script>
@@ -36,7 +36,7 @@
 body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .seo-page{min-height:100vh}
 .seo-wrap{width:min(1080px,92%);margin:auto}
-.seo-nav{padding:24px 0 18px;text-align:center;border-bottom:1px solid rgba(234,223,185,.7)}
+.seo-nav{padding:24px 0 18px;text-align:center;border-bottom:1px solid var(--t-bd-rgba-234-223-185-0p7)}
 .seo-brand{display:inline-flex;flex-direction:column;align-items:center;gap:5px;text-decoration:none;color:var(--boltiv-text);font-weight:1000;letter-spacing:.12em;font-size:24px}
 .seo-brand img{width:82px;height:82px;object-fit:contain;display:block}
 .seo-brand span{display:block}
@@ -44,7 +44,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 .seo-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;padding:12px 18px;font-size:13px;font-weight:900;transition:transform .15s ease,box-shadow .15s ease}
 .seo-btn:hover{transform:translateY(-1px)}
 .seo-btn.primary{background:var(--boltiv-gold);color:#fff;box-shadow:0 8px 20px rgba(184,134,11,.16)}
-.seo-btn.secondary{border:1px solid #e3d39b;color:var(--boltiv-gold-dark);background:#fff}
+.seo-btn.secondary{border:1px solid var(--t-bd-e3d39b);color:var(--boltiv-gold-dark);background:var(--t-bg-ffffff)}
 .seo-hero{padding:64px 0 54px;display:grid;grid-template-columns:1.08fr .92fr;gap:50px;align-items:center}
 .seo-kicker{color:var(--boltiv-gold);font-size:12px;font-weight:1000;letter-spacing:.18em}
 .seo-hero h1{font-size:clamp(42px,7vw,72px);line-height:.98;margin:14px 0 18px;letter-spacing:-.04em}
@@ -54,31 +54,31 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 .seo-hero > div:first-child{text-align:center}
 .seo-hero > div:first-child .seo-hero p{margin-left:auto;margin-right:auto}
 .seo-hero-actions{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap;justify-content:center}
-.seo-card{background:#fff;border:1px solid var(--boltiv-line);border-radius:28px;padding:34px;box-shadow:0 20px 60px rgba(80,60,10,.09)}
+.seo-card{background:var(--t-bg-ffffff);border:1px solid var(--boltiv-line);border-radius:28px;padding:34px;box-shadow:0 20px 60px rgba(80,60,10,.09)}
 .seo-logo{width:170px;height:170px;object-fit:contain;display:block;margin:0 auto 18px}
 .seo-card h2{text-align:center;margin:0 0 8px;font-size:25px}
-.seo-card p{text-align:center;color:#777;line-height:1.6;font-size:14px;margin:0}
+.seo-card p{text-align:center;color:var(--t-fg-777777);line-height:1.6;font-size:14px;margin:0}
 .seo-section{padding:34px 0 70px}
-.seo-section.alt{border-top:1px solid #eee7d4}
+.seo-section.alt{border-top:1px solid var(--t-bd-eee7d4)}
 .seo-section h2{text-align:center;font-size:32px;margin:0 0 10px;letter-spacing:-.02em}
 .seo-section-intro{text-align:center;color:var(--boltiv-muted);max-width:620px;margin:0 auto 28px;line-height:1.65}
 .seo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
-.seo-service,.seo-benefit,.seo-step{background:#fff;border:1px solid #ebe5d2;border-radius:20px;padding:24px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
-.seo-service .icon,.seo-benefit .icon{width:42px;height:42px;border-radius:13px;background:#fff9e8;border:1px solid #eadfb9;display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000;margin-bottom:16px}
+.seo-service,.seo-benefit,.seo-step{background:var(--t-bg-ffffff);border:1px solid var(--t-bd-ebe5d2);border-radius:20px;padding:24px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
+.seo-service .icon,.seo-benefit .icon{width:42px;height:42px;border-radius:13px;background:var(--t-bg-fff9e8);border:1px solid var(--t-bd-eadfb9);display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000;margin-bottom:16px}
 .seo-service strong,.seo-benefit strong{display:block;margin-bottom:8px;font-size:16px}
-.seo-service span,.seo-benefit span{color:#777;font-size:13px;line-height:1.6}
+.seo-service span,.seo-benefit span{color:var(--t-fg-777777);font-size:13px;line-height:1.6}
 .seo-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
 .seo-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
 .seo-step .number{font-size:13px;font-weight:1000;color:var(--boltiv-gold);letter-spacing:.1em;margin-bottom:16px}
 .seo-step strong{display:block;margin-bottom:8px}
-.seo-step span{color:#777;font-size:13px;line-height:1.6}
-.seo-trust{margin:12px 0 70px;background:#fff;border:1px solid var(--boltiv-line);border-radius:26px;padding:38px 28px;text-align:center}
+.seo-step span{color:var(--t-fg-777777);font-size:13px;line-height:1.6}
+.seo-trust{margin:12px 0 70px;background:var(--t-bg-ffffff);border:1px solid var(--boltiv-line);border-radius:26px;padding:38px 28px;text-align:center}
 .seo-trust h2{margin:0 0 12px;font-size:30px}
 .seo-trust p{max-width:720px;margin:0 auto;color:var(--boltiv-muted);line-height:1.7}
-.seo-final{background:#171717;color:#fff;border-radius:28px;padding:46px 28px;text-align:center;margin-bottom:70px}
+.seo-final{background:var(--t-bg-171717);color:#fff;border-radius:28px;padding:46px 28px;text-align:center;margin-bottom:70px}
 .seo-final h2{margin:0 0 12px;font-size:32px}
 .seo-final p{margin:0 auto 24px;color:#d8d8d8;max-width:600px;line-height:1.6}
-.seo-footer{border-top:1px solid #ebe5d2;padding:28px 0 40px;color:#777;font-size:12px;text-align:center}
+.seo-footer{border-top:1px solid var(--t-bd-ebe5d2);padding:28px 0 40px;color:var(--t-fg-777777);font-size:12px;text-align:center}
 .seo-footer a{color:var(--boltiv-gold-dark);margin:0 9px;text-decoration:none}
 @media(max-width:760px){
  .seo-wrap{width:min(94%,620px)}
@@ -95,19 +95,19 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 
 /* Enhanced homepage sections */
 .seo-mini-nav{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:14px}
-.seo-mini-nav a{font-size:12px;font-weight:800;color:#6b675f;text-decoration:none}
+.seo-mini-nav a{font-size:12px;font-weight:800;color:var(--t-fg-6b675f);text-decoration:none}
 .seo-mini-nav a:hover{color:var(--boltiv-gold-dark)}
 .seo-availability{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
-.seo-availability-card{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #ebe5d2;border-radius:18px;padding:18px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
-.seo-availability-card .availability-icon{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:#fff9e8;border:1px solid #eadfb9;display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000}
+.seo-availability-card{display:flex;align-items:center;gap:14px;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-ebe5d2);border-radius:18px;padding:18px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
+.seo-availability-card .availability-icon{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:var(--t-bg-fff9e8);border:1px solid var(--t-bd-eadfb9);display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000}
 .seo-availability-card strong{display:block;font-size:15px;margin-bottom:5px}
 .seo-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:900;letter-spacing:.05em}
-.seo-status.live{color:#25824f}
+.seo-status.live{color:var(--t-fg-25824f)}
 .seo-status.live::before{content:"";width:7px;height:7px;border-radius:50%;background:#35a66c}
 .seo-status.soon{color:#8b806b}
 .seo-status.soon::before{content:"";width:7px;height:7px;border-radius:50%;background:#c9a22b}
 .seo-wallet{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:stretch}
-.seo-wallet-copy{background:#171717;color:#fff;border-radius:28px;padding:38px}
+.seo-wallet-copy{background:var(--t-bg-171717);color:#fff;border-radius:28px;padding:38px}
 .seo-wallet-copy .seo-kicker{color:#d3aa27}
 .seo-wallet-copy h2{text-align:left;color:#fff;margin:12px 0;font-size:34px}
 .seo-wallet-copy p{color:#d3d3d3;line-height:1.7}
@@ -115,18 +115,18 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 .seo-wallet-point{border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:15px}
 .seo-wallet-point strong{display:block;font-size:14px;margin-bottom:5px}
 .seo-wallet-point span{font-size:12px;color:#bdbdbd;line-height:1.5}
-.seo-wallet-card{background:#fff;border:1px solid var(--boltiv-line);border-radius:28px;padding:28px;box-shadow:0 16px 45px rgba(80,60,10,.07);display:flex;flex-direction:column;justify-content:center}
-.seo-wallet-balance{border-radius:22px;background:#fffaf0;border:1px solid #eadfb9;padding:24px;margin-bottom:18px}
-.seo-wallet-balance small{display:block;color:#817864;font-weight:800;letter-spacing:.08em;margin-bottom:10px}
+.seo-wallet-card{background:var(--t-bg-ffffff);border:1px solid var(--boltiv-line);border-radius:28px;padding:28px;box-shadow:0 16px 45px rgba(80,60,10,.07);display:flex;flex-direction:column;justify-content:center}
+.seo-wallet-balance{border-radius:22px;background:var(--t-bg-fffaf0);border:1px solid var(--t-bd-eadfb9);padding:24px;margin-bottom:18px}
+.seo-wallet-balance small{display:block;color:var(--t-fg-817864);font-weight:800;letter-spacing:.08em;margin-bottom:10px}
 .seo-wallet-balance strong{display:block;font-size:38px;letter-spacing:-.03em}
-.seo-wallet-card p{color:#777;line-height:1.6;font-size:13px}
+.seo-wallet-card p{color:var(--t-fg-777777);line-height:1.6;font-size:13px}
 .seo-faq{max-width:800px;margin:28px auto 0;display:grid;gap:10px}
-.seo-faq details{background:#fff;border:1px solid #ebe5d2;border-radius:16px;padding:18px 20px}
+.seo-faq details{background:var(--t-bg-ffffff);border:1px solid var(--t-bd-ebe5d2);border-radius:16px;padding:18px 20px}
 .seo-faq summary{cursor:pointer;font-weight:900;list-style:none;display:flex;justify-content:space-between;gap:15px}
 .seo-faq summary::-webkit-details-marker{display:none}
 .seo-faq summary::after{content:"+";color:var(--boltiv-gold);font-size:20px;line-height:1}
 .seo-faq details[open] summary::after{content:"−"}
-.seo-faq p{color:#777;line-height:1.65;font-size:13px;margin:14px 0 0}
+.seo-faq p{color:var(--t-fg-777777);line-height:1.65;font-size:13px;margin:14px 0 0}
 .seo-mobile-cta{display:none}
 @media(max-width:760px){
  .seo-mini-nav{gap:12px}
@@ -135,7 +135,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
  .seo-wallet-copy{padding:28px 22px}
  .seo-wallet-copy h2{font-size:29px}
  .seo-wallet-points{grid-template-columns:1fr}
- .seo-mobile-cta{position:fixed;display:grid;grid-template-columns:1fr 1fr;gap:10px;left:12px;right:12px;bottom:12px;padding:10px;background:rgba(255,255,255,.96);border:1px solid #e7dfc9;border-radius:18px;box-shadow:0 12px 35px rgba(0,0,0,.14);z-index:9999;backdrop-filter:blur(10px)}
+ .seo-mobile-cta{position:fixed;display:grid;grid-template-columns:1fr 1fr;gap:10px;left:12px;right:12px;bottom:12px;padding:10px;background:var(--t-bg-rgba-255-255-255-0p96);border:1px solid var(--t-bd-e7dfc9);border-radius:18px;box-shadow:0 12px 35px rgba(0,0,0,.14);z-index:9999;backdrop-filter:blur(10px)}
  .seo-mobile-cta .seo-btn{padding:13px 10px}
  .seo-footer{padding-bottom:105px}
 }
@@ -300,14 +300,14 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <a class="seo-btn secondary" href="/login">Sign in</a>
 <a class="seo-btn primary" href="/register">Create account</a>
 </div>
-<script src="boltiv-referral.js?v=1"></script>
-<script src="/boltiv-install.js?v=53"></script>
+<script src="boltiv-referral.js?v=20261004-dark"></script>
+<script src="/boltiv-install.js?v=20261004-dark"></script>
 <script>
 // Fire-and-forget: nudge the backend awake as early as possible for anyone
 // landing here before they log in. See boltiv-client.js for the recurring
 // keep-warm ping used on the rest of the app once someone's signed in.
 fetch(window.BOLTIV_API_BASE+'/api/health',{cache:'no-store'}).catch(function(){});
 </script>
-<script src="boltiv-footer.js?v=2"></script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
 </body>
 </html>

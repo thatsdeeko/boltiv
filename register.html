@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script>
+<head><script src="/boltiv-theme.js?v=20261004-dark"></script><link href="/boltiv-theme.css?v=20261004-dark" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <title>BOLTIV — Create Account</title>
-<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
+<link href="style.css?v=20261004-dark" rel="stylesheet"/>
 <style>
 .auth-page{
     min-height:100vh;
@@ -24,7 +24,7 @@
 
 .auth-tagline{
     text-align:center;
-    color:#555;
+    color:var(--t-fg-555555);
     font-size:7.7px;
     letter-spacing:2px;
     margin-top:4px;
@@ -33,22 +33,22 @@
 .auth-card{
     margin-top:28px;
     padding:22px;
-    border:1px solid #e5e5e1;
+    border:1px solid var(--t-bd-e5e5e1);
     border-radius:22px;
-    background:#ffffff;
+    background:var(--t-bg-ffffff);
     box-shadow:0 20px 60px rgba(0,0,0,.4);
 }
 
 .auth-card h1{
     margin:0;
-    color:#171717;
+    color:var(--t-fg-171717);
     font-size:23.1px;
     font-weight:1000;
 }
 
 .auth-subtitle{
     margin:6px 0 22px;
-    color:#666;
+    color:var(--t-fg-666666);
     font-size:11px;
 }
 
@@ -62,7 +62,7 @@
     margin-top:5px;
 }
 
-.legal-consent{margin:14px 4px 16px;color:#85857f;font-size:9px;line-height:1.6;text-align:center}.legal-consent a{color:#9b760c;font-weight:900;text-decoration:none}.legal-consent a:hover{text-decoration:underline}
+.legal-consent{margin:14px 4px 16px;color:var(--t-fg-85857f);font-size:9px;line-height:1.6;text-align:center}.legal-consent a{color:var(--t-fg-9b760c);font-weight:900;text-decoration:none}.legal-consent a:hover{text-decoration:underline}
 .auth-links{
     display:flex;
     justify-content:center;
@@ -72,7 +72,7 @@
 }
 
 .auth-links a{
-    color:#777;
+    color:var(--t-fg-777777);
 }
 
 .auth-links a:first-child{
@@ -95,8 +95,8 @@
 
 .status-message.success{
     color:#D4AF37;
-    background:#fffdf4;
-    border:1px solid #ead99b;
+    background:var(--t-bg-fffdf4);
+    border:1px solid var(--t-bd-ead99b);
 }
 
 /* SUCCESS MODAL */
@@ -131,8 +131,8 @@
 
 body{
     margin:0;
-    background:#ffffff;
-    color:#171717;
+    background:var(--t-pg-ffffff);
+    color:var(--t-fg-171717);
 }
 
 .auth-page{
@@ -153,7 +153,7 @@ body{
 
 .auth-tagline{
     text-align:center;
-    color:#777;
+    color:var(--t-fg-777777);
     font-size:11px;
     font-weight:700;
     letter-spacing:2px;
@@ -163,22 +163,22 @@ body{
 .auth-card{
     margin-top:30px;
     padding:28px;
-    border:1px solid #e4e4e4;
+    border:1px solid var(--t-bd-e4e4e4);
     border-radius:20px;
-    background:#ffffff;
+    background:var(--t-bg-ffffff);
     box-shadow:0 12px 35px rgba(0,0,0,.07);
 }
 
 .auth-card h1{
     margin:0;
-    color:#171717;
+    color:var(--t-fg-171717);
     font-size:29.7px;
     font-weight:900;
 }
 
 .auth-subtitle{
     margin:8px 0 26px;
-    color:#707070;
+    color:var(--t-fg-707070);
     font-size:15.4px;
     line-height:1.5;
 }
@@ -190,7 +190,7 @@ body{
 .label{
     display:block;
     margin-bottom:8px;
-    color:#333333;
+    color:var(--t-fg-333333);
     font-size:13.2px;
     font-weight:800;
     letter-spacing:.8px;
@@ -201,11 +201,11 @@ body{
     height:52px;
     padding:0 15px;
 
-    border:1px solid #dcdcdc;
+    border:1px solid var(--t-bd-dcdcdc);
     border-radius:11px;
 
-    background:#ffffff;
-    color:#171717;
+    background:var(--t-bg-ffffff);
+    color:var(--t-fg-171717);
 
     font-size:16.5px;
 
@@ -217,7 +217,7 @@ body{
 }
 
 .input::placeholder{
-    color:#777;
+    color:var(--t-fg-777777);
 }
 
 .input:focus{
@@ -304,15 +304,15 @@ body{
 }
 
 .status-message.error{
-    color:#a32929;
-    background:#fff4f4;
-    border:1px solid #f0caca;
+    color:var(--t-fg-a32929);
+    background:var(--t-bg-fff4f4);
+    border:1px solid var(--t-bd-f0caca);
 }
 
 .status-message.success{
-    color:#80620c;
-    background:#fffaf0;
-    border:1px solid #ead9a5;
+    color:var(--t-fg-80620c);
+    background:var(--t-bg-fffaf0);
+    border:1px solid var(--t-bd-ead9a5);
 }
 
 
@@ -331,7 +331,7 @@ body{
 
     padding:20px;
 
-    background:rgba(255,255,255,.88);
+    background:var(--t-bg-rgba-255-255-255-0p88);
 
     backdrop-filter:blur(12px);
 
@@ -355,7 +355,7 @@ body{
     border:1px solid #D4AF37;
     border-radius:24px;
 
-    background:#ffffff;
+    background:var(--t-bg-ffffff);
 
     box-shadow:
         0 25px 70px
@@ -393,7 +393,7 @@ body{
 
     border:2px solid #D4AF37;
 
-    background:#fffaf0;
+    background:var(--t-bg-fffaf0);
 
     color:#C9A227;
 
@@ -417,7 +417,7 @@ body{
 
     margin:0;
 
-    color:#171717;
+    color:var(--t-fg-171717);
 
     font-size:26.4px;
 
@@ -430,7 +430,7 @@ body{
 
     max-width:300px;
 
-    color:#707070;
+    color:var(--t-fg-707070);
 
     font-size:14.3px;
 
@@ -443,11 +443,11 @@ body{
 
     padding:13px;
 
-    border:1px solid #e5e5e5;
+    border:1px solid var(--t-bd-e5e5e5);
 
     border-radius:12px;
 
-    background:#fafafa;
+    background:var(--t-bg-fafafa);
 
     color:#C9A227;
 
@@ -520,8 +520,8 @@ body{
     font-weight:700;
 }
 
-.pin-setup-status.error{color:#b42318}
-.pin-setup-status.success{color:#16794c}
+.pin-setup-status.error{color:var(--t-fg-b42318)}
+.pin-setup-status.success{color:var(--t-fg-16794c)}
 
 /* =========================
    MOBILE
@@ -576,17 +576,17 @@ body{
     min-width:52px;
     height:34px;
     padding:0 8px;
-    border:1px solid #e5d79d;
+    border:1px solid var(--t-bd-e5d79d);
     border-radius:8px;
-    background:#fffdf4;
-    color:#9b760c;
+    background:var(--t-bg-fffdf4);
+    color:var(--t-fg-9b760c);
     font-size:12px;
     font-weight:800;
     cursor:pointer;
     line-height:1;
 }
 .password-toggle:hover{
-    background:#f8f0d2;
+    background:var(--t-bg-f8f0d2);
 }
 .password-toggle:focus-visible{
     outline:3px solid #D4AF37;
@@ -633,7 +633,7 @@ Join BOLTIV and manage your digital services
 </div>
 </div>
 <div class="legal-consent" style="text-align:left">
-<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:#555">
+<label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;color:var(--t-fg-555555)">
 <input id="termsAgreement" type="checkbox" style="margin-top:3px;accent-color:#D4AF37">
 <span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>, including that BOLTIV wallet balances are non-transferable and redeemable only for supported BOLTIV services.</span>
 </label>
@@ -1023,8 +1023,8 @@ function setupPasswordToggle(toggleId,inputId){
 setupPasswordToggle("passwordToggle","passwordInput");
 setupPasswordToggle("confirmPasswordToggle","confirmPasswordInput");
 </script>
-<script src="boltiv-referral.js?v=1"></script>
-<script src="/boltiv-install.js?v=53"></script>
-<script src="boltiv-footer.js?v=2"></script>
+<script src="boltiv-referral.js?v=20261004-dark"></script>
+<script src="/boltiv-install.js?v=20261004-dark"></script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
 </body>
 </html>

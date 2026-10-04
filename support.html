@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 
 <html lang="en">
-<head><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=1"></script>
+<head><script src="/boltiv-theme.js?v=20261004-dark"></script><link href="/boltiv-theme.css?v=20261004-dark" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=20261004-dark"></script>
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#f7f7f5" name="theme-color"/>
 <title>BOLTIV — Support</title>
-<link href="style.css?v=20260821-servicecenter" rel="stylesheet"/>
+<link href="style.css?v=20261004-dark" rel="stylesheet"/>
 <script>
 boltivRequireAuth();
 </script>
@@ -28,9 +28,9 @@ padding:18px 0 24px;
 .support-back{
 width:40px;
 height:40px;
-border:1px solid #e5e5e1;
+border:1px solid var(--t-bd-e5e5e1);
 border-radius:12px;
-background:#ffffff;
+background:var(--t-bg-ffffff);
 color:#D4AF37;
 font-size:22px;
 }
@@ -38,12 +38,12 @@ font-size:22px;
 .support-title{
 font-size:20.9px;
 font-weight:1000;
-color:#171717;
+color:var(--t-fg-171717);
 }
 
 .support-subtitle{
 margin-top:4px;
-color:#666;
+color:var(--t-fg-666666);
 font-size:10px;
 letter-spacing:.5px;
 }
@@ -53,8 +53,8 @@ padding:22px;
 border-radius:22px;
 background:
 radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 38%),
-linear-gradient(145deg,#fffdf4,#ffffff);
-border:1px solid #e5e5e1;
+linear-gradient(145deg,var(--t-bg-fffdf4),var(--t-bg-ffffff));
+border:1px solid var(--t-bd-e5e5e1);
 margin-bottom:20px;
 }
 
@@ -65,7 +65,7 @@ border-radius:16px;
 display:flex;
 align-items:center;
 justify-content:center;
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #403513;
 color:#D4AF37;
 font-size:23.1px;
@@ -79,7 +79,7 @@ font-weight:1000;
 
 .hero-text{
 margin-top:6px;
-color:#777;
+color:var(--t-fg-777777);
 font-size:10px;
 line-height:1.7;
 }
@@ -93,10 +93,10 @@ gap:9px;
 .issue-card{
 padding:16px 13px;
 border-radius:16px;
-background:#ffffff;
-border:1px solid #e5e5e1;
+background:var(--t-bg-ffffff);
+border:1px solid var(--t-bd-e5e5e1);
 text-align:left;
-color:#171717;
+color:var(--t-fg-171717);
 transition:.2s ease;
 }
 
@@ -112,7 +112,7 @@ border-radius:11px;
 display:flex;
 align-items:center;
 justify-content:center;
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #403513;
 color:#D4AF37;
 font-size:15.4px;
@@ -126,7 +126,7 @@ font-weight:1000;
 
 .issue-text{
 margin-top:4px;
-color:#666;
+color:var(--t-fg-666666);
 font-size:7.7px;
 line-height:1.5;
 }
@@ -134,8 +134,8 @@ line-height:1.5;
 .form-card{
 padding:20px;
 border-radius:20px;
-background:#ffffff;
-border:1px solid #e5e5e1;
+background:var(--t-bg-ffffff);
+border:1px solid var(--t-bd-e5e5e1);
 }
 
 .form-group{
@@ -145,7 +145,7 @@ margin-bottom:16px;
 .form-label{
 display:block;
 margin-bottom:8px;
-color:#777;
+color:var(--t-fg-777777);
 font-size:10px;
 font-weight:900;
 letter-spacing:.6px;
@@ -154,10 +154,10 @@ letter-spacing:.6px;
 .form-select,
 .form-textarea{
 width:100%;
-border:1px solid #e5e5e1;
+border:1px solid var(--t-bd-e5e5e1);
 border-radius:12px;
-background:#ffffff;
-color:#171717;
+background:var(--t-bg-ffffff);
+color:var(--t-fg-171717);
 outline:none;
 font-family:inherit;
 font-size:11px;
@@ -198,23 +198,23 @@ transform:scale(.98);
 }
 
 
-.ticket-card{padding:13px;border:1px solid #e5e5e1;border-radius:13px;background:#fafaf8}
+.ticket-card{padding:13px;border:1px solid var(--t-bd-e5e5e1);border-radius:13px;background:var(--t-bg-fafaf8)}
 .ticket-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
 .ticket-subject{font-size:10px;font-weight:1000}
 .ticket-status{font-size:7px;font-weight:1000;color:#D4AF37;text-transform:uppercase}
-.ticket-meta{margin-top:5px;font-size:8px;color:#777}
-.ticket-thread{display:none;margin-top:10px;padding-top:10px;border-top:1px solid #e5e5e1}
+.ticket-meta{margin-top:5px;font-size:8px;color:var(--t-fg-777777)}
+.ticket-thread{display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--t-bd-e5e5e1)}
 .ticket-thread.show{display:block}
-.ticket-message{padding:9px;border-radius:10px;background:#fff;margin-bottom:7px;font-size:9px;line-height:1.5}
-.ticket-message.admin{background:#fff9e6;border:1px solid #ead99b}
-.ticket-reply{width:100%;margin-top:6px;box-sizing:border-box;border:1px solid #e5e5e1;border-radius:9px;padding:9px;font:inherit;font-size:9px}
+.ticket-message{padding:9px;border-radius:10px;background:var(--t-bg-ffffff);margin-bottom:7px;font-size:9px;line-height:1.5}
+.ticket-message.admin{background:var(--t-bg-fff9e6);border:1px solid var(--t-bd-ead99b)}
+.ticket-reply{width:100%;margin-top:6px;box-sizing:border-box;border:1px solid var(--t-bd-e5e5e1);border-radius:9px;padding:9px;font:inherit;font-size:9px}
 .ticket-send{margin-top:6px;border:0;border-radius:9px;padding:9px 11px;background:#D4AF37;color:#fff;font-size:8px;font-weight:1000}
 .contact-card{
 margin-top:20px;
 padding:22px;
 border-radius:20px;
-background:#ffffff;
-border:1px solid #e5e5e1;
+background:var(--t-bg-ffffff);
+border:1px solid var(--t-bd-e5e5e1);
 text-align:center;
 }
 
@@ -226,7 +226,7 @@ border-radius:15px;
 display:flex;
 align-items:center;
 justify-content:center;
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #403513;
 color:#D4AF37;
 font-size:22px;
@@ -239,7 +239,7 @@ font-weight:1000;
 
 .contact-text{
 margin-top:6px;
-color:#666;
+color:var(--t-fg-666666);
 font-size:10px;
 line-height:1.6;
 }
@@ -264,13 +264,13 @@ font-weight:1000;
 }
 
 .whatsapp-button{
-background:#151b16;
+background:var(--t-bg-151b16);
 border:1px solid #28452d;
 color:#70d47b;
 }
 
 .email-button{
-background:#fffdf4;
+background:var(--t-bg-fffdf4);
 border:1px solid #403513;
 color:#D4AF37;
 }
@@ -290,7 +290,7 @@ display:block;
 }
 
 .message-error{
-background:#fff0f0;
+background:var(--t-bg-fff0f0);
 border:1px solid #b94c4c;
 color:#e07878;
 }
@@ -305,8 +305,8 @@ height:68px;
 display:flex;
 justify-content:center;
 padding:8px 12px;
-background:rgba(255,255,255,.97);
-border-top:1px solid #222;
+background:var(--t-bg-rgba-255-255-255-0p97);
+border-top:1px solid var(--t-bd-222222);
 }
 
 .nav-item{
@@ -314,7 +314,7 @@ width:25%;
 max-width:110px;
 border:0;
 background:transparent;
-color:#555;
+color:var(--t-fg-555555);
 font-size:7.7px;
 font-weight:900;
 }
@@ -424,7 +424,7 @@ SEND SUPPORT REQUEST
 </div>
 </div>
 <!-- DIRECT CONTACT -->
-<section class="form-card" style="margin-top:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div><div style="font-size:14px;font-weight:1000">My Support Tickets</div><div style="font-size:9px;color:#777;margin-top:4px">Track replies and continue open conversations.</div></div><button id="refreshTickets" style="border:1px solid #ead99b;background:#fff9e6;color:#D4AF37;border-radius:9px;padding:8px 10px;font-size:9px;font-weight:900" type="button">REFRESH</button></div><div id="ticketList" style="display:grid;gap:9px"><div style="font-size:10px;color:#777">Loading tickets...</div></div></section>
+<section class="form-card" style="margin-top:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div><div style="font-size:14px;font-weight:1000">My Support Tickets</div><div style="font-size:9px;color:var(--t-fg-777777);margin-top:4px">Track replies and continue open conversations.</div></div><button id="refreshTickets" style="border:1px solid var(--t-bd-ead99b);background:var(--t-bg-fff9e6);color:#D4AF37;border-radius:9px;padding:8px 10px;font-size:9px;font-weight:900" type="button">REFRESH</button></div><div id="ticketList" style="display:grid;gap:9px"><div style="font-size:10px;color:var(--t-fg-777777)">Loading tickets...</div></div></section>
 <div class="contact-card">
 <div class="contact-icon">◉</div>
 <div class="contact-title">
@@ -513,7 +513,7 @@ card.onclick=()=>{
 subject.value=card.dataset.issue;
 
 document.querySelectorAll(".issue-card").forEach(item=>{
-item.style.borderColor="#e5e5e1";
+item.style.borderColor="var(--t-bd-e5e5e1)";
 });
 
 card.style.borderColor="#D4AF37";
@@ -600,13 +600,13 @@ async function loadTickets(){
 try{
 const r=await fetch(API+"/api/support/tickets",{headers:auth()}),d=await r.json();
 if(!r.ok||!d.success)throw new Error();
-if(!d.tickets.length){ticketList.innerHTML='<div style="font-size:10px;color:#777">No support tickets yet.</div>';return}
-ticketList.innerHTML=d.tickets.map(t=>`<article class="ticket-card"><div class="ticket-head"><div class="ticket-subject">#${Number(t.id)} · ${esc(t.subject)}</div><div class="ticket-status">${esc(t.status)}</div></div><div class="ticket-meta">Updated ${new Date(t.updated_at||t.created_at).toLocaleString("en-NG")}</div><button type="button" onclick="toggleTicket(${Number(t.id)},this)" style="margin-top:9px;border:1px solid #e5e5e1;background:#fff;border-radius:9px;padding:8px 10px;font-size:8px;font-weight:900">VIEW CONVERSATION</button><div id="thread-${Number(t.id)}" class="ticket-thread"></div></article>`).join("");
-}catch(e){ticketList.innerHTML='<div style="font-size:10px;color:#c55">Unable to load support tickets.</div>'}
+if(!d.tickets.length){ticketList.innerHTML='<div style="font-size:10px;color:var(--t-fg-777777)">No support tickets yet.</div>';return}
+ticketList.innerHTML=d.tickets.map(t=>`<article class="ticket-card"><div class="ticket-head"><div class="ticket-subject">#${Number(t.id)} · ${esc(t.subject)}</div><div class="ticket-status">${esc(t.status)}</div></div><div class="ticket-meta">Updated ${new Date(t.updated_at||t.created_at).toLocaleString("en-NG")}</div><button type="button" onclick="toggleTicket(${Number(t.id)},this)" style="margin-top:9px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);border-radius:9px;padding:8px 10px;font-size:8px;font-weight:900">VIEW CONVERSATION</button><div id="thread-${Number(t.id)}" class="ticket-thread"></div></article>`).join("");
+}catch(e){ticketList.innerHTML='<div style="font-size:10px;color:var(--t-fg-cc5555)">Unable to load support tickets.</div>'}
 }
 async function toggleTicket(id,button){
 const box=document.getElementById("thread-"+id);if(box.classList.contains("show")){box.classList.remove("show");button.textContent="VIEW CONVERSATION";return}
-try{const r=await fetch(API+"/api/support/ticket?id="+id,{headers:auth()}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to load ticket.");let html=d.messages.length?d.messages.map(m=>'<div class="ticket-message '+(m.sender_type==='admin'?'admin':'')+'"><strong>'+(m.sender_type==='admin'?'BOLTIV Support':'You')+'</strong><div style="margin-top:4px">'+esc(m.message)+'</div><div style="margin-top:4px;color:#999;font-size:7px">'+new Date(m.created_at).toLocaleString("en-NG")+'</div></div>').join(""):'<div class="ticket-message">No replies yet.</div>';if(d.ticket.status!=="closed")html+='<textarea id="reply-'+id+'" class="ticket-reply" placeholder="Reply to support..."></textarea><button type="button" class="ticket-send" onclick="replyTicket('+id+')">SEND REPLY</button>';else html+='<div style="font-size:8px;color:#777">This ticket is closed.</div>';box.innerHTML=html;box.classList.add("show");button.textContent="HIDE CONVERSATION"}catch(e){box.innerHTML='<div style="font-size:9px;color:#c55">Unable to load conversation.</div>';box.classList.add("show")}
+try{const r=await fetch(API+"/api/support/ticket?id="+id,{headers:auth()}),d=await r.json();if(!r.ok||!d.success)throw new Error(d.message||"Unable to load ticket.");let html=d.messages.length?d.messages.map(m=>'<div class="ticket-message '+(m.sender_type==='admin'?'admin':'')+'"><strong>'+(m.sender_type==='admin'?'BOLTIV Support':'You')+'</strong><div style="margin-top:4px">'+esc(m.message)+'</div><div style="margin-top:4px;color:var(--t-fg-999999);font-size:7px">'+new Date(m.created_at).toLocaleString("en-NG")+'</div></div>').join(""):'<div class="ticket-message">No replies yet.</div>';if(d.ticket.status!=="closed")html+='<textarea id="reply-'+id+'" class="ticket-reply" placeholder="Reply to support..."></textarea><button type="button" class="ticket-send" onclick="replyTicket('+id+')">SEND REPLY</button>';else html+='<div style="font-size:8px;color:var(--t-fg-777777)">This ticket is closed.</div>';box.innerHTML=html;box.classList.add("show");button.textContent="HIDE CONVERSATION"}catch(e){box.innerHTML='<div style="font-size:9px;color:var(--t-fg-cc5555)">Unable to load conversation.</div>';box.classList.add("show")}
 }
 async function replyTicket(id){
 const input=document.getElementById("reply-"+id),message=input?.value.trim();if(!message)return;
@@ -627,8 +627,8 @@ location.href=item.dataset.page;
 });
 
 </script>
-<script src="/boltiv-install.js?v=53"></script>
-<script src="boltiv-footer.js?v=2"></script>
+<script src="/boltiv-install.js?v=20261004-dark"></script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
 </body>
 </html>
 <!-- END OF BOLTIV SUPPORT -->

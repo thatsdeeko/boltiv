@@ -247,7 +247,7 @@
     help.textContent='NEED HELP? CHAT ON WHATSAPP';
     help.target='_blank';
     help.rel='noopener noreferrer';
-    help.style.cssText='display:block;text-align:center;border:1px solid #e5e5e1;border-radius:13px;padding:12px;background:#fff;color:#171717;font-weight:900;font-size:11px;text-decoration:none;';
+    help.style.cssText='display:block;text-align:center;border:1px solid var(--t-bd-e5e5e1);border-radius:13px;padding:12px;background:var(--t-bg-ffffff);color:var(--t-fg-171717);font-weight:900;font-size:11px;text-decoration:none;';
     help.onclick=function(){help.href=helpLink(getRows(),getStatus());};
     help.href='https://wa.me/'+SUPPORT_NUMBER;
     wrap.appendChild(share);

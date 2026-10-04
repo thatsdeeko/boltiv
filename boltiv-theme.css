@@ -129,3 +129,6 @@ html[data-theme="dark"][data-page="verify-email"] button:disabled{--t-bd-171717:
 .boltiv-seg button{border:0;background:transparent;color:var(--t-fg-777777,#777);font:inherit;font-size:9px;font-weight:900;letter-spacing:.3px;padding:6px 9px;border-radius:999px;cursor:pointer;min-width:38px}
 .boltiv-seg button.active{background:#D4AF37;color:#171717}
 .boltiv-seg button:focus-visible{outline:2px solid #D4AF37;outline-offset:1px}
+
+/* Dark mode uses a cleaned copy of the logo (the original has a white halo baked into its edge that shows on dark). Same size, so layout is unchanged. */
+@media screen{html[data-theme="dark"] img[src*="boltiv-logo.webp"]{content:url("/assets/boltiv-logo-dark.webp")}}

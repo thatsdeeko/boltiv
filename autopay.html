@@ -85,6 +85,10 @@ body.ap-open .bottom-nav{display:none}
 .ap-plan-cats{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 9px;scrollbar-width:none}.ap-plan-cats::-webkit-scrollbar{display:none}.ap-plan-cat{flex:none;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-777777);border-radius:999px;padding:8px 11px;font-family:inherit;font-size:9px;font-weight:1000;cursor:pointer}.ap-plan-cat.active{color:#D4AF37;border-color:#D4AF37;background:var(--t-bg-fffdf4)}
 .ap-plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}.ap-plan-button{min-width:0;box-sizing:border-box;overflow-wrap:break-word;word-break:break-word;text-align:left;padding:10px;border-radius:13px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-171717);font-family:inherit;cursor:pointer}.ap-plan-button.active{border-color:#D4AF37;background:var(--t-bg-fffdf4);box-shadow:0 0 0 1px rgba(212,175,55,.12)}.ap-plan-size{color:#D4AF37;font-size:11.5px;font-weight:1000;margin-bottom:4px;line-height:1.25;overflow-wrap:break-word;word-break:break-word}.ap-plan-validity{color:var(--t-fg-777777);font-size:8.5px;margin-bottom:6px;line-height:1.25}.ap-plan-price{color:var(--t-fg-171717);font-size:9.5px;font-weight:1000}.ap-plan-loading{grid-column:1/-1;padding:18px;border-radius:15px;border:1px dashed var(--t-bd-d9d9d4);color:var(--t-fg-777777);text-align:center;font-size:10px;line-height:1.5;background:var(--t-bg-fafaf8)}
 @media(max-width:420px){.ap-plan-grid{grid-template-columns:repeat(2,1fr)}.ap-plan-button{padding:10px 9px}.ap-plan-size{font-size:11px}}
+<style>
+/* AutoPay maximum-payment + confirmation UI: page-scoped only. */
+.ap-max-wrap{position:relative}.ap-max-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#D4AF37;font-size:13px;font-weight:1000;pointer-events:none}.ap-max-input{padding-left:31px}.ap-max-hint{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.ap-max-hint span:last-child{white-space:nowrap;color:var(--t-fg-777777)}
+.ap-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:2600;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}.ap-confirm-overlay.show{display:flex}.ap-confirm{width:100%;max-width:520px;max-height:90vh;overflow-y:auto;background:#171717;border:1px solid #3a3a3a;border-radius:24px;padding:28px 22px 22px;box-sizing:border-box;box-shadow:0 22px 70px rgba(0,0,0,.4);color:#f5f5f5}.ap-confirm-icon{width:64px;height:64px;border-radius:50%;border:2px solid #D4AF37;color:#D4AF37;display:grid;place-items:center;margin:0 auto 18px;font-size:34px;font-weight:1000}.ap-confirm-kicker{text-align:center;color:#D4AF37;font-size:10px;font-weight:1000;letter-spacing:1.4px}.ap-confirm-title{text-align:center;color:#f5f5f5;font-size:23px;font-weight:1000;margin-top:6px}.ap-confirm-copy{text-align:center;color:#aaa;font-size:11px;line-height:1.55;margin:7px 0 18px}.ap-confirm-card{border:1px solid #3a3a3a;background:#202024;border-radius:17px;padding:8px 14px}.ap-confirm-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #3a3a3a;font-size:11px}.ap-confirm-row:last-child{border-bottom:0}.ap-confirm-row span{color:#aaa}.ap-confirm-row b{text-align:right;color:#f5f5f5;font-weight:1000;max-width:64%;word-break:break-word}.ap-confirm-limit{margin-top:13px;padding:12px 13px;border-radius:13px;background:rgba(212,175,55,.09);border:1px solid rgba(212,175,55,.28);color:#D4AF37;font-size:10.5px;font-weight:800;line-height:1.5}.ap-confirm-limit b{font-weight:1000}.ap-confirm-wallet{color:#f5f5f5;font-size:10.5px;font-weight:800;line-height:1.5;margin:12px 2px 0}.ap-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.ap-confirm-btn{min-height:52px;border-radius:14px;border:1px solid #3a3a3a;background:#202024;color:#f5f5f5;font-family:inherit;font-size:11px;font-weight:1000;cursor:pointer}.ap-confirm-btn.primary{border-color:#D4AF37;background:#D4AF37;color:#171717}.ap-confirm-btn:disabled{opacity:.5;cursor:not-allowed}@media(max-width:420px){.ap-confirm{padding:24px 16px 18px;border-radius:22px}.ap-confirm-title{font-size:21px}.ap-confirm-actions{grid-template-columns:1fr}.ap-confirm-btn.primary{order:-1}}
 </style><link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
 <style>:focus-visible{outline:3px solid #D4AF37;outline-offset:3px}</style><link rel="manifest" href="/manifest.webmanifest">
 </head><body><div class="page ap-page"><div class="container">
@@ -142,11 +146,30 @@ body.ap-open .bottom-nav{display:none}
 <div class="ap-grid ap-g2" id="apFreq"><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
 <div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
 <div id="apDom" style="display:none"><label class="ap-label" for="apDomSel">DAY OF THE MONTH</label><select class="ap-input" id="apDomSel"></select><div class="ap-hint">In months with fewer days, it runs on the last day of the month.</div></div>
+<label class="ap-label" for="apMaxAmount">MAXIMUM PAYMENT</label>
+<div class="ap-max-wrap"><span class="ap-max-prefix">₦</span><input class="ap-input ap-max-input" id="apMaxAmount" inputmode="decimal" placeholder="Maximum amount"/></div>
+<div class="ap-hint ap-max-hint"><span>The most BOLTIV can charge for each scheduled purchase.</span><span>Up to ₦1,000,000</span></div>
 <div class="ap-sum" id="apSummary">Fill in the details above.</div>
 <div class="ap-err" id="apErr"></div>
 <button class="ap-primary" id="apCreate" style="margin-top:14px" disabled>CREATE AUTOPAY</button>
 <div class="ap-hint" style="text-align:center;margin-top:10px">You'll enter your Transaction PIN once. Runs skip automatically if your wallet balance is too low.</div>
 </div></div>
+
+<div class="ap-confirm-overlay" id="apConfirmOverlay">
+  <div class="ap-confirm" role="dialog" aria-modal="true" aria-labelledby="apConfirmTitle">
+    <div class="ap-confirm-icon">?</div>
+    <div class="ap-confirm-kicker">CONFIRM AUTOPAY</div>
+    <div class="ap-confirm-title" id="apConfirmTitle">Set Up This AutoPay</div>
+    <div class="ap-confirm-copy">Please confirm the recurring payment you want to set up.</div>
+    <div class="ap-confirm-card" id="apConfirmCard"></div>
+    <div class="ap-confirm-limit" id="apConfirmLimit"></div>
+    <div class="ap-confirm-wallet">Payment will come from your <b>BOLTIV wallet.</b></div>
+    <div class="ap-confirm-actions">
+      <button class="ap-confirm-btn" id="apConfirmCancel" type="button">CANCEL</button>
+      <button class="ap-confirm-btn primary" id="apConfirmProceed" type="button">CREATE AUTOPAY</button>
+    </div>
+  </div>
+</div>
 <div class="ap-toast" id="apToast"></div>
 
 <nav class="bottom-nav"><button class="nav-item" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button><button class="nav-item" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button><button class="nav-item" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button><button class="nav-item" onclick="location.href='/profile'"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span>Profile</button></nav>
@@ -158,7 +181,7 @@ var API=window.BOLTIV_API_BASE||"";
 var $=function(id){return document.getElementById(id)};
 var NETS=["MTN","AIRTEL","GLO","9MOBILE"];
 var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[]};
+var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[],maxTouched:false};
 function money(n){return "₦"+Number(n||0).toLocaleString("en-NG",{minimumFractionDigits:0,maximumFractionDigits:2})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function ord(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
@@ -240,10 +263,10 @@ function buildNetGrids(){
   document.querySelectorAll("[data-net]").forEach(function(g){
     var svc=g.getAttribute("data-net");
     g.innerHTML=NETS.map(function(n){return '<button class="ap-opt" data-v="'+n+'" type="button">'+n+'</button>'}).join("");
-    g.addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.net[svc]=b.getAttribute("data-v");state.networkConfirmed=false;mark(g,state.net[svc]);if(svc==="data")loadPlans();refresh()});
+    g.addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.net[svc]=b.getAttribute("data-v");state.networkConfirmed=false;state.maxTouched=false;$("apMaxAmount").value="";mark(g,state.net[svc]);if(svc==="data")loadPlans();refresh()});
   });
   $("atChips").innerHTML=[100,200,500,1000].map(function(n){return '<button class="ap-opt" data-v="'+n+'" type="button">₦'+n.toLocaleString("en-NG")+'</button>'}).join("");
-  $("atChips").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;$("atAmount").value=b.getAttribute("data-v");syncChips();refresh()});
+  $("atChips").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;$("atAmount").value=b.getAttribute("data-v");syncChips();syncMaxDefault();refresh()});
   var dom=$("apDomSel");for(var i=1;i<=31;i++){var o=document.createElement("option");o.value=i;o.textContent=ord(i);dom.appendChild(o)}
 }
 function mark(group,v){group.querySelectorAll("[data-v]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-v")===String(v))})}
@@ -261,17 +284,19 @@ function formatPlanValidity(value,days){
   var d=Number(days);return d>0?d+" "+(d===1?"Day":"Days"):"Validity not available";
 }
 function planLabel(p){return String((p&&p.name)||(p&&p.code)||"").trim()}
-var PLAN_CATS=[{id:"1-2",label:"1-2GB",max:2},{id:"3-5",label:"3-5GB",max:5},{id:"6-10",label:"6-10GB",max:10},{id:"11-20",label:"11-20GB",max:20},{id:"20+",label:"20GB+",max:Infinity}];
+var PLAN_CATS=[{id:"1-2",label:"1-2GB",min:1,max:2},{id:"3-5",label:"3-5GB",min:3,max:5},{id:"6-10",label:"6-10GB",min:6,max:10},{id:"11-20",label:"11-20GB",min:11,max:20},{id:"20+",label:"20GB+",min:20,max:Infinity}];
 function planGb(p){
-  var mb=Number(p&&p.size_mb)||0;if(mb>=1000&&mb<1024)return 1;if(mb>0)return mb/1024;
-  var m=String(p&&p.name||"").match(/(\d+(?:\.\d+)?)\s*(gb|mb)\b/i);return m?(m[2].toLowerCase()==="gb"?Number(m[1]):Number(m[1])/1024):0;
+  var name=String(p&&p.name||"");
+  var nameMatch=name.match(/(\d+(?:\.\d+)?)\s*(gb|g|mb)\b/i);
+  if(nameMatch){var nv=Number(nameMatch[1]);if(Number.isFinite(nv)&&nv>0)return nameMatch[2].toLowerCase()==="mb"?nv/1024:nv;}
+  var candidates=[p&&p.size_mb,p&&p.sizeMb,p&&p.data_mb,p&&p.dataMb,p&&p.volume,p&&p.size,p&&p.quantity,p&&p.data_size,p&&p.dataSize];
+  for(var i=0;i<candidates.length;i++){var raw=Number(candidates[i]);if(!Number.isFinite(raw)||raw<=0)continue;return raw>20?raw/1024:raw;}
+  return 0;
 }
-function planCatId(p){var c=Math.ceil(planGb(p)-0.0001);var cat=PLAN_CATS.find(function(x){return c<=x.max});return cat?cat.id:"20+"}
+function planCatId(p){var gb=planGb(p);if(gb<=0)return "unknown";if(gb<=2)return "1-2";if(gb<=5)return "3-5";if(gb<=10)return "6-10";if(gb<=20)return "11-20";return "20+"}
 function drawPlanCats(){
   var cats=$("dtPlanCats");cats.innerHTML="";
-  var present={};state.plans.forEach(function(p){present[planCatId(p)]=true});
-  var list=[{id:"all",label:"All"}].concat(PLAN_CATS.filter(function(c){return present[c.id]}));
-  if(list.length<=2)return;
+  var list=[{id:"all",label:"All"}].concat(PLAN_CATS);
   list.forEach(function(c){var b=document.createElement("button");b.type="button";b.className="ap-plan-cat"+(c.id===state.activePlanCat?" active":"");b.textContent=c.label;b.onclick=function(){state.activePlanCat=c.id;state.selectedPlan=null;drawPlans();refresh()};cats.appendChild(b)});
 }
 function drawPlans(){
@@ -282,7 +307,7 @@ function drawPlans(){
     var b=document.createElement("button");b.type="button";b.className="ap-plan-button";b._plan=plan;
     var label=planLabel(plan),validity=formatPlanValidity(plan.validity!=null?plan.validity:(plan.validity_period!=null?plan.validity_period:plan.duration),plan.validity_days);
     b.innerHTML='<div class="ap-plan-size">'+esc(label)+'</div><div class="ap-plan-validity">'+esc(validity)+'</div><div class="ap-plan-price">'+money(plan.customer_price)+'</div>';
-    b.onclick=function(){state.selectedPlan=plan;grid.querySelectorAll(".ap-plan-button").forEach(function(x){x.classList.remove("active")});b.classList.add("active");refresh()};
+    b.onclick=function(){state.selectedPlan=plan;grid.querySelectorAll(".ap-plan-button").forEach(function(x){x.classList.remove("active")});b.classList.add("active");syncMaxDefault();refresh()};
     if(state.selectedPlan&&((plan.lookup_key&&state.selectedPlan.lookup_key&&plan.lookup_key===state.selectedPlan.lookup_key)||(plan.code===state.selectedPlan.code&&String(plan.service_id)===String(state.selectedPlan.service_id))))b.classList.add("active");
     grid.appendChild(b);
   });
@@ -290,7 +315,7 @@ function drawPlans(){
 function highlightPlan(plan){
   if(!plan)return;state.selectedPlan=plan;
   var cat=planCatId(plan);if(state.activePlanCat!=="all"&&cat!==state.activePlanCat){state.activePlanCat="all";drawPlanCats()}
-  drawPlans();
+  drawPlans();syncMaxDefault();
 }
 async function loadPlans(){
   var net=state.net.data;state.plans=[];state.selectedPlan=null;state.activePlanCat="all";$("dtPlanCats").innerHTML="";
@@ -299,11 +324,7 @@ async function loadPlans(){
   try{
     var d=await api("/api/vtu/data/plans",{network:net});if(!d.success)throw new Error(d.message||"Could not load plans.");
     var plans=Array.isArray(d.plans)?d.plans:[];
-    state.plans=plans.filter(function(plan){
-      var sizeText=[plan&&plan.size_mb,plan&&plan.sizeMb,plan&&plan.data_mb,plan&&plan.dataMb,plan&&plan.volume,plan&&plan.size,plan&&plan.quantity,plan&&plan.data_size,plan&&plan.dataSize,plan&&plan.name].filter(Boolean).join(" ");
-      var match=sizeText.match(/(\d+(?:\.\d+)?)\s*(gb|mb)\b/i);var explicit=match?(match[2].toLowerCase()==="gb"?Number(match[1])*1024:Number(match[1])):(Number(plan&&plan.size_mb)||0);
-      return explicit>=1000;
-    }).sort(function(a,b){return Number(a.customer_price)-Number(b.customer_price)});
+    state.plans=plans.filter(function(plan){return planGb(plan)>=1;}).sort(function(a,b){return Number(a.customer_price)-Number(b.customer_price)});
     if(!state.plans.length){$("dtPlanGrid").innerHTML='<div class="ap-plan-loading">No data plans are currently available for this network.</div>';return}
     drawPlanCats();drawPlans();
     if(state.prefillPlan){var found=state.plans.find(function(p){return p.code===state.prefillPlan.code&&String(p.service_id)===String(state.prefillPlan.service_id)});if(found)highlightPlan(found);state.prefillPlan=null}
@@ -323,24 +344,35 @@ async function verifyCable(){
     var names=Object.keys(d.plans||{});state.cablePlans=names.map(function(k){return{name:k,price:Number(d.plans[k].customer_price)}});
     var sel=$("cbPlan");sel.innerHTML='<option value="">Choose a plan</option>'+state.cablePlans.map(function(p,i){return '<option value="'+i+'">'+esc(p.name)+" — "+money(p.price)+"</option>"}).join("");sel.disabled=false;
     if(state.prefillCablePlan){var i3=state.cablePlans.findIndex(function(p){return p.name===state.prefillCablePlan});if(i3>=0)sel.value=String(i3);state.prefillCablePlan=null}
+    syncMaxDefault();
   }catch(e){state.cableVerified=false;hint.textContent=e.message||"Verification failed."}
   $("cbVerify").disabled=false;refresh();
 }
 function resetCable(){state.cableVerified=false;state.cablePlans=[];$("cbPlan").disabled=true;$("cbPlan").innerHTML="<option>Verify your number first</option>";$("cbHint").textContent=""}
+function currentAmount(){
+  if(state.svc==="airtime")return Number($("atAmount").value)||0;
+  if(state.svc==="data")return state.selectedPlan?Number(state.selectedPlan.customer_price)||0:0;
+  var cp=state.cablePlans[Number($("cbPlan").value)];return cp?Number(cp.price)||0:0;
+}
+function syncMaxDefault(){
+  var amt=currentAmount();if(amt&&!state.maxTouched){$("apMaxAmount").value=String(amt);}
+}
+function maxAmount(){return Number(String($("apMaxAmount").value||"").replace(/,/g,""))||0;}
+
 function details(){
-  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc};
+  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,maxPay=maxAmount(),base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc,maxAmount:maxPay};
   if(state.svc==="airtime"){
     var amt=Number($("atAmount").value),ph=$("atPhone").value.trim();
-    if(!state.net.airtime||!/^0\d{10}$/.test(ph)||!(amt>=50&&Math.round(amt)===amt))return null;
+    if(!state.net.airtime||!/^0\d{10}$/.test(ph)||!(amt>=50&&Math.round(amt)===amt)||!Number.isFinite(maxPay)||maxPay<amt||maxPay>1000000)return null;
     return Object.assign(base,{network:state.net.airtime,phone:ph,amount:amt,networkConfirmed:state.networkConfirmed,_text:money(amt)+" "+state.net.airtime+" airtime to "+ph});
   }
   if(state.svc==="data"){
     var p=state.selectedPlan,ph2=$("dtPhone").value.trim();
-    if(!state.net.data||!p||!/^0\d{10}$/.test(ph2))return null;
+    if(!state.net.data||!p||!/^0\d{10}$/.test(ph2)||!Number.isFinite(maxPay)||maxPay<Number(p.customer_price)||maxPay>1000000)return null;
     return Object.assign(base,{network:state.net.data,phone:ph2,plan_code:p.code,service_id:p.service_id,bundle_id:p.bundle_id,plan_name:p.name,_text:p.name+" ("+state.net.data+", "+money(p.customer_price)+") for "+ph2});
   }
   var cp=state.cablePlans[Number($("cbPlan").value)],card=$("cbCard").value.trim();
-  if(!state.cableVerified||!cp||!/^\d{8,20}$/.test(card))return null;
+  if(!state.cableVerified||!cp||!/^\d{8,20}$/.test(card)||!Number.isFinite(maxPay)||maxPay<Number(cp.price)||maxPay>1000000)return null;
   return Object.assign(base,{provider:state.prov,smartcard:card,plan:cp.name,useExistingRecipient:!!state.editingId,_text:state.prov+" "+cp.name+" ("+money(cp.price)+") for card ending "+card.slice(-4)});
 }
 function refresh(){
@@ -349,28 +381,60 @@ function refresh(){
   mark($("apFreq"),f);
   if(!d){$("apSummary").textContent="Fill in the details above.";$("apCreate").disabled=true;return}
   var n=nextRun(f,d.dayOfWeek,d.dayOfMonth);
-  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b>";
+  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b><br/><span style=\"display:block;margin-top:8px;color:#8b6c08\">Maximum charge: <b>"+money(d.maxAmount)+"</b>. If the price goes above this amount, this AutoPay will be skipped.</span>";
   $("apCreate").disabled=state.busy;
 }
 function openSheet(){$("apErr").style.display="none";$("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh()}
 function closeSheet(){$("apOverlay").classList.remove("show");document.body.classList.remove("ap-open")}
-async function create(){
-  var d=details();if(!d||state.busy)return;
+function buildConfirmation(d){
+  var n=nextRun(state.freq,d.dayOfWeek,d.dayOfMonth);
+  var service=state.svc==="data"?"Data":state.svc==="cable"?"Cable TV":"Airtime";
+  var purchase=d._text;
+  var rows=[
+    ["Service",service],
+    [state.svc==="airtime"?"Network":state.svc==="data"?"Network":"Provider",state.svc==="airtime"||state.svc==="data"?state.net[state.svc]:state.prov],
+    ["Purchase",purchase],
+    ["Frequency",state.freq==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth)],
+    ["Current price",money(currentAmount())],
+    ["Maximum charge",money(d.maxAmount)]
+  ];
+  $("apConfirmTitle").textContent=state.editingId?"Confirm AutoPay Changes":"Set Up This AutoPay";
+  $("apConfirmCard").innerHTML=rows.map(function(r){return '<div class="ap-confirm-row"><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>';}).join("");
+  $("apConfirmLimit").innerHTML="You'll be charged automatically according to this schedule. If the price goes above <b>"+money(d.maxAmount)+"</b>, this AutoPay will be skipped."+(n?"<br><span style=\"opacity:.82\">First run: "+esc(lagos(n,{weekday:"long",day:"numeric",month:"long"}))+" at 7:00 AM.</span>":"");
+  $("apConfirmProceed").textContent=state.editingId?"SAVE CHANGES":"CREATE AUTOPAY";
+  $("apConfirmOverlay").classList.add("show");
+}
+function closeConfirmation(){$("apConfirmOverlay").classList.remove("show");}
+async function submitAutopay(){
+  var d=details();if(!d||state.busy){closeConfirmation();return;}
+  closeConfirmation();
   var pin=await boltivGetTransactionPin();if(!pin)return;
   state.busy=true;$("apCreate").disabled=true;$("apCreate").textContent=state.editingId?"SAVING…":"CREATING…";$("apErr").style.display="none";
-  var body=Object.assign({},d,{transactionPin:pin});delete body._text;
+  var body=Object.assign({},d,{transactionPin:pin,maxAmount:d.maxAmount});delete body._text;
   try{
     var endpoint=state.editingId?"/api/autopay/edit":"/api/autopay/create";if(state.editingId)body.id=state.editingId;
     var r=await api(endpoint,body);
-    if(!r.success&&r.requiresNetworkConfirmation){if(confirm((r.message||"This number may be on a different network.")+"\n\nContinue with "+state.net.airtime+"?")){state.networkConfirmed=true;state.busy=false;return create()}throw new Error("Choose the correct network and try again.");}
+    if(!r.success&&r.requiresNetworkConfirmation){if(confirm((r.message||"This number may be on a different network.")+"\n\nContinue with "+state.net.airtime+"?")){state.networkConfirmed=true;state.busy=false;return submitAutopay();}throw new Error("Choose the correct network and try again.");}
     if(!r.success)throw new Error(r.message||"Could not save AutoPay.");
     closeSheet();toast(state.editingId?"AutoPay updated.":"AutoPay created. First run: "+lagos(r.schedule.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM.");state.editingId=null;await load();
-  }catch(e){if(e.message!=="SESSION_EXPIRED"){$("apErr").textContent=e.message;$('apErr').style.display="block"}}
+  }catch(e){if(e.message!=="SESSION_EXPIRED"){$("apErr").textContent=e.message;$("apErr").style.display="block";}}
   state.busy=false;$("apCreate").textContent=state.editingId?"SAVE CHANGES":"CREATE AUTOPAY";refresh();
+}
+async function create(){
+  var d=details();
+  if(!d){
+    var amt=currentAmount(),maxPay=maxAmount();
+    if(amt>0&&(!maxPay||maxPay<amt)){$("apErr").textContent="Set a maximum payment of at least "+money(amt)+".";$("apErr").style.display="block";}
+    else if(maxPay>1000000){$("apErr").textContent="Maximum payment cannot be more than ₦1,000,000.";$("apErr").style.display="block";}
+    return;
+  }
+  if(state.busy)return;
+  $("apErr").style.display="none";
+  buildConfirmation(d);
 }
 
 function openEdit(s){
-  state.editingId=Number(s.id);state.svc=s.service;state.freq=s.frequency;state.net.airtime=s.network||"";state.net.data=s.network||"";state.prov=s.network||"DSTV";
+  state.editingId=Number(s.id);state.svc=s.service;state.freq=s.frequency;state.net.airtime=s.network||"";state.net.data=s.network||"";state.prov=s.network||"DSTV";state.maxTouched=true;$("apMaxAmount").value=String(s.maxAmount!=null?s.maxAmount:(s.amount||""));
   $("apSheetTitle").textContent="Edit AutoPay";$("apCreate").textContent="SAVE CHANGES";
   if(s.service==="airtime"){$("atPhone").value=(s.recipient||"").replace(/\D/g,"");$("atAmount").value=String(s.amount||"");syncChips();}
   if(s.service==="data"){$("dtPhone").value=(s.recipient||"").replace(/\D/g,"");state.selectedPlan=null;state.prefillPlan={code:s.planCode||"",service_id:s.serviceId||""};}
@@ -387,22 +451,24 @@ async function bulkAction(action){
 
 /* ---------------- wiring ---------------- */
 buildNetGrids();
-$("apNew").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
+$("apNew").onclick=function(){state.editingId=null;state.maxTouched=false;$("apMaxAmount").value="";$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
 $("apOverlay").addEventListener("click",function(e){if(e.target===$("apOverlay"))closeSheet()});
-$("apService").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.svc=b.getAttribute("data-v");showSvc()});
+$("apService").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.svc=b.getAttribute("data-v");state.maxTouched=false;$("apMaxAmount").value="";showSvc();syncMaxDefault()});
 $("apFreq").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.freq=b.getAttribute("data-v");refresh()});
 $("cbProv").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.prov=b.getAttribute("data-v");mark($("cbProv"),state.prov);resetCable();refresh()});
 ["atPhone","dtPhone","cbCard"].forEach(function(id){$(id).addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");if(id==="cbCard")resetCable();state.networkConfirmed=false;refresh()})});
-$("atAmount").addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");syncChips();refresh()});
-["cbPlan","apDowSel","apDomSel"].forEach(function(id){$(id).addEventListener("change",refresh)});
+$("atAmount").addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");syncChips();syncMaxDefault();refresh()});
+$("apMaxAmount").addEventListener("input",function(){this.value=this.value.replace(/[^0-9.]/g,"");state.maxTouched=true;refresh()});
+["cbPlan","apDowSel","apDomSel"].forEach(function(id){$(id).addEventListener("change",function(){if(id==="cbPlan")syncMaxDefault();refresh();})});
 $("cbVerify").onclick=verifyCable;$("apCreate").onclick=create;
+$("apConfirmCancel").onclick=closeConfirmation;$("apConfirmProceed").onclick=submitAutopay;$("apConfirmOverlay").addEventListener("click",function(e){if(e.target===$("apConfirmOverlay"))closeConfirmation();});
 
 /* "Repeat this every month?" links from the purchase pages open the sheet pre-filled */
 function prefill(){
   var q=new URLSearchParams(location.search);if(q.get("new")!=="1")return;
   var svc=q.get("service");if(["airtime","data","cable"].indexOf(svc)<0)return;
   state.svc=svc;
-  if(svc==="airtime"){var n=(q.get("network")||"").toUpperCase();if(NETS.indexOf(n)>=0){state.net.airtime=n;mark(document.querySelector('[data-net="airtime"]'),n)}$("atPhone").value=(q.get("phone")||"").replace(/\D/g,"");$("atAmount").value=(q.get("amount")||"").replace(/\D/g,"");syncChips()}
+  if(svc==="airtime"){var n=(q.get("network")||"").toUpperCase();if(NETS.indexOf(n)>=0){state.net.airtime=n;mark(document.querySelector('[data-net="airtime"]'),n)}$("atPhone").value=(q.get("phone")||"").replace(/\D/g,"");$("atAmount").value=(q.get("amount")||"").replace(/\D/g,"");syncChips();syncMaxDefault()}
   if(svc==="data"){var n2=(q.get("network")||"").toUpperCase();if(NETS.indexOf(n2)>=0){state.net.data=n2;mark(document.querySelector('[data-net="data"]'),n2);state.prefillPlan={code:q.get("plan_code")||"",service_id:q.get("service_id")||""};loadPlans()}$("dtPhone").value=(q.get("phone")||"").replace(/\D/g,"")}
   if(svc==="cable"){var pv=(q.get("provider")||"DSTV").toUpperCase();state.prov=pv==="GOTV"?"GOTV":"DSTV";mark($("cbProv"),state.prov);$("cbCard").value=(q.get("smartcard")||"").replace(/\D/g,"");state.prefillCablePlan=q.get("plan")||"";if($("cbCard").value)verifyCable()}
   showSvc();

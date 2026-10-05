@@ -54,6 +54,28 @@
 body.ap-open .bottom-nav{display:none}
 .ap-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);max-width:88%;padding:12px 16px;border-radius:12px;background:#171717;color:#fff;font-size:11px;font-weight:800;z-index:3000;display:none;text-align:center}
 .ap-err{color:var(--t-fg-b94c4c);font-size:10.5px;font-weight:800;margin-top:10px;display:none}
+.ap-how{margin:0 0 16px;border:1px solid var(--t-bd-e5e5e1);border-radius:18px;background:var(--t-bg-ffffff);overflow:hidden;box-shadow:0 8px 24px rgba(23,23,23,.035)}
+.ap-how summary{list-style:none;cursor:pointer;padding:14px 15px;display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--t-fg-171717)}
+.ap-how summary::-webkit-details-marker{display:none}
+.ap-how summary:focus-visible{outline:3px solid #D4AF37;outline-offset:-3px}
+.ap-how-title{display:flex;align-items:center;gap:10px;min-width:0}
+.ap-how-icon{width:28px;height:28px;flex:none;border-radius:9px;border:1px solid var(--t-bd-ead99b);background:var(--t-bg-fff9e6);color:#D4AF37;display:grid;place-items:center;font-size:14px;font-weight:1000}
+.ap-how-copy{min-width:0}
+.ap-how-copy b{display:block;font-size:11px;font-weight:1000;letter-spacing:.8px}
+.ap-how-copy span{display:block;color:var(--t-fg-777777);font-size:9.5px;font-weight:700;margin-top:2px;line-height:1.35}
+.ap-how-chevron{color:#D4AF37;font-size:16px;font-weight:1000;transition:transform .18s ease;flex:none}
+.ap-how[open] .ap-how-chevron{transform:rotate(180deg)}
+.ap-how-body{padding:0 15px 15px;border-top:1px solid var(--t-bd-e5e5e1)}
+.ap-how-intro{color:var(--t-fg-777777);font-size:10.5px;line-height:1.55;margin:13px 0}
+.ap-how-step{display:flex;gap:10px;margin-top:12px}
+.ap-how-num{width:22px;height:22px;flex:none;border-radius:7px;background:var(--t-bg-fff9e6);border:1px solid var(--t-bd-ead99b);color:#D4AF37;display:grid;place-items:center;font-size:8px;font-weight:1000}
+.ap-how-step b{display:block;color:var(--t-fg-171717);font-size:10.5px;font-weight:1000;margin-bottom:2px}
+.ap-how-step p{margin:0;color:var(--t-fg-777777);font-size:9.7px;line-height:1.5}
+.ap-how-protect{margin-top:14px;padding:12px;border-radius:13px;background:var(--t-bg-fff9e6);border:1px solid var(--t-bd-ead99b)}
+.ap-how-protect b{display:block;color:var(--t-fg-8b6c08);font-size:10px;font-weight:1000;margin-bottom:3px}
+.ap-how-protect p{margin:0;color:var(--t-fg-8b6c08);font-size:9.7px;line-height:1.5;font-weight:700}
+@media(max-width:420px){.ap-how summary{padding:13px}.ap-how-body{padding:0 13px 13px}}
+
 
 /* Premium AutoPay refresh — page-scoped only. */
 .ap-page{padding-bottom:130px}.ap-header{padding:22px 0 18px}.ap-title{font-size:22px;letter-spacing:-.3px}.ap-sub{font-weight:800;letter-spacing:1.1px}.ap-hero{position:relative;overflow:hidden;padding:25px;border-radius:24px;box-shadow:0 14px 34px rgba(23,23,23,.05)}.ap-hero:after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;right:-45px;bottom:-55px;border:1px solid rgba(212,175,55,.24)}.ap-hero-title{font-size:26px;line-height:1.08;max-width:460px;letter-spacing:-.6px}.ap-hero-text{max-width:560px;font-size:12px}.ap-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.ap-toolbar .ap-btn{flex:1;min-width:145px;padding:12px 14px;background:var(--t-bg-ffffff);box-shadow:0 7px 20px rgba(23,23,23,.04)}.ap-toolbar .gold-action{background:#D4AF37;color:#171717;border-color:#D4AF37}.ap-stats{gap:12px}.ap-stat{padding:16px;border-radius:18px;box-shadow:0 8px 22px rgba(23,23,23,.035)}.ap-stat b{font-size:18px}.ap-section{margin:24px 0 11px}.ap-section h2{font-size:11px;letter-spacing:1.4px}.ap-card{padding:17px;border-radius:20px;margin-bottom:11px;box-shadow:0 8px 24px rgba(23,23,23,.035)}.ap-name{font-size:14px}.ap-meta{font-size:10.8px}.ap-actions{border-top:1px solid var(--t-bd-e5e5e1);padding-top:11px}.ap-actions .ap-btn{flex:1}.ap-btn{background:var(--t-bg-ffffff);padding:10px 12px}.ap-primary{box-shadow:0 10px 24px rgba(212,175,55,.18)}.ap-history-head{display:flex;align-items:center;justify-content:space-between;width:100%}.ap-history-note{font-size:9px;color:var(--t-fg-777777);font-weight:800}.ap-sheet{max-width:560px;box-shadow:0 -16px 45px rgba(0,0,0,.16)}.ap-sheet-top{position:sticky;top:-20px;background:var(--t-bg-ffffff);padding:4px 0 12px;z-index:2}@media(min-width:700px){.ap-page .container{max-width:760px}.ap-hero{padding:30px}.ap-toolbar .ap-btn{flex:0 0 auto}}@media(max-width:420px){.ap-hero-title{font-size:23px}.ap-toolbar .ap-btn{min-width:100%}.ap-card{padding:15px}.ap-actions{gap:6px}.ap-actions .ap-btn{padding:9px 8px;font-size:9px}}
@@ -69,6 +91,19 @@ body.ap-open .bottom-nav{display:none}
 <div class="ap-header"><button class="ap-back" onclick="if(history.length>1)history.back();else location.href='/dashboard'" aria-label="Back">‹</button><div><div class="ap-title">AutoPay</div><div class="ap-sub">AUTOMATIC REPEAT PURCHASES</div></div></div>
 <div class="ap-hero"><div class="ap-hero-label">BOLTIV AUTOPAY</div><div class="ap-hero-title">Set it once. Stay topped up.</div><div class="ap-hero-text">Airtime, data and cable TV are paid automatically from your wallet at 7:00 AM on the day you choose. Data purchases still earn cashback.</div></div>
 <div class="ap-toolbar"><button class="ap-btn gold-action" id="apNew" disabled>+ CREATE AUTOPAY</button><button class="ap-btn" id="apPauseAll" disabled>PAUSE ALL</button><button class="ap-btn" id="apResumeAll" disabled>RESUME ALL</button></div>
+<details class="ap-how" id="apHow">
+<summary><span class="ap-how-title"><span class="ap-how-icon">ⓘ</span><span class="ap-how-copy"><b>HOW AUTOPAY WORKS</b><span>Understand how your scheduled payments work</span></span></span><span class="ap-how-chevron">⌄</span></summary>
+<div class="ap-how-body">
+<p class="ap-how-intro">AutoPay automatically purchases your selected Airtime, Data or Cable TV service on your chosen schedule using your BOLTIV wallet.</p>
+<div class="ap-how-step"><span class="ap-how-num">01</span><div><b>Choose what you want to automate</b><p>Select the service, plan or amount and choose how often you want it purchased.</p></div></div>
+<div class="ap-how-step"><span class="ap-how-num">02</span><div><b>Set your maximum payment</b><p>Prices and availability can change. Your maximum payment tells BOLTIV the most you're comfortable paying for each scheduled purchase.</p></div></div>
+<div class="ap-how-step"><span class="ap-how-num">03</span><div><b>We check before every payment</b><p>When your AutoPay is due, BOLTIV checks the current price and availability of your selected service.</p></div></div>
+<div class="ap-how-step"><span class="ap-how-num">04</span><div><b>You're protected from unexpected charges</b><p>If the current price is within your limit, the purchase proceeds normally. If it is above your limit, we won't charge your wallet and we'll notify you.</p></div></div>
+<div class="ap-how-step"><span class="ap-how-num">05</span><div><b>Temporary provider or network issues</b><p>If a temporary issue prevents the purchase, BOLTIV may retry according to the AutoPay rules. Your approved payment limit still applies.</p></div></div>
+<div class="ap-how-step"><span class="ap-how-num">06</span><div><b>You're always in control</b><p>You can edit, pause, resume or cancel your AutoPay at any time.</p></div></div>
+<div class="ap-how-protect"><b>🛡️ Your wallet, your limits.</b><p>AutoPay is designed to automate your payments while keeping you in control.</p></div>
+</div>
+</details>
 <div id="apNotice"></div>
 <div class="ap-stats"><div class="ap-stat"><small>WALLET BALANCE</small><b id="apBalance">—</b></div><div class="ap-stat"><small>AUTOPAY CASHBACK</small><b id="apCashback">—</b></div></div>
 <div class="ap-section"><h2>YOUR AUTOPAYS</h2><small id="apCount" style="color:var(--t-fg-777777);font-size:10px;font-weight:800"></small></div>
@@ -103,7 +138,6 @@ body.ap-open .bottom-nav{display:none}
 <label class="ap-label" for="cbPlan">SUBSCRIPTION PLAN</label><select class="ap-input" id="cbPlan" disabled><option>Verify your number first</option></select>
 </div>
 
-<label class="ap-label" for="apMaxAmount">MAXIMUM PAYMENT</label><input class="ap-input" id="apMaxAmount" inputmode="decimal" placeholder="Maximum amount per payment"/><div class="ap-hint">💡 Prices may change. Set the maximum amount you’re comfortable paying. If the current price is higher than your limit, we won’t charge you.</div>
 <label class="ap-label">HOW OFTEN</label>
 <div class="ap-grid ap-g2" id="apFreq"><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
 <div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
@@ -124,7 +158,7 @@ var API=window.BOLTIV_API_BASE||"";
 var $=function(id){return document.getElementById(id)};
 var NETS=["MTN","AIRTEL","GLO","9MOBILE"];
 var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[],maxTouched:false};
+var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[]};
 function money(n){return "₦"+Number(n||0).toLocaleString("en-NG",{minimumFractionDigits:0,maximumFractionDigits:2})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function ord(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
@@ -183,7 +217,7 @@ async function load(){
 function card(s){
   var active=s.status==="active";
   var next=active&&s.nextRunAt?"Next run: "+lagos(s.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM":(PAUSE[s.pauseReason]||"Paused.");
-  return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>Maximum: "+money(s.maxAmount||s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+(active?"ok":"gold")+'">'+(active?"ACTIVE":"PAUSED")+'</span></div>'
+  return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+(active?"ok":"gold")+'">'+(active?"ACTIVE":"PAUSED")+'</span></div>'
    +'<div class="ap-actions"><button class="ap-btn" data-edit="'+s.id+'" type="button">EDIT</button><button class="ap-btn" data-act="'+(active?"pause":"resume")+'" data-id="'+s.id+'" type="button">'+(active?"PAUSE":"RESUME")+'</button><button class="ap-btn danger" data-act="delete" data-id="'+s.id+'" type="button">DELETE</button></div></div>';
 }
 function runRow(r){
@@ -294,7 +328,7 @@ async function verifyCable(){
 }
 function resetCable(){state.cableVerified=false;state.cablePlans=[];$("cbPlan").disabled=true;$("cbPlan").innerHTML="<option>Verify your number first</option>";$("cbHint").textContent=""}
 function details(){
-  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,maxAmount=Number($("apMaxAmount").value),base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc,maxAmount:maxAmount};
+  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc};
   if(state.svc==="airtime"){
     var amt=Number($("atAmount").value),ph=$("atPhone").value.trim();
     if(!state.net.airtime||!/^0\d{10}$/.test(ph)||!(amt>=50&&Math.round(amt)===amt))return null;
@@ -314,11 +348,8 @@ function refresh(){
   $("apDow").style.display=f==="weekly"?"block":"none";$("apDom").style.display=f==="monthly"?"block":"none";
   mark($("apFreq"),f);
   if(!d){$("apSummary").textContent="Fill in the details above.";$("apCreate").disabled=true;return}
-  var currentAmount=state.svc==="airtime"?Number($("atAmount").value):state.svc==="data"?(state.selectedPlan?Number(state.selectedPlan.customer_price):0):(state.cablePlans[Number($("cbPlan").value)]?Number(state.cablePlans[Number($("cbPlan").value)].price):0);
-  if(!state.maxTouched&&currentAmount>0){$("apMaxAmount").value=String(Math.ceil(currentAmount));d.maxAmount=Number($("apMaxAmount").value);}
-  if(!Number.isFinite(d.maxAmount)||d.maxAmount<currentAmount||d.maxAmount>1000000){$("apSummary").innerHTML=esc(d._text)+"<br/><span style=\"color:#b3261e\">Set a maximum payment of at least "+money(currentAmount)+".</span>";$("apCreate").disabled=true;return;}
   var n=nextRun(f,d.dayOfWeek,d.dayOfMonth);
-  $("apSummary").innerHTML=esc(d._text)+"<br/>Maximum payment: <b>"+money(d.maxAmount)+"</b><br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b>";
+  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b>";
   $("apCreate").disabled=state.busy;
 }
 function openSheet(){$("apErr").style.display="none";$("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh()}
@@ -339,7 +370,7 @@ async function create(){
 }
 
 function openEdit(s){
-  state.editingId=Number(s.id);state.maxTouched=true;state.svc=s.service;state.freq=s.frequency;state.net.airtime=s.network||"";state.net.data=s.network||"";state.prov=s.network||"DSTV";$("apMaxAmount").value=String(s.maxAmount||s.amount||"");
+  state.editingId=Number(s.id);state.svc=s.service;state.freq=s.frequency;state.net.airtime=s.network||"";state.net.data=s.network||"";state.prov=s.network||"DSTV";
   $("apSheetTitle").textContent="Edit AutoPay";$("apCreate").textContent="SAVE CHANGES";
   if(s.service==="airtime"){$("atPhone").value=(s.recipient||"").replace(/\D/g,"");$("atAmount").value=String(s.amount||"");syncChips();}
   if(s.service==="data"){$("dtPhone").value=(s.recipient||"").replace(/\D/g,"");state.selectedPlan=null;state.prefillPlan={code:s.planCode||"",service_id:s.serviceId||""};}
@@ -356,7 +387,7 @@ async function bulkAction(action){
 
 /* ---------------- wiring ---------------- */
 buildNetGrids();
-$("apNew").onclick=function(){state.editingId=null;state.maxTouched=false;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";$("apMaxAmount").value="";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;state.maxTouched=false;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
+$("apNew").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
 $("apOverlay").addEventListener("click",function(e){if(e.target===$("apOverlay"))closeSheet()});
 $("apService").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.svc=b.getAttribute("data-v");showSvc()});
 $("apFreq").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.freq=b.getAttribute("data-v");refresh()});
@@ -364,7 +395,7 @@ $("cbProv").addEventListener("click",function(e){var b=e.target.closest("[data-v
 ["atPhone","dtPhone","cbCard"].forEach(function(id){$(id).addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");if(id==="cbCard")resetCable();state.networkConfirmed=false;refresh()})});
 $("atAmount").addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");syncChips();refresh()});
 ["cbPlan","apDowSel","apDomSel"].forEach(function(id){$(id).addEventListener("change",refresh)});
-$("cbVerify").onclick=verifyCable;$("apMaxAmount").addEventListener("input",function(){this.value=this.value.replace(/[^0-9.]/g,"");state.maxTouched=true;refresh()});$("apCreate").onclick=create;
+$("cbVerify").onclick=verifyCable;$("apCreate").onclick=create;
 
 /* "Repeat this every month?" links from the purchase pages open the sheet pre-filled */
 function prefill(){

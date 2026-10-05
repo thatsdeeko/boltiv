@@ -2087,6 +2087,9 @@ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 finished_at TIMESTAMPTZ
 )`);
 await db(`CREATE INDEX IF NOT EXISTS autopay_runs_user_idx ON autopay_runs(user_id,created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS autopay_audit(id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL,schedule_id BIGINT,action TEXT NOT NULL,details JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE INDEX IF NOT EXISTS autopay_audit_user_idx ON autopay_audit(user_id,created_at DESC)`);
+await db(`CREATE INDEX IF NOT EXISTS autopay_audit_schedule_idx ON autopay_audit(schedule_id,created_at DESC)`);
 await db(`CREATE TABLE IF NOT EXISTS platform_alerts( id BIGSERIAL PRIMARY KEY, alert_key TEXT UNIQUE NOT NULL, severity TEXT NOT NULL DEFAULT 'warning', title TEXT NOT NULL, message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', details JSONB NOT NULL DEFAULT '{}'::jsonb, first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), resolved_at TIMESTAMPTZ, email_sent_at TIMESTAMPTZ)`);
 await db(`CREATE INDEX IF NOT EXISTS platform_alerts_status_idx ON platform_alerts(status,last_seen_at DESC)`);
 await db(`ALTER TABLE platform_alerts ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ`);
@@ -4902,13 +4905,17 @@ function autopayPublic(s){
     nextRunAt:s.next_run_at,lastRunAt:s.last_run_at,lastStatus:s.last_status||null,
     consecutiveFailures:Number(s.consecutive_failures||0),
     recipient:s.service==="cable"?(sc?`Card ending ${sc.slice(-4)}`:""):clean(p.phone),
-    network:p.network||p.provider||""
+    network:p.network||p.provider||"",
+    planCode:s.service==="data"?clean(p.plan_code):null,
+    serviceId:s.service==="data"?Number(p.service_id||0):null,
+    planName:s.service==="data"?clean(p.plan_name):s.service==="cable"?clean(p.plan):null
   };
 }
 async function autopayNotify(userId,title,message,key){
   try{await addNotificationOnce(userId,title,message,"info",key);}
   catch(e){console.error("AUTOPAY NOTIFY ERROR:",e?.message||e);}
 }
+async function autopayAudit(userId,scheduleId,action,details={}){try{await db(`INSERT INTO autopay_audit(user_id,schedule_id,action,details) VALUES($1,$2,$3,$4::jsonb)`,[userId,scheduleId||null,action,JSON.stringify(details||{})]);}catch(e){console.error("AUTOPAY AUDIT ERROR:",e?.message||e);}}
 
 /* ---- validate a create request and build the stored purchase details ---- */
 async function autopayBuildPayload(user,b){
@@ -4983,6 +4990,7 @@ async function autopayFinish(s,runKey,o){
   const cycle=new Date(s.cycle_for||s.next_run_at);
   await db(`UPDATE autopay_runs SET status=$2,message=$3,transaction_reference=$4,amount=$5,finished_at=NOW() WHERE run_key=$1`,
     [runKey,o.status,String(o.message||"").slice(0,300),o.txRef||null,o.amount!=null?o.amount:Number(s.amount)]);
+  await autopayAudit(s.user_id,s.id,"run",{runKey,status:o.status,message:String(o.message||"").slice(0,300),transactionReference:o.txRef||null,amount:o.amount!=null?Number(o.amount):Number(s.amount)});
   if(o.retry){
     await db(`UPDATE autopay_schedules SET attempt=2,next_run_at=NOW()+INTERVAL '30 minutes',locked_until=NULL,updated_at=NOW() WHERE id=$1`,[s.id]);
     return;
@@ -5116,7 +5124,7 @@ async function handleAutopayRoutes(req,res,path,user){
       db(`SELECT r.id,r.status,r.message,r.amount,r.scheduled_for,r.finished_at,r.attempt,s.label,s.service,COALESCE(bl.amount,0) AS cashback
           FROM autopay_runs r JOIN autopay_schedules s ON s.id=r.schedule_id
           LEFT JOIN bonus_lots bl ON bl.source_reference='CASHBACK-'||r.transaction_reference AND bl.status<>'reversed'
-          WHERE r.user_id=$1 AND r.status<>'running' ORDER BY r.created_at DESC LIMIT 40`,[user.user_id]),
+          WHERE r.user_id=$1 AND r.status<>'running' ORDER BY r.created_at DESC LIMIT 100`,[user.user_id]),
       db(`SELECT COALESCE(SUM(bl.amount),0) AS total FROM bonus_lots bl JOIN autopay_runs r ON bl.source_reference='CASHBACK-'||r.transaction_reference WHERE r.user_id=$1 AND bl.status<>'reversed'`,[user.user_id]),
       getWallet(user.user_id),
       autopayEnabled()
@@ -5159,8 +5167,42 @@ async function handleAutopayRoutes(req,res,path,user){
       VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,'active',$9,$9,$10) RETURNING *`,
       [user.user_id,built.service,built.label,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,JSON.stringify(built.payload),next,reminded]);
     try{await addNotification(user.user_id,"AutoPay created",`${built.label} (₦${autopayMoney(built.amount)}) will run ${frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"info");}catch{}
+    await autopayAudit(user.user_id,ins.rows[0].id,"created",{service:built.service,amount:Number(built.amount),frequency});
     send(res,200,{success:true,message:"AutoPay created.",schedule:autopayPublic(ins.rows[0])});
     return true;
+  }
+  if(req.method==="POST"&&path==="/api/autopay/edit"){
+    const rl=rateLimit(req,`autopay-edit:${user.user_id}`,20,15*60*1000);if(!rl.allowed){rateLimitedResponse(res,rl);return true;}
+    const b=await body(req),id=Number(b.id);if(!(id>0)){send(res,400,{success:false,message:"Invalid AutoPay."});return true;}
+    if(!(await autopayEnabled())){send(res,503,{success:false,message:"AutoPay is not available right now."});return true;}
+    const cur=(await db(`SELECT * FROM autopay_schedules WHERE id=$1 AND user_id=$2 AND status<>'deleted'`,[id,user.user_id])).rows[0];if(!cur){send(res,404,{success:false,message:"AutoPay not found."});return true;}
+    const pin=clean(b.transactionPin);if(!/^\d{4}$/.test(pin)){send(res,400,{success:false,message:"Enter your 4-digit Transaction PIN."});return true;}
+    const security=await getSecurity(user.user_id);if(!security?.transaction_pin_hash||!verifyPassword(pin,security.transaction_pin_hash)){send(res,400,{success:false,message:"Incorrect Transaction PIN."});return true;}
+    const service=clean(b.service).toLowerCase();if(service!==cur.service){send(res,400,{success:false,message:"The AutoPay service cannot be changed. Edit its plan, amount or schedule instead."});return true;}
+    const frequency=clean(b.frequency).toLowerCase(),dow=Number(b.dayOfWeek),dom=Number(b.dayOfMonth);
+    if(!["weekly","monthly"].includes(frequency)){send(res,400,{success:false,message:"Choose weekly or monthly."});return true;}
+    if(frequency==="weekly"&&!(Number.isInteger(dow)&&dow>=0&&dow<=6)){send(res,400,{success:false,message:"Choose a day of the week."});return true;}
+    if(frequency==="monthly"&&!(Number.isInteger(dom)&&dom>=1&&dom<=31)){send(res,400,{success:false,message:"Choose a day of the month (1–31)."});return true;}
+    const editInput={...b};if(service==="cable"&&(b.useExistingRecipient===true||!clean(editInput.smartcard)))editInput.smartcard=clean(cur.payload?.smartcard);
+    const built=await autopayBuildPayload(user,editInput);if(built.error){send(res,built.statusCode||400,{success:false,message:built.error,requiresNetworkConfirmation:built.requiresNetworkConfirmation||false,detectedNetwork:built.detectedNetwork||undefined});return true;}
+    const dup=await db(`SELECT id FROM autopay_schedules WHERE user_id=$1 AND id<>$2 AND status<>'deleted' AND service=$3 AND label=$4 AND frequency=$5 AND COALESCE(day_of_week,-1)=$6 AND COALESCE(day_of_month,-1)=$7 AND (payload->>'phone'=$8 OR payload->>'smartcard'=$8) LIMIT 1`,[user.user_id,id,built.service,built.label,frequency,frequency==="weekly"?dow:-1,frequency==="monthly"?dom:-1,built.recipientKey]);if(dup.rows.length){send(res,400,{success:false,message:"You already have this AutoPay."});return true;}
+    const next=autopayNextRun(frequency,dow,dom,new Date(Date.now()+AUTOPAY_MIN_LEAD_MS));if(!next){send(res,400,{success:false,message:"Could not work out the next run date."});return true;}
+    const reminded=(next.getTime()-Date.now())<=24*60*60*1000?next:null;
+    const upd=await db(`UPDATE autopay_schedules SET frequency=$2,day_of_week=$3,day_of_month=$4,amount=$5,payload=$6::jsonb,label=$7,next_run_at=$8,cycle_for=$8,attempt=1,locked_until=NULL,reminded_for=$9,updated_at=NOW() WHERE id=$1 RETURNING *`,[id,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,JSON.stringify(built.payload),built.label,next,reminded]);
+    await autopayAudit(user.user_id,id,"edited",{service:built.service,frequency,amount:Number(built.amount),label:built.label});
+    await autopayNotify(user.user_id,"AutoPay updated",`${built.label} was updated. Next run: ${autopayDateText(next)} at 7:00 AM.`,`autopay-security-edit-${id}-${next.getTime()}`);
+    send(res,200,{success:true,message:"AutoPay updated.",schedule:autopayPublic(upd.rows[0])});return true;
+  }
+  if(req.method==="POST"&&path==="/api/autopay/bulk-action"){
+    const rl=rateLimit(req,`autopay-bulk:${user.user_id}`,10,15*60*1000);if(!rl.allowed){rateLimitedResponse(res,rl);return true;}
+    const b=await body(req),action=clean(b.action).toLowerCase();if(!["pause_all","resume_all"].includes(action)){send(res,400,{success:false,message:"Invalid request."});return true;}
+    if(action==="resume_all"&&!(await autopayEnabled())){send(res,503,{success:false,message:"AutoPay is not available right now."});return true;}
+    const rows=(await db(`SELECT * FROM autopay_schedules WHERE user_id=$1 AND status<>'deleted' ORDER BY id ASC`,[user.user_id])).rows;let changed=0;
+    for(const cur of rows){
+      if(action==="pause_all"){if(cur.status!=="paused"){await db(`UPDATE autopay_schedules SET status='paused',pause_reason='user',locked_until=NULL,updated_at=NOW() WHERE id=$1`,[cur.id]);changed++;await autopayAudit(user.user_id,cur.id,"paused_all",{});}}
+      else if(cur.status!=="active"){const agent=await getEffectiveAgentService(user.user_id,cur.service);if(agent.isAgent)continue;const next=autopayNextRun(cur.frequency,cur.day_of_week,cur.day_of_month,new Date(Date.now()+AUTOPAY_MIN_LEAD_MS));const reminded=next&&(next.getTime()-Date.now())<=24*60*60*1000?next:null;await db(`UPDATE autopay_schedules SET status='active',pause_reason=NULL,consecutive_failures=0,attempt=1,locked_until=NULL,next_run_at=$2,cycle_for=$2,reminded_for=$3,updated_at=NOW() WHERE id=$1`,[cur.id,next,reminded]);changed++;await autopayAudit(user.user_id,cur.id,"resumed_all",{nextRunAt:next});}
+    }
+    await autopayNotify(user.user_id,action==="pause_all"?"All AutoPays paused":"All AutoPays resumed",`${changed} AutoPay${changed===1?"":"s"} ${action==="pause_all"?"paused":"resumed"}.`, `autopay-security-${action}-${Date.now()}`);send(res,200,{success:true,changed});return true;
   }
   if(req.method==="POST"&&path==="/api/autopay/action"){
     const rl=rateLimit(req,`autopay-action:${user.user_id}`,30,15*60*1000);
@@ -5172,8 +5214,10 @@ async function handleAutopayRoutes(req,res,path,user){
     if(!cur){send(res,404,{success:false,message:"AutoPay not found."});return true;}
     if(action==="pause"){
       await db(`UPDATE autopay_schedules SET status='paused',pause_reason='user',updated_at=NOW() WHERE id=$1`,[id]);
+      await autopayAudit(user.user_id,id,"paused",{});await autopayNotify(user.user_id,"AutoPay paused",`${cur.label} was paused.`,`autopay-security-pause-${id}-${Date.now()}`);
     }else if(action==="delete"){
       await db(`UPDATE autopay_schedules SET status='deleted',updated_at=NOW() WHERE id=$1`,[id]);
+      await autopayAudit(user.user_id,id,"deleted",{});await autopayNotify(user.user_id,"AutoPay deleted",`${cur.label} was deleted and will no longer run.`,`autopay-security-delete-${id}-${Date.now()}`);
     }else{
       if(!(await autopayEnabled())){send(res,503,{success:false,message:"AutoPay is not available right now."});return true;}
       const agent=await getEffectiveAgentService(user.user_id,cur.service);
@@ -5181,6 +5225,7 @@ async function handleAutopayRoutes(req,res,path,user){
       const next=autopayNextRun(cur.frequency,cur.day_of_week,cur.day_of_month,new Date(Date.now()+AUTOPAY_MIN_LEAD_MS));
       const reminded=next&&(next.getTime()-Date.now())<=24*60*60*1000?next:null;
       await db(`UPDATE autopay_schedules SET status='active',pause_reason=NULL,consecutive_failures=0,attempt=1,locked_until=NULL,next_run_at=$2,cycle_for=$2,reminded_for=$3,updated_at=NOW() WHERE id=$1`,[id,next,reminded]);
+      await autopayAudit(user.user_id,id,"resumed",{nextRunAt:next});await autopayNotify(user.user_id,"AutoPay resumed",`${cur.label} was resumed. Next run: ${autopayDateText(next)} at 7:00 AM.`,`autopay-security-resume-${id}-${next.getTime()}`);
     }
     const fresh=(await db(`SELECT * FROM autopay_schedules WHERE id=$1`,[id])).rows[0];
     send(res,200,{success:true,schedule:autopayPublic(fresh)});

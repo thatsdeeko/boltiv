@@ -103,6 +103,7 @@ body.ap-open .bottom-nav{display:none}
 <label class="ap-label" for="cbPlan">SUBSCRIPTION PLAN</label><select class="ap-input" id="cbPlan" disabled><option>Verify your number first</option></select>
 </div>
 
+<label class="ap-label" for="apMaxAmount">MAXIMUM PAYMENT</label><input class="ap-input" id="apMaxAmount" inputmode="decimal" placeholder="Maximum amount per payment"/><div class="ap-hint">💡 Prices may change. Set the maximum amount you’re comfortable paying. If the current price is higher than your limit, we won’t charge you.</div>
 <label class="ap-label">HOW OFTEN</label>
 <div class="ap-grid ap-g2" id="apFreq"><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
 <div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
@@ -123,7 +124,7 @@ var API=window.BOLTIV_API_BASE||"";
 var $=function(id){return document.getElementById(id)};
 var NETS=["MTN","AIRTEL","GLO","9MOBILE"];
 var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[]};
+var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[],maxTouched:false};
 function money(n){return "₦"+Number(n||0).toLocaleString("en-NG",{minimumFractionDigits:0,maximumFractionDigits:2})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function ord(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
@@ -182,7 +183,7 @@ async function load(){
 function card(s){
   var active=s.status==="active";
   var next=active&&s.nextRunAt?"Next run: "+lagos(s.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM":(PAUSE[s.pauseReason]||"Paused.");
-  return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+(active?"ok":"gold")+'">'+(active?"ACTIVE":"PAUSED")+'</span></div>'
+  return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>Maximum: "+money(s.maxAmount||s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+(active?"ok":"gold")+'">'+(active?"ACTIVE":"PAUSED")+'</span></div>'
    +'<div class="ap-actions"><button class="ap-btn" data-edit="'+s.id+'" type="button">EDIT</button><button class="ap-btn" data-act="'+(active?"pause":"resume")+'" data-id="'+s.id+'" type="button">'+(active?"PAUSE":"RESUME")+'</button><button class="ap-btn danger" data-act="delete" data-id="'+s.id+'" type="button">DELETE</button></div></div>';
 }
 function runRow(r){
@@ -293,7 +294,7 @@ async function verifyCable(){
 }
 function resetCable(){state.cableVerified=false;state.cablePlans=[];$("cbPlan").disabled=true;$("cbPlan").innerHTML="<option>Verify your number first</option>";$("cbHint").textContent=""}
 function details(){
-  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc};
+  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,maxAmount=Number($("apMaxAmount").value),base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc,maxAmount:maxAmount};
   if(state.svc==="airtime"){
     var amt=Number($("atAmount").value),ph=$("atPhone").value.trim();
     if(!state.net.airtime||!/^0\d{10}$/.test(ph)||!(amt>=50&&Math.round(amt)===amt))return null;
@@ -313,8 +314,11 @@ function refresh(){
   $("apDow").style.display=f==="weekly"?"block":"none";$("apDom").style.display=f==="monthly"?"block":"none";
   mark($("apFreq"),f);
   if(!d){$("apSummary").textContent="Fill in the details above.";$("apCreate").disabled=true;return}
+  var currentAmount=state.svc==="airtime"?Number($("atAmount").value):state.svc==="data"?(state.selectedPlan?Number(state.selectedPlan.customer_price):0):(state.cablePlans[Number($("cbPlan").value)]?Number(state.cablePlans[Number($("cbPlan").value)].price):0);
+  if(!state.maxTouched&&currentAmount>0){$("apMaxAmount").value=String(Math.ceil(currentAmount));d.maxAmount=Number($("apMaxAmount").value);}
+  if(!Number.isFinite(d.maxAmount)||d.maxAmount<currentAmount||d.maxAmount>1000000){$("apSummary").innerHTML=esc(d._text)+"<br/><span style=\"color:#b3261e\">Set a maximum payment of at least "+money(currentAmount)+".</span>";$("apCreate").disabled=true;return;}
   var n=nextRun(f,d.dayOfWeek,d.dayOfMonth);
-  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b>";
+  $("apSummary").innerHTML=esc(d._text)+"<br/>Maximum payment: <b>"+money(d.maxAmount)+"</b><br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b>";
   $("apCreate").disabled=state.busy;
 }
 function openSheet(){$("apErr").style.display="none";$("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh()}
@@ -335,7 +339,7 @@ async function create(){
 }
 
 function openEdit(s){
-  state.editingId=Number(s.id);state.svc=s.service;state.freq=s.frequency;state.net.airtime=s.network||"";state.net.data=s.network||"";state.prov=s.network||"DSTV";
+  state.editingId=Number(s.id);state.maxTouched=true;state.svc=s.service;state.freq=s.frequency;state.net.airtime=s.network||"";state.net.data=s.network||"";state.prov=s.network||"DSTV";$("apMaxAmount").value=String(s.maxAmount||s.amount||"");
   $("apSheetTitle").textContent="Edit AutoPay";$("apCreate").textContent="SAVE CHANGES";
   if(s.service==="airtime"){$("atPhone").value=(s.recipient||"").replace(/\D/g,"");$("atAmount").value=String(s.amount||"");syncChips();}
   if(s.service==="data"){$("dtPhone").value=(s.recipient||"").replace(/\D/g,"");state.selectedPlan=null;state.prefillPlan={code:s.planCode||"",service_id:s.serviceId||""};}
@@ -352,7 +356,7 @@ async function bulkAction(action){
 
 /* ---------------- wiring ---------------- */
 buildNetGrids();
-$("apNew").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
+$("apNew").onclick=function(){state.editingId=null;state.maxTouched=false;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";$("apMaxAmount").value="";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;state.maxTouched=false;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
 $("apOverlay").addEventListener("click",function(e){if(e.target===$("apOverlay"))closeSheet()});
 $("apService").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.svc=b.getAttribute("data-v");showSvc()});
 $("apFreq").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.freq=b.getAttribute("data-v");refresh()});
@@ -360,7 +364,7 @@ $("cbProv").addEventListener("click",function(e){var b=e.target.closest("[data-v
 ["atPhone","dtPhone","cbCard"].forEach(function(id){$(id).addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");if(id==="cbCard")resetCable();state.networkConfirmed=false;refresh()})});
 $("atAmount").addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");syncChips();refresh()});
 ["cbPlan","apDowSel","apDomSel"].forEach(function(id){$(id).addEventListener("change",refresh)});
-$("cbVerify").onclick=verifyCable;$("apCreate").onclick=create;
+$("cbVerify").onclick=verifyCable;$("apMaxAmount").addEventListener("input",function(){this.value=this.value.replace(/[^0-9.]/g,"");state.maxTouched=true;refresh()});$("apCreate").onclick=create;
 
 /* "Repeat this every month?" links from the purchase pages open the sheet pre-filled */
 function prefill(){

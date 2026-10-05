@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><script src="/boltiv-theme.js?v=20261004-dark2"></script><link href="/boltiv-theme.css?v=20261004-dark2" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="noindex,nofollow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=20261004-dark"></script><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="#f7f7f5" name="theme-color"/><meta content="Automatic airtime, data and cable TV payments from your BOLTIV wallet." name="description"/>
+<title>BOLTIV — AutoPay</title><link href="style.css?v=20261004-dark" rel="stylesheet"/><script src="transaction-pin.js?v=20261004-dark"></script><script>boltivRequireAuth();</script><style>
+.ap-page{min-height:100vh;padding-bottom:120px}
+.ap-header{display:flex;align-items:center;gap:13px;padding:18px 0 22px}
+.ap-back{width:40px;height:40px;border-radius:12px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:#D4AF37;font-size:22px;cursor:pointer}
+.ap-title{color:#D4AF37;font-size:20.9px;font-weight:1000}
+.ap-sub{color:var(--t-fg-666666);font-size:10px;margin-top:4px;letter-spacing:.4px}
+.ap-hero{padding:22px;border-radius:23px;background:radial-gradient(circle at 90% 10%,rgba(212,175,55,.16),transparent 38%),linear-gradient(145deg,var(--t-bg-fffdf4),var(--t-bg-ffffff));border:1px solid var(--t-bd-e5e5e1);margin-bottom:16px}
+.ap-hero-label{color:#D4AF37;font-size:10px;font-weight:1000;letter-spacing:1px}
+.ap-hero-title{color:var(--t-fg-171717);font-size:22px;font-weight:1000;margin-top:7px}
+.ap-hero-text{color:var(--t-fg-777777);font-size:11px;line-height:1.6;margin-top:6px}
+.ap-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.ap-stat{padding:14px;border-radius:16px;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1)}
+.ap-stat small{display:block;color:var(--t-fg-777777);font-size:9px;font-weight:900;letter-spacing:.6px}
+.ap-stat b{display:block;color:var(--t-fg-171717);font-size:16px;font-weight:1000;margin-top:6px}
+.ap-notice{padding:13px 14px;border-radius:14px;background:var(--t-bg-fff9e6);border:1px solid var(--t-bd-ead99b);color:var(--t-fg-8b6c08);font-size:11px;font-weight:800;line-height:1.5;margin-bottom:14px}
+.ap-notice.bad{background:var(--t-bg-fff1f1);border-color:var(--t-bd-e7baba);color:var(--t-fg-b94c4c)}
+.ap-section{display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px}
+.ap-section h2{margin:0;color:var(--t-fg-171717);font-size:12px;font-weight:1000;letter-spacing:1px}
+.ap-card{padding:16px;border-radius:18px;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1);margin-bottom:10px}
+.ap-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.ap-name{color:var(--t-fg-171717);font-size:13px;font-weight:1000}
+.ap-meta{color:var(--t-fg-777777);font-size:10.5px;line-height:1.55;margin-top:4px}
+.ap-pill{flex:none;padding:5px 9px;border-radius:999px;font-size:8.5px;font-weight:1000;letter-spacing:.5px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-777777)}
+.ap-pill.ok{background:var(--t-bg-f0fdf4);border-color:var(--t-bd-bbf7d0);color:var(--t-fg-17833d)}
+.ap-pill.gold{background:var(--t-bg-fff9e6);border-color:var(--t-bd-ead99b);color:var(--t-fg-8b6c08)}
+.ap-pill.bad{background:var(--t-bg-fff1f1);border-color:var(--t-bd-e7baba);color:var(--t-fg-b94c4c)}
+.ap-actions{display:flex;gap:8px;margin-top:12px}
+.ap-btn{border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-171717);border-radius:11px;padding:9px 14px;font-family:inherit;font-size:10px;font-weight:1000;letter-spacing:.4px;cursor:pointer}
+.ap-btn.danger{color:var(--t-fg-b94c4c)}
+.ap-primary{width:100%;border:0;border-radius:14px;padding:16px;background:#D4AF37;color:#171717;font-family:inherit;font-size:12px;font-weight:1000;letter-spacing:.6px;cursor:pointer}
+.ap-primary:disabled{opacity:.45;cursor:not-allowed}
+.ap-empty{padding:26px 16px;text-align:center;border:1px dashed var(--t-bd-e5e5e1);border-radius:18px;color:var(--t-fg-777777);font-size:11px;line-height:1.6}
+.ap-empty b{display:block;color:var(--t-fg-171717);font-size:13px;margin-bottom:4px}
+.ap-run-amt{color:var(--t-fg-171717);font-size:12px;font-weight:1000;white-space:nowrap}
+.ap-run-cb{color:var(--t-fg-17833d);font-size:10px;font-weight:900;margin-top:3px}
+.ap-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:none;align-items:flex-end;justify-content:center}
+.ap-overlay.show{display:flex}
+.ap-sheet{width:100%;max-width:520px;max-height:92vh;overflow-y:auto;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1);border-radius:24px 24px 0 0;padding:20px 18px 26px;box-sizing:border-box}
+.ap-sheet-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.ap-sheet-top h3{margin:0;color:var(--t-fg-171717);font-size:16px;font-weight:1000}
+.ap-x{width:34px;height:34px;border-radius:50%;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-777777);font-size:18px;cursor:pointer}
+.ap-label{display:block;color:var(--t-fg-777777);font-size:10px;font-weight:900;letter-spacing:.6px;margin:14px 0 8px}
+.ap-input{width:100%;box-sizing:border-box;padding:14px;border-radius:13px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:var(--t-fg-171717);outline:none;font-family:inherit;font-size:13px;font-weight:800}
+.ap-input:focus{border-color:#D4AF37}
+.ap-grid{display:grid;gap:8px}
+.ap-g2{grid-template-columns:repeat(2,1fr)}.ap-g3{grid-template-columns:repeat(3,1fr)}.ap-g4{grid-template-columns:repeat(4,1fr)}
+.ap-opt{border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-777777);border-radius:12px;padding:12px 6px;font-family:inherit;font-size:10px;font-weight:1000;cursor:pointer}
+.ap-opt.on{color:#D4AF37;border-color:#D4AF37;background:var(--t-bg-fffdf4)}
+.ap-hint{color:var(--t-fg-777777);font-size:10px;line-height:1.5;margin-top:7px}
+.ap-sum{margin-top:16px;padding:13px 14px;border-radius:14px;background:var(--t-bg-fffdf4);border:1px solid var(--t-bd-ebe5d2);color:var(--t-fg-171717);font-size:11px;font-weight:800;line-height:1.6}
+body.ap-open .bottom-nav{display:none}
+.ap-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);max-width:88%;padding:12px 16px;border-radius:12px;background:#171717;color:#fff;font-size:11px;font-weight:800;z-index:3000;display:none;text-align:center}
+.ap-err{color:var(--t-fg-b94c4c);font-size:10.5px;font-weight:800;margin-top:10px;display:none}
+</style><link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<style>:focus-visible{outline:3px solid #D4AF37;outline-offset:3px}</style><link rel="manifest" href="/manifest.webmanifest">
+</head><body><div class="page ap-page"><div class="container">
+<div class="ap-header"><button class="ap-back" onclick="if(history.length>1)history.back();else location.href='/dashboard'" aria-label="Back">‹</button><div><div class="ap-title">AutoPay</div><div class="ap-sub">AUTOMATIC REPEAT PURCHASES</div></div></div>
+<div class="ap-hero"><div class="ap-hero-label">BOLTIV AUTOPAY</div><div class="ap-hero-title">Set it once. Stay topped up.</div><div class="ap-hero-text">Airtime, data and cable TV are paid automatically from your wallet at 7:00 AM on the day you choose. Data purchases still earn cashback.</div></div>
+<div id="apNotice"></div>
+<div class="ap-stats"><div class="ap-stat"><small>WALLET BALANCE</small><b id="apBalance">—</b></div><div class="ap-stat"><small>AUTOPAY CASHBACK</small><b id="apCashback">—</b></div></div>
+<div class="ap-section"><h2>YOUR AUTOPAYS</h2><small id="apCount" style="color:var(--t-fg-777777);font-size:10px;font-weight:800"></small></div>
+<div id="apList"><div class="ap-empty">Loading…</div></div>
+<button class="ap-primary" id="apNew" style="margin-top:6px" disabled>+ CREATE AUTOPAY</button>
+<div class="ap-section"><h2>RECENT RUNS</h2></div>
+<div id="apRuns"></div>
+</div></div>
+
+<div class="ap-overlay" id="apOverlay"><div class="ap-sheet" role="dialog" aria-modal="true" aria-label="Create AutoPay">
+<div class="ap-sheet-top"><h3>New AutoPay</h3><button class="ap-x" id="apClose" aria-label="Close">×</button></div>
+<label class="ap-label" style="margin-top:0">SERVICE</label>
+<div class="ap-grid ap-g3" id="apService"><button class="ap-opt on" data-v="airtime" type="button">Airtime</button><button class="ap-opt" data-v="data" type="button">Data</button><button class="ap-opt" data-v="cable" type="button">Cable TV</button></div>
+
+<div id="apAirtime">
+<label class="ap-label">NETWORK</label><div class="ap-grid ap-g4" data-net="airtime"></div>
+<label class="ap-label" for="atPhone">PHONE NUMBER</label><input class="ap-input" id="atPhone" inputmode="numeric" maxlength="11" placeholder="08012345678"/>
+<label class="ap-label">AMOUNT</label><div class="ap-grid ap-g4" id="atChips"></div>
+<input class="ap-input" id="atAmount" inputmode="numeric" placeholder="Or enter amount (min ₦50)" style="margin-top:8px"/>
+</div>
+
+<div id="apData" style="display:none">
+<label class="ap-label">NETWORK</label><div class="ap-grid ap-g4" data-net="data"></div>
+<label class="ap-label" for="dtPhone">PHONE NUMBER</label><input class="ap-input" id="dtPhone" inputmode="numeric" maxlength="11" placeholder="08012345678"/>
+<label class="ap-label" for="dtPlan">DATA PLAN</label><select class="ap-input" id="dtPlan" disabled><option>Choose a network first</option></select>
+<div class="ap-hint" id="dtHint"></div>
+</div>
+
+<div id="apCable" style="display:none">
+<label class="ap-label">PROVIDER</label><div class="ap-grid ap-g2" id="cbProv"><button class="ap-opt on" data-v="DSTV" type="button">DStv</button><button class="ap-opt" data-v="GOTV" type="button">GOtv</button></div>
+<label class="ap-label" for="cbCard">SMARTCARD / IUC NUMBER</label><input class="ap-input" id="cbCard" inputmode="numeric" maxlength="20" placeholder="Enter smartcard number"/>
+<button class="ap-btn" id="cbVerify" type="button" style="margin-top:10px;width:100%;padding:12px">VERIFY NUMBER</button>
+<div class="ap-hint" id="cbHint"></div>
+<label class="ap-label" for="cbPlan">SUBSCRIPTION PLAN</label><select class="ap-input" id="cbPlan" disabled><option>Verify your number first</option></select>
+</div>
+
+<label class="ap-label">HOW OFTEN</label>
+<div class="ap-grid ap-g2" id="apFreq"><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
+<div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
+<div id="apDom" style="display:none"><label class="ap-label" for="apDomSel">DAY OF THE MONTH</label><select class="ap-input" id="apDomSel"></select><div class="ap-hint">In months with fewer days, it runs on the last day of the month.</div></div>
+<div class="ap-sum" id="apSummary">Fill in the details above.</div>
+<div class="ap-err" id="apErr"></div>
+<button class="ap-primary" id="apCreate" style="margin-top:14px" disabled>CREATE AUTOPAY</button>
+<div class="ap-hint" style="text-align:center;margin-top:10px">You'll enter your Transaction PIN once. Runs skip automatically if your wallet balance is too low.</div>
+</div></div>
+<div class="ap-toast" id="apToast"></div>
+
+<nav class="bottom-nav"><button class="nav-item" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button><button class="nav-item" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button><button class="nav-item" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button><button class="nav-item" onclick="location.href='/profile'"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span>Profile</button></nav>
+
+<script>
+(function(){
+"use strict";
+var API=window.BOLTIV_API_BASE||"";
+var $=function(id){return document.getElementById(id)};
+var NETS=["MTN","AIRTEL","GLO","9MOBILE"];
+var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false};
+function money(n){return "₦"+Number(n||0).toLocaleString("en-NG",{minimumFractionDigits:0,maximumFractionDigits:2})}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
+function ord(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
+function lagos(d,o){return new Date(d).toLocaleDateString("en-NG",Object.assign({timeZone:"Africa/Lagos"},o))}
+function toast(m){var t=$("apToast");t.textContent=m;t.style.display="block";clearTimeout(toast._t);toast._t=setTimeout(function(){t.style.display="none"},3200)}
+function token(){return boltivMemoryStorage.getItem("boltivAuthToken")||""}
+async function api(path,body){
+  var opt={method:body?"POST":"GET",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token()}};
+  if(body)opt.body=JSON.stringify(body);
+  var r=await fetch(API+path,opt),d={};try{d=await r.json()}catch(e){}
+  if(r.status===401){try{boltivMemoryStorage.clear()}catch(e){}location.replace("/login");throw new Error("SESSION_EXPIRED")}
+  d._status=r.status;return d;
+}
+/* same schedule maths as the server (runs at 06:00 UTC = 07:00 in Nigeria) */
+function nextRun(freq,dow,dom){
+  var from=new Date(Date.now()+12*3600*1000);
+  for(var add=0;add<=70;add++){
+    var d=new Date(Date.UTC(from.getUTCFullYear(),from.getUTCMonth(),from.getUTCDate()+add,6,0,0));
+    if(d<=from)continue;
+    if(freq==="weekly"){if(d.getUTCDay()===dow)return d}
+    else{var last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();if(d.getUTCDate()===Math.min(dom,last))return d}
+  }
+  return null;
+}
+function when(s){return s.frequency==="weekly"?"Every "+DAYS[s.dayOfWeek]:"Monthly on the "+ord(s.dayOfMonth)}
+var PAUSE={failures:"Paused after 3 missed runs. Fund your wallet, then tap Resume.",user:"Paused by you.",agent:"Not available for agent accounts.",account:"Not available for this account."};
+var RUN={successful:["Successful","ok"],pending:["Processing","gold"],skipped:["Skipped","gold"],failed:["Failed","bad"]};
+
+/* ---------------- list ---------------- */
+async function load(){
+  try{
+    var d=await api("/api/autopay");
+    if(!d.success)throw new Error(d.message||"Could not load AutoPay.");
+    state.enabled=d.enabled!==false;state.max=d.maxSchedules||5;state.count=d.schedules.length;
+    $("apBalance").textContent=money(d.walletBalance);$("apCashback").textContent=money(d.cashbackEarned);
+    $("apCount").textContent=d.schedules.length+" / "+state.max;
+    var notes="";
+    if(!state.enabled)notes+='<div class="ap-notice bad">AutoPay is temporarily unavailable. Your schedules are saved and nothing will run until it is back.</div>';
+    var low=d.schedules.filter(function(s){return s.status==="active"&&s.amount>d.walletBalance});
+    if(state.enabled&&low.length)notes+='<div class="ap-notice">Your wallet balance is lower than the amount of '+(low.length===1?"one of your AutoPays":low.length+" of your AutoPays")+'. Fund your wallet so it doesn\'t get skipped.</div>';
+    if(d.schedules.some(function(s){return s.status==="paused"&&s.pauseReason==="failures"}))notes+='<div class="ap-notice bad">An AutoPay was paused after 3 missed runs. Fund your wallet, then tap Resume.</div>';
+    $("apNotice").innerHTML=notes;
+    $("apList").innerHTML=d.schedules.length?d.schedules.map(card).join(""):'<div class="ap-empty"><b>No AutoPays yet</b>Create one to pay for airtime, data or cable TV automatically.</div>';
+    $("apRuns").innerHTML=d.runs.length?d.runs.map(runRow).join(""):'<div class="ap-empty">Your AutoPay runs will appear here.</div>';
+    var full=state.count>=state.max;
+    $("apNew").disabled=!state.enabled||full;
+    $("apNew").textContent=full?"MAXIMUM "+state.max+" AUTOPAYS REACHED":"+ CREATE AUTOPAY";
+  }catch(e){
+    if(e.message==="SESSION_EXPIRED")return;
+    $("apList").innerHTML='<div class="ap-empty"><b>Could not load AutoPay</b>'+esc(e.message||"Please try again.")+'</div>';
+  }
+}
+function card(s){
+  var active=s.status==="active";
+  var next=active&&s.nextRunAt?"Next run: "+lagos(s.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM":(PAUSE[s.pauseReason]||"Paused.");
+  return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+(active?"ok":"gold")+'">'+(active?"ACTIVE":"PAUSED")+'</span></div>'
+   +'<div class="ap-actions"><button class="ap-btn" data-act="'+(active?"pause":"resume")+'" data-id="'+s.id+'" type="button">'+(active?"PAUSE":"RESUME")+'</button><button class="ap-btn danger" data-act="delete" data-id="'+s.id+'" type="button">DELETE</button></div></div>';
+}
+function runRow(r){
+  var st=RUN[r.status]||[r.status,""];
+  return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(r.label)+'</div><div class="ap-meta">'+lagos(r.finishedAt||r.scheduledFor,{day:"numeric",month:"short",year:"numeric"})+(r.message&&r.status!=="successful"?"<br/>"+esc(r.message):"")+'</div>'+(r.cashback>0?'<div class="ap-run-cb">+ '+money(r.cashback)+' cashback</div>':"")+'</div><div style="text-align:right"><div class="ap-run-amt">'+money(r.amount)+'</div><span class="ap-pill '+st[1]+'" style="display:inline-block;margin-top:6px">'+st[0].toUpperCase()+'</span></div></div></div>';
+}
+$("apList").addEventListener("click",async function(e){
+  var b=e.target.closest("[data-act]");if(!b)return;
+  var act=b.getAttribute("data-act"),id=Number(b.getAttribute("data-id"));
+  if(act==="delete"&&!confirm("Delete this AutoPay? It will stop running."))return;
+  b.disabled=true;
+  try{var d=await api("/api/autopay/action",{id:id,action:act});if(!d.success)throw new Error(d.message||"Something went wrong.");toast(act==="delete"?"AutoPay deleted.":act==="pause"?"AutoPay paused.":"AutoPay resumed.");}
+  catch(err){if(err.message!=="SESSION_EXPIRED")toast(err.message)}
+  await load();
+});
+
+/* ---------------- create sheet ---------------- */
+function buildNetGrids(){
+  document.querySelectorAll("[data-net]").forEach(function(g){
+    var svc=g.getAttribute("data-net");
+    g.innerHTML=NETS.map(function(n){return '<button class="ap-opt" data-v="'+n+'" type="button">'+n+'</button>'}).join("");
+    g.addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.net[svc]=b.getAttribute("data-v");state.networkConfirmed=false;mark(g,state.net[svc]);if(svc==="data")loadPlans();refresh()});
+  });
+  $("atChips").innerHTML=[100,200,500,1000].map(function(n){return '<button class="ap-opt" data-v="'+n+'" type="button">₦'+n.toLocaleString("en-NG")+'</button>'}).join("");
+  $("atChips").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;$("atAmount").value=b.getAttribute("data-v");syncChips();refresh()});
+  var dom=$("apDomSel");for(var i=1;i<=31;i++){var o=document.createElement("option");o.value=i;o.textContent=ord(i);dom.appendChild(o)}
+}
+function mark(group,v){group.querySelectorAll("[data-v]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-v")===String(v))})}
+function syncChips(){mark($("atChips"),$("atAmount").value.trim())}
+function showSvc(){
+  ["airtime","data","cable"].forEach(function(s){$("ap"+s.charAt(0).toUpperCase()+s.slice(1)).style.display=state.svc===s?"block":"none"});
+  mark($("apService"),state.svc);refresh();
+}
+async function loadPlans(){
+  var sel=$("dtPlan"),net=state.net.data;state.plans=[];
+  if(!net){sel.disabled=true;sel.innerHTML="<option>Choose a network first</option>";return}
+  sel.disabled=true;sel.innerHTML="<option>Loading plans…</option>";$("dtHint").textContent="";
+  try{
+    var d=await api("/api/vtu/data/plans",{network:net});
+    if(!d.success)throw new Error(d.message||"Could not load plans.");
+    state.plans=d.plans||[];
+    sel.innerHTML='<option value="">Choose a plan</option>'+state.plans.map(function(p,i){return '<option value="'+i+'">'+esc(p.name)+" — "+money(p.customer_price)+"</option>"}).join("");
+    sel.disabled=false;
+    if(state.prefillPlan){var i2=state.plans.findIndex(function(p){return p.code===state.prefillPlan.code&&String(p.service_id)===String(state.prefillPlan.service_id)});if(i2>=0){sel.value=String(i2)}state.prefillPlan=null}
+  }catch(e){sel.innerHTML="<option>Could not load plans</option>";$("dtHint").textContent=e.message||""}
+  refresh();
+}
+async function verifyCable(){
+  var n=$("cbCard").value.trim(),hint=$("cbHint");
+  if(!/^\d{8,20}$/.test(n)){hint.textContent="Enter a valid smartcard or IUC number.";return}
+  $("cbVerify").disabled=true;hint.textContent="Verifying with your cable provider…";
+  try{
+    var d=await api("/api/vtu/cable/verify",{provider:state.prov,smartcard:n});
+    if(!d.success)throw new Error(d.message||"We couldn't verify this number.");
+    state.cableVerified=true;
+    var name=(d.customer&&(d.customer.customer_name||d.customer.name||d.customer.customerName))||"";
+    hint.textContent=name?"Verified: "+name:"Number verified.";
+    var names=Object.keys(d.plans||{});state.cablePlans=names.map(function(k){return{name:k,price:Number(d.plans[k].customer_price)}});
+    var sel=$("cbPlan");sel.innerHTML='<option value="">Choose a plan</option>'+state.cablePlans.map(function(p,i){return '<option value="'+i+'">'+esc(p.name)+" — "+money(p.price)+"</option>"}).join("");sel.disabled=false;
+    if(state.prefillCablePlan){var i3=state.cablePlans.findIndex(function(p){return p.name===state.prefillCablePlan});if(i3>=0)sel.value=String(i3);state.prefillCablePlan=null}
+  }catch(e){state.cableVerified=false;hint.textContent=e.message||"Verification failed."}
+  $("cbVerify").disabled=false;refresh();
+}
+function resetCable(){state.cableVerified=false;state.cablePlans=[];$("cbPlan").disabled=true;$("cbPlan").innerHTML="<option>Verify your number first</option>";$("cbHint").textContent=""}
+function details(){
+  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc};
+  if(state.svc==="airtime"){
+    var amt=Number($("atAmount").value),ph=$("atPhone").value.trim();
+    if(!state.net.airtime||!/^0\d{10}$/.test(ph)||!(amt>=50&&Math.round(amt)===amt))return null;
+    return Object.assign(base,{network:state.net.airtime,phone:ph,amount:amt,networkConfirmed:state.networkConfirmed,_text:money(amt)+" "+state.net.airtime+" airtime to "+ph});
+  }
+  if(state.svc==="data"){
+    var p=state.plans[Number($("dtPlan").value)],ph2=$("dtPhone").value.trim();
+    if(!state.net.data||!p||!/^0\d{10}$/.test(ph2))return null;
+    return Object.assign(base,{network:state.net.data,phone:ph2,plan_code:p.code,service_id:p.service_id,bundle_id:p.bundle_id,plan_name:p.name,_text:p.name+" ("+state.net.data+", "+money(p.customer_price)+") for "+ph2});
+  }
+  var cp=state.cablePlans[Number($("cbPlan").value)],card=$("cbCard").value.trim();
+  if(!state.cableVerified||!cp||!/^\d{8,20}$/.test(card))return null;
+  return Object.assign(base,{provider:state.prov,smartcard:card,plan:cp.name,_text:state.prov+" "+cp.name+" ("+money(cp.price)+") for card ending "+card.slice(-4)});
+}
+function refresh(){
+  var d=details(),f=state.freq;
+  $("apDow").style.display=f==="weekly"?"block":"none";$("apDom").style.display=f==="monthly"?"block":"none";
+  mark($("apFreq"),f);
+  if(!d){$("apSummary").textContent="Fill in the details above.";$("apCreate").disabled=true;return}
+  var n=nextRun(f,d.dayOfWeek,d.dayOfMonth);
+  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b>";
+  $("apCreate").disabled=state.busy;
+}
+function openSheet(){$("apErr").style.display="none";$("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh()}
+function closeSheet(){$("apOverlay").classList.remove("show");document.body.classList.remove("ap-open")}
+async function create(){
+  var d=details();if(!d||state.busy)return;
+  var pin=await boltivGetTransactionPin();if(!pin)return;
+  state.busy=true;$("apCreate").disabled=true;$("apCreate").textContent="CREATING…";$("apErr").style.display="none";
+  var body=Object.assign({},d,{transactionPin:pin});delete body._text;
+  try{
+    var r=await api("/api/autopay/create",body);
+    if(!r.success&&r.requiresNetworkConfirmation){
+      if(confirm((r.message||"This number may be on a different network.")+"\n\nContinue with "+state.net.airtime+"?")){state.networkConfirmed=true;state.busy=false;$("apCreate").textContent="CREATE AUTOPAY";return create()}
+      throw new Error("Choose the correct network and try again.");
+    }
+    if(!r.success)throw new Error(r.message||"Could not create AutoPay.");
+    closeSheet();toast("AutoPay created. First run: "+lagos(r.schedule.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM.");
+    await load();
+  }catch(e){if(e.message!=="SESSION_EXPIRED"){$("apErr").textContent=e.message;$("apErr").style.display="block"}}
+  state.busy=false;$("apCreate").textContent="CREATE AUTOPAY";refresh();
+}
+
+/* ---------------- wiring ---------------- */
+buildNetGrids();
+$("apNew").onclick=openSheet;$("apClose").onclick=closeSheet;
+$("apOverlay").addEventListener("click",function(e){if(e.target===$("apOverlay"))closeSheet()});
+$("apService").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.svc=b.getAttribute("data-v");showSvc()});
+$("apFreq").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.freq=b.getAttribute("data-v");refresh()});
+$("cbProv").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.prov=b.getAttribute("data-v");mark($("cbProv"),state.prov);resetCable();refresh()});
+["atPhone","dtPhone","cbCard"].forEach(function(id){$(id).addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");if(id==="cbCard")resetCable();state.networkConfirmed=false;refresh()})});
+$("atAmount").addEventListener("input",function(){this.value=this.value.replace(/\D/g,"");syncChips();refresh()});
+["dtPlan","cbPlan","apDowSel","apDomSel"].forEach(function(id){$(id).addEventListener("change",refresh)});
+$("cbVerify").onclick=verifyCable;$("apCreate").onclick=create;
+
+/* "Repeat this every month?" links from the purchase pages open the sheet pre-filled */
+function prefill(){
+  var q=new URLSearchParams(location.search);if(q.get("new")!=="1")return;
+  var svc=q.get("service");if(["airtime","data","cable"].indexOf(svc)<0)return;
+  state.svc=svc;
+  if(svc==="airtime"){var n=(q.get("network")||"").toUpperCase();if(NETS.indexOf(n)>=0){state.net.airtime=n;mark(document.querySelector('[data-net="airtime"]'),n)}$("atPhone").value=(q.get("phone")||"").replace(/\D/g,"");$("atAmount").value=(q.get("amount")||"").replace(/\D/g,"");syncChips()}
+  if(svc==="data"){var n2=(q.get("network")||"").toUpperCase();if(NETS.indexOf(n2)>=0){state.net.data=n2;mark(document.querySelector('[data-net="data"]'),n2);state.prefillPlan={code:q.get("plan_code")||"",service_id:q.get("service_id")||""};loadPlans()}$("dtPhone").value=(q.get("phone")||"").replace(/\D/g,"")}
+  if(svc==="cable"){var pv=(q.get("provider")||"DSTV").toUpperCase();state.prov=pv==="GOTV"?"GOTV":"DSTV";mark($("cbProv"),state.prov);$("cbCard").value=(q.get("smartcard")||"").replace(/\D/g,"");state.prefillCablePlan=q.get("plan")||"";if($("cbCard").value)verifyCable()}
+  showSvc();
+  history.replaceState(null,"","/autopay");
+  var wait=setInterval(function(){if(!$("apNew").disabled||state.count>=state.max){clearInterval(wait);if(!$("apNew").disabled)openSheet()}},150);setTimeout(function(){clearInterval(wait)},6000);
+}
+showSvc();load().then(prefill);
+})();
+</script><script src="/boltiv-install.js?v=20261004-dark"></script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
+</body></html>

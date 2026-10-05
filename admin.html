@@ -615,6 +615,14 @@ ACTIVE
 </div>
 <div class="activity">
 <div>
+<strong>AutoPay</strong>
+<br/>
+<small>Scheduled airtime, data and cable TV purchases. Turning it off stops all runs and new AutoPays; saved schedules are kept.</small>
+</div>
+<button class="btn" id="autopayBtn" onclick="toggleAutopay()">LOADING</button>
+</div>
+<div class="activity">
+<div>
 <strong>Referral Program</strong>
 <br/>
 <small>Reward customers who bring friends. Turning it off stops new links and rewards.</small>
@@ -961,8 +969,9 @@ async function loadSettings(){try{const d=await api('/api/admin/settings');const
 async function updateSettings(patch){try{const d=await api('/api/admin/settings',{method:'PATCH',body:JSON.stringify(patch)});const s=d.settings||{};if($('maintenanceBtn'))$('maintenanceBtn').textContent=s.maintenance_mode?'ENABLED':'DISABLED';if($('registrationBtn'))$('registrationBtn').textContent=s.registration_enabled?'ENABLED':'DISABLED';renderCashbackSetting(s);return s}catch(e){alert(e.message);throw e}}
 async function toggleMaintenance(){const d=await api('/api/admin/settings');await updateSettings({maintenance_mode:!d.settings.maintenance_mode});}
 async function toggleRegistration(){const d=await api('/api/admin/settings');await updateSettings({registration_enabled:!d.settings.registration_enabled});}
-function renderCashbackSetting(s){const b=$('cashbackBtn');if(!b||!s)return;const on=s.cashback_enabled!==false;b.textContent=on?'ENABLED':'DISABLED';b.classList.toggle('primary',on);const rb=$('referralBtn');if(rb){const ron=s.referral_enabled!==false;rb.textContent=ron?'ENABLED':'DISABLED';rb.classList.toggle('primary',ron);}loadBonusStats();}
+function renderCashbackSetting(s){const ab=$('autopayBtn');if(ab&&s){const aon=s.autopay_enabled!==false;ab.textContent=aon?'ENABLED':'DISABLED';ab.classList.toggle('primary',aon);}const b=$('cashbackBtn');if(!b||!s)return;const on=s.cashback_enabled!==false;b.textContent=on?'ENABLED':'DISABLED';b.classList.toggle('primary',on);const rb=$('referralBtn');if(rb){const ron=s.referral_enabled!==false;rb.textContent=ron?'ENABLED':'DISABLED';rb.classList.toggle('primary',ron);}loadBonusStats();}
 async function toggleReferral(){const d=await api('/api/admin/settings');const on=d.settings.referral_enabled!==false;await updateSettings({referral_enabled:!on});}
+async function toggleAutopay(){const d=await api('/api/admin/settings');const on=d.settings.autopay_enabled!==false;if(on&&!confirm('Turn AutoPay OFF? No scheduled purchases will run until you turn it back on.'))return;await updateSettings({autopay_enabled:!on});}
 async function toggleCashback(){const d=await api('/api/admin/settings');const on=d.settings.cashback_enabled!==false;await updateSettings({cashback_enabled:!on});}
 async function loadBonusStats(){try{const d=await api('/api/admin/revenue');const b=d&&d.summary&&d.summary.bonus;const el=$('bonusStats');if(!el||!b)return;const f=n=>'\u20A6'+Number(n||0).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2});el.textContent='Issued '+f(b.issued)+' | Used '+f(b.spent)+' | Expired '+f(b.expired)+' | Outstanding '+f(b.outstanding);const rs=$('referralStats');if(rs&&b.referral)rs.textContent='Referred '+b.referral.total+' | Rewarded '+b.referral.rewarded+' | Bonus paid '+f(b.referral.paid);}catch(e){}}
 async function loadSecurity(){try{const [e,s]=await Promise.all([api('/api/admin/security/events'),api('/api/admin/security/sessions')]);const events=e.events||[],sessions=s.sessions||[];$('securityEventsCount').textContent=events.length;$('activeSessionsCount').textContent=sessions.length;$('securityEvents').innerHTML=events.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>EVENT</th><th>SEVERITY</th><th>ADMIN</th><th>DETAILS</th></tr></thead><tbody>'+events.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.event_type)}</td><td>${esc(x.severity)}</td><td>${esc(x.email||x.admin_id||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">No security events available.</div>'}catch(e){$('securityEvents').innerHTML='<div class="error-box">'+esc(e.message)+'</div>'}}

@@ -107,6 +107,23 @@ body.modal-open{overflow:hidden!important}
 .bottom-nav .nav-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.bottom-nav .nav-icon.nav-icon-text{font-size:18px!important;font-weight:900}
 @media(max-width:899px){.home-balance-card{border-radius:22px!important}.home-service-card .service-icon{width:38px;height:38px;border-radius:12px}.service-icon svg{width:18px;height:18px}}
 </style>
+<style id="boltiv-smart-features-inline">
+.smart-features-section{margin-top:18px}
+.smart-features-header{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:12px}
+.smart-features-title-wrap{min-width:0}
+.smart-features-kicker{font-size:10px;font-weight:900;letter-spacing:.16em;color:var(--t-fg-a17b13);margin-bottom:4px}
+.smart-features-title{margin:0;font-size:16px;font-weight:900;letter-spacing:.02em;color:var(--t-fg-171717)}
+.smart-features-subtitle{margin:4px 0 0;font-size:11px;line-height:1.45;color:var(--t-fg-817b70);max-width:360px}
+.smart-feature-card{display:flex;align-items:center;gap:13px;width:100%;padding:15px;text-decoration:none;border:1px solid rgba(197,154,28,.22);border-radius:20px;background:linear-gradient(145deg,var(--t-bg-ffffff),var(--t-bg-fffdf7));box-shadow:0 10px 28px rgba(30,24,10,.055);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.smart-feature-card:hover{transform:translateY(-2px);border-color:rgba(197,154,28,.42);box-shadow:0 14px 32px rgba(30,24,10,.09)}
+.smart-feature-icon{width:44px;height:44px;flex:0 0 auto;border-radius:14px;display:grid;place-items:center;background:var(--t-bg-faf3d9);color:var(--t-fg-a17b13);border:1px solid #e4ce7a}
+.smart-feature-icon svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.smart-feature-content{min-width:0;flex:1}
+.smart-feature-content strong{display:block;font-size:13px;color:var(--t-fg-24211d)}
+.smart-feature-content small{display:block;margin-top:3px;font-size:10.5px;line-height:1.45;color:var(--t-fg-888174)}
+.smart-feature-arrow{color:var(--t-fg-a17b13);font-size:20px;line-height:1;flex:0 0 auto}
+@media(max-width:560px){.smart-features-header{align-items:flex-start}.smart-feature-card{padding:14px}.smart-feature-icon{width:42px;height:42px}}
+</style>
 </head>
 <body class="boltiv-animated-home">
 <div aria-hidden="true" class="home-ambient">
@@ -160,25 +177,27 @@ body.modal-open{overflow:hidden!important}
 </div>
 </section>
 <section class="section home-services-section" id="quickServicesSection">
-<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><button class="section-link home-services-toggle" id="homeServicesToggle" type="button" aria-expanded="false">More services →</button></div>
+<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2></div>
 <div class="home-service-grid">
 <a class="home-service-card" href="/airtime"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.2"></rect><path d="M10 6h4M11 18h2"></path></svg></span><strong>Airtime</strong><small>Recharge any network</small></a>
 <a class="home-service-card" href="/data"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5a11 11 0 0 1 16 0M7 12.5a7 7 0 0 1 10 0M10 15.5a3 3 0 0 1 4 0"></path><circle cx="12" cy="18" r="1"></circle></svg></span><strong>Data</strong><small>Choose a live bundle</small></a>
 <a class="home-service-card" href="/cable"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="12" rx="2"></rect><path d="M8 21h8M12 17v4M9 3l3 3 3-3"></path></svg></span><strong>Cable TV</strong><small>Renew your subscription</small></a>
 <a class="home-service-card" href="/electricity"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.8 5.8 13h5.3l-.8 8.2L18.2 11h-5.1l.4-8.2Z"></path></svg></span><strong>Electricity</strong><small>Pay your meter</small></a>
-<a class="home-service-card" href="/autopay"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-13.7 5.6M4 12a8 8 0 0 1 13.7-5.6"></path><path d="M17.5 3v3.6h-3.6M6.5 21v-3.6h3.6"></path></svg></span><strong>AutoPay</strong><small>Repeat purchases automatically</small></a>
-<a class="home-service-card" href="/exam-pin"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20.5H7z"></path><path d="M14 3.5v4h4M9.5 12h5M9.5 15h5"></path></svg></span><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB</small></a>
-<button class="home-service-card coming-soon" data-service="Betting" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8.5h10a4 4 0 0 1 3.7 5.5l-1.1 3a2 2 0 0 1-3.6.4L14.7 15H9.3l-1.3 2.4a2 2 0 0 1-3.6-.4l-1.1-3A4 4 0 0 1 7 8.5Z"></path><path d="M7.5 11v4M5.5 13h4M16.5 12.5h.01M18.5 11.5h.01"></path></svg></span><strong>Betting</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Recharge PIN" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 13h5M16 16h.01"></path></svg></span><strong>Recharge PIN</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="SMS" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H8l-4 3v-14Z"></path><path d="M7.5 9h9M7.5 12h6"></path></svg></span><strong>SMS</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Bulk SMS" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14v9H9l-4 3V6Z"></path><path d="M8 4h12v9M8 9h8M8 12h5"></path></svg></span><strong>Bulk SMS</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Gift Cards" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="11" rx="2"></rect><path d="M12 7v11M3.5 11h17M12 7c-2.5 0-4-1.1-4-2.5S9.1 2 10.4 3.3L12 7ZM12 7c2.5 0 4-1.1 4-2.5S14.9 2 13.6 3.3L12 7Z"></path></svg></span><strong>Gift Cards</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="Insurance" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 19 6v5.5c0 4.2-2.7 7.5-7 9-4.3-1.5-7-4.8-7-9V6l7-2.5Z"></path><path d="m8.5 12 2.2 2.2 4.8-5"></path></svg></span><strong>Insurance</strong><small>Coming soon</small></button>
-<button class="home-service-card coming-soon" data-service="International Airtime" type="button"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M3.8 12h16.4M12 3.5c2.1 2.3 3.2 5.1 3.2 8.5s-1.1 6.2-3.2 8.5c-2.1-2.3-3.2-5.1-3.2-8.5S9.9 5.8 12 3.5Z"></path></svg></span><strong>Intl. Airtime</strong><small>Coming soon</small></button>
 </div>
-<div class="home-services-more" id="homeServicesMore" hidden aria-hidden="true">
-<div class="home-services-more-label">MORE SERVICES</div>
+</section>
+<section class="section smart-features-section" aria-label="BOLTIV Smart Features">
+<div class="smart-features-header">
+<div class="smart-features-title-wrap">
+<div class="smart-features-kicker">BOLTIV SMART FEATURES</div>
+<h2 class="smart-features-title">Smarter ways to manage your everyday digital services.</h2>
+<p class="smart-features-subtitle">Built to make routine payments simpler, smarter, and more convenient.</p>
 </div>
+</div>
+<a class="smart-feature-card" href="/autopay" aria-label="Open AutoPay">
+<span class="smart-feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.6M4 12a8 8 0 0 1 13.7-5.6"></path><path d="M17.5 3v3.6h-3.6M6.5 21v-3.6h3.6"></path></svg></span>
+<span class="smart-feature-content"><strong>AutoPay</strong><small>Set your regular purchases to happen automatically.</small></span>
+<span class="smart-feature-arrow" aria-hidden="true">→</span>
+</a>
 </section>
 <section class="section home-repeat-section" aria-label="Buy again">
 <div class="section-head"><h2 class="section-title">BUY AGAIN</h2><a class="section-link" href="/transactions">See all →</a></div>
@@ -414,32 +433,7 @@ setInterval(loadHome,30000);
   }
 })();
 </script>
-<script>
-(function(){
-  'use strict';
-  var grid=document.querySelector('.home-service-grid');
-  var toggle=document.getElementById('homeServicesToggle');
-  var more=document.getElementById('homeServicesMore');
-  if(!grid||!toggle||!more)return;
-  var cards=Array.prototype.slice.call(grid.children);
-  // Keep the first four services as the primary dashboard shortcuts.
-  // All existing service cards remain in the DOM so their links and Coming Soon behavior are unchanged.
-  cards.forEach(function(card,index){
-    if(index>=4) card.classList.add('home-service-secondary');
-  });
-  var extra=cards.slice(4);
-  if(!extra.length){toggle.hidden=true;return;}
-  extra.forEach(function(card){more.appendChild(card);});
-  function setOpen(open){
-    toggle.setAttribute('aria-expanded',String(open));
-    more.hidden=!open;
-    more.setAttribute('aria-hidden',String(!open));
-    toggle.textContent=open?'Show fewer ←':'More services →';
-  }
-  toggle.addEventListener('click',function(){setOpen(toggle.getAttribute('aria-expanded')!=='true');});
-  setOpen(false);
-})();
-</script>
+
 <script src="boltiv-bonus.js?v=20261004-dark"></script>
 <script src="boltiv-share.js?v=20261004-dark"></script>
 <script src="boltiv-referral.js?v=20261004-dark"></script>

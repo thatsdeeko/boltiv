@@ -83,12 +83,16 @@ body.ap-open .bottom-nav{display:none}
 <style>
 /* Data-plan selector: intentionally mirrors the normal BOLTIV Data page */
 .ap-plan-cats{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 9px;scrollbar-width:none}.ap-plan-cats::-webkit-scrollbar{display:none}.ap-plan-cat{flex:none;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-777777);border-radius:999px;padding:8px 11px;font-family:inherit;font-size:9px;font-weight:1000;cursor:pointer}.ap-plan-cat.active{color:#D4AF37;border-color:#D4AF37;background:var(--t-bg-fffdf4)}
+.ap-plan-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}.ap-plan-heading .ap-label{margin-bottom:8px}.ap-plan-filter-indicator{flex:none;color:#D4AF37;background:var(--t-bg-fff9e6);border:1px solid var(--t-bd-ead99b);border-radius:999px;padding:5px 8px;font-size:8px;font-weight:1000;letter-spacing:.45px;white-space:nowrap}.ap-sheet{overflow-x:hidden}.ap-plan-cats{position:relative;z-index:1}
 .ap-plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}.ap-plan-button{min-width:0;box-sizing:border-box;overflow-wrap:break-word;word-break:break-word;text-align:left;padding:10px;border-radius:13px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-fafaf8);color:var(--t-fg-171717);font-family:inherit;cursor:pointer}.ap-plan-button.active{border-color:#D4AF37;background:var(--t-bg-fffdf4);box-shadow:0 0 0 1px rgba(212,175,55,.12)}.ap-plan-size{color:#D4AF37;font-size:11.5px;font-weight:1000;margin-bottom:4px;line-height:1.25;overflow-wrap:break-word;word-break:break-word}.ap-plan-validity{color:var(--t-fg-777777);font-size:8.5px;margin-bottom:6px;line-height:1.25}.ap-plan-price{color:var(--t-fg-171717);font-size:9.5px;font-weight:1000}.ap-plan-loading{grid-column:1/-1;padding:18px;border-radius:15px;border:1px dashed var(--t-bd-d9d9d4);color:var(--t-fg-777777);text-align:center;font-size:10px;line-height:1.5;background:var(--t-bg-fafaf8)}
 @media(max-width:420px){.ap-plan-grid{grid-template-columns:repeat(2,1fr)}.ap-plan-button{padding:10px 9px}.ap-plan-size{font-size:11px}}
 <style>
 /* AutoPay maximum-payment + confirmation UI: page-scoped only. */
-.ap-max-wrap{position:relative}.ap-max-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#D4AF37;font-size:13px;font-weight:1000;pointer-events:none}.ap-max-input{padding-left:31px}.ap-max-hint{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.ap-max-hint span:last-child{white-space:nowrap;color:var(--t-fg-777777)}
+.ap-max-wrap{position:relative}.ap-max-input{padding-left:14px}.ap-max-hint{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.ap-max-hint span:last-child{white-space:nowrap;color:var(--t-fg-777777)}
 .ap-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:2600;display:none;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}.ap-confirm-overlay.show{display:flex}.ap-confirm{width:100%;max-width:520px;max-height:90vh;overflow-y:auto;background:#171717;border:1px solid #3a3a3a;border-radius:24px;padding:28px 22px 22px;box-sizing:border-box;box-shadow:0 22px 70px rgba(0,0,0,.4);color:#f5f5f5}.ap-confirm-icon{width:64px;height:64px;border-radius:50%;border:2px solid #D4AF37;color:#D4AF37;display:grid;place-items:center;margin:0 auto 18px;font-size:34px;font-weight:1000}.ap-confirm-kicker{text-align:center;color:#D4AF37;font-size:10px;font-weight:1000;letter-spacing:1.4px}.ap-confirm-title{text-align:center;color:#f5f5f5;font-size:23px;font-weight:1000;margin-top:6px}.ap-confirm-copy{text-align:center;color:#aaa;font-size:11px;line-height:1.55;margin:7px 0 18px}.ap-confirm-card{border:1px solid #3a3a3a;background:#202024;border-radius:17px;padding:8px 14px}.ap-confirm-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #3a3a3a;font-size:11px}.ap-confirm-row:last-child{border-bottom:0}.ap-confirm-row span{color:#aaa}.ap-confirm-row b{text-align:right;color:#f5f5f5;font-weight:1000;max-width:64%;word-break:break-word}.ap-confirm-limit{margin-top:13px;padding:12px 13px;border-radius:13px;background:rgba(212,175,55,.09);border:1px solid rgba(212,175,55,.28);color:#D4AF37;font-size:10.5px;font-weight:800;line-height:1.5}.ap-confirm-limit b{font-weight:1000}.ap-confirm-wallet{color:#f5f5f5;font-size:10.5px;font-weight:800;line-height:1.5;margin:12px 2px 0}.ap-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.ap-confirm-btn{min-height:52px;border-radius:14px;border:1px solid #3a3a3a;background:#202024;color:#f5f5f5;font-family:inherit;font-size:11px;font-weight:1000;cursor:pointer}.ap-confirm-btn.primary{border-color:#D4AF37;background:#D4AF37;color:#171717}.ap-confirm-btn:disabled{opacity:.5;cursor:not-allowed}@media(max-width:420px){.ap-confirm{padding:24px 16px 18px;border-radius:22px}.ap-confirm-title{font-size:21px}.ap-confirm-actions{grid-template-columns:1fr}.ap-confirm-btn.primary{order:-1}}
+
+/* AutoPay data-bundle confirmation uses the same visual language as the normal data purchase modal. */
+#apPlanConfirmModal{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;background:rgba(20,20,20,.45);backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:.25s}#apPlanConfirmModal.show{opacity:1;visibility:visible}#apPlanConfirmModal .boltiv-modal-card{width:100%;max-width:390px;box-sizing:border-box;padding:28px 22px;border-radius:25px;text-align:center;background:linear-gradient(145deg,var(--t-bg-fffdf4),var(--t-bg-ffffff));border:1px solid var(--t-bd-e5e5e1);box-shadow:0 30px 90px rgba(0,0,0,.75);transform:translateY(25px) scale(.94);transition:.3s}#apPlanConfirmModal.show .boltiv-modal-card{transform:translateY(0) scale(1)}#apPlanConfirmModal .modal-icon{width:66px;height:66px;margin:0 auto 17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30.8px;font-weight:1000;background:var(--t-bg-fffdf4);border:1px solid #D4AF37;color:#D4AF37}#apPlanConfirmModal .modal-status{color:#D4AF37;font-size:10px;font-weight:1000;letter-spacing:1px;margin-bottom:8px}#apPlanConfirmModal .modal-title{color:var(--t-fg-171717);font-size:20.9px;font-weight:1000}#apPlanConfirmModal .modal-message{color:var(--t-fg-777777);font-size:11px;line-height:1.6;margin-top:8px}#apPlanConfirmModal .modal-details{margin-top:20px;padding:5px 14px;border-radius:15px;background:var(--t-bg-fafaf8);border:1px solid var(--t-bd-e5e5e1)}#apPlanConfirmModal .modal-detail{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid var(--t-bd-e9e9e5);text-align:left}#apPlanConfirmModal .modal-detail:last-child{border-bottom:0}#apPlanConfirmModal .modal-detail span{color:var(--t-fg-666666);font-size:10px}#apPlanConfirmModal .modal-detail strong{color:var(--t-fg-171717);font-size:11px;font-weight:900;text-align:right;word-break:break-word}#apPlanConfirmModal .modal-button{width:100%;margin-top:18px;padding:14px;border:0;border-radius:13px;background:linear-gradient(135deg,#f5d76e,#D4AF37,#D4AF37);color:#f7f7f5;font-family:inherit;font-size:11px;font-weight:1000}#apPlanConfirmModal #apPlanConfirmCancel{background:var(--t-bg-fafaf8);color:var(--t-fg-171717);border:1px solid var(--t-bd-e5e5e1)}
 </style><link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
 <style>:focus-visible{outline:3px solid #D4AF37;outline-offset:3px}</style><link rel="manifest" href="/manifest.webmanifest">
 </head><body><div class="page ap-page"><div class="container">
@@ -131,7 +135,7 @@ body.ap-open .bottom-nav{display:none}
 <div id="apData" style="display:none">
 <label class="ap-label">NETWORK</label><div class="ap-grid ap-g4" data-net="data"></div>
 <label class="ap-label" for="dtPhone">PHONE NUMBER</label><input class="ap-input" id="dtPhone" inputmode="numeric" maxlength="11" placeholder="08012345678"/>
-<label class="ap-label" id="dtPlanLabel">DATA PLAN</label><div class="ap-plan-cats" id="dtPlanCats"></div><div class="ap-plan-grid" id="dtPlanGrid"><div class="ap-plan-loading">Choose a network to load available plans.</div></div><div class="ap-hint" id="dtHint"></div>
+<div class="ap-plan-heading"><label class="ap-label" id="dtPlanLabel">DATA PLAN</label><span class="ap-plan-filter-indicator" id="dtPlanCategoryIndicator">ALL PLANS</span></div><div class="ap-plan-cats" id="dtPlanCats"></div><div class="ap-plan-grid" id="dtPlanGrid"><div class="ap-plan-loading">Choose a network to load available plans.</div></div><div class="ap-hint" id="dtHint"></div>
 </div>
 
 <div id="apCable" style="display:none">
@@ -147,13 +151,27 @@ body.ap-open .bottom-nav{display:none}
 <div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
 <div id="apDom" style="display:none"><label class="ap-label" for="apDomSel">DAY OF THE MONTH</label><select class="ap-input" id="apDomSel"></select><div class="ap-hint">In months with fewer days, it runs on the last day of the month.</div></div>
 <label class="ap-label" for="apMaxAmount">MAXIMUM PAYMENT</label>
-<div class="ap-max-wrap"><span class="ap-max-prefix">₦</span><input class="ap-input ap-max-input" id="apMaxAmount" inputmode="decimal" placeholder="Maximum amount"/></div>
-<div class="ap-hint ap-max-hint"><span>The most BOLTIV can charge for each scheduled purchase.</span><span>Up to ₦1,000,000</span></div>
+<div class="ap-max-wrap"><input class="ap-input ap-max-input" id="apMaxAmount" inputmode="decimal" placeholder="Enter maximum amount"/></div>
+<div class="ap-hint ap-max-hint"><span>The most BOLTIV can charge for each scheduled purchase.</span><span>Set your preferred limit</span></div>
 <div class="ap-sum" id="apSummary">Fill in the details above.</div>
 <div class="ap-err" id="apErr"></div>
 <button class="ap-primary" id="apCreate" style="margin-top:14px" disabled>CREATE AUTOPAY</button>
 <div class="ap-hint" style="text-align:center;margin-top:10px">You'll enter your Transaction PIN once. Runs skip automatically if your wallet balance is too low.</div>
 </div></div>
+
+<div class="boltiv-modal warning" id="apPlanConfirmModal" aria-modal="true" role="dialog">
+  <div class="boltiv-modal-card">
+    <div class="modal-icon" id="apPlanConfirmIcon">?</div>
+    <div class="modal-status" id="apPlanConfirmStatus">CONFIRM BUNDLE</div>
+    <div class="modal-title">Confirm This Bundle</div>
+    <div class="modal-message">Please confirm this is the data bundle you want to select for AutoPay.</div>
+    <div class="modal-details" id="apPlanConfirmDetails"></div>
+    <div style="display:flex;gap:10px">
+      <button class="modal-button" id="apPlanConfirmCancel" type="button" style="margin-top:18px;background:var(--t-bg-fafaf8);color:var(--t-fg-171717);border:1px solid var(--t-bd-e5e5e1)">CANCEL</button>
+      <button class="modal-button" id="apPlanConfirmOk" type="button" style="margin-top:18px">YES, SELECT THIS</button>
+    </div>
+  </div>
+</div>
 
 <div class="ap-confirm-overlay" id="apConfirmOverlay">
   <div class="ap-confirm" role="dialog" aria-modal="true" aria-labelledby="apConfirmTitle">
@@ -182,6 +200,8 @@ var $=function(id){return document.getElementById(id)};
 var NETS=["MTN","AIRTEL","GLO","9MOBILE"];
 var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 var state={svc:"airtime",net:{airtime:"",data:""},prov:"DSTV",freq:"weekly",plans:[],selectedPlan:null,activePlanCat:"all",cablePlans:[],cableVerified:false,amount:0,enabled:true,max:5,count:0,busy:false,networkConfirmed:false,editingId:null,schedules:[],maxTouched:false};
+var pendingAutoPayPlan=null;
+var apPlanConfirmModal=$("apPlanConfirmModal"),apPlanConfirmDetails=$("apPlanConfirmDetails"),apPlanConfirmCancel=$("apPlanConfirmCancel"),apPlanConfirmOk=$("apPlanConfirmOk");
 function money(n){return "₦"+Number(n||0).toLocaleString("en-NG",{minimumFractionDigits:0,maximumFractionDigits:2})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function ord(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
@@ -294,10 +314,17 @@ function planGb(p){
   return 0;
 }
 function planCatId(p){var gb=planGb(p);if(gb<=0)return "unknown";if(gb<=2)return "1-2";if(gb<=5)return "3-5";if(gb<=10)return "6-10";if(gb<=20)return "11-20";return "20+"}
+function updatePlanCategoryIndicator(){
+  var el=$("dtPlanCategoryIndicator");
+  if(!el)return;
+  var cat=state.activePlanCat==="all"?null:PLAN_CATS.find(function(c){return c.id===state.activePlanCat});
+  el.textContent=cat?cat.label+" DATA PLANS":"ALL PLANS";
+}
 function drawPlanCats(){
   var cats=$("dtPlanCats");cats.innerHTML="";
   var list=[{id:"all",label:"All"}].concat(PLAN_CATS);
-  list.forEach(function(c){var b=document.createElement("button");b.type="button";b.className="ap-plan-cat"+(c.id===state.activePlanCat?" active":"");b.textContent=c.label;b.onclick=function(){state.activePlanCat=c.id;state.selectedPlan=null;drawPlans();refresh()};cats.appendChild(b)});
+  list.forEach(function(c){var b=document.createElement("button");b.type="button";b.className="ap-plan-cat"+(c.id===state.activePlanCat?" active":"");b.textContent=c.label;b.onclick=function(){state.activePlanCat=c.id;state.selectedPlan=null;state.maxTouched=false;$("apMaxAmount").value="";updatePlanCategoryIndicator();drawPlans();refresh()};cats.appendChild(b)});
+  updatePlanCategoryIndicator();
 }
 function drawPlans(){
   var grid=$("dtPlanGrid");grid.innerHTML="";
@@ -307,11 +334,33 @@ function drawPlans(){
     var b=document.createElement("button");b.type="button";b.className="ap-plan-button";b._plan=plan;
     var label=planLabel(plan),validity=formatPlanValidity(plan.validity!=null?plan.validity:(plan.validity_period!=null?plan.validity_period:plan.duration),plan.validity_days);
     b.innerHTML='<div class="ap-plan-size">'+esc(label)+'</div><div class="ap-plan-validity">'+esc(validity)+'</div><div class="ap-plan-price">'+money(plan.customer_price)+'</div>';
-    b.onclick=function(){state.selectedPlan=plan;grid.querySelectorAll(".ap-plan-button").forEach(function(x){x.classList.remove("active")});b.classList.add("active");syncMaxDefault();refresh()};
+    b.onclick=function(){openAutoPayPlanConfirm(plan,b)};
     if(state.selectedPlan&&((plan.lookup_key&&state.selectedPlan.lookup_key&&plan.lookup_key===state.selectedPlan.lookup_key)||(plan.code===state.selectedPlan.code&&String(plan.service_id)===String(state.selectedPlan.service_id))))b.classList.add("active");
     grid.appendChild(b);
   });
 }
+function closeAutoPayPlanConfirm(){
+  apPlanConfirmModal.classList.remove("show");
+  pendingAutoPayPlan=null;
+}
+function openAutoPayPlanConfirm(plan,button){
+  pendingAutoPayPlan={plan:plan,button:button};
+  var label=planLabel(plan),validity=formatPlanValidity(plan.validity!=null?plan.validity:(plan.validity_period!=null?plan.validity_period:plan.duration),plan.validity_days);
+  apPlanConfirmDetails.innerHTML='<div class="modal-detail"><span>Network</span><strong>'+esc(state.net.data)+'</strong></div><div class="modal-detail"><span>Bundle</span><strong>'+esc(label)+'</strong></div><div class="modal-detail"><span>Validity</span><strong>'+esc(validity)+'</strong></div><div class="modal-detail"><span>Price</span><strong>'+money(plan.customer_price)+'</strong></div>';
+  apPlanConfirmModal.classList.add("show");
+}
+apPlanConfirmCancel.onclick=closeAutoPayPlanConfirm;
+apPlanConfirmModal.onclick=function(e){if(e.target===apPlanConfirmModal)closeAutoPayPlanConfirm()};
+apPlanConfirmOk.onclick=function(){
+  if(!pendingAutoPayPlan)return closeAutoPayPlanConfirm();
+  var plan=pendingAutoPayPlan.plan,button=pendingAutoPayPlan.button;
+  state.selectedPlan=plan;
+  document.querySelectorAll(".ap-plan-button").forEach(function(x){x.classList.remove("active")});
+  button.classList.add("active");
+  closeAutoPayPlanConfirm();
+  syncMaxDefault();
+  refresh();
+};
 function highlightPlan(plan){
   if(!plan)return;state.selectedPlan=plan;
   var cat=planCatId(plan);if(state.activePlanCat!=="all"&&cat!==state.activePlanCat){state.activePlanCat="all";drawPlanCats()}
@@ -425,7 +474,7 @@ async function create(){
   if(!d){
     var amt=currentAmount(),maxPay=maxAmount();
     if(amt>0&&(!maxPay||maxPay<amt)){$("apErr").textContent="Set a maximum payment of at least "+money(amt)+".";$("apErr").style.display="block";}
-    else if(maxPay>1000000){$("apErr").textContent="Maximum payment cannot be more than ₦1,000,000.";$("apErr").style.display="block";}
+    else if(maxPay>1000000){$("apErr").textContent="Maximum payment limit exceeded. Please enter a lower amount.";$("apErr").style.display="block";}
     return;
   }
   if(state.busy)return;

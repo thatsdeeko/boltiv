@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="/boltiv-theme.js?v=20261004-dark2"></script>
+<link href="/boltiv-theme.css?v=20261004-dark2" rel="stylesheet"/>
+<script src="/boltiv-api-config.js?v=1"></script>
+<base href="/">
+<script src="boltiv-client.js?v=20260820-nostorage"></script>
+<script src="boltiv-lock.js?v=20261004-dark"></script>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#171717"/>
+<meta name="description" content="BOLTIV services — everyday digital services in one place."/>
+<title>BOLTIV Services</title>
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
+<link href="style.css?v=20261004-dark" rel="stylesheet"/>
+<script>boltivRequireAuth();</script>
+<style>
+.services-page{padding-bottom:112px}
+.services-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:24px 0 30px}
+.services-back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--t-fg-26231e);font-weight:800;font-size:13px}
+.services-back span{width:36px;height:36px;border:1px solid var(--t-bd-eadfba);border-radius:12px;display:grid;place-items:center;background:var(--t-bg-ffffff);color:var(--t-fg-a17b13);font-size:18px}
+.services-heading{margin-bottom:26px}
+.services-kicker{font-size:11px;letter-spacing:.17em;font-weight:900;color:var(--t-fg-a17b13);margin-bottom:9px}
+.services-heading h1{margin:0;color:var(--t-fg-171717);font-size:clamp(30px,6vw,46px);line-height:1.04;letter-spacing:-.035em}
+.services-heading p{margin:12px 0 0;max-width:650px;color:var(--t-fg-716e68);font-size:14px;line-height:1.65}
+.service-group{margin-top:28px}
+.service-group-head{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-bottom:13px}
+.service-group-title{margin:0;color:var(--t-fg-26231e);font-size:15px;letter-spacing:.1em;font-weight:900}
+.service-group-note{font-size:11px;color:var(--t-fg-817b70);font-weight:700}
+.services-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.service-card{display:flex;align-items:center;gap:14px;min-width:0;padding:17px;border:1px solid var(--t-bd-eee8d9);border-radius:20px;background:var(--t-bg-ffffff);text-decoration:none;box-shadow:0 9px 24px rgba(25,25,20,.045);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.service-card:hover{transform:translateY(-2px);border-color:#d9bf61;box-shadow:0 14px 30px rgba(25,25,20,.08)}
+.service-card-icon{width:48px;height:48px;flex:0 0 48px;border-radius:15px;display:grid;place-items:center;background:var(--t-bg-fbf4d9);border:1px solid #e4ce7a;color:var(--t-fg-b48a12)}
+.service-card-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.service-card-copy{min-width:0;flex:1}.service-card-copy strong{display:block;color:var(--t-fg-24211d);font-size:14px}.service-card-copy small{display:block;margin-top:4px;color:var(--t-fg-888174);font-size:11px;line-height:1.45}
+.service-arrow{color:var(--t-fg-a17b13);font-size:21px;flex:0 0 auto}
+.service-card.soon{cursor:default;background:var(--t-bg-faf8f0);box-shadow:none;opacity:.9}
+.service-card.soon:hover{transform:none;border-color:var(--t-bd-eee8d9);box-shadow:none}
+.soon-badge{display:inline-flex;margin-top:6px;padding:4px 7px;border-radius:999px;background:var(--t-bg-fbf4d9);border:1px solid #e4ce7a;color:var(--t-fg-a17b13);font-size:9px;font-weight:900;letter-spacing:.08em}
+.services-footer-note{margin-top:30px;padding:18px 20px;border:1px solid rgba(197,154,28,.2);border-radius:18px;background:var(--t-bg-fffdf7);color:var(--t-fg-716e68);font-size:12px;line-height:1.6}
+@media(max-width:560px){.services-topbar{margin-top:18px;margin-bottom:25px}.services-grid{grid-template-columns:1fr;gap:11px}.service-card{padding:14px;border-radius:18px}.service-card-icon{width:44px;height:44px;flex-basis:44px;border-radius:13px}.service-group-note{display:none}.services-heading h1{font-size:34px}}
+</style>
+</head>
+<body class="boltiv-animated-home">
+<div class="page boltiv-home services-page">
+<div class="container">
+<header class="header home-header">
+<a aria-label="Back to BOLTIV dashboard" class="home-brand" href="/dashboard"><img alt="BOLTIV" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></a>
+<div class="home-header-actions">
+<button aria-label="Switch theme" class="icon-button theme-toggle" data-theme-toggle="" type="button"><svg class="tt-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"></path></svg><svg class="tt-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"></path></svg></button>
+<button aria-label="Notifications" class="icon-button" onclick="location.href='/notifications'" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" class="notification-icon"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg></button>
+<button class="profile-mini" onclick="location.href='/profile'" type="button">U</button>
+</div>
+</header>
+<main>
+<div class="services-topbar"><a class="services-back" href="/dashboard"><span aria-hidden="true">←</span> Back to dashboard</a></div>
+<section class="services-heading"><div class="services-kicker">BOLTIV SERVICES</div><h1>Everything you need, in one place.</h1><p>Explore BOLTIV's digital services. Use what's available today and discover the services we're preparing for the future.</p></section>
+<section class="service-group" aria-labelledby="available-services"><div class="service-group-head"><h2 class="service-group-title" id="available-services">AVAILABLE NOW</h2><span class="service-group-note">Ready to use</span></div><div class="services-grid">
+<a class="service-card" href="/airtime"><span class="service-card-icon"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.2"></rect><path d="M10 6h4M11 18h2"></path></svg></span><span class="service-card-copy"><strong>Airtime</strong><small>Recharge any network instantly.</small></span><span class="service-arrow">›</span></a>
+<a class="service-card" href="/data"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M4 9.5a11 11 0 0 1 16 0M7 12.5a7 7 0 0 1 10 0M10 15.5a3 3 0 0 1 4 0"></path><circle cx="12" cy="18" r="1"></circle></svg></span><span class="service-card-copy"><strong>Data</strong><small>Choose a live data bundle for your network.</small></span><span class="service-arrow">›</span></a>
+<a class="service-card" href="/cable"><span class="service-card-icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="12" rx="2"></rect><path d="M8 21h8M12 17v4M9 3l3 3 3-3"></path></svg></span><span class="service-card-copy"><strong>Cable TV</strong><small>Renew your TV subscription with ease.</small></span><span class="service-arrow">›</span></a>
+<a class="service-card" href="/electricity"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M13.5 2.8 5.8 13h5.3l-.8 8.2L18.2 11h-5.1l.4-8.2Z"></path></svg></span><span class="service-card-copy"><strong>Electricity</strong><small>Pay your meter and manage electricity payments.</small></span><span class="service-arrow">›</span></a>
+<a class="service-card" href="/exam-pin"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4V20.5H7z"></path><path d="M14 3.5v4h4M9.5 12h5M9.5 15h5"></path></svg></span><span class="service-card-copy"><strong>Exam PINs</strong><small>WAEC, NECO &amp; NABTEB PIN services.</small></span><span class="service-arrow">›</span></a>
+</div></section>
+<section class="service-group" aria-labelledby="coming-services"><div class="service-group-head"><h2 class="service-group-title" id="coming-services">COMING SOON</h2><span class="service-group-note">More services are on the way</span></div><div class="services-grid">
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M7 8.5h10a4 4 0 0 1 3.7 5.5l-1.1 3a2 2 0 0 1-3.6.4L14.7 15H9.3l-1.3 2.4a2 2 0 0 1-3.6-.4l-1.1-3A4 4 0 0 1 7 8.5Z"></path><path d="M7.5 11v4M5.5 13h4M16.5 12.5h.01M18.5 11.5h.01"></path></svg></span><span class="service-card-copy"><strong>Betting</strong><small>Sports and betting-related services.</small><span class="soon-badge">COMING SOON</span></span></div>
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 13h5M16 16h.01"></path></svg></span><span class="service-card-copy"><strong>Recharge PIN</strong><small>Recharge PIN products for supported networks.</small><span class="soon-badge">COMING SOON</span></span></div>
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v11H8l-4 3v-14Z"></path><path d="M7.5 9h9M7.5 12h6"></path></svg></span><span class="service-card-copy"><strong>SMS</strong><small>SMS services for everyday communication.</small><span class="soon-badge">COMING SOON</span></span></div>
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M5 6h14v9H9l-4 3V6Z"></path><path d="M8 4h12v9M8 9h8M8 12h5"></path></svg></span><span class="service-card-copy"><strong>Bulk SMS</strong><small>Business messaging and bulk communication.</small><span class="soon-badge">COMING SOON</span></span></div>
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="7" width="17" height="11" rx="2"></rect><path d="M12 7v11M3.5 11h17M12 7c-2.5 0-4-1.1-4-2.5S9.1 2 10.4 3.3L12 7ZM12 7c2.5 0 4-1.1 4-2.5S14.9 2 13.6 3.3L12 7Z"></path></svg></span><span class="service-card-copy"><strong>Gift Cards</strong><small>Digital gift cards and related products.</small><span class="soon-badge">COMING SOON</span></span></div>
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><path d="M12 3.5 19 6v5.5c0 4.2-2.7 7.5-7 9-4.3-1.5-7-4.8-7-9V6l7-2.5Z"></path><path d="m8.5 12 2.2 2.2 4.8-5"></path></svg></span><span class="service-card-copy"><strong>Insurance</strong><small>Insurance-related digital services.</small><span class="soon-badge">COMING SOON</span></span></div>
+<div class="service-card soon"><span class="service-card-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M3.8 12h16.4M12 3.5c2.1 2.3 3.2 5.1 3.2 8.5s-1.1 6.2-3.2 8.5c-2.1-2.3-3.2-5.1-3.2-8.5S9.9 5.8 12 3.5Z"></path></svg></span><span class="service-card-copy"><strong>International Airtime</strong><small>International recharge options.</small><span class="soon-badge">COMING SOON</span></span></div>
+</div></section>
+<div class="services-footer-note">BOLTIV services will continue to grow. New services can appear here without changing the Quick Services shortcuts on your dashboard.</div>
+</main>
+</div>
+</div>
+<nav class="bottom-nav"><button class="nav-item active" data-page="/dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10.5 8.5-7 8.5 7v9a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1z"></path><path d="M9.5 20.5v-6h5v6"></path></svg></span><span>Home</span></button><button class="nav-item" data-page="/wallet"><span class="nav-icon nav-icon-text">₦</span><span>Wallet</span></button><button class="nav-item" data-page="/transactions"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"></path></svg></span><span>Activity</span></button><button class="nav-item" data-page="/profile"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span><span>Profile</span></button></nav>
+<script>document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);</script>
+<script src="boltiv-footer.js?v=20261004-dark"></script>
+</body>
+</html>

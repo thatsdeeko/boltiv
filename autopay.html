@@ -102,7 +102,7 @@ body.ap-open .bottom-nav{display:none}
 <details class="ap-how" id="apHow">
 <summary><span class="ap-how-title"><span class="ap-how-icon">ⓘ</span><span class="ap-how-copy"><b>HOW AUTOPAY WORKS</b><span>Understand how your scheduled payments work</span></span></span><span class="ap-how-chevron">⌄</span></summary>
 <div class="ap-how-body">
-<p class="ap-how-intro">AutoPay automatically purchases your selected Airtime, Data or Cable TV service on your chosen schedule using your BOLTIV wallet.</p>
+<p class="ap-how-intro">AutoPay automatically purchases your selected Airtime, Data or Cable TV service on your chosen schedule using your BOLTIV wallet. You can also schedule a one-time payment for any date and time you choose.</p>
 <div class="ap-how-step"><span class="ap-how-num">01</span><div><b>Choose what you want to automate</b><p>Select the service, plan or amount and choose how often you want it purchased.</p></div></div>
 <div class="ap-how-step"><span class="ap-how-num">02</span><div><b>Set your maximum payment</b><p>Prices and availability can change. Your maximum payment tells BOLTIV the most you're comfortable paying for each scheduled purchase.</p></div></div>
 <div class="ap-how-step"><span class="ap-how-num">03</span><div><b>We check before every payment</b><p>When your AutoPay is due, BOLTIV checks the current price and availability of your selected service.</p></div></div>
@@ -114,8 +114,10 @@ body.ap-open .bottom-nav{display:none}
 </details>
 <div id="apNotice"></div>
 <div class="ap-stats"><div class="ap-stat"><small>WALLET BALANCE</small><b id="apBalance">—</b></div><div class="ap-stat"><small>AUTOPAY CASHBACK</small><b id="apCashback">—</b></div></div>
-<div class="ap-section"><h2>YOUR AUTOPAYS</h2><small id="apCount" style="color:var(--t-fg-777777);font-size:10px;font-weight:800"></small></div>
+<div id="apCards"><div class="ap-section"><h2>YOUR AUTOPAYS</h2><small id="apCount" style="color:var(--t-fg-777777);font-size:10px;font-weight:800"></small></div>
 <div id="apList"><div class="ap-empty">Loading…</div></div>
+<div class="ap-section"><h2>SCHEDULED PAYMENTS</h2><small id="apOnceCount" style="color:var(--t-fg-777777);font-size:10px;font-weight:800"></small></div>
+<div id="apOnceList"><div class="ap-empty">Loading…</div></div></div>
 <div class="ap-section"><div class="ap-history-head"><h2>AUTOPAY HISTORY</h2><span class="ap-history-note">Latest 100 runs</span></div></div>
 <div id="apRuns"></div>
 </div></div>
@@ -147,13 +149,14 @@ body.ap-open .bottom-nav{display:none}
 </div>
 
 <label class="ap-label">HOW OFTEN</label>
-<div class="ap-grid ap-g3" id="apFreq"><button class="ap-opt" data-v="daily" type="button">Every day</button><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
+<div class="ap-grid ap-g2" id="apFreq"><button class="ap-opt" data-v="daily" type="button">Every day</button><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button><button class="ap-opt" data-v="once" type="button">Just once</button></div>
 <div class="ap-hint" id="apDailyHint" style="display:none">Runs every day at 7:00 AM. Best for airtime or 1-day data plans, because each run buys it again. Your wallet needs to cover it every day, or runs are skipped and this AutoPay pauses after 3 missed days in a row.</div>
 <div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
 <div id="apDom" style="display:none"><label class="ap-label" for="apDomSel">DAY OF THE MONTH</label><select class="ap-input" id="apDomSel"></select><div class="ap-hint">In months with fewer days, it runs on the last day of the month.</div></div>
+<div id="apOnce" style="display:none"><label class="ap-label" for="apOnceDate">DATE</label><input class="ap-input" id="apOnceDate" type="date"/><label class="ap-label" for="apOnceHour">TIME (NIGERIA TIME)</label><select class="ap-input" id="apOnceHour"></select><div class="ap-hint">Paid once from your wallet at this time, then it is done. If it cannot be paid (low balance, or the price is above your limit) we will tell you so you can fix it.</div></div>
 <label class="ap-label" for="apMaxAmount">MAXIMUM PAYMENT</label>
 <div class="ap-max-wrap"><input class="ap-input ap-max-input" id="apMaxAmount" inputmode="decimal" placeholder="Enter maximum amount"/></div>
-<div class="ap-hint ap-max-hint"><span>💡 <b>Set a maximum amount you're comfortable paying.</b><br/>BOLTIV will never automatically charge more than your limit. <br/>If the price goes above it, we skip that run.</span></div>
+<div class="ap-hint ap-max-hint"><span>💡 <b>Set a maximum amount you're comfortable paying.</b><br/>For data and cable TV we suggest a little above today's price, so a small price rise doesn't skip your payment. BOLTIV will never automatically charge more than your limit. <br/>If the price goes above it, we skip that run and let you approve the new price in one tap.</span></div>
 <div class="ap-sum" id="apSummary">Fill in the details above.</div>
 <div class="ap-err" id="apErr"></div>
 <button class="ap-primary" id="apCreate" style="margin-top:14px" disabled>CREATE AUTOPAY</button>
@@ -207,6 +210,8 @@ function money(n){return "₦"+Number(n||0).toLocaleString("en-NG",{minimumFract
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}
 function ord(n){var s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
 function lagos(d,o){return new Date(d).toLocaleDateString("en-NG",Object.assign({timeZone:"Africa/Lagos"},o))}
+function lagosTime(d){return new Date(d).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Africa/Lagos"})}
+function onceAt(){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec($("apOnceDate").value),hr=Number($("apOnceHour").value);if(!m||!(hr>=0&&hr<=23))return null;var at=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],hr-1,0,0));if(isNaN(at.getTime())||at.getTime()<Date.now()+10*60*1000)return null;return at}
 function toast(m){var t=$("apToast");t.textContent=m;t.style.display="block";clearTimeout(toast._t);toast._t=setTimeout(function(){t.style.display="none"},3200)}
 function token(){return boltivMemoryStorage.getItem("boltivAuthToken")||""}
 async function api(path,body){
@@ -218,6 +223,7 @@ async function api(path,body){
 }
 /* same schedule maths as the server (runs at 06:00 UTC = 07:00 in Nigeria) */
 function nextRun(freq,dow,dom){
+  if(freq==="once")return onceAt();
   var from=new Date(Date.now()+12*3600*1000);
   for(var add=0;add<=70;add++){
     var d=new Date(Date.UTC(from.getUTCFullYear(),from.getUTCMonth(),from.getUTCDate()+add,6,0,0));
@@ -228,8 +234,8 @@ function nextRun(freq,dow,dom){
   }
   return null;
 }
-function when(s){return s.frequency==="daily"?"Every day":s.frequency==="weekly"?"Every "+DAYS[s.dayOfWeek]:"Monthly on the "+ord(s.dayOfMonth)}
-var PAUSE={failures:"Paused after 3 missed runs. Fund your wallet, then tap Resume.",user:"Paused by you.",agent:"Not available for agent accounts.",account:"Not available for this account."};
+function when(s){return s.frequency==="once"?"One-time payment":s.frequency==="daily"?"Every day":s.frequency==="weekly"?"Every "+DAYS[s.dayOfWeek]:"Monthly on the "+ord(s.dayOfMonth)}
+var PAUSE={failures:"Paused after 3 missed runs. Fund your wallet, then tap Resume.",user:"Paused by you.",agent:"Not available for agent accounts.",account:"Not available for this account.",once_failed:"Payment not made."};
 var RUN={successful:["Successful","ok"],pending:["Processing","gold"],skipped:["Skipped","gold"],failed:["Failed","bad"]};
 
 /* ---------------- list ---------------- */
@@ -237,21 +243,21 @@ async function load(){
   try{
     var d=await api("/api/autopay");
     if(!d.success)throw new Error(d.message||"Could not load AutoPay.");
-    state.enabled=d.enabled!==false;state.max=d.maxSchedules||5;state.count=d.schedules.length;state.schedules=d.schedules||[];
+    state.enabled=d.enabled!==false;state.max=d.maxSchedules||5;state.maxOnce=d.maxOnce||10;var rec=(d.schedules||[]).filter(function(s){return s.frequency!=="once"}),one=(d.schedules||[]).filter(function(s){return s.frequency==="once"});state.count=rec.length;state.onceCount=one.length;state.schedules=d.schedules||[];
     $("apBalance").textContent=money(d.walletBalance);$("apCashback").textContent=money(d.cashbackEarned);
-    $("apCount").textContent=d.schedules.length+" / "+state.max;
+    $("apCount").textContent=rec.length+" / "+state.max;$("apOnceCount").textContent=one.length+" / "+state.maxOnce;
     var notes="";
     if(!state.enabled)notes+='<div class="ap-notice bad">AutoPay is temporarily unavailable. Your schedules are saved and nothing will run until it is back.</div>';
     var low=d.schedules.filter(function(s){return s.status==="active"&&s.amount>d.walletBalance});
     if(state.enabled&&low.length)notes+='<div class="ap-notice">Your wallet balance is lower than the amount of '+(low.length===1?"one of your AutoPays":low.length+" of your AutoPays")+'. Fund your wallet so it doesn\'t get skipped.</div>';
     if(d.schedules.some(function(s){return s.status==="paused"&&s.pauseReason==="failures"}))notes+='<div class="ap-notice bad">An AutoPay was paused after 3 missed runs. Fund your wallet, then tap Resume.</div>';
     $("apNotice").innerHTML=notes;
-    $("apList").innerHTML=d.schedules.length?d.schedules.map(card).join(""):'<div class="ap-empty"><b>No AutoPays yet</b>Create one to pay for airtime, data or cable TV automatically.</div>';
+    $("apList").innerHTML=rec.length?rec.map(card).join(""):'<div class="ap-empty"><b>No AutoPays yet</b>Create one to pay for airtime, data or cable TV automatically.</div>';$("apOnceList").innerHTML=one.length?one.map(card).join(""):'<div class="ap-empty"><b>No scheduled payments</b>Pay for airtime, data or cable TV once, on a date and time you choose.</div>';
     $("apRuns").innerHTML=d.runs.length?d.runs.map(runRow).join(""):'<div class="ap-empty">Your AutoPay runs will appear here.</div>';
-    var full=state.count>=state.max;
+    var full=state.count>=state.max&&state.onceCount>=state.maxOnce;
     $("apNew").disabled=!state.enabled||full;
-    $("apNew").textContent=full?"MAXIMUM "+state.max+" AUTOPAYS REACHED":"+ CREATE AUTOPAY";
-    var has=state.count>0;
+    $("apNew").textContent=full?"MAXIMUM REACHED":"+ CREATE AUTOPAY";
+    var has=(state.count+state.onceCount)>0;
     $("apPauseAll").disabled=!state.enabled||!has||!d.schedules.some(function(x){return x.status==="active"});
     $("apResumeAll").disabled=!state.enabled||!has||!d.schedules.some(function(x){return x.status!=="active"});
   }catch(e){
@@ -260,20 +266,22 @@ async function load(){
   }
 }
 function card(s){
-  var active=s.status==="active";
-  var next=active&&s.nextRunAt?"Next run: "+lagos(s.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM":(PAUSE[s.pauseReason]||"Paused.");
+  var active=s.status==="active",once=s.frequency==="once",failedOnce=once&&s.pauseReason==="once_failed";
+  var next=once?(active&&s.nextRunAt?"Pays on "+lagos(s.nextRunAt,{weekday:"short",day:"numeric",month:"short",year:"numeric"})+" at "+lagosTime(s.nextRunAt):(PAUSE[s.pauseReason]||"Paused.")):(active&&s.nextRunAt?"Next run: "+lagos(s.nextRunAt,{weekday:"short",day:"numeric",month:"short"})+" at 7:00 AM":(PAUSE[s.pauseReason]||"Paused."));
   var pb=s.priceBlock,banner="";
-  if(pb&&pb.kind==="price")banner='<div class="ap-notice" style="margin:12px 0 0"><b>Price went up to '+money(pb.amount)+'</b> (your limit is '+money(s.maxAmount)+'). Approve it and we\'ll raise your limit.<div class="ap-actions" style="margin-top:10px"><button class="ap-btn" data-approve="'+s.id+'" type="button">APPROVE NEW PRICE</button></div></div>';
-  else if(pb&&pb.kind==="plan")banner='<div class="ap-notice bad" style="margin:12px 0 0"><b>This plan is no longer available.</b> Choose a new plan to keep this AutoPay running.<div class="ap-actions" style="margin-top:10px"><button class="ap-btn" data-edit="'+s.id+'" type="button">CHOOSE NEW PLAN</button></div></div>';
-  return '<div class="ap-card" data-card="'+s.id+'"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+(active?"ok":"gold")+'">'+(active?"ACTIVE":"PAUSED")+'</span></div>'
-   +banner+'<div class="ap-actions"><button class="ap-btn" data-edit="'+s.id+'" type="button">EDIT</button><button class="ap-btn" data-act="'+(active?"pause":"resume")+'" data-id="'+s.id+'" type="button">'+(active?"PAUSE":"RESUME")+'</button><button class="ap-btn danger" data-act="delete" data-id="'+s.id+'" type="button">DELETE</button></div></div>';
+  if(pb&&pb.kind==="price")banner='<div class="ap-notice" style="margin:12px 0 0"><b>Price went up to '+money(pb.amount)+'</b> (your limit is '+money(s.maxAmount)+'). '+(once?"Approve it and we\'ll raise your limit and pay it now.":"Approve it and we\'ll raise your limit.")+'<div class="ap-actions" style="margin-top:10px"><button class="ap-btn" data-approve="'+s.id+'" type="button">'+(once?"APPROVE & PAY NOW":"APPROVE NEW PRICE")+'</button></div></div>';
+  else if(pb&&pb.kind==="plan")banner='<div class="ap-notice bad" style="margin:12px 0 0"><b>This plan is no longer available.</b> Choose a new plan'+(once?" and time":" to keep this AutoPay running")+'.<div class="ap-actions" style="margin-top:10px"><button class="ap-btn" data-edit="'+s.id+'" type="button">CHOOSE NEW PLAN</button></div></div>';
+  else if(failedOnce)banner='<div class="ap-notice bad" style="margin:12px 0 0"><b>This payment was not made.</b> Fund your wallet if needed, then reschedule it.</div>';
+  var pillCls=active?"ok":"gold",pillTxt=active?(once?"SCHEDULED":"ACTIVE"):(failedOnce?"FAILED":"PAUSED");
+  var acts='<button class="ap-btn" data-edit="'+s.id+'" type="button">'+(failedOnce?"RESCHEDULE":"EDIT")+'</button>'+(failedOnce?"":'<button class="ap-btn" data-act="'+(active?"pause":"resume")+'" data-id="'+s.id+'" type="button">'+(active?"PAUSE":"RESUME")+'</button>')+'<button class="ap-btn danger" data-act="delete" data-id="'+s.id+'" type="button">'+(once?"CANCEL":"DELETE")+'</button>';
+  return '<div class="ap-card" data-card="'+s.id+'"><div class="ap-row"><div><div class="ap-name">'+esc(s.label)+'</div><div class="ap-meta">'+esc(s.recipient)+" · "+money(s.amount)+"<br/>"+esc(when(s))+"<br/>"+esc(next)+'</div></div><span class="ap-pill '+pillCls+'">'+pillTxt+'</span></div>'+banner+'<div class="ap-actions">'+acts+'</div></div>';
 }
 function runRow(r){
   var st=RUN[r.status]||[r.status,""];
   return '<div class="ap-card"><div class="ap-row"><div><div class="ap-name">'+esc(r.label)+'</div><div class="ap-meta">'+lagos(r.finishedAt||r.scheduledFor,{day:"numeric",month:"short",year:"numeric"})+(r.message&&r.status!=="successful"?"<br/>"+esc(r.message):"")+'</div>'+(r.cashback>0?'<div class="ap-run-cb">+ '+money(r.cashback)+' cashback</div>':"")+'</div><div style="text-align:right"><div class="ap-run-amt">'+money(r.amount)+'</div><span class="ap-pill '+st[1]+'" style="display:inline-block;margin-top:6px">'+st[0].toUpperCase()+'</span></div></div></div>';
 }
 async function approvePrice(s){
-  var pb=s.priceBlock||{},msg="Approve the new price of "+money(pb.amount)+"? We'll raise your limit to a little above it so small increases don't skip your payment."+(s.status==="active"?" If it was skipped today, we'll buy it now.":"");
+  var pb=s.priceBlock||{},msg="Approve the new price of "+money(pb.amount)+"? We'll raise your limit to a little above it so small increases don't skip your payment."+(s.frequency==="once"?" We'll pay it now.":(s.status==="active"?" If it was skipped today, we'll buy it now.":""));
   if(!confirm(msg))return;
   var pin=await boltivGetTransactionPin();if(!pin)return;
   try{
@@ -283,7 +291,7 @@ async function approvePrice(s){
   }catch(err){if(err.message!=="SESSION_EXPIRED")toast(err.message)}
   await load();
 }
-$("apList").addEventListener("click",async function(e){
+$("apCards").addEventListener("click",async function(e){
   var ap=e.target.closest("[data-approve]");if(ap){var sc=state.schedules.find(function(x){return Number(x.id)===Number(ap.getAttribute("data-approve"))});if(sc)approvePrice(sc);return;}
   var edit=e.target.closest("[data-edit]");if(edit){var found=state.schedules.find(function(x){return Number(x.id)===Number(edit.getAttribute("data-edit"))});if(found)openEdit(found);return;}
   var b=e.target.closest("[data-act]");if(!b)return;
@@ -430,7 +438,8 @@ function syncMaxDefault(){
 function maxAmount(){return Number(String($("apMaxAmount").value||"").replace(/,/g,""))||0;}
 
 function details(){
-  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,maxPay=maxAmount(),base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc,maxAmount:maxPay};
+  var f=state.freq,dow=Number($("apDowSel").value),dom=Number($("apDomSel").value)||1,maxPay=maxAmount(),base={frequency:f,dayOfWeek:dow,dayOfMonth:dom,service:state.svc,maxAmount:maxPay,onceDate:$("apOnceDate").value,onceHour:Number($("apOnceHour").value)};
+  if(f==="once"&&!onceAt())return null;
   if(state.svc==="airtime"){
     var amt=Number($("atAmount").value),ph=$("atPhone").value.trim();
     if(!state.net.airtime||!/^0\d{10}$/.test(ph)||!(amt>=50&&Math.round(amt)===amt)||!Number.isFinite(maxPay)||maxPay<amt||maxPay>1000000)return null;
@@ -447,11 +456,14 @@ function details(){
 }
 function refresh(){
   var d=details(),f=state.freq;
+  $("apOnce").style.display=f==="once"?"block":"none";$("apOnceDate").min=new Date(Date.now()+3600000).toISOString().slice(0,10);
+  var fb=$("apFreq").querySelectorAll("[data-v]");for(var i=0;i<fb.length;i++){var fv=fb[i].getAttribute("data-v"),fs=true;if(state.svc==="cable"&&fv==="daily")fs=false;if(state.editingId&&((fv==="once")!==(state.freq==="once")))fs=false;fb[i].style.display=fs?"":"none"}
+  if(!state.editingId){$("apSheetTitle").textContent=f==="once"?"Schedule a Payment":"New AutoPay";$("apCreate").textContent=f==="once"?"SCHEDULE PAYMENT":"CREATE AUTOPAY"}
   $("apDailyHint").style.display=f==="daily"?"block":"none";$("apDow").style.display=f==="weekly"?"block":"none";$("apDom").style.display=f==="monthly"?"block":"none";
   mark($("apFreq"),f);
   if(!d){$("apSummary").textContent="Fill in the details above.";$("apCreate").disabled=true;return}
   var n=nextRun(f,d.dayOfWeek,d.dayOfMonth);
-  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="daily"?"Every day":f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b><br/><span style=\"display:block;margin-top:8px;color:#8b6c08\">Maximum charge: <b>"+money(d.maxAmount)+"</b>. If the price goes above this amount, this AutoPay will be skipped.</span>";
+  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="once"?"Paid once":f==="daily"?"Every day":f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at "+(f==="once"&&n?lagosTime(n):"7:00 AM")+", paid from your wallet.<br/>"+(f==="once"?"Date":"First run")+": <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long",year:"numeric"}):"—")+"</b><br/><span style=\"display:block;margin-top:8px;color:#8b6c08\">Maximum charge: <b>"+money(d.maxAmount)+"</b>. If the price goes above this amount, this AutoPay will be skipped.</span>";
   $("apCreate").disabled=state.busy;
 }
 function openSheet(){$("apErr").style.display="none";$("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh()}
@@ -464,14 +476,14 @@ function buildConfirmation(d){
     ["Service",service],
     [state.svc==="airtime"?"Network":state.svc==="data"?"Network":"Provider",state.svc==="airtime"||state.svc==="data"?state.net[state.svc]:state.prov],
     ["Purchase",purchase],
-    ["Frequency",state.freq==="daily"?"Every day":state.freq==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth)],
+    ["Frequency",state.freq==="once"?"One time only":state.freq==="daily"?"Every day":state.freq==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth)],
     ["Current price",money(currentAmount())],
     ["Maximum charge",money(d.maxAmount)]
   ];
-  $("apConfirmTitle").textContent=state.editingId?"Confirm AutoPay Changes":"Set Up This AutoPay";
+  $("apConfirmTitle").textContent=state.editingId?"Confirm AutoPay Changes":(state.freq==="once"?"Schedule This Payment":"Set Up This AutoPay");
   $("apConfirmCard").innerHTML=rows.map(function(r){return '<div class="ap-confirm-row"><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>';}).join("");
-  $("apConfirmLimit").innerHTML="You'll be charged automatically according to this schedule. If the price goes above <b>"+money(d.maxAmount)+"</b>, this AutoPay will be skipped."+(n?"<br><span style=\"opacity:.82\">First run: "+esc(lagos(n,{weekday:"long",day:"numeric",month:"long"}))+" at 7:00 AM.</span>":"");
-  $("apConfirmProceed").textContent=state.editingId?"SAVE CHANGES":"CREATE AUTOPAY";
+  $("apConfirmLimit").innerHTML="You'll be charged automatically according to this schedule. If the price goes above <b>"+money(d.maxAmount)+"</b>, this AutoPay will be skipped."+(n?"<br><span style=\"opacity:.82\">"+(state.freq==="once"?"Paid on: ":"First run: ")+esc(lagos(n,{weekday:"long",day:"numeric",month:"long",year:"numeric"}))+" at "+(state.freq==="once"?lagosTime(n):"7:00 AM")+".</span>":"");
+  $("apConfirmProceed").textContent=state.editingId?"SAVE CHANGES":(state.freq==="once"?"SCHEDULE PAYMENT":"CREATE AUTOPAY");
   $("apConfirmOverlay").classList.add("show");
 }
 function closeConfirmation(){$("apConfirmOverlay").classList.remove("show");}
@@ -510,6 +522,7 @@ function openEdit(s){
   if(s.service==="data"){$("dtPhone").value=(s.recipient||"").replace(/\D/g,"");state.selectedPlan=null;state.prefillPlan={code:s.planCode||"",service_id:s.serviceId||""};}
   if(s.service==="cable"){$("cbCard").value="00000000";state.cableVerified=true;state.cablePlans=[{name:s.planName||"Current plan",price:Number(s.amount||0)}];$("cbPlan").innerHTML='<option value="0">'+esc(s.planName||"Current plan")+" — "+money(s.amount)+"</option>";$("cbPlan").disabled=false;$("cbHint").textContent="Your saved cable account will be kept.";}
   $("apDowSel").value=String(s.dayOfWeek==null?1:s.dayOfWeek);$("apDomSel").value=String(s.dayOfMonth||1);
+  if(s.frequency==="once"&&s.nextRunAt){var od=new Date(new Date(s.nextRunAt).getTime()+3600000);$("apOnceDate").value=od.getTime()<Date.now()?"":od.toISOString().slice(0,10);$("apOnceHour").value=String(od.getUTCHours());}
   showSvc();if(s.service==="data")loadPlans();
   $("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh();
 }
@@ -521,6 +534,7 @@ async function bulkAction(action){
 
 /* ---------------- wiring ---------------- */
 buildNetGrids();
+(function(){var sel=$("apOnceHour");for(var hr=0;hr<24;hr++){var o=document.createElement("option");o.value=hr;o.textContent=((hr%12)||12)+":00 "+(hr<12?"AM":"PM");sel.appendChild(o)}sel.value="9";$("apOnceDate").addEventListener("input",refresh);$("apOnceDate").addEventListener("change",refresh);sel.addEventListener("change",refresh);})();
 $("apNew").onclick=function(){state.editingId=null;state.maxTouched=false;$("apMaxAmount").value="";$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";openSheet()};$("apPauseAll").onclick=function(){bulkAction("pause_all")};$("apResumeAll").onclick=function(){bulkAction("resume_all")};$("apClose").onclick=function(){state.editingId=null;$("apSheetTitle").textContent="New AutoPay";$("apCreate").textContent="CREATE AUTOPAY";closeSheet()};
 $("apOverlay").addEventListener("click",function(e){if(e.target===$("apOverlay"))closeSheet()});
 $("apService").addEventListener("click",function(e){var b=e.target.closest("[data-v]");if(!b)return;state.svc=b.getAttribute("data-v");state.maxTouched=false;$("apMaxAmount").value="";showSvc();syncMaxDefault()});
@@ -545,6 +559,7 @@ function prefill(){
     if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.style.outline="2px solid #D4AF37";setTimeout(function(){el.style.outline=""},3500);}
     return;
   }
+  if(q.get("schedule")==="1"){history.replaceState(null,"","/autopay");state.freq="once";var w2=setInterval(function(){if(!$("apNew").disabled){clearInterval(w2);state.editingId=null;state.maxTouched=false;$("apMaxAmount").value="";openSheet()}},150);setTimeout(function(){clearInterval(w2)},6000);return;}
   if(q.get("new")!=="1")return;
   var svc=q.get("service");if(["airtime","data","cable"].indexOf(svc)<0)return;
   state.svc=svc;
@@ -553,7 +568,7 @@ function prefill(){
   if(svc==="cable"){var pv=(q.get("provider")||"DSTV").toUpperCase();state.prov=pv==="GOTV"?"GOTV":"DSTV";mark($("cbProv"),state.prov);$("cbCard").value=(q.get("smartcard")||"").replace(/\D/g,"");state.prefillCablePlan=q.get("plan")||"";if($("cbCard").value)verifyCable()}
   showSvc();
   history.replaceState(null,"","/autopay");
-  var wait=setInterval(function(){if(!$("apNew").disabled||state.count>=state.max){clearInterval(wait);if(!$("apNew").disabled)openSheet()}},150);setTimeout(function(){clearInterval(wait)},6000);
+  var wait=setInterval(function(){if(!$("apNew").disabled||(state.count>=state.max&&state.onceCount>=state.maxOnce)){clearInterval(wait);if(!$("apNew").disabled)openSheet()}},150);setTimeout(function(){clearInterval(wait)},6000);
 }
 showSvc();load().then(prefill);
 })();

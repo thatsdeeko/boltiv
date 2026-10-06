@@ -1,4 +1,4 @@
-const CACHE = 'boltiv-shell-v67';
+const CACHE = 'boltiv-shell-v68';
 const SHELL = [
   '/', '/index.html', '/login.html', '/register.html', '/dashboard.html',
   '/wallet.html', '/airtime.html', '/data.html', '/cable.html', '/electricity.html',

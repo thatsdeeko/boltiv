@@ -802,7 +802,7 @@ if(["airtime","data","cable","electricity"].includes(service)&&!/^0\d{10}$/.test
 const idem=clean(data.idempotencyKey||data.idempotency_key);const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};if(opts.skipPin!==true){const suppliedPin=String(data.transactionPin||"");if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};}
 let providerPayload={},recipient=clean(data.phone||data.providerPayload?.phone||user.phone),pricingMeta={providerCost:null,customerPrice:amount,grossProfit:0};
 if(service==="data"){
-const requestedPlanCode=clean(data.plan_code??data.providerPayload?.plan_code??data.plan_id??data.providerPayload?.plan_id??"");const requestedServiceId=Number(data.service_id??data.providerPayload?.service_id??0);const fallbackLookupKey=clean(data.bundle_id??data.providerPayload?.bundle_id??"");const planCode=(requestedServiceId>0&&requestedPlanCode)?planLookupKey(requestedPlanCode,requestedServiceId):(fallbackLookupKey||requestedPlanCode);const network=normalizeDataNetwork(data.network||data.providerPayload?.network);if(!planCode)return{success:false,statusCode:400,message:"Plan code is required."};let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planCode);}catch(e){console.error("VTUGATE unavailable (Unable to verify the current data plan price.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name};const providerPlanCode=clean(authoritative.plan_code||authoritative.code||authoritative.provider_code||"");if(!providerPlanCode)return{success:false,statusCode:503,message:"VTUGATE did not return a plan code for the selected data plan."};providerPayload={service_id:Number(authoritative.service_id),code:providerPlanCode,plan_code:providerPlanCode,phone:recipient,phone_number:recipient,msisdn:recipient,amount,ref:null};
+const requestedPlanCode=clean(data.plan_code??data.providerPayload?.plan_code??data.plan_id??data.providerPayload?.plan_id??"");const requestedServiceId=Number(data.service_id??data.providerPayload?.service_id??0);const fallbackLookupKey=clean(data.bundle_id??data.providerPayload?.bundle_id??"");const planCode=(requestedServiceId>0&&requestedPlanCode)?planLookupKey(requestedPlanCode,requestedServiceId):(fallbackLookupKey||requestedPlanCode);const network=normalizeDataNetwork(data.network||data.providerPayload?.network);if(!planCode)return{success:false,statusCode:400,message:"Plan code is required."};let authoritative;try{authoritative=await getAuthoritativeVTUGATEDataPlan(network,planCode);}catch(e){console.error("VTUGATE unavailable (Unable to verify the current data plan price.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}if(Math.abs(amount-Number(authoritative.customer_price))>.009)return{success:false,statusCode:400,message:"The selected data plan price has changed. Please refresh the plans and try again."};pricingMeta={providerCost:authoritative.provider_price,customerPrice:authoritative.customer_price,grossProfit:Number((authoritative.customer_price-authoritative.provider_price).toFixed(2)),network:authoritative.network_name,plan:authoritative.name,validityDays:Number(authoritative.validity_days)||null};const providerPlanCode=clean(authoritative.plan_code||authoritative.code||authoritative.provider_code||"");if(!providerPlanCode)return{success:false,statusCode:503,message:"VTUGATE did not return a plan code for the selected data plan."};providerPayload={service_id:Number(authoritative.service_id),code:providerPlanCode,plan_code:providerPlanCode,phone:recipient,phone_number:recipient,msisdn:recipient,amount,ref:null};
 }else if(service==="exam_pin"){
 const productId=Number(data.product_id||data.providerPayload?.product_id||0),quantity=Number(data.quantity||data.providerPayload?.quantity||1);if(!Number.isInteger(productId)||productId<=0)return{success:false,statusCode:400,message:"Invalid education PIN product."};if(![1,2,5].includes(quantity))return{success:false,statusCode:400,message:"Education PIN quantity must be 1, 2, or 5."};const serviceId=productId;let unitPrice;try{unitPrice=await getVTUGATEEducationPrice(serviceId);}catch(e){console.error("VTUGATE unavailable (Unable to verify the current education PIN price.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const productCode=clean(data.product_code||data.providerPayload?.product_code||data.exam||"waec");const expectedTotal=Number((unitPrice*quantity).toFixed(2));if(Math.abs(amount-expectedTotal)>.009)return{success:false,statusCode:400,message:"The selected education PIN price has changed. Please refresh the products and try again."};pricingMeta={providerCost:Number((unitPrice*quantity).toFixed(2)),customerPrice:expectedTotal,grossProfit:Number((expectedTotal-unitPrice*quantity).toFixed(2)),plan:productCode.toUpperCase()};providerPayload={service_id:serviceId,phone:recipient||user.phone||"08000000000",phone_number:recipient||user.phone||"08000000000",msisdn:recipient||user.phone||"08000000000",quantity,product_code:productCode,ref:null};
 }else if(service==="airtime"){
@@ -2073,6 +2073,7 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 // Additive AutoPay price-protection migration. Existing schedules use their current saved amount as the initial limit.
 await db(`ALTER TABLE autopay_schedules ADD COLUMN IF NOT EXISTS max_amount NUMERIC(14,2)`);
 await db(`UPDATE autopay_schedules SET max_amount=amount WHERE max_amount IS NULL`);
+await db(`ALTER TABLE autopay_schedules ADD COLUMN IF NOT EXISTS price_block JSONB`);
 await db(`CREATE INDEX IF NOT EXISTS autopay_schedules_due_idx ON autopay_schedules(status,next_run_at)`);
 await db(`CREATE INDEX IF NOT EXISTS autopay_schedules_user_idx ON autopay_schedules(user_id)`);
 await db(`CREATE TABLE IF NOT EXISTS autopay_runs(
@@ -2093,6 +2094,8 @@ await db(`CREATE INDEX IF NOT EXISTS autopay_runs_user_idx ON autopay_runs(user_
 await db(`CREATE TABLE IF NOT EXISTS autopay_audit(id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL,schedule_id BIGINT,action TEXT NOT NULL,details JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS autopay_audit_user_idx ON autopay_audit(user_id,created_at DESC)`);
 await db(`CREATE INDEX IF NOT EXISTS autopay_audit_schedule_idx ON autopay_audit(schedule_id,created_at DESC)`);
+await db(`CREATE TABLE IF NOT EXISTS user_favorites(id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL,kind TEXT NOT NULL,name TEXT NOT NULL,recipient TEXT NOT NULL,network TEXT,provider TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(user_id,kind,recipient))`);
+await db(`CREATE INDEX IF NOT EXISTS user_favorites_user_idx ON user_favorites(user_id,updated_at DESC)`);
 await db(`CREATE TABLE IF NOT EXISTS platform_alerts( id BIGSERIAL PRIMARY KEY, alert_key TEXT UNIQUE NOT NULL, severity TEXT NOT NULL DEFAULT 'warning', title TEXT NOT NULL, message TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', details JSONB NOT NULL DEFAULT '{}'::jsonb, first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), resolved_at TIMESTAMPTZ, email_sent_at TIMESTAMPTZ)`);
 await db(`CREATE INDEX IF NOT EXISTS platform_alerts_status_idx ON platform_alerts(status,last_seen_at DESC)`);
 await db(`ALTER TABLE platform_alerts ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ`);
@@ -4876,6 +4879,7 @@ const AUTOPAY_RUN_HOUR_UTC=6;                 // 07:00 in Nigeria (UTC+1, no day
 const AUTOPAY_RETRY_MS=30*60*1000;            // one retry, 30 minutes after a provider-side failure
 const AUTOPAY_MISSED_MS=6*60*60*1000;         // runs more than 6h late (downtime) are skipped, not fired
 const AUTOPAY_MIN_LEAD_MS=12*60*60*1000;      // first run is always at least 12h after creation
+const AUTOPAY_LOWBAL_RETRY_HOUR_UTC=17;     // 6:00 PM in Nigeria: one same-day retry when the wallet was too low at 7 AM
 let autopayBusy=false;
 
 async function autopayEnabled(){
@@ -4911,11 +4915,48 @@ function autopayPublic(s){
     network:p.network||p.provider||"",
     planCode:s.service==="data"?clean(p.plan_code):null,
     serviceId:s.service==="data"?Number(p.service_id||0):null,
-    planName:s.service==="data"?clean(p.plan_name):s.service==="cable"?clean(p.plan):null
+    planName:s.service==="data"?clean(p.plan_name):s.service==="cable"?clean(p.plan):null,
+    priceBlock:s.price_block&&typeof s.price_block==="object"?{kind:s.price_block.kind,amount:s.price_block.amount==null?null:Number(s.price_block.amount),at:s.price_block.at||null}:null
   };
 }
-async function autopayNotify(userId,title,message,key){
-  try{await addNotificationOnce(userId,title,message,"info",key);}
+/* AutoPay email alerts. Sent only when the in-app notification was newly created (so retries never double-send).
+   "AutoPay completed" is not emailed: the normal transaction email already covers a successful run.
+   Emails go out one at a time, spaced apart, so a busy 7 AM run stays under Resend's rate limit. */
+const AUTOPAY_EMAIL_TITLES=new Set(["AutoPay reminder","AutoPay skipped","AutoPay waiting for funds","AutoPay paused","AutoPay created","AutoPay updated","AutoPay deleted"]);
+let autopayEmailChain=Promise.resolve();
+async function autopayEmailSend(userId,title,message,link){
+  const r=await db(`SELECT name,email FROM users WHERE user_id=$1 LIMIT 1`,[String(userId)]);
+  const u=r.rows[0];
+  if(!u?.email)return;
+  const result=await sendEmail({
+    to:u.email,
+    subject:`BOLTIV ${title}`,
+    html:`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717">
+<div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7">
+<div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div>
+<h2 style="text-align:center;margin-top:28px">${escapeHtmlEmail(title)}</h2>
+<p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(u.name||"BOLTIV User")},</p>
+<p style="font-size:15px;line-height:1.7;color:#555">${escapeHtmlEmail(message)}</p>
+<p style="text-align:center;margin:26px 0 8px"><a href="https://boltiv.ng${link||"/autopay"}" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px">Open AutoPay</a></p>
+<p style="font-size:12px;line-height:1.6;color:#999;text-align:center;margin-top:22px">If you did not set up or change this AutoPay, pause it from the AutoPay page and contact BOLTIV support.</p>
+</div></body></html>`
+  });
+  if(!result||!result.success)console.error("AUTOPAY EMAIL NOT SENT:",title,result&&result.message);
+}
+function autopayEmail(userId,title,message,link){
+  autopayEmailChain=autopayEmailChain
+    .then(()=>autopayEmailSend(userId,title,message,link))
+    .catch(e=>console.error("AUTOPAY EMAIL ERROR:",e?.message||e))
+    .then(()=>new Promise(r=>setTimeout(r,600)));
+}
+async function autopayNotify(userId,title,message,key,link){
+  try{
+    const added=await addNotificationOnce(userId,title,message,"info",key);
+    // pause/resume/delete the user does themselves carry an "autopay-security-" key: no email for those except delete
+    const selfAction=/^autopay-security-(pause|resume|pause_all|resume_all)/.test(String(key||""));
+    if(added&&AUTOPAY_EMAIL_TITLES.has(title)&&!selfAction)autopayEmail(userId,title,message,link);
+  }
   catch(e){console.error("AUTOPAY NOTIFY ERROR:",e?.message||e);}
 }
 async function autopayAudit(userId,scheduleId,action,details={}){try{await db(`INSERT INTO autopay_audit(user_id,schedule_id,action,details) VALUES($1,$2,$3,$4::jsonb)`,[userId,scheduleId||null,action,JSON.stringify(details||{})]);}catch(e){console.error("AUTOPAY AUDIT ERROR:",e?.message||e);}}
@@ -4995,7 +5036,9 @@ async function autopayFinish(s,runKey,o){
     [runKey,o.status,String(o.message||"").slice(0,300),o.txRef||null,o.amount!=null?o.amount:Number(s.amount)]);
   await autopayAudit(s.user_id,s.id,"run",{runKey,status:o.status,message:String(o.message||"").slice(0,300),transactionReference:o.txRef||null,amount:o.amount!=null?Number(o.amount):Number(s.amount)});
   if(o.retry){
-    await db(`UPDATE autopay_schedules SET attempt=2,next_run_at=NOW()+INTERVAL '30 minutes',locked_until=NULL,updated_at=NOW() WHERE id=$1`,[s.id]);
+    const retryAt=o.retryAt instanceof Date?o.retryAt:new Date(Date.now()+AUTOPAY_RETRY_MS);
+    await db(`UPDATE autopay_schedules SET attempt=2,next_run_at=$2,locked_until=NULL,updated_at=NOW() WHERE id=$1`,[s.id,retryAt]);
+    if(o.retryNotice)await autopayNotify(s.user_id,"AutoPay waiting for funds",o.retryNotice,`autopay-lowbal-${runKey}`);
     return;
   }
   const ok=o.status==="successful"||o.status==="pending";
@@ -5005,6 +5048,8 @@ async function autopayFinish(s,runKey,o){
   const newAmount=o.newAmount!=null?o.newAmount:Number(s.amount);
   await db(`UPDATE autopay_schedules SET status=$2,pause_reason=$3,next_run_at=$4,cycle_for=$4,attempt=1,locked_until=NULL,last_run_at=NOW(),last_status=$5,consecutive_failures=$6,amount=$7,reminded_for=NULL,updated_at=NOW() WHERE id=$1`,
     [s.id,pause?"paused":"active",pause?"failures":null,next,o.status,failures,newAmount]);
+  if(o.priceBlock)await db(`UPDATE autopay_schedules SET price_block=$2::jsonb WHERE id=$1`,[s.id,JSON.stringify(o.priceBlock)]);
+  else if(ok)await db(`UPDATE autopay_schedules SET price_block=NULL WHERE id=$1 AND price_block IS NOT NULL`,[s.id]);
   const nextText=next?autopayDateText(next):"";
   const key=`autopay-run-${runKey}`;
   if(ok){
@@ -5012,7 +5057,7 @@ async function autopayFinish(s,runKey,o){
   }else if(pause){
     await autopayNotify(s.user_id,"AutoPay paused",`${s.label} was skipped again (${o.message}) and has been paused after ${AUTOPAY_MAX_FAILURES} missed runs in a row. Fund your wallet, then resume it from the AutoPay page.`,key);
   }else{
-    await autopayNotify(s.user_id,"AutoPay skipped",`${s.label} (₦${autopayMoney(newAmount)}) was not run: ${o.message} Next try: ${nextText}.`,key);
+    await autopayNotify(s.user_id,"AutoPay skipped",`${s.label} (₦${autopayMoney(newAmount)}) was not run: ${o.message} Next try: ${nextText}.${o.priceBlock?(o.priceBlock.kind==="price"?" Open AutoPay to approve the new price in one tap.":" Open AutoPay to choose a new plan."):""}`,key,o.priceBlock?`/autopay?fix=${s.id}`:undefined);
   }
 }
 async function autopayProcess(s){
@@ -5064,14 +5109,14 @@ async function autopayProcess(s){
     try{plan=await getAuthoritativeVTUGATEDataPlan(payload.network,payload.plan_key||planLookupKey(payload.plan_code,payload.service_id));}
     catch(e){
       const m=String(e?.message||"");
-      if(/no longer available|Invalid data plan/i.test(m))return autopayFinish(s,runKey,{status:"skipped",message:"this data plan is no longer available. Create a new AutoPay with a current plan."});
+      if(/no longer available|Invalid data plan/i.test(m))return autopayFinish(s,runKey,{status:"skipped",message:"this data plan is no longer available.",priceBlock:{kind:"plan",at:new Date().toISOString()}});
       return retryOrFail("the data service could not be reached.");
     }
     amount=Number(plan.customer_price);
     data={service:"data",phone:payload.phone,network:payload.network,plan_code:payload.plan_code,service_id:payload.service_id,bundle_id:payload.bundle_id,plan_name:clean(plan.name)||payload.plan_name,amount};
   }else{
     const price=getCablePlanPrice(payload.provider,payload.plan);
-    if(price===null)return autopayFinish(s,runKey,{status:"skipped",message:"this cable TV plan is no longer available. Create a new AutoPay with a current plan."});
+    if(price===null)return autopayFinish(s,runKey,{status:"skipped",message:"this cable TV plan is no longer available.",priceBlock:{kind:"plan",at:new Date().toISOString()}});
     amount=price;
     data={service:"cable",provider:payload.provider,smartcard:payload.smartcard,plan:payload.plan,amount};
   }
@@ -5079,11 +5124,16 @@ async function autopayProcess(s){
   // 5) customer price protection: never silently charge above the user's chosen limit.
   const maxAmount=Number(s.max_amount==null?s.amount:s.max_amount);
   if(amount>maxAmount+0.009){
-    return autopayFinish(s,runKey,{status:"skipped",message:`the current price is ₦${autopayMoney(amount)}, above your ₦${autopayMoney(maxAmount)} AutoPay limit.`,amount,countFailure:false,priceNote});
+    return autopayFinish(s,runKey,{status:"skipped",message:`the current price is ₦${autopayMoney(amount)}, above your ₦${autopayMoney(maxAmount)} AutoPay limit.`,amount,countFailure:false,priceNote,priceBlock:{kind:"price",amount,at:new Date().toISOString()}});
   }
   // 6) enough money? (the purchase itself re-checks atomically)
   const wallet=await getWallet(s.user_id);
   if(Number(wallet?.balance||0)<amount){
+    if(canRetry){ // first attempt: wait for the user to top up and try once more this evening (not counted as a missed run)
+      const retryAt=new Date(Math.max(Date.UTC(scheduledFor.getUTCFullYear(),scheduledFor.getUTCMonth(),scheduledFor.getUTCDate(),AUTOPAY_LOWBAL_RETRY_HOUR_UTC,0,0,0),Date.now()+AUTOPAY_RETRY_MS));
+      return autopayFinish(s,runKey,{status:"skipped",message:"your wallet balance is too low.",amount,newAmount:amount,retry:true,retryAt,
+        retryNotice:`${s.label} (₦${autopayMoney(amount)}) could not run because your wallet balance is too low. We'll try once more today at 6:00 PM — fund your wallet before then and it will go through.`});
+    }
     return autopayFinish(s,runKey,{status:"skipped",message:"your wallet balance is too low.",amount,newAmount:amount});
   }
   data.providerPayload={...data};
@@ -5104,6 +5154,16 @@ async function autopayProcess(s){
   }
   const insufficient=/insufficient/i.test(result.message||"");
   return autopayFinish(s,runKey,{status:"skipped",message:insufficient?"your wallet balance is too low.":String(result.message||"it could not be completed.").replace(/\.$/,"")+".",amount,newAmount:amount});
+}
+/* Current price of a saved data/cable AutoPay, read the same way a real run reads it. */
+async function autopayFreshPrice(cur){
+  const p=cur.payload&&typeof cur.payload==="object"?cur.payload:{};
+  if(cur.service==="data"){
+    try{const plan=await getAuthoritativeVTUGATEDataPlan(p.network,p.plan_key||planLookupKey(p.plan_code,p.service_id));return{price:Number(plan.customer_price)};}
+    catch(e){return{error:true,gone:/no longer available|Invalid data plan/i.test(String(e?.message||""))};}
+  }
+  if(cur.service==="cable"){const price=getCablePlanPrice(p.provider,p.plan);return price===null?{error:true,gone:true}:{price:Number(price)};}
+  return{price:Number(cur.amount)};
 }
 async function autopayTick(){
   if(autopayBusy)return;
@@ -5176,7 +5236,7 @@ async function handleAutopayRoutes(req,res,path,user){
     const ins=await db(`INSERT INTO autopay_schedules(user_id,service,label,frequency,day_of_week,day_of_month,amount,max_amount,payload,status,next_run_at,cycle_for,reminded_for)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'active',$10,$10,$11) RETURNING *`,
       [user.user_id,built.service,built.label,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,maxAmount,JSON.stringify(built.payload),next,reminded]);
-    try{await addNotification(user.user_id,"AutoPay created",`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will run ${frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"info");}catch{}
+    try{await autopayNotify(user.user_id,"AutoPay created",`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will run ${frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"");}catch{}
     await autopayAudit(user.user_id,ins.rows[0].id,"created",{service:built.service,amount:Number(built.amount),maxAmount,frequency});
     send(res,200,{success:true,message:"AutoPay created.",schedule:autopayPublic(ins.rows[0])});
     return true;
@@ -5200,7 +5260,7 @@ async function handleAutopayRoutes(req,res,path,user){
     const dup=await db(`SELECT id FROM autopay_schedules WHERE user_id=$1 AND id<>$2 AND status<>'deleted' AND service=$3 AND label=$4 AND frequency=$5 AND COALESCE(day_of_week,-1)=$6 AND COALESCE(day_of_month,-1)=$7 AND (payload->>'phone'=$8 OR payload->>'smartcard'=$8) LIMIT 1`,[user.user_id,id,built.service,built.label,frequency,frequency==="weekly"?dow:-1,frequency==="monthly"?dom:-1,built.recipientKey]);if(dup.rows.length){send(res,400,{success:false,message:"You already have this AutoPay."});return true;}
     const next=autopayNextRun(frequency,dow,dom,new Date(Date.now()+AUTOPAY_MIN_LEAD_MS));if(!next){send(res,400,{success:false,message:"Could not work out the next run date."});return true;}
     const reminded=(next.getTime()-Date.now())<=24*60*60*1000?next:null;
-    const upd=await db(`UPDATE autopay_schedules SET frequency=$2,day_of_week=$3,day_of_month=$4,amount=$5,max_amount=$6,payload=$7::jsonb,label=$8,next_run_at=$9,cycle_for=$9,attempt=1,locked_until=NULL,reminded_for=$10,updated_at=NOW() WHERE id=$1 RETURNING *`,[id,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,maxAmount,JSON.stringify(built.payload),built.label,next,reminded]);
+    const upd=await db(`UPDATE autopay_schedules SET frequency=$2,day_of_week=$3,day_of_month=$4,amount=$5,max_amount=$6,payload=$7::jsonb,label=$8,next_run_at=$9,cycle_for=$9,attempt=1,locked_until=NULL,reminded_for=$10,price_block=NULL,updated_at=NOW() WHERE id=$1 RETURNING *`,[id,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,maxAmount,JSON.stringify(built.payload),built.label,next,reminded]);
     await autopayAudit(user.user_id,id,"edited",{service:built.service,frequency,amount:Number(built.amount),maxAmount,label:built.label});
     await autopayNotify(user.user_id,"AutoPay updated",`${built.label} was updated. Next run: ${autopayDateText(next)} at 7:00 AM.`,`autopay-security-edit-${id}-${next.getTime()}`);
     send(res,200,{success:true,message:"AutoPay updated.",schedule:autopayPublic(upd.rows[0])});return true;
@@ -5215,6 +5275,37 @@ async function handleAutopayRoutes(req,res,path,user){
       else if(cur.status!=="active"){const agent=await getEffectiveAgentService(user.user_id,cur.service);if(agent.isAgent)continue;const next=autopayNextRun(cur.frequency,cur.day_of_week,cur.day_of_month,new Date(Date.now()+AUTOPAY_MIN_LEAD_MS));const reminded=next&&(next.getTime()-Date.now())<=24*60*60*1000?next:null;await db(`UPDATE autopay_schedules SET status='active',pause_reason=NULL,consecutive_failures=0,attempt=1,locked_until=NULL,next_run_at=$2,cycle_for=$2,reminded_for=$3,updated_at=NOW() WHERE id=$1`,[cur.id,next,reminded]);changed++;await autopayAudit(user.user_id,cur.id,"resumed_all",{nextRunAt:next});}
     }
     await autopayNotify(user.user_id,action==="pause_all"?"All AutoPays paused":"All AutoPays resumed",`${changed} AutoPay${changed===1?"":"s"} ${action==="pause_all"?"paused":"resumed"}.`, `autopay-security-${action}-${Date.now()}`);send(res,200,{success:true,changed});return true;
+  }
+  if(req.method==="POST"&&path==="/api/autopay/approve-price"){
+    const rl=rateLimit(req,`autopay-approve:${user.user_id}`,10,15*60*1000);if(!rl.allowed){rateLimitedResponse(res,rl);return true;}
+    if(!(await autopayEnabled())){send(res,503,{success:false,message:"AutoPay is not available right now."});return true;}
+    const b=await body(req),id=Number(b.id);
+    if(!(id>0)){send(res,400,{success:false,message:"Invalid AutoPay."});return true;}
+    const pin=clean(b.transactionPin);if(!/^\d{4}$/.test(pin)){send(res,400,{success:false,message:"Enter your 4-digit Transaction PIN."});return true;}
+    const security=await getSecurity(user.user_id);
+    if(!security?.transaction_pin_hash||!verifyPassword(pin,security.transaction_pin_hash)){send(res,400,{success:false,message:"Incorrect Transaction PIN."});return true;}
+    const cur=(await db(`SELECT * FROM autopay_schedules WHERE id=$1 AND user_id=$2 AND status<>'deleted'`,[id,user.user_id])).rows[0];
+    if(!cur){send(res,404,{success:false,message:"AutoPay not found."});return true;}
+    const block=cur.price_block;
+    if(!block||block.kind!=="price"){send(res,400,{success:false,message:"There is no new price waiting for your approval."});return true;}
+    const agent=await getEffectiveAgentService(user.user_id,cur.service);
+    if(agent.isAgent){send(res,403,{success:false,message:"AutoPay is only available for regular customer accounts."});return true;}
+    const fresh=await autopayFreshPrice(cur);
+    if(fresh.error){send(res,409,{success:false,message:fresh.gone?"This plan is no longer available. Edit the AutoPay to choose a new plan.":"We couldn't check the current price. Please try again in a moment."});return true;}
+    const price=Number(fresh.price);
+    if(!(price>0)){send(res,400,{success:false,message:"We couldn't read the current price. Please try again."});return true;}
+    const newLimit=Math.min(1000000,Math.max(price,Math.ceil(price*1.10/50)*50,Number(cur.max_amount||0)));
+    const wallet=await getWallet(user.user_id);
+    const within=block.at&&(Date.now()-new Date(block.at).getTime())<24*60*60*1000;
+    const runNow=Boolean(within&&cur.status==="active"&&Number(wallet?.balance||0)>=price);
+    await db(`UPDATE autopay_schedules SET max_amount=$2,amount=$3,price_block=NULL,updated_at=NOW() WHERE id=$1`,[id,newLimit,price]);
+    await autopayAudit(user.user_id,id,"price_approved",{price,newLimit,runNow});
+    await autopayNotify(user.user_id,"AutoPay updated",`${cur.label}: the new price of ₦${autopayMoney(price)} was approved and your limit is now ₦${autopayMoney(newLimit)}.${runNow?" Buying it now.":" It will run on its next scheduled date."}`,`autopay-security-approve-${id}-${Date.now()}`);
+    if(runNow){
+      const row=(await db(`UPDATE autopay_schedules SET next_run_at=NOW(),cycle_for=NOW(),attempt=3,locked_until=NOW()+INTERVAL '10 minutes',reminded_for=NULL,updated_at=NOW() WHERE id=$1 AND status='active' RETURNING *`,[id])).rows[0];
+      if(row)autopayProcess(row).catch(e=>console.error("AUTOPAY APPROVE RUN ERROR:",e?.stack||e?.message||e));
+    }
+    send(res,200,{success:true,price,newLimit,runNow});return true;
   }
   if(req.method==="POST"&&path==="/api/autopay/action"){
     const rl=rateLimit(req,`autopay-action:${user.user_id}`,30,15*60*1000);
@@ -5246,10 +5337,95 @@ async function handleAutopayRoutes(req,res,path,user){
   return false;
 }
 
+/* ===================== BOLTIV FAVORITES (saved numbers & smartcards) ===================== */
+const FAVORITES_MAX=20;
+const favoritePublic=r=>({id:Number(r.id),kind:r.kind,name:r.name,recipient:r.recipient,network:r.network||"",provider:r.provider||""});
+async function handleFavoritesRoutes(req,res,path,user){
+  if(req.method==="GET"&&path==="/api/favorites"){
+    const r=await db(`SELECT id,kind,name,recipient,network,provider FROM user_favorites WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 100`,[user.user_id]);
+    send(res,200,{success:true,max:FAVORITES_MAX,favorites:r.rows.map(favoritePublic)});return true;
+  }
+  if(req.method==="POST"&&path==="/api/favorites"){
+    const rl=rateLimit(req,`favorites-save:${user.user_id}`,30,15*60*1000);
+    if(!rl.allowed){rateLimitedResponse(res,rl);return true;}
+    const b=await body(req);
+    const kind=clean(b.kind).toLowerCase();
+    const name=clean(b.name).replace(/\s+/g," ").slice(0,30);
+    const recipient=clean(b.recipient).replace(/\s+/g,"");
+    if(!["phone","cable"].includes(kind)){send(res,400,{success:false,message:"Invalid saved item."});return true;}
+    if(!name){send(res,400,{success:false,message:"Enter a name for this saved number."});return true;}
+    if(kind==="phone"&&!/^0\d{10}$/.test(recipient)){send(res,400,{success:false,message:"Enter a valid 11-digit phone number."});return true;}
+    if(kind==="cable"&&!/^\d{8,20}$/.test(recipient)){send(res,400,{success:false,message:"Enter a valid smartcard / IUC number."});return true;}
+    const network=kind==="phone"?(normalizeDataNetwork(b.network)||null):null;
+    const provider=kind==="cable"?clean(b.provider).toUpperCase():null;
+    if(kind==="cable"&&!["DSTV","GOTV"].includes(provider)){send(res,400,{success:false,message:"Choose a cable provider."});return true;}
+    const exists=(await db(`SELECT id FROM user_favorites WHERE user_id=$1 AND kind=$2 AND recipient=$3`,[user.user_id,kind,recipient])).rows[0];
+    if(!exists){
+      const n=(await db(`SELECT COUNT(*)::int AS n FROM user_favorites WHERE user_id=$1`,[user.user_id])).rows[0].n;
+      if(n>=FAVORITES_MAX){send(res,400,{success:false,message:`You can save up to ${FAVORITES_MAX} numbers. Remove one to add another.`});return true;}
+    }
+    const ins=await db(`INSERT INTO user_favorites(user_id,kind,name,recipient,network,provider) VALUES($1,$2,$3,$4,$5,$6)
+      ON CONFLICT(user_id,kind,recipient) DO UPDATE SET name=EXCLUDED.name,network=EXCLUDED.network,provider=EXCLUDED.provider,updated_at=NOW()
+      RETURNING id,kind,name,recipient,network,provider`,[user.user_id,kind,name,recipient,network,provider]);
+    send(res,200,{success:true,favorite:favoritePublic(ins.rows[0])});return true;
+  }
+  if(req.method==="POST"&&path==="/api/favorites/delete"){
+    const rl=rateLimit(req,`favorites-delete:${user.user_id}`,60,15*60*1000);
+    if(!rl.allowed){rateLimitedResponse(res,rl);return true;}
+    const b=await body(req),id=Number(b.id);
+    if(!(id>0)){send(res,400,{success:false,message:"Invalid saved item."});return true;}
+    await db(`DELETE FROM user_favorites WHERE id=$1 AND user_id=$2`,[id,user.user_id]);
+    send(res,200,{success:true});return true;
+  }
+  return false;
+}
+
+/* ===================== DATA EXPIRY REMINDERS =====================
+   One in-app reminder per successful data purchase whose plan lasts a week or more, a few days before it ends.
+   Skipped when the same number already bought again, or when the purchase came from AutoPay. */
+const DATA_REMIND_MIN_DAYS=7;
+let dataExpiryBusy=false;
+function dataValidityDays(meta){
+  const p=(meta&&meta.pricing)||{};
+  const v=Number(p.validityDays);
+  if(Number.isFinite(v)&&v>0)return v;
+  const name=String(p.plan||(meta&&(meta.plan||meta.plan_name))||(meta&&meta.request&&meta.request.plan_name)||"");
+  const m=name.match(/(\d+)\s*-?\s*days?\b/i);
+  return m?Number(m[1]):0;
+}
+async function dataExpirySweep(){
+  if(dataExpiryBusy)return;
+  dataExpiryBusy=true;
+  try{
+    const r=await db(`SELECT id,user_id,recipient,metadata,COALESCE(completed_at,date) AS bought_at
+      FROM transactions
+      WHERE service='data' AND status='successful' AND recipient IS NOT NULL
+        AND COALESCE(completed_at,date)>NOW()-INTERVAL '100 days' AND COALESCE(completed_at,date)<NOW()-INTERVAL '2 days'
+        AND (metadata->'autopay') IS NULL
+      ORDER BY id DESC LIMIT 3000`);
+    const DAY=86400000,now=Date.now();
+    for(const t of r.rows){
+      const days=dataValidityDays(t.metadata);
+      if(!(days>=DATA_REMIND_MIN_DAYS))continue;
+      const lead=days>=28?3:1;
+      const bought=new Date(t.bought_at).getTime();
+      const expiresAt=bought+days*DAY;
+      if(now<expiresAt-lead*DAY||now>=expiresAt)continue;
+      const newer=await db(`SELECT 1 FROM transactions WHERE user_id=$1 AND service='data' AND recipient=$2 AND id>$3 AND status IN ('successful','pending','processing') LIMIT 1`,[t.user_id,t.recipient,t.id]);
+      if(newer.rows.length)continue;
+      const plan=clean((t.metadata&&t.metadata.pricing&&t.metadata.pricing.plan)||(t.metadata&&t.metadata.request&&t.metadata.request.plan_name)||"data plan");
+      const left=Math.max(1,Math.ceil((expiresAt-now)/DAY));
+      await addNotificationOnce(t.user_id,"Data plan expiring soon",`${plan} for ${t.recipient} expires in about ${left} day${left===1?"":"s"}. Open Buy Data to renew it.`,"info",`data-expiry-${t.id}`);
+    }
+  }catch(e){console.error("DATA EXPIRY SWEEP ERROR:",e?.stack||e?.message||e);}
+  finally{dataExpiryBusy=false;}
+}
+
 async function handleExtraUserRoutes(req,res,path,url){
 const user=await userFromToken(req);
 if(!user) return null;
 if(path==="/api/autopay"||path.startsWith("/api/autopay/")){const apHandled=await handleAutopayRoutes(req,res,path,user);if(apHandled)return true;}
+if(path==="/api/favorites"||path.startsWith("/api/favorites/")){const fvHandled=await handleFavoritesRoutes(req,res,path,user);if(fvHandled)return true;}
 if(req.method==="GET"&&path==="/api/security"){
 const security=await getSecurity(user.user_id); return send(res,200,{success:true,transactionPinSet:Boolean(security?.transaction_pin_hash)});
 }
@@ -6280,6 +6456,10 @@ setInterval(()=>{
 // AutoPay: check for due runs and day-before reminders every minute.
 setTimeout(()=>autopayTick().catch(e=>console.error("AUTOPAY INITIAL TICK ERROR:",e)),25000).unref();
 setInterval(()=>autopayTick().catch(e=>console.error("AUTOPAY TICK ERROR:",e)),60*1000).unref();
+
+// Data expiry reminders: check every 30 minutes.
+setTimeout(()=>dataExpirySweep(),45000).unref();
+setInterval(()=>dataExpirySweep(),30*60*1000).unref();
 
 console.log(
 `Admin configured: ${

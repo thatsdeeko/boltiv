@@ -147,7 +147,8 @@ body.ap-open .bottom-nav{display:none}
 </div>
 
 <label class="ap-label">HOW OFTEN</label>
-<div class="ap-grid ap-g2" id="apFreq"><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
+<div class="ap-grid ap-g3" id="apFreq"><button class="ap-opt" data-v="daily" type="button">Every day</button><button class="ap-opt on" data-v="weekly" type="button">Every week</button><button class="ap-opt" data-v="monthly" type="button">Every month</button></div>
+<div class="ap-hint" id="apDailyHint" style="display:none">Runs every day at 7:00 AM. Best for airtime or 1-day data plans, because each run buys it again. Your wallet needs to cover it every day, or runs are skipped and this AutoPay pauses after 3 missed days in a row.</div>
 <div id="apDow"><label class="ap-label" for="apDowSel">DAY OF THE WEEK</label><select class="ap-input" id="apDowSel"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="0">Sunday</option></select></div>
 <div id="apDom" style="display:none"><label class="ap-label" for="apDomSel">DAY OF THE MONTH</label><select class="ap-input" id="apDomSel"></select><div class="ap-hint">In months with fewer days, it runs on the last day of the month.</div></div>
 <label class="ap-label" for="apMaxAmount">MAXIMUM PAYMENT</label>
@@ -221,12 +222,13 @@ function nextRun(freq,dow,dom){
   for(var add=0;add<=70;add++){
     var d=new Date(Date.UTC(from.getUTCFullYear(),from.getUTCMonth(),from.getUTCDate()+add,6,0,0));
     if(d<=from)continue;
+    if(freq==="daily")return d;
     if(freq==="weekly"){if(d.getUTCDay()===dow)return d}
     else{var last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();if(d.getUTCDate()===Math.min(dom,last))return d}
   }
   return null;
 }
-function when(s){return s.frequency==="weekly"?"Every "+DAYS[s.dayOfWeek]:"Monthly on the "+ord(s.dayOfMonth)}
+function when(s){return s.frequency==="daily"?"Every day":s.frequency==="weekly"?"Every "+DAYS[s.dayOfWeek]:"Monthly on the "+ord(s.dayOfMonth)}
 var PAUSE={failures:"Paused after 3 missed runs. Fund your wallet, then tap Resume.",user:"Paused by you.",agent:"Not available for agent accounts.",account:"Not available for this account."};
 var RUN={successful:["Successful","ok"],pending:["Processing","gold"],skipped:["Skipped","gold"],failed:["Failed","bad"]};
 
@@ -307,6 +309,9 @@ function buildNetGrids(){
 function mark(group,v){group.querySelectorAll("[data-v]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-v")===String(v))})}
 function syncChips(){mark($("atChips"),$("atAmount").value.trim())}
 function showSvc(){
+  var dailyBtn=$("apFreq").querySelector('[data-v="daily"]');
+  if(dailyBtn)dailyBtn.style.display=state.svc==="cable"?"none":"";
+  if(state.svc==="cable"&&state.freq==="daily")state.freq="weekly";
   ["airtime","data","cable"].forEach(function(s){$("ap"+s.charAt(0).toUpperCase()+s.slice(1)).style.display=state.svc===s?"block":"none"});
   mark($("apService"),state.svc);refresh();
 }
@@ -442,11 +447,11 @@ function details(){
 }
 function refresh(){
   var d=details(),f=state.freq;
-  $("apDow").style.display=f==="weekly"?"block":"none";$("apDom").style.display=f==="monthly"?"block":"none";
+  $("apDailyHint").style.display=f==="daily"?"block":"none";$("apDow").style.display=f==="weekly"?"block":"none";$("apDom").style.display=f==="monthly"?"block":"none";
   mark($("apFreq"),f);
   if(!d){$("apSummary").textContent="Fill in the details above.";$("apCreate").disabled=true;return}
   var n=nextRun(f,d.dayOfWeek,d.dayOfMonth);
-  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b><br/><span style=\"display:block;margin-top:8px;color:#8b6c08\">Maximum charge: <b>"+money(d.maxAmount)+"</b>. If the price goes above this amount, this AutoPay will be skipped.</span>";
+  $("apSummary").innerHTML=esc(d._text)+"<br/>"+(f==="daily"?"Every day":f==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth))+" at 7:00 AM, paid from your wallet.<br/>First run: <b>"+(n?lagos(n,{weekday:"long",day:"numeric",month:"long"}):"—")+"</b><br/><span style=\"display:block;margin-top:8px;color:#8b6c08\">Maximum charge: <b>"+money(d.maxAmount)+"</b>. If the price goes above this amount, this AutoPay will be skipped.</span>";
   $("apCreate").disabled=state.busy;
 }
 function openSheet(){$("apErr").style.display="none";$("apOverlay").classList.add("show");document.body.classList.add("ap-open");refresh()}
@@ -459,7 +464,7 @@ function buildConfirmation(d){
     ["Service",service],
     [state.svc==="airtime"?"Network":state.svc==="data"?"Network":"Provider",state.svc==="airtime"||state.svc==="data"?state.net[state.svc]:state.prov],
     ["Purchase",purchase],
-    ["Frequency",state.freq==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth)],
+    ["Frequency",state.freq==="daily"?"Every day":state.freq==="weekly"?"Every "+DAYS[d.dayOfWeek]:"Every month on the "+ord(d.dayOfMonth)],
     ["Current price",money(currentAmount())],
     ["Maximum charge",money(d.maxAmount)]
   ];

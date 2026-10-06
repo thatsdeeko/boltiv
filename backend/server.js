@@ -3133,10 +3133,20 @@ async function sendTransactionEmail(userId, tx, status){
     const amount=Number(tx.amount||0).toLocaleString("en-NG",{minimumFractionDigits:2});
     const service=escapeHtmlEmail(String(tx.service||"BOLTIV service"));
     const recipient=tx.recipient?`<p style="font-size:14px;color:#666">Recipient: ${escapeHtmlEmail(tx.recipient)}</p>`:"";
-    const title=status==="successful"?"Transaction successful":"Transaction refunded";
-    const body=status==="successful"
-      ?`Your ${service} purchase of ₦${amount} was successful.`
-      :`Your ${service} transaction of ₦${amount} was refunded to your BOLTIV wallet.`;
+    let meta=tx.metadata;if(typeof meta==="string"){try{meta=JSON.parse(meta);}catch{meta=null;}}
+    const isAutopay=Boolean(meta&&meta.autopay);   // purchases made by AutoPay get their own wording
+    const title=isAutopay
+      ?(status==="successful"?"AutoPay purchase successful":"AutoPay purchase refunded")
+      :(status==="successful"?"Transaction successful":"Transaction refunded");
+    const planName=isAutopay&&meta.pricing&&meta.pricing.plan?` (${escapeHtmlEmail(String(meta.pricing.plan))})`:"";
+    const body=isAutopay
+      ?(status==="successful"
+        ?`Your AutoPay purchase of ${service}${planName} for ₦${amount} was successful. It ran automatically from your BOLTIV wallet.`
+        :`Your AutoPay ${service} purchase of ₦${amount} was refunded to your BOLTIV wallet.`)
+      :(status==="successful"
+        ?`Your ${service} purchase of ₦${amount} was successful.`
+        :`Your ${service} transaction of ₦${amount} was refunded to your BOLTIV wallet.`);
+    const autopayLink=isAutopay?`<p style="text-align:center;margin:22px 0 6px"><a href="https://boltiv.ng/autopay" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px">Manage AutoPay</a></p>`:"";
     return await sendEmail({
       to:user.email,
       subject:`BOLTIV ${title}`,
@@ -3149,6 +3159,7 @@ async function sendTransactionEmail(userId, tx, status){
 <p style="font-size:15px;line-height:1.7;color:#555">${body}</p>
 ${recipient}
 <p style="font-size:13px;line-height:1.6;color:#777">Reference: ${escapeHtmlEmail(tx.reference||"N/A")}</p>
+${autopayLink}
 </div></body></html>`
     });
   }catch(error){
@@ -4894,6 +4905,7 @@ function autopayNextRun(frequency,dayOfWeek,dayOfMonth,after){
   for(let add=0;add<=70;add++){
     const d=new Date(Date.UTC(from.getUTCFullYear(),from.getUTCMonth(),from.getUTCDate()+add,AUTOPAY_RUN_HOUR_UTC,0,0,0));
     if(d.getTime()<=from.getTime())continue;
+    if(frequency==="daily")return d;
     if(frequency==="weekly"){if(d.getUTCDay()===Number(dayOfWeek))return d;}
     else{
       const last=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).getUTCDate();
@@ -5006,11 +5018,15 @@ async function autopayBuildPayload(user,b){
 
 /* ---- scheduler ---- */
 async function autopaySendReminders(){
-  const r=await db(`SELECT s.id,s.user_id,s.label,s.amount,s.next_run_at,COALESCE(w.balance,0) AS balance
+  const r=await db(`SELECT s.id,s.user_id,s.label,s.amount,s.frequency,s.next_run_at,COALESCE(w.balance,0) AS balance
     FROM autopay_schedules s LEFT JOIN wallets w ON w.user_id=s.user_id
     WHERE s.status='active' AND s.attempt=1 AND s.next_run_at>NOW() AND s.next_run_at<=NOW()+INTERVAL '24 hours'
       AND (s.reminded_for IS NULL OR s.reminded_for<>s.next_run_at) LIMIT 200`);
   for(const s of r.rows){
+    if(s.frequency==="daily"&&Number(s.balance)>=Number(s.amount)){ // a reminder every single day would be noise: only warn when the wallet is short
+      await db(`UPDATE autopay_schedules SET reminded_for=next_run_at WHERE id=$1 AND next_run_at=$2`,[s.id,s.next_run_at]);
+      continue;
+    }
     let msg=`Your AutoPay for ${s.label} (₦${autopayMoney(s.amount)}) runs ${autopayDateText(s.next_run_at)} at 7:00 AM.`;
     if(Number(s.balance)<Number(s.amount))msg+=` Your wallet balance is ₦${autopayMoney(s.balance)} — please fund your wallet so it doesn't get skipped.`;
     await autopayNotify(s.user_id,"AutoPay reminder",msg,`autopay-remind-${s.id}-${new Date(s.next_run_at).getTime()}`);
@@ -5218,7 +5234,8 @@ async function handleAutopayRoutes(req,res,path,user){
     if(agent.isAgent){send(res,403,{success:false,message:"AutoPay is only available for regular customer accounts."});return true;}
     const frequency=clean(b.frequency).toLowerCase();
     const dow=Number(b.dayOfWeek),dom=Number(b.dayOfMonth);
-    if(frequency!=="weekly"&&frequency!=="monthly"){send(res,400,{success:false,message:"Choose weekly or monthly."});return true;}
+    if(!["daily","weekly","monthly"].includes(frequency)){send(res,400,{success:false,message:"Choose daily, weekly or monthly."});return true;}
+    if(frequency==="daily"&&service==="cable"){send(res,400,{success:false,message:"Daily AutoPay is available for airtime and data only."});return true;}
     if(frequency==="weekly"&&!(Number.isInteger(dow)&&dow>=0&&dow<=6)){send(res,400,{success:false,message:"Choose a day of the week."});return true;}
     if(frequency==="monthly"&&!(Number.isInteger(dom)&&dom>=1&&dom<=31)){send(res,400,{success:false,message:"Choose a day of the month (1–31)."});return true;}
     const count=await db(`SELECT COUNT(*)::int AS n FROM autopay_schedules WHERE user_id=$1 AND status<>'deleted'`,[user.user_id]);
@@ -5236,7 +5253,7 @@ async function handleAutopayRoutes(req,res,path,user){
     const ins=await db(`INSERT INTO autopay_schedules(user_id,service,label,frequency,day_of_week,day_of_month,amount,max_amount,payload,status,next_run_at,cycle_for,reminded_for)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'active',$10,$10,$11) RETURNING *`,
       [user.user_id,built.service,built.label,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,maxAmount,JSON.stringify(built.payload),next,reminded]);
-    try{await autopayNotify(user.user_id,"AutoPay created",`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will run ${frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"");}catch{}
+    try{await autopayNotify(user.user_id,"AutoPay created",`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will run ${frequency==="daily"?"every day":frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"");}catch{}
     await autopayAudit(user.user_id,ins.rows[0].id,"created",{service:built.service,amount:Number(built.amount),maxAmount,frequency});
     send(res,200,{success:true,message:"AutoPay created.",schedule:autopayPublic(ins.rows[0])});
     return true;
@@ -5250,7 +5267,8 @@ async function handleAutopayRoutes(req,res,path,user){
     const security=await getSecurity(user.user_id);if(!security?.transaction_pin_hash||!verifyPassword(pin,security.transaction_pin_hash)){send(res,400,{success:false,message:"Incorrect Transaction PIN."});return true;}
     const service=clean(b.service).toLowerCase();if(service!==cur.service){send(res,400,{success:false,message:"The AutoPay service cannot be changed. Edit its plan, amount or schedule instead."});return true;}
     const frequency=clean(b.frequency).toLowerCase(),dow=Number(b.dayOfWeek),dom=Number(b.dayOfMonth);
-    if(!["weekly","monthly"].includes(frequency)){send(res,400,{success:false,message:"Choose weekly or monthly."});return true;}
+    if(!["daily","weekly","monthly"].includes(frequency)){send(res,400,{success:false,message:"Choose daily, weekly or monthly."});return true;}
+    if(frequency==="daily"&&service==="cable"){send(res,400,{success:false,message:"Daily AutoPay is available for airtime and data only."});return true;}
     if(frequency==="weekly"&&!(Number.isInteger(dow)&&dow>=0&&dow<=6)){send(res,400,{success:false,message:"Choose a day of the week."});return true;}
     if(frequency==="monthly"&&!(Number.isInteger(dom)&&dom>=1&&dom<=31)){send(res,400,{success:false,message:"Choose a day of the month (1–31)."});return true;}
     const editInput={...b};if(service==="cable"&&(b.useExistingRecipient===true||!clean(editInput.smartcard)))editInput.smartcard=clean(cur.payload?.smartcard);
@@ -5296,7 +5314,7 @@ async function handleAutopayRoutes(req,res,path,user){
     if(!(price>0)){send(res,400,{success:false,message:"We couldn't read the current price. Please try again."});return true;}
     const newLimit=Math.min(1000000,Math.max(price,Math.ceil(price*1.10/50)*50,Number(cur.max_amount||0)));
     const wallet=await getWallet(user.user_id);
-    const within=block.at&&(Date.now()-new Date(block.at).getTime())<24*60*60*1000;
+    const within=block.at&&(cur.frequency==="daily"?new Date(block.at).toISOString().slice(0,10)===new Date().toISOString().slice(0,10):(Date.now()-new Date(block.at).getTime())<24*60*60*1000);
     const runNow=Boolean(within&&cur.status==="active"&&Number(wallet?.balance||0)>=price);
     await db(`UPDATE autopay_schedules SET max_amount=$2,amount=$3,price_block=NULL,updated_at=NOW() WHERE id=$1`,[id,newLimit,price]);
     await autopayAudit(user.user_id,id,"price_approved",{price,newLimit,runNow});

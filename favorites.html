@@ -10,8 +10,8 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <meta name="theme-color" content="#171717"/>
-<meta name="description" content="BOLTIV Smart Features — smarter tools for everyday digital services."/>
-<title>BOLTIV Smart Features</title>
+<meta name="description" content="Your saved phone numbers and smartcards on BOLTIV."/>
+<title>BOLTIV Favorites</title>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/>
 <link href="style.css?v=20261004-dark" rel="stylesheet"/>
 <script>boltivRequireAuth();</script>
@@ -20,6 +20,11 @@
 .smart-hero{position:relative;overflow:hidden;border-radius:28px;padding:30px;background:linear-gradient(135deg,#171717 0%,#211f18 55%,#2d2616 100%);border:1px solid rgba(212,175,55,.48);box-shadow:0 20px 48px rgba(0,0,0,.18);color:#fff}.smart-hero:before{content:"";position:absolute;width:280px;height:280px;right:-80px;top:-110px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,.3),transparent 68%)}.smart-hero>*{position:relative;z-index:1}.smart-kicker{font-size:11px;letter-spacing:.18em;font-weight:900;color:#e2c453;margin-bottom:10px}.smart-hero h1{margin:0;max-width:720px;font-size:clamp(31px,7vw,52px);line-height:1.02;letter-spacing:-.04em;color:#fff}.smart-hero p{margin:13px 0 0;max-width:680px;color:rgba(255,255,255,.72);font-size:14px;line-height:1.65}.smart-hero-tag{display:inline-flex;margin-top:20px;padding:9px 12px;border:1px solid rgba(228,206,122,.35);border-radius:999px;background:rgba(212,175,55,.1);color:#e5c65a;font-size:11px;font-weight:800}
 .smart-group{margin-top:30px}.smart-group-head{display:flex;justify-content:space-between;align-items:end;gap:14px;margin-bottom:13px}.smart-group-title{margin:0;color:var(--t-fg-26231e);font-size:15px;letter-spacing:.1em;font-weight:900}.smart-group-note{font-size:11px;color:var(--t-fg-817b70);font-weight:700}.smart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.smart-card{position:relative;display:flex;align-items:center;gap:14px;min-width:0;padding:18px;border:1px solid var(--t-bd-eee8d9);border-radius:21px;background:var(--t-bg-ffffff);text-decoration:none;box-shadow:0 9px 24px rgba(25,25,20,.045);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}.smart-card:hover{transform:translateY(-2px);border-color:#d9bf61;box-shadow:0 14px 30px rgba(25,25,20,.08)}.smart-card-icon{width:50px;height:50px;flex:0 0 50px;border-radius:16px;display:grid;place-items:center;background:var(--t-bg-fbf4d9);border:1px solid #e4ce7a;color:var(--t-fg-b48a12)}.smart-card-icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.smart-card-copy{min-width:0;flex:1}.smart-card-copy strong{display:block;color:var(--t-fg-24211d);font-size:14px}.smart-card-copy small{display:block;margin-top:4px;color:var(--t-fg-888174);font-size:11px;line-height:1.45}.smart-arrow{color:var(--t-fg-a17b13);font-size:21px}.smart-card.soon{background:var(--t-bg-faf8f0);box-shadow:none;opacity:.9}.smart-card.soon:hover{transform:none;border-color:var(--t-bd-eee8d9);box-shadow:none}.smart-badge{display:inline-flex;margin-top:6px;padding:4px 7px;border-radius:999px;background:var(--t-bg-fbf4d9);border:1px solid #e4ce7a;color:var(--t-fg-a17b13);font-size:9px;font-weight:900;letter-spacing:.08em}.smart-footer-note{margin-top:30px;padding:18px 20px;border:1px solid rgba(197,154,28,.2);border-radius:18px;background:var(--t-bg-fffdf7);color:var(--t-fg-716e68);font-size:12px;line-height:1.6}
 @media(max-width:560px){.smart-topbar{margin-top:18px;margin-bottom:25px}.smart-hero{padding:24px 20px;border-radius:23px}.smart-hero h1{font-size:34px}.smart-grid{grid-template-columns:1fr;gap:11px}.smart-card{padding:14px;border-radius:18px}.smart-card-icon{width:44px;height:44px;flex-basis:44px;border-radius:13px}.smart-group-note{display:none}}
+</style>
+<style>
+.fav-intro{margin:6px 0 4px;color:var(--t-fg-26231e);font-size:26px;font-weight:900;letter-spacing:-.03em}.fav-sub{margin:0 0 6px;color:var(--t-fg-817b70);font-size:13px;line-height:1.6}
+.fav-row .smart-card-copy small{word-break:break-all}.fav-del{flex:0 0 auto;border:1px solid var(--t-bd-eadfba);background:var(--t-bg-ffffff);color:var(--t-fg-b94c4c);border-radius:10px;padding:8px 10px;font-size:10px;font-weight:900;font-family:inherit;cursor:pointer}
+.fav-empty{margin-top:24px;padding:20px;border:1px dashed var(--t-bd-eadfba);border-radius:18px;color:var(--t-fg-817b70);font-size:13px;line-height:1.6;text-align:center}.fav-err{color:var(--t-fg-b94c4c);font-size:12px;margin-top:14px}
 </style>
 </head>
 <body class="boltiv-animated-home">
@@ -30,20 +35,53 @@
 <div class="home-header-actions"><button aria-label="Switch theme" class="icon-button theme-toggle" data-theme-toggle="" type="button"><svg class="tt-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"></path></svg><svg class="tt-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"></path></svg></button><button aria-label="Notifications" class="icon-button" onclick="location.href='/notifications'" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" class="notification-icon"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg></button><button class="profile-mini" onclick="location.href='/profile'" type="button">U</button></div>
 </header>
 <main>
-<div class="smart-topbar"><a class="smart-back" href="/dashboard"><span aria-hidden="true">←</span> Back to dashboard</a></div>
-<section class="smart-hero"><div class="smart-kicker">BOLTIV SMART FEATURES</div><h1>Smarter ways to manage your everyday digital services.</h1><p>Tools built to reduce repetitive work, make everyday payments easier and give you more control over how you use BOLTIV.</p><span class="smart-hero-tag">Built into BOLTIV</span></section>
-<section class="smart-group" aria-labelledby="available"><div class="smart-group-head"><h2 class="smart-group-title" id="available">AVAILABLE NOW</h2><span class="smart-group-note">Tap a feature to open it.</span></div><div class="smart-grid">
-<a class="smart-card" href="/autopay"><span class="smart-card-icon"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.6M4 12a8 8 0 0 1 13.7-5.6"></path><path d="M17.5 3v3.6h-3.6M6.5 21v-3.6h3.6"></path></svg></span><span class="smart-card-copy"><strong>AutoPay</strong><small>Automatically repeat supported Airtime, Data and Cable TV purchases.</small></span><span class="smart-arrow">›</span></a>
-<a class="smart-card" href="/favorites.html"><span class="smart-card-icon"><svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"></path></svg></span><span class="smart-card-copy"><strong>Favorites</strong><small>Save numbers and smartcards you buy for often, and use them in one tap.</small></span><span class="smart-arrow">›</span></a>
-<a class="smart-card" href="/dashboard#quickRepeatList"><span class="smart-card-icon"><svg viewBox="0 0 24 24"><path d="M6 4h12v16H6z"></path><path d="M9 8h6M9 12h6M9 16h4"></path></svg></span><span class="smart-card-copy"><strong>Buy Again</strong><small>Repeat services you've successfully purchased before in one tap.</small></span><span class="smart-arrow">›</span></a>
-<a class="smart-card" href="/dashboard#monthlySpent"><span class="smart-card-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path></svg></span><span class="smart-card-copy"><strong>Spending Insights</strong><small>See how much you spend each month and on which services.</small></span><span class="smart-arrow">›</span></a>
-<a class="smart-card" href="/notifications"><span class="smart-card-icon"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg></span><span class="smart-card-copy"><strong>Transaction Alerts</strong><small>Review notifications about your account, AutoPay runs and data plans about to expire.</small></span><span class="smart-arrow">›</span></a>
-</div></section>
+<div class="smart-topbar"><a class="smart-back" href="/smart-features.html"><span aria-hidden="true">←</span> Back to Smart Features</a></div>
+<h1 class="fav-intro">Favorites</h1>
+<p class="fav-sub">Saved numbers and smartcards show up as one-tap shortcuts on the Airtime, Data and Cable TV pages.</p>
+<div id="favList"><div class="fav-empty">Loading…</div></div>
 </main>
 </div>
 </div>
 <nav class="bottom-nav"><button class="nav-item active" data-page="/dashboard"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.5 10.5 8.5-7 8.5 7v9a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1z"></path><path d="M9.5 20.5v-6h5v6"></path></svg></span><span>Home</span></button><button class="nav-item" data-page="/wallet"><span class="nav-icon nav-icon-text">₦</span><span>Wallet</span></button><button class="nav-item" data-page="/transactions"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"></path></svg></span><span>Activity</span></button><button class="nav-item" data-page="/profile"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span><span>Profile</span></button></nav>
 <script>document.querySelectorAll('.nav-item').forEach(i=>i.onclick=()=>location.href=i.dataset.page);</script>
+<script>
+(function(){
+var API=window.BOLTIV_API_BASE,list=document.getElementById("favList");
+function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
+function hdr(){var t=window.boltivMemoryStorage&&boltivMemoryStorage.getItem("boltivAuthToken");var h={"Content-Type":"application/json"};if(t)h.Authorization="Bearer "+t;return h}
+var ICON_PHONE='<svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M11 18h2"></path></svg>';
+var ICON_TV='<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>';
+function group(title,items,icon){
+  if(!items.length)return"";
+  return '<section class="smart-group"><div class="smart-group-head"><h2 class="smart-group-title">'+title+'</h2></div><div class="smart-grid">'+items.map(function(f){
+    var meta=f.recipient+(f.network?" · "+f.network:f.provider?" · "+f.provider:"");
+    return '<div class="smart-card fav-row"><span class="smart-card-icon">'+icon+'</span><span class="smart-card-copy"><strong>'+esc(f.name)+'</strong><small>'+esc(meta)+'</small></span><button class="fav-del" type="button" data-id="'+Number(f.id)+'" aria-label="Remove '+esc(f.name)+'">REMOVE</button></div>';
+  }).join("")+'</div></section>';
+}
+function render(favs){
+  var phones=favs.filter(function(f){return f.kind==="phone"}),cards=favs.filter(function(f){return f.kind==="cable"});
+  if(!favs.length){list.innerHTML='<div class="fav-empty">Nothing saved yet.<br/>Open Airtime, Data or Cable TV, enter a number and tap <b>Save this number</b>.</div>';return}
+  list.innerHTML=group("PHONE NUMBERS",phones,ICON_PHONE)+group("SMARTCARDS",cards,ICON_TV);
+  list.querySelectorAll(".fav-del").forEach(function(b){b.onclick=function(){remove(Number(b.dataset.id),b)}});
+}
+function load(){
+  window.boltivAuthReady.then(function(u){
+    if(!u)return;
+    return fetch(API+"/api/favorites",{headers:hdr(),cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
+      if(!d.success)throw new Error();render(d.favorites||[]);
+    });
+  }).catch(function(){list.innerHTML='<div class="fav-err">Could not load your saved items. Please try again.</div>'});
+}
+function remove(id,btn){
+  if(!id||!confirm("Remove this saved item?"))return;
+  btn.disabled=true;
+  fetch(API+"/api/favorites/delete",{method:"POST",headers:hdr(),body:JSON.stringify({id:id})}).then(function(r){return r.json()}).then(function(d){
+    if(d.success)load();else{btn.disabled=false;alert(d.message||"Could not remove it. Please try again.")}
+  }).catch(function(){btn.disabled=false;alert("Could not remove it. Please try again.")});
+}
+load();
+})();
+</script>
 <script src="boltiv-footer.js?v=20261004-dark"></script>
 </body>
 </html>

@@ -1,12 +1,15 @@
 <!DOCTYPE html>
-
 <html lang="en">
-<head><script src="/boltiv-theme.js?v=20261004-dark"></script><link href="/boltiv-theme.css?v=20261004-dark" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/">
+<head>
+<script src="/boltiv-theme.js?v=20261007"></script>
+<link href="/boltiv-theme.css?v=20261007" rel="stylesheet"/>
+<script src="/boltiv-api-config.js?v=1"></script>
+<base href="/">
 <meta charset="utf-8"/>
 <meta content="width=device-width,initial-scale=1.0" name="viewport"/>
 <meta content="#C9A227" name="theme-color"/>
-<title>BOLTIV — Digital Services &amp; Payments in Nigeria</title>
-<meta content="BOLTIV is a digital services and payments platform in Nigeria for airtime, data, electricity bills and cable TV. Fast, convenient and secure everyday payments in one account." name="description"/>
+<title>BOLTIV — Powering Your Everyday Life</title>
+<meta content="BOLTIV brings airtime, data, electricity, cable TV, wallet payments, smart payment tools and rewards together in one simple platform." name="description"/>
 <meta content="index,follow,max-image-preview:large" name="robots"/>
 <link href="https://boltiv.ng/" rel="canonical"/>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/webp"/>
@@ -14,300 +17,105 @@
 <meta content="BOLTIV" name="application-name"/>
 <meta content="website" property="og:type"/>
 <meta content="BOLTIV" property="og:site_name"/>
-<meta content="BOLTIV — Digital Services &amp; Payments in Nigeria" property="og:title"/>
-<meta content="BOLTIV is a digital services and payments platform in Nigeria for airtime, data, electricity bills and cable TV. Fast, convenient and secure everyday payments in one account." property="og:description"/>
+<meta content="BOLTIV — Powering Your Everyday Life" property="og:title"/>
+<meta content="Everyday digital services, smart payment tools and rewards — all in one BOLTIV account." property="og:description"/>
 <meta content="https://boltiv.ng/" property="og:url"/>
 <meta content="https://boltiv.ng/assets/boltiv-social.webp" property="og:image"/>
-<meta content="BOLTIV — Digital Services &amp; Payments in Nigeria" property="og:image:alt"/>
+<meta content="BOLTIV — Powering Your Everyday Life" property="og:image:alt"/>
 <meta content="summary" name="twitter:card"/>
-<meta content="BOLTIV — Digital Services &amp; Payments in Nigeria" name="twitter:title"/>
-<meta content="BOLTIV is a digital services and payments platform in Nigeria for airtime, data, electricity bills and cable TV. Fast, convenient and secure everyday payments in one account." name="twitter:description"/>
+<meta content="BOLTIV — Powering Your Everyday Life" name="twitter:title"/>
+<meta content="Everyday digital services, smart payment tools and rewards — all in one BOLTIV account." name="twitter:description"/>
 <meta content="https://boltiv.ng/assets/boltiv-social.webp" name="twitter:image"/>
-<meta content="BOLTIV — Digital Services &amp; Payments in Nigeria" name="twitter:image:alt"/>
-<link href="style.css?v=20261004-dark" rel="stylesheet"/>
+<meta content="BOLTIV — Powering Your Everyday Life" name="twitter:image:alt"/>
+<link href="style.css?v=20261007" rel="stylesheet"/>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Organization","name":"BOLTIV","alternateName":"BOLTIV Nigeria","url":"https://boltiv.ng/","logo":"https://boltiv.ng/assets/boltiv-logo.webp","description":"BOLTIV is a Nigerian digital services and payments platform for airtime, data, electricity bills and cable TV."}
-</script>
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"BOLTIV","url":"https://boltiv.ng/"}
+{"@context":"https://schema.org","@type":"Organization","name":"BOLTIV","alternateName":"BOLTIV Nigeria","url":"https://boltiv.ng/","logo":"https://boltiv.ng/assets/boltiv-logo.webp","description":"BOLTIV is a Nigerian digital services and payments platform for everyday services, smart payment tools and rewards."}
 </script>
 <style>
-:root{--boltiv-gold:#C9A227;--boltiv-gold-dark:#8d6907;--boltiv-line:#eadfb9;--boltiv-soft:#fffdf7;--boltiv-text:#171717;--boltiv-muted:#68645b}
-body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.seo-page{min-height:100vh}
-.seo-wrap{width:min(1080px,92%);margin:auto}
-.seo-nav{padding:24px 0 18px;text-align:center;border-bottom:1px solid var(--t-bd-rgba-234-223-185-0p7)}
-.seo-brand{display:inline-flex;flex-direction:column;align-items:center;gap:5px;text-decoration:none;color:var(--boltiv-text);font-weight:1000;letter-spacing:.12em;font-size:24px}
-.seo-brand img{width:82px;height:82px;object-fit:contain;display:block}
-.seo-brand span{display:block}
-.seo-actions{display:flex;justify-content:center;gap:10px;margin-top:16px}
-.seo-btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;padding:12px 18px;font-size:13px;font-weight:900;transition:transform .15s ease,box-shadow .15s ease}
-.seo-btn:hover{transform:translateY(-1px)}
-.seo-btn.primary{background:var(--boltiv-gold);color:#fff;box-shadow:0 8px 20px rgba(184,134,11,.16)}
-.seo-btn.secondary{border:1px solid var(--t-bd-e3d39b);color:var(--boltiv-gold-dark);background:var(--t-bg-ffffff)}
-.seo-hero{padding:64px 0 54px;display:grid;grid-template-columns:1.08fr .92fr;gap:50px;align-items:center}
-.seo-kicker{color:var(--boltiv-gold);font-size:12px;font-weight:1000;letter-spacing:.18em}
-.seo-hero h1{font-size:clamp(42px,7vw,72px);line-height:.98;margin:14px 0 18px;letter-spacing:-.04em}
-.seo-hero h1 span{color:var(--boltiv-gold)}
-.seo-hero p{font-size:18px;line-height:1.65;color:var(--boltiv-muted);max-width:620px}
-/* Center the public homepage hero content */
-.seo-hero > div:first-child{text-align:center}
-.seo-hero > div:first-child .seo-hero p{margin-left:auto;margin-right:auto}
-.seo-hero-actions{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap;justify-content:center}
-.seo-card{background:var(--t-bg-ffffff);border:1px solid var(--boltiv-line);border-radius:28px;padding:34px;box-shadow:0 20px 60px rgba(80,60,10,.09)}
-.seo-logo{width:170px;height:170px;object-fit:contain;display:block;margin:0 auto 18px}
-.seo-card h2{text-align:center;margin:0 0 8px;font-size:25px}
-.seo-card p{text-align:center;color:var(--t-fg-777777);line-height:1.6;font-size:14px;margin:0}
-.seo-section{padding:34px 0 70px}
-.seo-section.alt{border-top:1px solid var(--t-bd-eee7d4)}
-.seo-section h2{text-align:center;font-size:32px;margin:0 0 10px;letter-spacing:-.02em}
-.seo-section-intro{text-align:center;color:var(--boltiv-muted);max-width:620px;margin:0 auto 28px;line-height:1.65}
-.seo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
-.seo-service,.seo-benefit,.seo-step{background:var(--t-bg-ffffff);border:1px solid var(--t-bd-ebe5d2);border-radius:20px;padding:24px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
-.seo-service .icon,.seo-benefit .icon{width:42px;height:42px;border-radius:13px;background:var(--t-bg-fff9e8);border:1px solid var(--t-bd-eadfb9);display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000;margin-bottom:16px}
-.seo-service strong,.seo-benefit strong{display:block;margin-bottom:8px;font-size:16px}
-.seo-service span,.seo-benefit span{color:var(--t-fg-777777);font-size:13px;line-height:1.6}
-.seo-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
-.seo-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
-.seo-step .number{font-size:13px;font-weight:1000;color:var(--boltiv-gold);letter-spacing:.1em;margin-bottom:16px}
-.seo-step strong{display:block;margin-bottom:8px}
-.seo-step span{color:var(--t-fg-777777);font-size:13px;line-height:1.6}
-.seo-trust{margin:12px 0 70px;background:var(--t-bg-ffffff);border:1px solid var(--boltiv-line);border-radius:26px;padding:38px 28px;text-align:center}
-.seo-trust h2{margin:0 0 12px;font-size:30px}
-.seo-trust p{max-width:720px;margin:0 auto;color:var(--boltiv-muted);line-height:1.7}
-.seo-final{background:var(--t-bg-171717);color:#fff;border-radius:28px;padding:46px 28px;text-align:center;margin-bottom:70px}
-.seo-final h2{margin:0 0 12px;font-size:32px}
-.seo-final p{margin:0 auto 24px;color:#d8d8d8;max-width:600px;line-height:1.6}
-.seo-footer{border-top:1px solid var(--t-bd-ebe5d2);padding:28px 0 40px;color:var(--t-fg-777777);font-size:12px;text-align:center}
-.seo-footer a{color:var(--boltiv-gold-dark);margin:0 9px;text-decoration:none}
-@media(max-width:760px){
- .seo-wrap{width:min(94%,620px)}
- .seo-brand{font-size:22px}
- .seo-brand img{width:74px;height:74px}
- .seo-hero{grid-template-columns:1fr;padding:48px 0 42px;gap:28px}.seo-hero > div:first-child{text-align:center}.seo-hero > div:first-child .seo-hero p{margin-left:auto;margin-right:auto}
- .seo-hero h1{font-size:46px}
- .seo-grid,.seo-benefits{grid-template-columns:1fr}
- .seo-steps{grid-template-columns:1fr 1fr}
- .seo-card{padding:28px 22px}
- .seo-section{padding-bottom:54px}
-}
-@media(max-width:430px){.seo-steps{grid-template-columns:1fr}.seo-hero-actions{flex-direction:column}.seo-hero-actions .seo-btn{width:100%}.seo-actions .seo-btn{min-width:110px}}
-
-/* Enhanced homepage sections */
-.seo-mini-nav{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin-top:14px}
-.seo-mini-nav a{font-size:12px;font-weight:800;color:var(--t-fg-6b675f);text-decoration:none}
-.seo-mini-nav a:hover{color:var(--boltiv-gold-dark)}
-.seo-availability{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
-.seo-availability-card{display:flex;align-items:center;gap:14px;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-ebe5d2);border-radius:18px;padding:18px;box-shadow:0 8px 24px rgba(80,60,10,.035)}
-.seo-availability-card .availability-icon{width:42px;height:42px;flex:0 0 42px;border-radius:13px;background:var(--t-bg-fff9e8);border:1px solid var(--t-bd-eadfb9);display:flex;align-items:center;justify-content:center;color:var(--boltiv-gold);font-weight:1000}
-.seo-availability-card strong{display:block;font-size:15px;margin-bottom:5px}
-.seo-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:900;letter-spacing:.05em}
-.seo-status.live{color:var(--t-fg-25824f)}
-.seo-status.live::before{content:"";width:7px;height:7px;border-radius:50%;background:#35a66c}
-.seo-status.soon{color:#8b806b}
-.seo-status.soon::before{content:"";width:7px;height:7px;border-radius:50%;background:#c9a22b}
-.seo-wallet{display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:stretch}
-.seo-wallet-copy{background:var(--t-bg-171717);color:#fff;border-radius:28px;padding:38px}
-.seo-wallet-copy .seo-kicker{color:#d3aa27}
-.seo-wallet-copy h2{text-align:left;color:#fff;margin:12px 0;font-size:34px}
-.seo-wallet-copy p{color:#d3d3d3;line-height:1.7}
-.seo-wallet-points{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
-.seo-wallet-point{border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:15px}
-.seo-wallet-point strong{display:block;font-size:14px;margin-bottom:5px}
-.seo-wallet-point span{font-size:12px;color:#bdbdbd;line-height:1.5}
-.seo-wallet-card{background:var(--t-bg-ffffff);border:1px solid var(--boltiv-line);border-radius:28px;padding:28px;box-shadow:0 16px 45px rgba(80,60,10,.07);display:flex;flex-direction:column;justify-content:center}
-.seo-wallet-balance{border-radius:22px;background:var(--t-bg-fffaf0);border:1px solid var(--t-bd-eadfb9);padding:24px;margin-bottom:18px}
-.seo-wallet-balance small{display:block;color:var(--t-fg-817864);font-weight:800;letter-spacing:.08em;margin-bottom:10px}
-.seo-wallet-balance strong{display:block;font-size:38px;letter-spacing:-.03em}
-.seo-wallet-card p{color:var(--t-fg-777777);line-height:1.6;font-size:13px}
-.seo-faq{max-width:800px;margin:28px auto 0;display:grid;gap:10px}
-.seo-faq details{background:var(--t-bg-ffffff);border:1px solid var(--t-bd-ebe5d2);border-radius:16px;padding:18px 20px}
-.seo-faq summary{cursor:pointer;font-weight:900;list-style:none;display:flex;justify-content:space-between;gap:15px}
-.seo-faq summary::-webkit-details-marker{display:none}
-.seo-faq summary::after{content:"+";color:var(--boltiv-gold);font-size:20px;line-height:1}
-.seo-faq details[open] summary::after{content:"−"}
-.seo-faq p{color:var(--t-fg-777777);line-height:1.65;font-size:13px;margin:14px 0 0}
-.seo-mobile-cta{display:none}
-@media(max-width:760px){
- .seo-mini-nav{gap:12px}
- .seo-availability{grid-template-columns:1fr}
- .seo-wallet{grid-template-columns:1fr}
- .seo-wallet-copy{padding:28px 22px}
- .seo-wallet-copy h2{font-size:29px}
- .seo-wallet-points{grid-template-columns:1fr}
- .seo-mobile-cta{position:fixed;display:grid;grid-template-columns:1fr 1fr;gap:10px;left:12px;right:12px;bottom:12px;padding:10px;background:var(--t-bg-rgba-255-255-255-0p96);border:1px solid var(--t-bd-e7dfc9);border-radius:18px;box-shadow:0 12px 35px rgba(0,0,0,.14);z-index:9999;backdrop-filter:blur(10px)}
- .seo-mobile-cta .seo-btn{padding:13px 10px}
- .seo-footer{padding-bottom:105px}
-}
-
-
+:root{--g:#c9a227;--gd:#8f6b08;--ink:#151515;--muted:#6f6b63;--cream:#fbfaf6;--line:#e9e2cf;--card:#fff;--green:#218653}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--cream);color:var(--ink);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.lp{overflow:hidden}.wrap{width:min(1160px,92%);margin:auto}
+.nav{padding:18px 0;border-bottom:1px solid rgba(233,226,207,.8);background:rgba(251,250,246,.88);backdrop-filter:blur(14px);position:sticky;top:0;z-index:50}.nav-inner{display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink);font-weight:1000;letter-spacing:.1em}.brand img{width:40px;height:40px;object-fit:contain}.brand span{font-size:19px}.navlinks{display:flex;gap:24px;align-items:center}.navlinks a{font-size:13px;font-weight:800;color:#625e56;text-decoration:none}.navlinks a:hover{color:var(--gd)}.actions{display:flex;gap:9px}.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:12px;padding:12px 18px;text-decoration:none;font-size:13px;font-weight:900;transition:.18s ease;border:1px solid transparent}.btn:hover{transform:translateY(-1px)}.btn.gold{background:var(--g);color:#fff;box-shadow:0 10px 24px rgba(143,107,8,.16)}.btn.light{background:#fff;border-color:#ddd4bb;color:#514a3d}.btn.dark{background:#171717;color:#fff}.btn.big{padding:15px 22px;border-radius:13px}
+.hero{padding:78px 0 70px;position:relative}.hero-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:60px;align-items:center}.eyebrow{font-size:11px;font-weight:1000;letter-spacing:.18em;color:var(--gd)}.hero h1{font-size:clamp(48px,6.3vw,78px);line-height:.96;letter-spacing:-.055em;margin:15px 0 21px;max-width:680px}.hero h1 span{color:var(--g)}.hero-copy{font-size:18px;line-height:1.7;color:var(--muted);max-width:620px}.hero-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:29px}.hero-note{display:flex;align-items:center;gap:9px;margin-top:20px;color:#817b70;font-size:12px;font-weight:700}.dot{width:8px;height:8px;border-radius:50%;background:#39a66c;box-shadow:0 0 0 5px rgba(57,166,108,.1)}
+.product-stage{position:relative;min-height:510px;display:flex;align-items:center;justify-content:center}.glow{position:absolute;width:410px;height:410px;border-radius:50%;background:rgba(201,162,39,.13);filter:blur(45px)}.wallet{position:relative;width:min(430px,100%);background:#171717;color:#fff;border-radius:30px;padding:26px;box-shadow:0 35px 80px rgba(25,20,5,.18);transform:rotate(2deg)}.wallet-top{display:flex;justify-content:space-between;align-items:center}.wallet-brand{display:flex;align-items:center;gap:9px;font-weight:1000;letter-spacing:.1em}.wallet-brand img{width:34px;height:34px;filter:none}.balance-label{margin-top:38px;color:#aaa79e;font-size:10px;font-weight:900;letter-spacing:.12em}.balance{font-size:40px;font-weight:900;letter-spacing:-.04em;margin:5px 0 24px}.wallet-row{display:flex;gap:10px}.wallet-pill{flex:1;border:1px solid rgba(255,255,255,.1);border-radius:15px;padding:14px}.wallet-pill small{display:block;color:#99958c;font-size:9px;font-weight:800;margin-bottom:5px}.wallet-pill strong{font-size:13px}.wallet-bottom{margin-top:16px;display:flex;align-items:center;justify-content:space-between}.wallet-bottom span{font-size:11px;color:#a7a39b}.wallet-chip{background:var(--g);color:#fff;padding:8px 12px;border-radius:9px;font-size:10px;font-weight:1000}.float-card{position:absolute;background:#fff;border:1px solid var(--line);box-shadow:0 20px 50px rgba(45,35,10,.13);border-radius:17px;padding:15px 17px;display:flex;gap:11px;align-items:center}.float-card strong{display:block;font-size:12px}.float-card small{color:#858078;font-size:10px}.float-icon{width:36px;height:36px;border-radius:11px;background:#fff8e6;color:var(--gd);display:grid;place-items:center;font-weight:1000}.float-one{right:-10px;top:70px}.float-two{left:-10px;bottom:65px}.float-two .float-icon{background:#edf8f1;color:var(--green)}
+.trustbar{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;padding:20px 0}.trust{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.trust-item{display:flex;align-items:center;justify-content:center;gap:9px;font-size:12px;font-weight:850;color:#59554d}.trust-item b{color:var(--g);font-size:18px}
+.section{padding:92px 0}.section.alt{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.section-head{text-align:center;max-width:720px;margin:0 auto 38px}.section-head .eyebrow{margin-bottom:10px}.section h2{font-size:clamp(31px,4vw,46px);line-height:1.03;letter-spacing:-.04em;margin:0 0 13px}.section-head p{color:var(--muted);line-height:1.7;margin:0;font-size:15px}
+.service-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.service{background:#fff;border:1px solid var(--line);border-radius:19px;padding:22px 18px;text-decoration:none;color:inherit;transition:.18s ease}.service:hover{transform:translateY(-3px);box-shadow:0 15px 35px rgba(70,50,10,.08)}.service-icon{width:42px;height:42px;border-radius:12px;background:#fff8e7;border:1px solid #eadfb9;color:var(--gd);display:grid;place-items:center;font-weight:1000;font-size:12px;margin-bottom:17px}.service strong{display:block;font-size:14px;margin-bottom:6px}.service span{font-size:11px;line-height:1.55;color:#7a756c}
+.smart-layout{display:grid;grid-template-columns:.8fr 1.2fr;gap:45px;align-items:center}.smart-copy{max-width:440px}.smart-copy h2{text-align:left}.smart-copy p{color:var(--muted);line-height:1.7}.smart-badge{display:inline-flex;padding:7px 10px;border-radius:8px;background:#fff8e5;border:1px solid #eadfb9;color:var(--gd);font-size:10px;font-weight:1000;letter-spacing:.1em}.smart-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.smart-card{display:flex;align-items:center;gap:13px;padding:18px;border:1px solid var(--line);border-radius:18px;background:#fff;text-decoration:none;color:inherit;min-height:95px;transition:.18s}.smart-card:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(70,50,10,.07)}.smart-icon{width:40px;height:40px;border-radius:12px;background:#fff8e7;color:var(--gd);display:grid;place-items:center;flex:0 0 40px;font-weight:1000}.smart-card strong{display:block;font-size:13px;margin-bottom:5px}.smart-card small{color:#7c776f;font-size:10px;line-height:1.45}.arrow{margin-left:auto;color:#b2a88f;font-size:22px}
+.wallet-section{display:grid;grid-template-columns:1fr 1fr;gap:55px;align-items:center}.dark-panel{background:#171717;color:#fff;border-radius:29px;padding:38px}.dark-panel .eyebrow{color:#d3ab2e}.dark-panel h2{text-align:left;margin-top:10px}.dark-panel p{color:#c7c4be;line-height:1.7}.points{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px}.point{border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px}.point b{display:block;font-size:12px;margin-bottom:5px}.point span{font-size:10px;line-height:1.45;color:#aaa69f}.wallet-preview{background:#fff;border:1px solid var(--line);border-radius:29px;padding:27px;box-shadow:0 20px 55px rgba(50,40,10,.08)}.preview-card{background:linear-gradient(135deg,#1c1c1c,#292619);color:#fff;border-radius:23px;padding:24px}.preview-card small{color:#aaa69f;font-size:9px;font-weight:900;letter-spacing:.1em}.preview-card h3{font-size:35px;margin:9px 0 27px}.preview-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.preview-action{border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;font-size:10px;font-weight:800}.wallet-caption{font-size:12px;color:var(--muted);line-height:1.6;margin:17px 3px 0}
+.reward-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.reward{border-radius:24px;padding:29px;background:#fff;border:1px solid var(--line)}.reward.gold{background:#fff9e8}.reward-icon{width:45px;height:45px;border-radius:13px;background:#fff;border:1px solid #eadfb9;display:grid;place-items:center;color:var(--gd);font-weight:1000;margin-bottom:19px}.reward h3{font-size:22px;margin:0 0 8px}.reward p{color:var(--muted);line-height:1.65;font-size:13px;margin:0 0 18px}.reward a{font-size:12px;font-weight:900;color:var(--gd);text-decoration:none}
+.agent{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center}.agent-copy h2{text-align:left}.agent-copy p{color:var(--muted);line-height:1.7}.agent-card{background:#171717;color:#fff;border-radius:29px;padding:29px;box-shadow:0 25px 60px rgba(0,0,0,.13)}.agent-card-top{display:flex;justify-content:space-between;align-items:center}.agent-status{padding:7px 10px;border-radius:999px;background:rgba(48,167,103,.13);color:#63cf96;font-size:9px;font-weight:1000}.agent-title{font-size:11px;letter-spacing:.12em;color:#aaa79f;font-weight:900;margin-top:34px}.agent-profit{font-size:38px;font-weight:900;margin:5px 0 24px}.agent-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.agent-stat{border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:13px}.agent-stat small{display:block;color:#97938b;font-size:8px;margin-bottom:5px}.agent-stat b{font-size:12px}.agent-list{display:grid;gap:10px;margin-top:20px}.agent-list div{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:#5e5a52}.check{color:var(--green);font-weight:1000}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.step{background:#fff;border:1px solid var(--line);border-radius:19px;padding:23px}.num{font-size:11px;font-weight:1000;color:var(--g);letter-spacing:.12em;margin-bottom:27px}.step strong{display:block;font-size:14px;margin-bottom:7px}.step span{font-size:11px;line-height:1.6;color:#777269}
+.faq{max-width:800px;margin:auto;display:grid;gap:9px}.faq details{background:#fff;border:1px solid var(--line);border-radius:15px;padding:18px 20px}.faq summary{cursor:pointer;font-weight:900;font-size:13px;list-style:none;display:flex;justify-content:space-between}.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";color:var(--g);font-size:18px}.faq details[open] summary::after{content:"−"}.faq p{color:#777269;font-size:12px;line-height:1.65;margin:12px 0 0}
+.final{padding:0 0 90px}.final-box{background:#171717;color:#fff;border-radius:31px;padding:60px 30px;text-align:center}.final-box .eyebrow{color:#d2aa2d}.final-box h2{font-size:clamp(34px,5vw,52px);letter-spacing:-.04em;margin:10px 0 13px}.final-box p{color:#c8c5be;line-height:1.7;max-width:600px;margin:0 auto 26px}.footer{border-top:1px solid var(--line);padding:28px 0 40px;text-align:center;color:#777269;font-size:11px}.footer a{color:var(--gd);text-decoration:none;margin:0 7px}.mobile-cta{display:none}
+@media(max-width:900px){.navlinks{display:none}.hero-grid,.smart-layout,.wallet-section,.agent{grid-template-columns:1fr;gap:40px}.product-stage{min-height:430px}.service-grid{grid-template-columns:repeat(3,1fr)}.trust{grid-template-columns:repeat(2,1fr)}.steps{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:620px){.wrap{width:min(94%,600px)}.nav{padding:12px 0}.actions .btn.light{display:none}.brand img{width:35px;height:35px}.hero{padding:55px 0 45px}.hero h1{font-size:47px}.hero-copy{font-size:16px}.product-stage{min-height:390px}.wallet{padding:21px;border-radius:24px}.float-one{right:-5px;top:25px}.float-two{left:-5px;bottom:25px}.trust{grid-template-columns:1fr 1fr}.trust-item{font-size:10px}.section{padding:70px 0}.service-grid{grid-template-columns:1fr 1fr}.smart-grid,.reward-grid{grid-template-columns:1fr}.points{grid-template-columns:1fr}.agent-stats{grid-template-columns:1fr 1fr}.steps{grid-template-columns:1fr}.final{padding-bottom:75px}.final-box{padding:43px 22px}.mobile-cta{display:grid;position:fixed;bottom:11px;left:11px;right:11px;grid-template-columns:1fr 1fr;gap:8px;padding:9px;background:rgba(255,255,255,.94);border:1px solid #e4ddcd;border-radius:17px;box-shadow:0 14px 40px rgba(0,0,0,.14);z-index:100;backdrop-filter:blur(14px)}.mobile-cta .btn{padding:12px 8px}.footer{padding-bottom:105px}}
+@media(max-width:390px){.service-grid{grid-template-columns:1fr}.hero h1{font-size:42px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+:focus-visible{outline:3px solid var(--g);outline-offset:3px}
 </style>
-<style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #C9A227;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body>
-<div class="seo-page">
-<div class="seo-wrap">
-<header class="seo-nav">
-<a aria-label="BOLTIV home" class="seo-brand" href="/">
-<img alt="BOLTIV logo" src="assets/boltiv-logo.webp"/>
-<span>BOLTIV</span>
-</a>
-<div class="seo-actions">
-<a class="seo-btn secondary" href="/login">Sign in</a>
-<a class="seo-btn primary" href="/register">Get started</a>
-</div>
-<div class="seo-mini-nav">
-<a href="#services">Services</a>
-<a href="#agents">BOLTIV for Agents</a>
-<a href="#how-it-works">How it works</a>
-<a href="#faq">FAQ</a>
+<div class="lp">
+<header class="nav">
+<div class="wrap nav-inner">
+<a class="brand" href="/" aria-label="BOLTIV home"><img src="assets/boltiv-logo.webp" alt="BOLTIV logo"/><span>BOLTIV</span></a>
+<nav class="navlinks" aria-label="Main navigation"><a href="#services">Services</a><a href="#smart">Smart Features</a><a href="#wallet">Wallet</a><a href="#agents">Agents</a></nav>
+<div class="actions"><a class="btn light" href="/login">Sign in</a><a class="btn gold" href="/register">Get started</a></div>
 </div>
 </header>
 <main>
-<section class="seo-hero">
-<div>
-<div class="seo-kicker">BOLTIV DIGITAL SERVICES</div>
-<h1>EVERYDAY SERVICES.<br/><span>ONE SIMPLE PLACE.</span></h1>
-<p>Buy airtime and data, pay electricity bills, renew cable TV and access useful digital services through BOLTIV — all from one simple platform.</p>
-<div class="seo-hero-actions">
-<a class="seo-btn primary" href="/register">Create your account</a>
-<a class="seo-btn secondary" href="#services" id="explore-services">Explore services</a>
+<section class="hero"><div class="wrap hero-grid"><div>
+<div class="eyebrow">POWERING YOUR EVERYDAY LIFE</div>
+<h1>More than payments.<br/><span>Built for everyday.</span></h1>
+<p class="hero-copy">BOLTIV brings your everyday digital services, wallet, smart payment tools and rewards into one simple platform.</p>
+<div class="hero-actions"><a class="btn gold big" href="/register">Create your account</a><a class="btn light big" href="#services">Explore BOLTIV</a></div>
+<div class="hero-note"><span class="dot"></span>Fast, simple and built around the way you pay.</div>
 </div>
+<div class="product-stage" aria-label="BOLTIV wallet preview">
+<div class="glow"></div>
+<div class="wallet">
+<div class="wallet-top"><div class="wallet-brand"><img src="assets/boltiv-logo.webp" alt=""/>BOLTIV</div><span style="font-size:10px;color:#aaa79f;font-weight:800">WALLET</span></div>
+<div class="balance-label">AVAILABLE BALANCE</div><div class="balance">₦••••••</div>
+<div class="wallet-row"><div class="wallet-pill"><small>TODAY'S SPEND</small><strong>₦••••</strong></div><div class="wallet-pill"><small>BONUS BALANCE</small><strong>₦••••</strong></div></div>
+<div class="wallet-bottom"><span>Secure account controls</span><span class="wallet-chip">ACTIVE</span></div>
 </div>
-<div class="seo-card">
-<img alt="BOLTIV gold logo" class="seo-logo" src="assets/boltiv-logo.webp"/>
-<h2>Simple. Secure. Built for everyday use.</h2>
-<p>Keep your everyday digital services in one BOLTIV account and manage them with a clean, straightforward experience.</p>
+<div class="float-card float-one"><div class="float-icon">↻</div><div><strong>AutoPay</strong><small>Set it once. Stay topped up.</small></div></div>
+<div class="float-card float-two"><div class="float-icon">✓</div><div><strong>Cashback earned</strong><small>Use your Bonus Balance on purchases.</small></div></div>
 </div>
-</section>
-<section class="seo-section" id="services">
-<h2>Everyday services, one simple place</h2>
-<p class="seo-section-intro">Choose a service, follow a few clear steps and keep your activity together inside your BOLTIV account.</p>
-<div class="seo-grid">
-<a class="seo-service" href="/airtime" style="text-decoration:none;color:inherit">
-<div class="icon">₦</div><strong>Airtime</strong><span>Recharge supported networks quickly and keep your phone connected.</span>
-</a>
-<a class="seo-service" href="/data" style="text-decoration:none;color:inherit">
-<div class="icon">▣</div><strong>Data</strong><span>Choose available data plans and purchase them from your BOLTIV account.</span>
-</a>
-<a class="seo-service" href="/electricity" style="text-decoration:none;color:inherit">
-<div class="icon">ϟ</div><strong>Electricity</strong><span>Pay supported electricity bills conveniently from one place.</span>
-</a>
-<a class="seo-service" href="/cable" style="text-decoration:none;color:inherit">
-<div class="icon">TV</div><strong>Cable TV</strong><span>Renew supported cable TV subscriptions without leaving BOLTIV.</span>
-</a>
-<a class="seo-service" href="/exam-pin" style="text-decoration:none;color:inherit">
-<div class="icon">PIN</div><strong>Exam PINs</strong><span>Access available examination PIN products through the platform.</span>
-</a>
-<a class="seo-service" href="/dashboard" style="text-decoration:none;color:inherit">
-<div class="icon">+</div><strong>More services</strong><span>Explore additional digital services as they become available.</span>
-</a>
-</div>
-<h3 style="text-align:center;margin:48px 0 0;font-size:22px">Service availability</h3>
-<p class="seo-section-intro" style="margin-bottom:0">See what's available now and what's coming next.</p>
-<div class="seo-availability">
-<div class="seo-availability-card"><div class="availability-icon">₦</div><div><strong>Airtime</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
-<div class="seo-availability-card"><div class="availability-icon">▣</div><div><strong>Data</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
-<div class="seo-availability-card"><div class="availability-icon">ϟ</div><div><strong>Electricity</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
-<div class="seo-availability-card"><div class="availability-icon">TV</div><div><strong>Cable TV</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
-<div class="seo-availability-card"><div class="availability-icon">PIN</div><div><strong>Exam PINs</strong><span class="seo-status live">AVAILABLE NOW</span></div></div>
-<div class="seo-availability-card"><div class="availability-icon">+</div><div><strong>More services</strong><span class="seo-status soon">COMING SOON</span></div></div>
-</div>
-</section>
-<section class="seo-section alt" id="wallet">
-<div class="seo-wallet">
-<div class="seo-wallet-copy">
-<div class="seo-kicker">YOUR BOLTIV WALLET</div>
-<h2>Fund once. Use it across your services.</h2>
-<p>Keep funds ready in your BOLTIV wallet and use them for supported purchases. Your transactions stay connected to your account so you can review your activity later.</p>
-<div class="seo-wallet-points">
-<div class="seo-wallet-point"><strong>One balance</strong><span>Manage your available funds from one place.</span></div>
-<div class="seo-wallet-point"><strong>Transaction records</strong><span>Keep a clear history of your purchases and funding.</span></div>
-<div class="seo-wallet-point"><strong>Fast checkout</strong><span>Choose a service and complete supported purchases from your wallet.</span></div>
-<div class="seo-wallet-point"><strong>Security controls</strong><span>Use your account and transaction PIN protections.</span></div>
-</div>
-</div>
-<div class="seo-wallet-card">
-<div class="seo-wallet-balance">
-<small>WALLET BALANCE</small>
-<strong>₦••••••</strong>
-</div>
-<p>Your balance stays private until you sign in. Fund your wallet, choose a service and keep your everyday payments together.</p>
-<a class="seo-btn primary" href="/login">Sign in to your wallet</a>
-</div>
-</div>
-</section>
-<section class="seo-section alt">
-<h2>Why use BOLTIV?</h2>
-<p class="seo-section-intro">A simple experience designed around the services people use regularly.</p>
-<div class="seo-benefits">
-<div class="seo-benefit"><div class="icon">✓</div><strong>Simple experience</strong><span>Clear screens and straightforward steps help you complete transactions with less confusion.</span></div>
-<div class="seo-benefit"><div class="icon">↗</div><strong>One account</strong><span>Manage multiple everyday digital services from one BOLTIV account.</span></div>
-<div class="seo-benefit"><div class="icon">▣</div><strong>Transaction history</strong><span>Keep track of your activity and review completed transactions from your account.</span></div>
-<div class="seo-benefit"><div class="icon">₦</div><strong>Wallet management</strong><span>Use your BOLTIV wallet to manage funds for supported services and payments.</span></div>
-<div class="seo-benefit"><div class="icon">●</div><strong>Secure account access</strong><span>Your account includes authentication and security controls designed for protected access.</span></div>
-<div class="seo-benefit"><div class="icon">?</div><strong>Support</strong><span>Get help when you need assistance with your BOLTIV account or services.</span></div>
-</div>
-</section>
-<section class="seo-section" id="agents">
-<div class="seo-kicker" style="text-align:center">BOLTIV FOR AGENTS</div>
-<h2>Turn your phone, POS or small business into a digital service business.</h2>
-<p class="seo-section-intro">Become a BOLTIV Agent, access discounted BOLTIV prices on airtime, data, electricity and cable TV, set your own customer prices and keep the difference as profit.</p>
-<div class="seo-benefits">
-<div class="seo-benefit"><div class="icon">₦</div><strong>Discounted BOLTIV prices</strong><span>Agents access wholesale pricing on supported digital services.</span></div>
-<div class="seo-benefit"><div class="icon">✓</div><strong>You set the price</strong><span>Decide what to charge your own customers and keep the difference as profit.</span></div>
-<div class="seo-benefit"><div class="icon">●</div><strong>Keep your existing account</strong><span>Upgrade your existing BOLTIV account — no separate signup, login or wallet.</span></div>
-</div>
-<div style="text-align:center;margin-top:32px">
-<a class="seo-btn primary" href="/agents">Learn more about BOLTIV Agent</a>
-</div>
-</section>
-<section class="seo-section" id="how-it-works">
-<h2>How BOLTIV works</h2>
-<p class="seo-section-intro">Getting started is designed to be straightforward.</p>
-<div class="seo-steps">
-<div class="seo-step"><div class="number">01</div><strong>Create your account</strong><span>Register for a BOLTIV account with your details.</span></div>
-<div class="seo-step"><div class="number">02</div><strong>Fund your wallet</strong><span>Add funds to your BOLTIV wallet using an available payment method.</span></div>
-<div class="seo-step"><div class="number">03</div><strong>Choose a service</strong><span>Select airtime, data, electricity, cable TV or another available service.</span></div>
-<div class="seo-step"><div class="number">04</div><strong>Complete your transaction</strong><span>Confirm the details and complete your purchase through BOLTIV.</span></div>
-</div>
-</section>
-<section class="seo-trust">
-<h2>Built for everyday digital payments.</h2>
-<p>BOLTIV brings useful digital services into one platform with a focus on a clean experience, convenient payments and easy access to your transaction activity.</p>
-</section>
-<section class="seo-section alt" id="faq">
-<h2>Frequently asked questions</h2>
-<p class="seo-section-intro">Quick answers to common questions about using BOLTIV.</p>
-<div class="seo-faq">
-<details><summary>What is BOLTIV?</summary><p>BOLTIV is a digital services and payments platform that brings everyday services such as airtime, data, electricity and cable TV into one account.</p></details>
-<details><summary>How do I get started?</summary><p>Create a BOLTIV account, complete the required account setup and then sign in to access the services available to you.</p></details>
-<details><summary>How does the BOLTIV wallet work?</summary><p>You can fund your wallet using an available payment method and use your available balance for supported services and transactions.</p></details>
-<details><summary>Can I see my transactions?</summary><p>Yes. Your account includes transaction activity and history so you can review purchases and wallet funding.</p></details>
-<details><summary>Is BOLTIV secure?</summary><p>BOLTIV includes account authentication and transaction security controls, including a transaction PIN for supported account actions.</p></details>
-<details><summary>What if I need help?</summary><p>Visit the support or contact section to get assistance with your BOLTIV account or services.</p></details>
-</div>
-</section>
-<section class="seo-final">
-<h2>Ready to make everyday payments simpler?</h2>
-<p>Create your BOLTIV account and get started with the digital services available on the platform.</p>
-<a class="seo-btn primary" href="/register">Create your BOLTIV account</a>
-</section>
+</div></section>
+<section class="trustbar"><div class="wrap trust"><div class="trust-item"><b>₦</b> Everyday services</div><div class="trust-item"><b>◉</b> One BOLTIV wallet</div><div class="trust-item"><b>↻</b> Smart payments</div><div class="trust-item"><b>+</b> Rewards & referrals</div></div></section>
+<section class="section" id="services"><div class="wrap"><div class="section-head"><div class="eyebrow">EVERYDAY SERVICES</div><h2>Everything you need, in one place.</h2><p>A single BOLTIV account for the digital services you use regularly.</p></div>
+<div class="service-grid">
+<a class="service" href="/airtime"><div class="service-icon">₦</div><strong>Airtime</strong><span>Recharge supported networks quickly.</span></a>
+<a class="service" href="/data"><div class="service-icon">DATA</div><strong>Data</strong><span>Choose a plan and stay connected.</span></a>
+<a class="service" href="/electricity"><div class="service-icon">ϟ</div><strong>Electricity</strong><span>Pay supported electricity bills.</span></a>
+<a class="service" href="/cable"><div class="service-icon">TV</div><strong>Cable TV</strong><span>Renew supported subscriptions.</span></a>
+<a class="service" href="/exam-pin"><div class="service-icon">PIN</div><strong>Exam PINs</strong><span>Access available examination PINs.</span></a>
+</div></div></section>
+<section class="section alt" id="smart"><div class="wrap smart-layout"><div class="smart-copy"><span class="smart-badge">BOLTIV SMART FEATURES</span><h2>Payments that work around you.</h2><p>BOLTIV isn't just about making a payment. Smart tools help you automate, repeat, plan and understand the way you use your everyday services.</p><a class="btn dark" href="/smart-features">Explore Smart Features</a></div>
+<div class="smart-grid">
+<a class="smart-card" href="/autopay"><div class="smart-icon">↻</div><div><strong>AutoPay</strong><small>Automatically repeat supported Airtime, Data and Cable TV purchases.</small></div><span class="arrow">›</span></a>
+<a class="smart-card" href="/scheduled-payments"><div class="smart-icon">◷</div><div><strong>Scheduled Payments</strong><small>Pay once on the date and time you choose.</small></div><span class="arrow">›</span></a>
+<a class="smart-card" href="/favorites"><div class="smart-icon">★</div><div><strong>Favorites</strong><small>Save frequently used numbers and smartcards for quick access.</small></div><span class="arrow">›</span></a>
+<a class="smart-card" href="/dashboard"><div class="smart-icon">↻</div><div><strong>Buy Again</strong><small>Repeat successful services in one tap.</small></div><span class="arrow">›</span></a>
+<a class="smart-card" href="/dashboard"><div class="smart-icon">▥</div><div><strong>Spending Insights</strong><small>See what you spend each month and where it goes.</small></div><span class="arrow">›</span></a>
+<a class="smart-card" href="/notifications"><div class="smart-icon">●</div><div><strong>Transaction Alerts</strong><small>Stay informed about account activity, AutoPay and expiry reminders.</small></div><span class="arrow">›</span></a>
+</div></div></section>
+<section class="section" id="wallet"><div class="wrap wallet-section"><div class="dark-panel"><div class="eyebrow">BOLTIV WALLET</div><h2>Your money. Your services. One balance.</h2><p>Fund your BOLTIV wallet and use your available balance across supported services. Keep your purchases, funding and activity connected in one place.</p><div class="points"><div class="point"><b>One balance</b><span>Manage available funds from one wallet.</span></div><div class="point"><b>Fast checkout</b><span>Pay for supported services without repeating payment setup.</span></div><div class="point"><b>Clear history</b><span>Review your transactions and wallet activity.</span></div><div class="point"><b>Security controls</b><span>Account authentication and transaction PIN protection.</span></div></div></div>
+<div class="wallet-preview"><div class="preview-card"><small>AVAILABLE BALANCE</small><h3>₦••••••</h3><div class="preview-actions"><div class="preview-action">+ FUND WALLET</div><div class="preview-action">VIEW ACTIVITY</div></div></div><p class="wallet-caption">Your wallet balance stays private until you sign in. Fund, pay and keep track of your everyday activity from your BOLTIV account.</p><a class="btn gold" href="/login">Open your wallet</a></div></div></section>
+<section class="section alt"><div class="wrap"><div class="section-head"><div class="eyebrow">REWARDS & COMMUNITY</div><h2>Get more from using BOLTIV.</h2><p>Built-in rewards and sharing tools give your everyday transactions more value.</p></div><div class="reward-grid"><div class="reward gold"><div class="reward-icon">₦</div><h3>Cashback & Bonus Balance</h3><p>Eligible purchases can earn cashback. Your Bonus Balance can then be used toward supported purchases, giving your everyday spending more value.</p><a href="/dashboard">Explore your rewards →</a></div><div class="reward"><div class="reward-icon">↗</div><h3>Refer & Earn</h3><p>Invite friends to BOLTIV, track your referral progress and earn rewards when eligible referrals complete the required activity.</p><a href="/register">Join BOLTIV →</a></div></div></div></section>
+<section class="section" id="agents"><div class="wrap agent"><div class="agent-copy"><div class="eyebrow">BOLTIV AGENT</div><h2>Turn everyday digital services into a business.</h2><p>For resellers, small businesses and entrepreneurs. Become a BOLTIV Agent, access Agent pricing, set your customer prices and track your sales and profit from a dedicated business experience.</p><div class="agent-list"><div><span class="check">✓</span> Sell Airtime, Data, Electricity and Cable TV.</div><div><span class="check">✓</span> Access discounted Agent pricing.</div><div><span class="check">✓</span> Set your own customer prices and keep the difference.</div><div><span class="check">✓</span> Track sales, activity and profit.</div></div><a class="btn gold big" style="margin-top:24px" href="/agents">Explore BOLTIV Agent</a></div>
+<div class="agent-card"><div class="agent-card-top"><div class="wallet-brand"><img src="assets/boltiv-logo.webp" alt="" style="width:32px;height:32px"/>BOLTIV AGENT</div><span class="agent-status">ACTIVE</span></div><div class="agent-title">TODAY'S PROFIT</div><div class="agent-profit">₦••••</div><div class="agent-stats"><div class="agent-stat"><small>TODAY'S SALES</small><b>₦••••</b></div><div class="agent-stat"><small>TRANSACTIONS</small><b>••</b></div><div class="agent-stat"><small>BALANCE</small><b>₦••••</b></div></div></div></div></section>
+<section class="section alt" id="how"><div class="wrap"><div class="section-head"><div class="eyebrow">GET STARTED</div><h2>Simple from the first step.</h2><p>Open your account and start using BOLTIV in a few straightforward steps.</p></div><div class="steps"><div class="step"><div class="num">01</div><strong>Create your account</strong><span>Register with your details and set up your BOLTIV account.</span></div><div class="step"><div class="num">02</div><strong>Fund your wallet</strong><span>Add funds using an available payment method.</span></div><div class="step"><div class="num">03</div><strong>Choose a service</strong><span>Select Airtime, Data, Electricity, Cable TV or another available service.</span></div><div class="step"><div class="num">04</div><strong>Pay & manage</strong><span>Complete your purchase, track activity and use smart tools when you need them.</span></div></div></div></section>
+<section class="section"><div class="wrap"><div class="section-head"><div class="eyebrow">FAQ</div><h2>Questions, answered.</h2><p>Everything you need to know before getting started.</p></div><div class="faq"><details><summary>What is BOLTIV?</summary><p>BOLTIV is a digital services and payments platform that brings everyday services, wallet payments, smart payment tools and rewards into one account.</p></details><details><summary>What services can I use on BOLTIV?</summary><p>BOLTIV currently supports Airtime, Data, Electricity, Cable TV and Exam PINs, with additional services planned as the platform grows.</p></details><details><summary>How does the BOLTIV Wallet work?</summary><p>Fund your wallet using an available payment method, then use your available balance for supported services and review your activity from your account.</p></details><details><summary>What are BOLTIV Smart Features?</summary><p>Smart Features include AutoPay, Scheduled Payments, Favorites, Buy Again, Spending Insights and Transaction Alerts.</p></details><details><summary>What is BOLTIV Agent?</summary><p>BOLTIV Agent is the business side of BOLTIV for people who want to resell supported digital services, access Agent pricing, set customer prices and track business performance.</p></details><details><summary>Is BOLTIV secure?</summary><p>BOLTIV uses account authentication and transaction security controls, including transaction PIN protection for supported account actions.</p></details></div></div></section>
+<section class="final"><div class="wrap"><div class="final-box"><div class="eyebrow">BOLTIV</div><h2>Power your everyday.</h2><p>From everyday services to smarter payments and rewards, BOLTIV gives you one simple place to manage more of what you do every day.</p><a class="btn gold big" href="/register">Create your BOLTIV account</a></div></div></section>
 </main>
+<footer class="footer"><div class="wrap"><div style="font-weight:900;color:#4f4b43;margin-bottom:8px">BOLTIV</div><div><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/security">Security</a><a href="/support">Support</a><a href="/contact">Contact</a><a href="/agents">Agent</a></div><div style="margin-top:14px">BOLTIV was powered by Boltiv Technologies Limited.</div></div></footer>
+<div class="mobile-cta" aria-label="Quick account actions"><a class="btn light" href="/login">Sign in</a><a class="btn gold" href="/register">Create account</a></div>
 </div>
-</div>
-<div aria-label="Quick account actions" class="seo-mobile-cta">
-<a class="seo-btn secondary" href="/login">Sign in</a>
-<a class="seo-btn primary" href="/register">Create account</a>
-</div>
-<script src="boltiv-referral.js?v=20261004-dark"></script>
-<script src="/boltiv-install.js?v=20261004-dark"></script>
-<script>
-// Fire-and-forget: nudge the backend awake as early as possible for anyone
-// landing here before they log in. See boltiv-client.js for the recurring
-// keep-warm ping used on the rest of the app once someone's signed in.
-fetch(window.BOLTIV_API_BASE+'/api/health',{cache:'no-store'}).catch(function(){});
-</script>
-<script src="boltiv-footer.js?v=20261004-dark"></script>
+<script src="boltiv-referral.js?v=20261007"></script>
+<script src="/boltiv-install.js?v=20261007"></script>
+<script>fetch(window.BOLTIV_API_BASE+'/api/health',{cache:'no-store'}).catch(function(){});</script>
+<script src="boltiv-footer.js?v=20261007"></script>
 </body>
 </html>

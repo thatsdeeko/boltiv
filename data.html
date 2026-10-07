@@ -303,6 +303,7 @@ function renderPlans(plans){
     // silently hiding real 1GB+ bundles that simply don't spell that out in their
     // name. Size (1GB minimum) is the only filter needed here - the backend has
     // already restricted the catalog to SME & Gifting bundles.
+    if(Number(plan?.size_mb)>=1000)return true;
     const sizeText=[plan?.size_mb,plan?.sizeMb,plan?.data_mb,plan?.dataMb,plan?.volume,plan?.size,plan?.quantity,plan?.data_size,plan?.dataSize,plan?.name].filter(Boolean).join(" ");
     const match=sizeText.match(/(\d+(?:\.\d+)?)\s*(gb|mb)\b/i);
     const explicitSize=match?(Number(match[2].toLowerCase()==="gb"?Number(match[1])*1024:Number(match[1]))):(Number(plan?.size_mb)||0);

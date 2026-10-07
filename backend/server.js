@@ -301,14 +301,20 @@ function detectNetworkFromPhone(phone){return NETWORK_PREFIXES[clean(phone).slic
 function findTransactionField(value,keys,depth=0){if(depth>6||value==null)return "";if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}if(typeof value!=="object")return "";for(const key of keys){const v=value[key];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}for(const key of Object.keys(value)){const found=findTransactionField(value[key],keys,depth+1);if(found)return found;}return "";}
 
 function vtugateStatus(data,responseOk=true){
-const raw=data?.data?.provider_status!==undefined?data.data.provider_status:(data?.status??data?.data?.status??data?.data?.transaction?.status??data?.transaction?.status??data?.state??data?.result);
-const value=typeof raw==="boolean"?(raw?(responseOk?"successful":"unknown"):"failed"):String(raw??"").trim().toLowerCase();
-if(["pending","processing","initiated","queued","in progress"].includes(value))return "pending";
-if(responseOk&&["failed","failure","error","declined","rejected","false"].includes(value))return "failed";
-if(responseOk&&["refunded","refund"].includes(value))return "refunded";
-if(["success","successful","completed","complete","delivered","true"].includes(value))return "successful";
-if(data?.status===true||data?.data?.provider_status===true)return responseOk?"successful":"unknown";
-if(responseOk&&(data?.status===false||data?.data?.provider_status===false))return "failed";
+// provider_status is the provider's own verdict on the delivery. When it is present, it decides:
+// an unrecognised value must never be rescued by the top-level "status":true, which only says the API call worked.
+const ps=data?.data?.provider_status;
+const providerSpoke=ps!==undefined&&ps!==null&&String(ps).trim()!=="";
+const nested=data?.data?.status??data?.data?.transaction?.status??data?.transaction?.status??data?.state??data?.result;
+const nestedSpoke=nested!==undefined&&nested!==null&&String(nested).trim()!=="";
+const raw=providerSpoke?ps:(nestedSpoke?nested:data?.status);
+if(typeof raw==="boolean")return raw?(responseOk?"successful":"unknown"):(responseOk?"failed":"unknown");
+const value=String(raw??"").trim().toLowerCase();
+if(!value)return "unknown";
+if(/(pending|processing|initiated|queued|in progress|awaiting)/.test(value))return "pending";
+if(/(refund|revers)/.test(value))return responseOk?"refunded":"unknown";
+if(/(fail|unsuccess|not success|declin|reject|cancel|error|invalid|insufficient)/.test(value)||value==="false")return responseOk?"failed":"unknown";
+if(/(success|complete|deliver)/.test(value)||value==="true")return "successful";
 return "unknown";
 }
 
@@ -682,6 +688,8 @@ for(const [code,label] of Object.entries(wanted)){
 if(!products.length){const fallback=await getVTUGATEServiceId("education");products.push({service_id:fallback,product_id:fallback,product_code:"waec",name:"WAEC",exam_name:"WAEC"});}
 return products;
 }
+let vtugateRequeryNextAt=0;
+async function vtugateRequeryThrottle(){const now=Date.now();const wait=Math.max(0,vtugateRequeryNextAt-now);vtugateRequeryNextAt=Math.max(now,vtugateRequeryNextAt)+1100;if(wait)await new Promise(r=>setTimeout(r,wait));}
 async function getVTUGATETransaction(providerReference,merchantReference=null){
 const lookupReference=clean(providerReference||merchantReference);
 if(!lookupReference)return{success:false,outcome:"unknown",message:"Missing transaction reference for VTUGATE requery."};
@@ -693,6 +701,7 @@ const payload={requery:true};
 if(providerReference && /^\d+$/.test(String(providerReference).trim())) payload.transaction_id=Number(providerReference);
 if(merchantReference) payload.external_reference=clean(merchantReference);
 if(!payload.transaction_id && !payload.external_reference) return{success:false,outcome:"unknown",message:"Missing valid VTUGATE transaction identifier for requery."};
+await vtugateRequeryThrottle();
 const r=await vtugateRequest("api/v1/transactionstatus",payload);
 const confirmedReference=r.providerReference||providerReference||null;
 if(r.outcome==="successful")return{success:true,outcome:"successful",data:r.data,providerReference:confirmedReference,message:r.message};
@@ -700,9 +709,17 @@ if(r.outcome==="failed"||r.outcome==="refunded")return{success:false,outcome:r.o
 return{success:false,outcome:"unknown",data:r.data,providerReference:confirmedReference,message:r.message||"VTUGATE transaction status is still unavailable."};
 }
 
+let reconcileBusy=false;
 async function reconcileVTUGATETransactions(){
+if(reconcileBusy)return{success:true,skipped:true};
+reconcileBusy=true;
+try{return await reconcileVTUGATETransactionsRun();}finally{reconcileBusy=false;}
+}
+async function reconcileVTUGATETransactionsRun(){
 let rows=[];
-try{rows=(await db(`SELECT id,reference,provider_reference FROM transactions WHERE status IN ('processing','pending') ORDER BY date ASC LIMIT 100`)).rows;}
+try{rows=(await db(`(SELECT id,reference,provider_reference FROM transactions WHERE status IN ('processing','pending') AND date>NOW()-INTERVAL '24 hours' ORDER BY date ASC LIMIT 100)
+ UNION ALL
+ (SELECT id,reference,provider_reference FROM transactions WHERE status IN ('processing','pending') AND date<=NOW()-INTERVAL '24 hours' ORDER BY date DESC LIMIT 50)`)).rows;}
 catch(e){console.error("VTUGATE RECONCILIATION QUERY ERROR:",e);return{success:false,error:e.message};}
 let finalized=0,unverified=0;
 for(const row of rows){
@@ -714,7 +731,7 @@ await finalizeVTUTransaction(row.id,r.outcome,r.data||{},r.providerReference||ro
 finalized++;
 }else{
 unverified++;
-console.log("VTUGATE TRANSACTION STILL UNVERIFIED:",JSON.stringify({transactionId:row.id,reference:row.reference,providerReference:row.provider_reference,lookupReference,status:r.outcome}));
+console.log("VTUGATE TRANSACTION STILL UNVERIFIED:",JSON.stringify({transactionId:row.id,reference:row.reference,providerReference:row.provider_reference,lookupReference,status:r.outcome,providerMessage:r.message,providerRaw:JSON.stringify(r.data||{}).slice(0,500)}));
 }
 }catch(e){
 unverified++;
@@ -724,6 +741,39 @@ return{success:true,checked:rows.length,finalized,unverified};
 }
 
 async function reconcilePendingTransactions(){return reconcileVTUGATETransactions();}
+
+/* Purchases we settled in the last 2 hours (the window in which VTUGATE itself auto-settles) are asked about again every ~40 minutes.
+   If the provider disagrees with what BOLTIV recorded, the transaction is flagged (metadata.provider_mismatch) and logged.
+   Nothing is refunded or charged automatically here. */
+let verifySuccessBusy=false;
+async function verifyRecentSuccessfulTransactions(){
+  if(verifySuccessBusy)return;
+  verifySuccessBusy=true;
+  try{
+    const rows=(await db(`SELECT id,reference,provider_reference,status FROM transactions
+      WHERE status IN ('successful','refunded') AND completed_at>NOW()-INTERVAL '110 minutes' AND completed_at<NOW()-INTERVAL '10 minutes'
+        AND (status='successful' OR provider_reference IS NOT NULL)
+        AND NOT (COALESCE(metadata,'{}'::jsonb) ? 'provider_mismatch')
+        AND (COALESCE(metadata->>'provider_checked_at','')='' OR (metadata->>'provider_checked_at')::timestamptz<NOW()-INTERVAL '40 minutes')
+      ORDER BY completed_at DESC LIMIT 40`)).rows;
+    for(const row of rows){
+      try{
+        const r=await getVTUGATETransaction(row.provider_reference,row.reference);
+        const now=new Date().toISOString();
+        const mismatch=(row.status==="successful"&&(r.outcome==="failed"||r.outcome==="refunded"))||(row.status==="refunded"&&r.outcome==="successful");
+        if(mismatch){
+          const d=(r.data&&r.data.data)||{};
+          const flag={provider_checked_at:now,provider_mismatch:{boltiv_status:row.status,provider_outcome:r.outcome,provider_message:clean(r.message).slice(0,300),wallet_adjusted:d.wallet_adjusted===true,reconciliation_action:d.reconciliation_action||null,at:now}};
+          await db(`UPDATE transactions SET metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[row.id,JSON.stringify(flag)]);
+          console.error("PROVIDER MISMATCH (BOLTIV says "+row.status+", provider says "+r.outcome+"):",JSON.stringify({transactionId:row.id,reference:row.reference,providerReference:row.provider_reference,walletAdjusted:d.wallet_adjusted===true,reconciliationAction:d.reconciliation_action||null,providerMessage:r.message}));
+        }else if(r.outcome==="successful"||r.outcome==="failed"||r.outcome==="refunded"){
+          await db(`UPDATE transactions SET metadata=COALESCE(metadata,'{}'::jsonb)||$2::jsonb WHERE id=$1`,[row.id,JSON.stringify({provider_checked_at:now})]);
+        }
+      }catch(e){console.error("VERIFY SETTLED ERROR:",row.reference,e?.message||e);}
+    }
+  }catch(e){console.error("VERIFY SETTLED SWEEP ERROR:",e?.message||e);}
+  finally{verifySuccessBusy=false;}
+}
 
 async function getAgentProfile(userId){
   const r=await db(`SELECT user_id,agent_id,status,tier,max_transaction_override,daily_limit_override,daily_count_override,activated_at,updated_at FROM agent_profiles WHERE user_id=$1 LIMIT 1`,[userId]);
@@ -3153,7 +3203,7 @@ async function sendTransactionEmail(userId, tx, status){
       :(status==="successful"
         ?`Your ${service} purchase of ₦${amount} was successful.`
         :`Your ${service} transaction of ₦${amount} was refunded to your BOLTIV wallet.`);
-    const autopayLink=isAutopay?`<p style="text-align:center;margin:22px 0 6px"><a href="https://boltiv.ng/autopay" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px">Manage AutoPay</a></p>`:"";
+    const autopayLink=isAutopay?`<p style="text-align:center;margin:22px 0 6px"><a href="https://boltiv.ng${isScheduled?"/scheduled-payments":"/autopay"}" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px">${isScheduled?"Manage Scheduled Payments":"Manage AutoPay"}</a></p>`:"";
     return await sendEmail({
       to:user.email,
       subject:`BOLTIV ${title}`,
@@ -4973,7 +5023,7 @@ async function autopayEmailSend(userId,title,message,link){
 <h2 style="text-align:center;margin-top:28px">${escapeHtmlEmail(title)}</h2>
 <p style="font-size:15px;line-height:1.7;color:#555">Hello ${escapeHtmlEmail(u.name||"BOLTIV User")},</p>
 <p style="font-size:15px;line-height:1.7;color:#555">${escapeHtmlEmail(message)}</p>
-<p style="text-align:center;margin:26px 0 8px"><a href="https://boltiv.ng${link||"/autopay"}" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px">Open AutoPay</a></p>
+<p style="text-align:center;margin:26px 0 8px"><a href="https://boltiv.ng${link||"/autopay"}" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:12px">${String(link||"").indexOf("/scheduled-payments")===0?"Open Scheduled Payments":"Open AutoPay"}</a></p>
 <p style="font-size:12px;line-height:1.6;color:#999;text-align:center;margin-top:22px">If you did not set up or change this AutoPay, pause it from the AutoPay page and contact BOLTIV support.</p>
 </div></body></html>`
   });
@@ -5052,7 +5102,7 @@ async function autopaySendReminders(){
     }
     let msg=`Your ${s.frequency==="once"?"scheduled payment":"AutoPay"} for ${s.label} (₦${autopayMoney(s.amount)}) runs ${autopayDateText(s.next_run_at)} at ${autopayTimeText(s.next_run_at)}.`;
     if(Number(s.balance)<Number(s.amount))msg+=` Your wallet balance is ₦${autopayMoney(s.balance)} — please fund your wallet so it doesn't get skipped.`;
-    await autopayNotify(s.user_id,"AutoPay reminder",msg,`autopay-remind-${s.id}-${new Date(s.next_run_at).getTime()}`);
+    await autopayNotify(s.user_id,"AutoPay reminder",msg,`autopay-remind-${s.id}-${new Date(s.next_run_at).getTime()}`,s.frequency==="once"?"/scheduled-payments":undefined);
     await db(`UPDATE autopay_schedules SET reminded_for=next_run_at WHERE id=$1 AND next_run_at=$2`,[s.id,s.next_run_at]);
   }
 }
@@ -5077,7 +5127,7 @@ async function autopayFinish(s,runKey,o){
   if(o.retry){
     const retryAt=o.retryAt instanceof Date?o.retryAt:new Date(Date.now()+AUTOPAY_RETRY_MS);
     await db(`UPDATE autopay_schedules SET attempt=2,next_run_at=$2,locked_until=NULL,updated_at=NOW() WHERE id=$1`,[s.id,retryAt]);
-    if(o.retryNotice)await autopayNotify(s.user_id,"AutoPay waiting for funds",o.retryNotice,`autopay-lowbal-${runKey}`);
+    if(o.retryNotice)await autopayNotify(s.user_id,"AutoPay waiting for funds",o.retryNotice,`autopay-lowbal-${runKey}`,s.frequency==="once"?"/scheduled-payments":undefined);
     return;
   }
   const ok=o.status==="successful"||o.status==="pending";
@@ -5089,7 +5139,7 @@ async function autopayFinish(s,runKey,o){
     }else{
       await db(`UPDATE autopay_schedules SET status='paused',pause_reason='once_failed',attempt=1,locked_until=NULL,last_run_at=NOW(),last_status=$2,updated_at=NOW() WHERE id=$1`,[s.id,o.status]);
       if(o.priceBlock)await db(`UPDATE autopay_schedules SET price_block=$2::jsonb WHERE id=$1`,[s.id,JSON.stringify(o.priceBlock)]);
-      await autopayNotify(s.user_id,"Scheduled payment failed",`${s.label} (₦${autopayMoney(s.amount)}) was not paid: ${o.message}${o.priceBlock?(o.priceBlock.kind==="price"?" Open AutoPay to approve the new price and buy it now.":" Open AutoPay to choose a new plan and time."):" Open AutoPay to reschedule it."}`,`autopay-run-${runKey}`,`/autopay?fix=${s.id}`);
+      await autopayNotify(s.user_id,"Scheduled payment failed",`${s.label} (₦${autopayMoney(s.amount)}) was not paid: ${o.message}${o.priceBlock?(o.priceBlock.kind==="price"?" Open Scheduled Payments to approve the new price and pay it now.":" Open Scheduled Payments to choose a new plan and time."):" Open Scheduled Payments to reschedule it."}`,`autopay-run-${runKey}`,`/scheduled-payments?fix=${s.id}`);
     }
     return;
   }
@@ -5240,7 +5290,7 @@ async function handleAutopayRoutes(req,res,path,user){
   if(req.method==="GET"&&path==="/api/autopay"){
     const [sch,runs,cb,wallet,enabled]=await Promise.all([
       db(`SELECT * FROM autopay_schedules WHERE user_id=$1 AND status<>'deleted' ORDER BY created_at DESC`,[user.user_id]),
-      db(`SELECT r.id,r.status,r.message,r.amount,r.scheduled_for,r.finished_at,r.attempt,s.label,s.service,COALESCE(bl.amount,0) AS cashback
+      db(`SELECT r.id,r.status,r.message,r.amount,r.scheduled_for,r.finished_at,r.attempt,s.label,s.service,s.frequency,COALESCE(bl.amount,0) AS cashback
           FROM autopay_runs r JOIN autopay_schedules s ON s.id=r.schedule_id
           LEFT JOIN bonus_lots bl ON bl.source_reference='CASHBACK-'||r.transaction_reference AND bl.status<>'reversed'
           WHERE r.user_id=$1 AND r.status<>'running' ORDER BY r.created_at DESC LIMIT 100`,[user.user_id]),
@@ -5251,7 +5301,7 @@ async function handleAutopayRoutes(req,res,path,user){
     send(res,200,{success:true,enabled,maxSchedules:AUTOPAY_MAX_SCHEDULES,maxOnce:AUTOPAY_MAX_ONCE,walletBalance:Number(wallet?.balance||0),
       cashbackEarned:Number(cb.rows[0]?.total||0),
       schedules:sch.rows.map(autopayPublic),
-      runs:runs.rows.map(r=>({id:Number(r.id),status:r.status,message:r.message,amount:r.amount==null?null:Number(r.amount),scheduledFor:r.scheduled_for,finishedAt:r.finished_at,label:r.label,service:r.service,cashback:Number(r.cashback||0)}))});
+      runs:runs.rows.map(r=>({id:Number(r.id),status:r.status,message:r.message,amount:r.amount==null?null:Number(r.amount),scheduledFor:r.scheduled_for,finishedAt:r.finished_at,label:r.label,service:r.service,frequency:r.frequency,cashback:Number(r.cashback||0)}))});
     return true;
   }
   if(req.method==="POST"&&path==="/api/autopay/create"){
@@ -5292,7 +5342,7 @@ async function handleAutopayRoutes(req,res,path,user){
     const ins=await db(`INSERT INTO autopay_schedules(user_id,service,label,frequency,day_of_week,day_of_month,amount,max_amount,payload,status,next_run_at,cycle_for,reminded_for)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,'active',$10,$10,$11) RETURNING *`,
       [user.user_id,built.service,built.label,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,maxAmount,JSON.stringify(built.payload),next,reminded]);
-    try{await autopayNotify(user.user_id,isOnce?"Scheduled payment created":"AutoPay created",isOnce?`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will be paid once on ${autopayDateText(next)} at ${autopayTimeText(next)} from your wallet.`:`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will run ${frequency==="daily"?"every day":frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"");}catch{}
+    try{await autopayNotify(user.user_id,isOnce?"Scheduled payment created":"AutoPay created",isOnce?`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will be paid once on ${autopayDateText(next)} at ${autopayTimeText(next)} from your wallet.`:`${built.label} (₦${autopayMoney(built.amount)}, max ₦${autopayMoney(maxAmount)}) will run ${frequency==="daily"?"every day":frequency==="weekly"?"every week":"every month"}. First run: ${autopayDateText(next)} at 7:00 AM from your wallet.`,"",isOnce?"/scheduled-payments":undefined);}catch{}
     await autopayAudit(user.user_id,ins.rows[0].id,"created",{service:built.service,amount:Number(built.amount),maxAmount,frequency});
     send(res,200,{success:true,message:"AutoPay created.",schedule:autopayPublic(ins.rows[0])});
     return true;
@@ -5323,14 +5373,14 @@ async function handleAutopayRoutes(req,res,path,user){
     const reminded=(next.getTime()-Date.now())<=24*60*60*1000?next:null;
     const upd=await db(`UPDATE autopay_schedules SET frequency=$2,day_of_week=$3,day_of_month=$4,amount=$5,max_amount=$6,payload=$7::jsonb,label=$8,next_run_at=$9,cycle_for=$9,attempt=1,locked_until=NULL,reminded_for=$10,price_block=NULL,status=CASE WHEN pause_reason='once_failed' THEN 'active' ELSE status END,pause_reason=CASE WHEN pause_reason='once_failed' THEN NULL ELSE pause_reason END,updated_at=NOW() WHERE id=$1 RETURNING *`,[id,frequency,frequency==="weekly"?dow:null,frequency==="monthly"?dom:null,built.amount,maxAmount,JSON.stringify(built.payload),built.label,next,reminded]);
     await autopayAudit(user.user_id,id,"edited",{service:built.service,frequency,amount:Number(built.amount),maxAmount,label:built.label});
-    await autopayNotify(user.user_id,"AutoPay updated",`${built.label} was updated. ${isOnceEdit?"It will be paid":"Next run:"} ${autopayDateText(next)} at ${autopayTimeText(next)}.`,`autopay-security-edit-${id}-${next.getTime()}`);
+    await autopayNotify(user.user_id,"AutoPay updated",`${built.label} was updated. ${isOnceEdit?"It will be paid":"Next run:"} ${autopayDateText(next)} at ${autopayTimeText(next)}.`,`autopay-security-edit-${id}-${next.getTime()}`,isOnceEdit?"/scheduled-payments":undefined);
     send(res,200,{success:true,message:"AutoPay updated.",schedule:autopayPublic(upd.rows[0])});return true;
   }
   if(req.method==="POST"&&path==="/api/autopay/bulk-action"){
     const rl=rateLimit(req,`autopay-bulk:${user.user_id}`,10,15*60*1000);if(!rl.allowed){rateLimitedResponse(res,rl);return true;}
     const b=await body(req),action=clean(b.action).toLowerCase();if(!["pause_all","resume_all"].includes(action)){send(res,400,{success:false,message:"Invalid request."});return true;}
     if(action==="resume_all"&&!(await autopayEnabled())){send(res,503,{success:false,message:"AutoPay is not available right now."});return true;}
-    const rows=(await db(`SELECT * FROM autopay_schedules WHERE user_id=$1 AND status<>'deleted' ORDER BY id ASC`,[user.user_id])).rows;let changed=0;
+    const rows=(await db(`SELECT * FROM autopay_schedules WHERE user_id=$1 AND status<>'deleted' AND frequency<>'once' ORDER BY id ASC`,[user.user_id])).rows;let changed=0;
     for(const cur of rows){
       if(action==="pause_all"){if(cur.status!=="paused"){await db(`UPDATE autopay_schedules SET status='paused',pause_reason='user',locked_until=NULL,updated_at=NOW() WHERE id=$1`,[cur.id]);changed++;await autopayAudit(user.user_id,cur.id,"paused_all",{});}}
       else if(cur.status!=="active"){const agent=await getEffectiveAgentService(user.user_id,cur.service);if(agent.isAgent)continue;if(cur.frequency==="once"&&new Date(cur.next_run_at).getTime()<Date.now()+AUTOPAY_ONCE_MIN_LEAD_MS)continue;const next=cur.frequency==="once"?new Date(cur.next_run_at):autopayNextRun(cur.frequency,cur.day_of_week,cur.day_of_month,new Date(Date.now()+AUTOPAY_MIN_LEAD_MS));const reminded=next&&(next.getTime()-Date.now())<=24*60*60*1000?next:null;await db(`UPDATE autopay_schedules SET status='active',pause_reason=NULL,consecutive_failures=0,attempt=1,locked_until=NULL,next_run_at=$2,cycle_for=$2,reminded_for=$3,updated_at=NOW() WHERE id=$1`,[cur.id,next,reminded]);changed++;await autopayAudit(user.user_id,cur.id,"resumed_all",{nextRunAt:next});}
@@ -5381,7 +5431,7 @@ async function handleAutopayRoutes(req,res,path,user){
       await autopayAudit(user.user_id,id,"paused",{});await autopayNotify(user.user_id,"AutoPay paused",`${cur.label} was paused.`,`autopay-security-pause-${id}-${Date.now()}`);
     }else if(action==="delete"){
       await db(`UPDATE autopay_schedules SET status='deleted',updated_at=NOW() WHERE id=$1`,[id]);
-      await autopayAudit(user.user_id,id,"deleted",{});await autopayNotify(user.user_id,"AutoPay deleted",`${cur.label} was deleted and will no longer run.`,`autopay-security-delete-${id}-${Date.now()}`);
+      await autopayAudit(user.user_id,id,"deleted",{});await autopayNotify(user.user_id,"AutoPay deleted",cur.frequency==="once"?`${cur.label} scheduled payment was cancelled and will not be paid.`:`${cur.label} was deleted and will no longer run.`,`autopay-security-delete-${id}-${Date.now()}`,cur.frequency==="once"?"/scheduled-payments":undefined);
     }else{
       if(!(await autopayEnabled())){send(res,503,{success:false,message:"AutoPay is not available right now."});return true;}
       const agent=await getEffectiveAgentService(user.user_id,cur.service);
@@ -6514,6 +6564,8 @@ setTimeout(()=>reconcileVTUGATETransactions().catch(error=>console.error("INITIA
 setInterval(()=>{
   reconcileVTUGATETransactions().catch(error=>console.error("AUTOMATIC VTUGATE RECONCILIATION ERROR:",error));
 },reconcileIntervalMs).unref();
+setTimeout(()=>verifyRecentSuccessfulTransactions(),90000).unref();
+setInterval(()=>verifyRecentSuccessfulTransactions(),15*60*1000).unref();
 
 // AutoPay: check for due runs and day-before reminders every minute.
 setTimeout(()=>autopayTick().catch(e=>console.error("AUTOPAY INITIAL TICK ERROR:",e)),25000).unref();

@@ -492,6 +492,23 @@ function parseDataSizeMb(plan,name=''){
   return 0;
 }
 
+const PLAN_ROW_NAME_FIELDS=['plan_name','planName','name','plan','data_plan','dataPlan','bundle_name','bundleName','bundle','product_name','productName','description','title','label'];
+const PLAN_ROW_PRICE_FIELDS=['vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','merchant_price','merchantPrice','retail_price','retailPrice','selling_price','sellingPrice','sell_price','sellPrice','price','amount','cost','plan_price','planPrice','amount_to_charge','amountToCharge'];
+// Looks only at the object's own keys (findCatalogField also searches inside children).
+function ownCatalogField(value,names){
+  if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
+  const wanted=new Set(names.map(x=>String(x).replace(/[^a-z0-9]/gi,'').toLowerCase()));
+  for(const [key,val] of Object.entries(value)){
+    if(wanted.has(String(key).replace(/[^a-z0-9]/gi,'').toLowerCase())&&val!==undefined&&val!==null&&String(val).trim()!=='')return val;
+  }
+  return undefined;
+}
+// A wrapper such as {provider_status, data_plans:[...]} must not be mistaken for a plan: its nested search borrows the first
+// plan's code/name/price, and that hollow copy then blocks the real first plan as a "duplicate".
+function holdsPlanRows(value){
+  const isRow=v=>v&&typeof v==='object'&&!Array.isArray(v)&&ownCatalogField(v,PLAN_ROW_NAME_FIELDS)!==undefined&&ownCatalogField(v,PLAN_ROW_PRICE_FIELDS)!==undefined;
+  return Object.values(value).some(v=>Array.isArray(v)?v.some(isRow):isRow(v));
+}
 function collectVTUGATEPlanCandidates(value,inheritedNetwork='',out=[],seen=new Set(),depth=0,inheritedPlanId=''){
   if(value==null||depth>12)return out;
   if(Array.isArray(value)){for(const item of value)collectVTUGATEPlanCandidates(item,inheritedNetwork,out,seen,depth+1,inheritedPlanId);return out;}
@@ -513,7 +530,7 @@ function collectVTUGATEPlanCandidates(value,inheritedNetwork='',out=[],seen=new 
   const id=parseCatalogNumber(idValue);
   const price=parseCatalogNumber(priceValue);
   const name=clean(nameValue);
-  const hasPlanSignals=(id>0||clean(idValue)!=='')&&(price>0||clean(priceValue)!=='')&&name!=='';
+  const hasPlanSignals=!holdsPlanRows(value)&&(id>0||clean(idValue)!=='')&&(price>0||clean(priceValue)!=='')&&name!=='';
   if(hasPlanSignals){
     const candidate={...value,__network:ownNetwork,__plan_id_fallback:clean(idValue)};
     const key=JSON.stringify([clean(idValue),name,price,ownNetwork]);
@@ -638,7 +655,8 @@ const normalized=raw.map(p=>{
   const planCode=clean(codeRaw??idRaw??'');
   const price=parseCatalogNumber(findCatalogField(p,['vendor_price','vendorPrice','agent_price','agentPrice','user_price','userPrice','selling_price','sellingPrice','price','amount','cost','plan_price','planPrice']));
   const rawValidity=normalizeCatalogValidity(p);
-  const sizeMb=parseDataSizeMb(p,name);
+  let sizeMb=parseDataSizeMb(p,name);
+  if(sizeMb<MIN_DATA_PLAN_MB){const gbName=String(name).match(/(\d+(?:\.\d+)?)\s*GB\b/i);if(gbName&&Number(gbName[1])>=1)sizeMb=Math.round(Number(gbName[1])*1024);}
   const validityMatch=String(rawValidity).match(/(\d+(?:\.\d+)?)\s*(day|days|hour|hours|minute|minutes)\b/i);
   const explicitDays=parseCatalogNumber(findCatalogField(p,['validity_days','validityDays','days','validity_in_days']));
   const validityDays=Number.isFinite(explicitDays)&&explicitDays>0?explicitDays:(validityMatch&&/day/i.test(validityMatch[2])?Number(validityMatch[1]):0);
@@ -652,7 +670,15 @@ const labeledNetworks=new Set(normalized.map(p=>p.network_name).filter(Boolean))
 const hasOtherNetwork=Array.from(labeledNetworks).some(n=>n!==selected);
 const nonRetailTerms=['thryve','msme','fibrenet','hynetflex','mifi','router','learning bundle'];
 const isNonRetail=name=>{const lower=String(name||'').toLowerCase();return nonRetailTerms.some(term=>lower.includes(term));};
-const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&Number(p.size_mb||0)>=MIN_DATA_PLAN_MB&&!isNonRetail(p.name)&&(!hasOtherNetwork||p.network_name===selected));
+const dropped={noCodeOrPrice:[],tooSmall:[],nonRetail:[],otherNetwork:[]};
+const cleaned=[];
+for(const p of normalized){
+  if(!p.plan_code||!(p.price>0)||!p.name){dropped.noCodeOrPrice.push(p.name||p.plan_code||"?");continue;}
+  if(!(Number(p.size_mb||0)>=MIN_DATA_PLAN_MB)){dropped.tooSmall.push(p.name);continue;}
+  if(isNonRetail(p.name)){dropped.nonRetail.push(p.name);continue;}
+  if(hasOtherNetwork&&p.network_name!==selected){dropped.otherNetwork.push(p.name);continue;}
+  cleaned.push(p);
+}
 // VTUGATE's current /api/v1/fetchdataplans returns one flat list of plans per network with no
 // sales-channel tag at all (no SME/Gifting/Awoof distinction in the response) — it already does
 // the cross-provider price/reliability comparison for managed-mode accounts server-side, and
@@ -664,13 +690,24 @@ const cleaned=normalized.filter(p=>p.plan_code&&p.price>0&&p.name&&Number(p.size
 // tiebreaker.
 const bestByBundle=new Map();
 for(const p of cleaned){
-  const bundleKey=p.size_mb>0&&p.validity_days>0?`${p.size_mb}:${p.validity_days}`:`unkeyed:${p.plan_code}`;
+  const nameKey=String(p.name||'').toLowerCase().replace(/validity/g,'').replace(/[^a-z0-9.+]/g,'');
+  const bundleKey=p.size_mb>0&&p.validity_days>0?`${p.size_mb}:${p.validity_days}:${nameKey}`:`unkeyed:${p.service_id}:${p.plan_code}`;
   const existing=bestByBundle.get(bundleKey);
   if(!existing){bestByBundle.set(bundleKey,p);continue;}
   const pRate=p.delivery_rate??50, exRate=existing.delivery_rate??50;
   if(pRate>exRate||(pRate===exRate&&p.price<existing.price))bestByBundle.set(bundleKey,p);
 }
-return Array.from(bestByBundle.values());
+const result=Array.from(bestByBundle.values());
+const nowTs=Date.now();
+if(!fetchVTUGATEDataPlans._logAt)fetchVTUGATEDataPlans._logAt={};
+if(nowTs-(fetchVTUGATEDataPlans._logAt[selected]||0)>300000){
+  fetchVTUGATEDataPlans._logAt[selected]=nowTs;
+  const sample=list=>list.slice(0,8).join(" | ");
+  console.log("DATA PLANS "+selected+":",JSON.stringify({requestedServiceIds:serviceIds,received:raw.length,shown:result.length,collapsedAsDuplicates:cleaned.length-result.length,
+    droppedNoCodeOrPrice:dropped.noCodeOrPrice.length,droppedTooSmall:dropped.tooSmall.length,droppedNonRetail:dropped.nonRetail.length,droppedOtherNetwork:dropped.otherNetwork.length,
+    nonRetailExamples:sample(dropped.nonRetail),tooSmallExamples:sample(dropped.tooSmall)}));
+}
+return result;
 }
 const vtugatePlanCache=new Map();
 function planLookupKey(planCode,serviceId){return `${Number(serviceId)||0}:${clean(planCode)}`;}

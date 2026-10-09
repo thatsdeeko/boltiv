@@ -1312,7 +1312,7 @@ async function smsPrepare(user,b){
   if(!message.trim())return{error:{success:false,statusCode:400,message:"Enter your message."}};
   if(message.length>SMS_MAX_CHARS)return{error:{success:false,statusCode:400,message:`Message is too long (max ${SMS_MAX_CHARS} characters).`}};
   const an=smsAnalyze(message);
-  if(an.pages>5)return{error:{success:false,statusCode:400,message:"Message is too long for its character set (max 5 pages). Remove emoji or accented characters, or shorten it."}};
+  if(an.pages>5)return{error:{success:false,statusCode:400,message:"This message is too long. Shorten it, or remove emoji and special letters, then try again."}};
   const phones=parseBulkPhones(b.recipients??b.recipient);
   if(!phones.length)return{error:{success:false,statusCode:400,message:"Add at least one recipient."}};
   const invalid=phones.filter(p=>!/^0\d{10}$/.test(p));
@@ -1370,7 +1370,7 @@ async function processSendSms(user,data){
   const ref=reference("BOLTIV-TX");
   const idem=clean(data.idempotencyKey||data.idempotency_key);
   const meta={provider:"vtugate",request:{service_id:p.route.service_id,sender_id:senderId,recipients:p.phones.length},
-    pricing:{providerCost:Number(p.cost.toFixed(2)),customerPrice:p.price,grossProfit:Number((p.price-p.cost).toFixed(2)),network:p.route.label,plan:`${p.an.pages} page${p.an.pages>1?"s":""}`},
+    pricing:{providerCost:Number(p.cost.toFixed(2)),customerPrice:p.price,grossProfit:Number((p.price-p.cost).toFixed(2)),network:p.route.label,plan:`${p.an.pages} SMS`},
     sms:{sender_id:senderId,route:p.route.label,pages:p.an.pages,encoding:p.an.encoding,characters:p.an.characters,recipients:p.phones.length,message:p.message,numbers:bulk?undefined:p.phones[0]}};
   const reserved=await createVTUTransactionAndDebit({userId,service:"sms",amount:p.price,reference:ref,recipient:bulk?`${p.phones.length} recipients`:p.phones[0],idempotencyKey:idem||null,useBonus:false,metadata:meta});
   if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};
@@ -2544,6 +2544,7 @@ await db(`DELETE FROM services WHERE key NOT IN ('airtime','data','electricity',
 // "Fixed profit per sale" pricing has been removed in favor of percentage-only pricing —
 // migrate any service still configured that way over to discount/percentage mode.
 await db(`UPDATE services SET config=jsonb_set(jsonb_set(config,'{pricing,mode}','"discount"'::jsonb,true),'{pricing,fixed_profit}','0'::jsonb,true),updated_at=NOW() WHERE config->'pricing'->>'mode' IN ('fixed','fixed_profit')`);
+await db(`DELETE FROM services WHERE key IN ('education','betting','sms')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true],['announcement_enabled',true],['announcement_text','Welcome to BOLTIV — Fast. Simple. Powerful.'],['announcement_items',[{text:'Welcome to BOLTIV — Fast. Simple. Powerful.',enabled:true}]]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
 // GLOBAL Agent pricing — one configuration row per service, applied identically to every

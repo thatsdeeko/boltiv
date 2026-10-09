@@ -727,7 +727,15 @@ return products;
 }
 let vtugateRequeryNextAt=0;
 async function vtugateRequeryThrottle(){const now=Date.now();const wait=Math.max(0,vtugateRequeryNextAt-now);vtugateRequeryNextAt=Math.max(now,vtugateRequeryNextAt)+1100;if(wait)await new Promise(r=>setTimeout(r,wait));}
-async function getVTUGATETransaction(providerReference,merchantReference=null){
+async function getVTUGATETransaction(providerReference,merchantReference=null,service=""){
+if(String(service||"").toLowerCase()==="international"){
+if(!/^\d+$/.test(String(providerReference||"").trim()))return{success:false,outcome:"unknown",message:"Missing provider transaction id for international requery."};
+await vtugateRequeryThrottle();
+const ir=await vtugateRequest("api/v1/international/topupstatus",{transaction_id:Number(providerReference)});
+if(ir.outcome==="successful")return{success:true,outcome:"successful",data:ir.data,providerReference:String(providerReference),message:ir.message};
+if(ir.outcome==="failed"||ir.outcome==="refunded")return{success:false,outcome:ir.outcome,data:ir.data,providerReference:String(providerReference),message:ir.message};
+return{success:false,outcome:"unknown",data:ir.data,providerReference:String(providerReference),message:ir.message||"VTUGATE transaction status is still unavailable."};
+}
 const lookupReference=clean(providerReference||merchantReference);
 if(!lookupReference)return{success:false,outcome:"unknown",message:"Missing transaction reference for VTUGATE requery."};
 // VTUGATE transactionstatus expects either its numeric transaction_id or the
@@ -754,15 +762,15 @@ try{return await reconcileVTUGATETransactionsRun();}finally{reconcileBusy=false;
 }
 async function reconcileVTUGATETransactionsRun(){
 let rows=[];
-try{rows=(await db(`(SELECT id,reference,provider_reference FROM transactions WHERE status IN ('processing','pending') AND date>NOW()-INTERVAL '24 hours' ORDER BY date ASC LIMIT 100)
+try{rows=(await db(`(SELECT id,reference,provider_reference,service FROM transactions WHERE status IN ('processing','pending') AND date>NOW()-INTERVAL '24 hours' ORDER BY date ASC LIMIT 100)
  UNION ALL
- (SELECT id,reference,provider_reference FROM transactions WHERE status IN ('processing','pending') AND date<=NOW()-INTERVAL '24 hours' ORDER BY date DESC LIMIT 50)`)).rows;}
+ (SELECT id,reference,provider_reference,service FROM transactions WHERE status IN ('processing','pending') AND date<=NOW()-INTERVAL '24 hours' ORDER BY date DESC LIMIT 50)`)).rows;}
 catch(e){console.error("VTUGATE RECONCILIATION QUERY ERROR:",e);return{success:false,error:e.message};}
 let finalized=0,unverified=0;
 for(const row of rows){
 try{
 const lookupReference=row.provider_reference||row.reference;
-const r=await getVTUGATETransaction(row.provider_reference,row.reference);
+const r=await getVTUGATETransaction(row.provider_reference,row.reference,row.service);
 if(r.outcome==="successful"||r.outcome==="failed"||r.outcome==="refunded"){
 await finalizeVTUTransaction(row.id,r.outcome,r.data||{},r.providerReference||row.provider_reference||null);
 finalized++;
@@ -787,7 +795,7 @@ async function verifyRecentSuccessfulTransactions(){
   if(verifySuccessBusy)return;
   verifySuccessBusy=true;
   try{
-    const rows=(await db(`SELECT id,reference,provider_reference,status FROM transactions
+    const rows=(await db(`SELECT id,reference,provider_reference,status,service FROM transactions
       WHERE status IN ('successful','refunded') AND completed_at>NOW()-INTERVAL '110 minutes' AND completed_at<NOW()-INTERVAL '10 minutes'
         AND (status='successful' OR provider_reference IS NOT NULL)
         AND NOT (COALESCE(metadata,'{}'::jsonb) ? 'provider_mismatch')
@@ -795,7 +803,7 @@ async function verifyRecentSuccessfulTransactions(){
       ORDER BY completed_at DESC LIMIT 40`)).rows;
     for(const row of rows){
       try{
-        const r=await getVTUGATETransaction(row.provider_reference,row.reference);
+        const r=await getVTUGATETransaction(row.provider_reference,row.reference,row.service);
         const now=new Date().toISOString();
         const mismatch=(row.status==="successful"&&(r.outcome==="failed"||r.outcome==="refunded"))||(row.status==="refunded"&&r.outcome==="successful");
         if(mismatch){
@@ -933,6 +941,519 @@ let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(serv
 let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
 if(!providerResult.success)console.error("VTUGATE TRANSACTION NOT CONFIRMED:",JSON.stringify({endpoint,outcome:providerResult.outcome,sentPayload:{...providerPayload,ref:providerPayload.ref},providerMessage:providerResult.message,providerRawResponse:providerResult.data}));
 const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||findTransactionField(providerData,["transaction_id","external_reference","reference","transactionId","id"])||null;const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);const wallet=await getWallet(userId);if(finalized.status==="refunded")return{success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};const delivery=providerData?.data?.delivery||providerData?.delivery||null;const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];const token=service==="electricity"?(findTransactionField(providerData,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||delivery?.token||""):"";const units=service==="electricity"?(findTransactionField(providerData,["units","kwh","unit"])||""):"";return{success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery,pins,token,units,amountCharged:debitAmount};
+}
+
+/* ===================== BULK AIRTIME (VTUGATE /api/v1/buybulkairtime) =====================
+   One provider call for up to 50 numbers, same network + amount for each. BOLTIV still keeps one
+   ordinary airtime transaction per number, so history, receipts, refunds and revenue all work
+   exactly as they do for a single purchase. Flow: debit every number up front -> one provider
+   call (1-2 min) -> per-number settle: success = keep, failed = refund that number only. */
+const BULK_AIRTIME_MAX=50,BULK_AIRTIME_MIN_AMOUNT=50;
+const bulkAirtimeInFlight=new Set();
+function normalizeBulkPhone(raw){
+  let p=String(raw||"").replace(/[^\d+]/g,"");
+  if(p.startsWith("+234"))p="0"+p.slice(4);
+  else if(p.startsWith("234")&&p.length===13)p="0"+p.slice(3);
+  else if(/^[789]\d{9}$/.test(p))p="0"+p;
+  return p;
+}
+function parseBulkPhones(input){
+  let items=[];
+  if(Array.isArray(input))items=input;
+  else{
+    const s=String(input||"").trim();
+    if(s.startsWith("[")){try{const j=JSON.parse(s);if(Array.isArray(j))items=j;}catch{}}
+    if(!items.length)items=s.split(/[\s,;]+/);
+  }
+  const out=[],seen=new Set();
+  for(const raw of items){
+    const p=normalizeBulkPhone(raw);
+    if(!p||seen.has(p))continue;
+    seen.add(p);out.push(p);
+  }
+  return out;
+}
+const bulkPhoneKey=p=>String(p||"").replace(/\D/g,"").slice(-10);
+async function processBulkAirtime(user,data){
+  const userId=clean(user?.user_id);
+  if(!userId)return{success:false,statusCode:401,message:"Unauthorized."};
+  const serviceRecord=await getService("airtime");
+  if(!serviceRecord||serviceRecord.enabled===false)return{success:false,statusCode:503,message:"This service is currently unavailable."};
+  if(serviceRecord.maintenance===true)return{success:false,statusCode:503,message:"This service is currently under maintenance."};
+  const agentService=await getEffectiveAgentService(userId,"airtime");
+  if(agentService.isAgent)return{success:false,statusCode:403,message:"Bulk airtime is not available on Agent accounts yet."};
+  const amount=Number(data.amount);
+  if(!Number.isInteger(amount)||amount<BULK_AIRTIME_MIN_AMOUNT)return{success:false,statusCode:400,message:`Enter a whole-naira amount of at least \u20A6${BULK_AIRTIME_MIN_AMOUNT}.`};
+  const network=normalizeDataNetwork(data.network);
+  if(!network)return{success:false,statusCode:400,message:"Unsupported network."};
+  const phones=parseBulkPhones(data.phones);
+  if(!phones.length)return{success:false,statusCode:400,message:"Add at least one phone number."};
+  const invalid=phones.filter(p=>!/^0\d{10}$/.test(p));
+  if(invalid.length)return{success:false,statusCode:400,message:`${invalid.length} number${invalid.length>1?"s are":" is"} not valid. Fix or remove ${invalid.length>1?"them":"it"} and try again.`,invalidNumbers:invalid.slice(0,BULK_AIRTIME_MAX)};
+  if(phones.length>BULK_AIRTIME_MAX)return{success:false,statusCode:400,message:`You can buy for up to ${BULK_AIRTIME_MAX} numbers at a time.`};
+  const mismatched=phones.map(p=>({phone:p,detectedNetwork:detectNetworkFromPhone(p)})).filter(x=>x.detectedNetwork&&x.detectedNetwork!==network);
+  if(mismatched.length&&data.networkConfirmed!==true)return{success:false,statusCode:409,requiresNetworkConfirmation:true,mismatchedNumbers:mismatched,message:`${mismatched.length} number${mismatched.length>1?"s look":" looks"} like a different network than ${network}. Numbers can be ported \u2014 confirm to continue.`};
+  const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);
+  if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
+  const suppliedPin=String(data.transactionPin||"");
+  if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
+  let serviceId;
+  try{serviceId=await getVTUGATEServiceId("airtime",network);}
+  catch(e){console.error("VTUGATE unavailable (bulk airtime service id):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}
+  const total=Number((amount*phones.length).toFixed(2));
+  const wallet0=await getWallet(userId);
+  let available=Number(wallet0?.balance||0);
+  if(data.useBonus===true){const c=await pool.connect();try{available+=await bonusAvailableFor(c,userId);}finally{c.release();}}
+  if(available+0.009<total)return{success:false,statusCode:400,message:`Insufficient balance. ${phones.length} \u00D7 \u20A6${amount.toLocaleString("en-NG")} = \u20A6${total.toLocaleString("en-NG")}.`};
+  if(bulkAirtimeInFlight.has(userId))return{success:false,statusCode:409,message:"A bulk airtime purchase is already in progress. Please wait for it to finish."};
+  bulkAirtimeInFlight.add(userId);
+  try{
+    const batchId=reference("BOLTIV-BULK");
+    const batchKey=clean(data.idempotencyKey||data.idempotency_key)||batchId;
+    const results=[],reserved=[],existing=[];
+    // 1) Reserve (debit) every number as its own airtime transaction.
+    for(const phone of phones){
+      const ref=reference("BOLTIV-TX");
+      const idem=crypto.createHash("sha1").update(`${batchKey}:${phone}`).digest("hex");
+      const meta={provider:"vtugate",request:{service_id:serviceId,network,amount,phone,bulk:true},pricing:{providerCost:null,customerPrice:amount,grossProfit:0,network},bulk:{batchId,size:phones.length}};
+      let r;
+      try{r=await createVTUTransactionAndDebit({userId,service:"airtime",amount,reference:ref,recipient:phone,idempotencyKey:idem,useBonus:data.useBonus===true,metadata:meta});}
+      catch(e){console.error("BULK AIRTIME RESERVE ERROR:",e?.stack||e?.message||e);r={success:false,message:"Could not reserve this purchase."};}
+      if(!r.success){results.push({phone,status:"failed",amount,message:(r.message||"Not processed.")+" You were not charged for this number."});continue;}
+      if(r.existing){existing.push({phone,transaction:r.transaction});continue;}
+      reserved.push({phone,transaction:r.transaction});
+    }
+    // Same idempotency key replayed: report what already happened, never re-send to the provider.
+    for(const e of existing){
+      const st=e.transaction.status;
+      results.push({phone:e.phone,status:st==="successful"?"success":(st==="refunded"||st==="failed"?"failed":"pending"),amount,reference:e.transaction.reference,providerReference:e.transaction.provider_reference||null,message:st==="successful"?"Airtime purchase was successful":(st==="refunded"?"Failed and refunded":"Still being confirmed")});
+    }
+    // 2) One provider call for everything that was reserved.
+    if(reserved.length){
+      let pr;
+      try{pr=await vtugateRequest("api/v1/buybulkairtime",{service_id:serviceId,amount,phones:reserved.map(x=>x.phone).join(",")},{timeoutMs:Number(process.env.VTUGATE_BULK_TIMEOUT_MS||240000)});}
+      catch(e){pr={success:false,outcome:"unknown",statusCode:502,data:{},message:"VTUGATE connection could not be confirmed."};}
+      const rows=Array.isArray(pr.data?.data?.results)?pr.data.data.results:[];
+      const byPhone=new Map();for(const row of rows)byPhone.set(bulkPhoneKey(row?.phone),row);
+      // A clean rejection with no per-number results means nothing was processed (bad request,
+      // provider balance, etc.) -> safe to refund everything. Timeouts / 5xx are NOT treated this way.
+      const rejected=!rows.length&&pr.data?.status===false&&[400,401,403,404,422].includes(pr.statusCode);
+      if(!rows.length)console.error("BULK AIRTIME NO PER-NUMBER RESULTS:",JSON.stringify({batchId,statusCode:pr.statusCode,outcome:pr.outcome,message:pr.message,raw:JSON.stringify(pr.data||{}).slice(0,500)}));
+      for(const item of reserved){
+        const row=byPhone.get(bulkPhoneKey(item.phone));
+        let outcome="pending",ref=null,msg="";
+        if(row){
+          const st=String(row.status||"").trim().toLowerCase();
+          ref=row.transaction_id!=null?String(row.transaction_id):null;msg=clean(row.message);
+          if(/^(success|successful|completed|delivered)$/.test(st))outcome="successful";
+          else if(/(fail|error|reject|declin|invalid|insufficient|cancel)/.test(st))outcome="failed";
+        }else if(rejected){outcome="failed";msg=clean(pr.message);}
+        let finalStatus="pending";
+        try{const f=await finalizeVTUTransaction(item.transaction.id,outcome,{bulk:true,batch_id:batchId,result:row||null,message:msg},ref,{quiet:true});finalStatus=f.status;}
+        catch(e){console.error("BULK AIRTIME FINALIZE ERROR:",JSON.stringify({batchId,reference:item.transaction.reference,error:e?.message}));}
+        results.push({phone:item.phone,status:finalStatus==="successful"?"success":(finalStatus==="refunded"?"failed":"pending"),amount,reference:item.transaction.reference,providerReference:ref,message:finalStatus==="successful"?(msg||"Airtime purchase was successful"):(finalStatus==="refunded"?((msg||"Could not be delivered")+". Refunded to your wallet."):"Still being confirmed with the provider.")});
+      }
+    }
+    const order=new Map(phones.map((p,i)=>[p,i]));results.sort((a,b)=>order.get(a.phone)-order.get(b.phone));
+    const ok=results.filter(r=>r.status==="success"),bad=results.filter(r=>r.status==="failed"),pend=results.filter(r=>r.status==="pending");
+    const sum=list=>Number(list.reduce((s,r)=>s+r.amount,0).toFixed(2));
+    const parts=[`${ok.length} successful`,`${bad.length} failed`];if(pend.length)parts.push(`${pend.length} pending`);
+    const message=`Bulk airtime processed: ${parts.join(", ")}`;
+    try{await addNotificationOnce(userId,"Bulk airtime processed",`${network} airtime of \u20A6${amount.toLocaleString("en-NG")} \u2014 ${parts.join(", ")}. Failed numbers are refunded to your wallet.`,"transaction",`bulk-${batchId}`);}catch(e){console.error("BULK AIRTIME NOTIFICATION ERROR:",e?.message);}
+    const wallet=await getWallet(userId);
+    return{success:ok.length>0||pend.length>0,statusCode:(ok.length>0||pend.length>0)?200:400,message:ok.length||pend.length?message:"None of the numbers could be recharged. You were not charged.",batchId,balance:Number(wallet?.balance??0),data:{network,total_requested:phones.length,total_successful:ok.length,total_failed:bad.length,total_pending:pend.length,successful_amount:sum(ok),failed_amount:sum(bad),pending_amount:sum(pend),results}};
+  }finally{bulkAirtimeInFlight.delete(userId);}
+}
+
+/* ===================== INTERNATIONAL TOP-UP (VTUGATE /api/v1/international/*) =====================
+   Catalogue calls (countries, operators, detect) are proxied + cached so the 60/min provider limit
+   is not burned by page loads. Prices are wholesale in NGN from VTUGATE's fxrate endpoint; BOLTIV adds
+   the admin-set markup % + service fee for the "international" service. The price is re-quoted
+   server-side at purchase time and the customer is asked to confirm if it has risen. */
+const intlCache={countries:{at:0,data:null},operators:new Map(),fx:new Map()};
+const INTL_CATALOG_TTL=6*60*60*1000,INTL_OPERATOR_TTL=10*60*1000,INTL_FX_TTL=30*1000;
+const intlRequest=(endpoint,payload={},opts={})=>vtugateRequest("api/v1/international/"+endpoint,payload,opts);
+const intlMsg=r=>clean(r?.data?.message||r?.message)||"Request failed.";
+async function getIntlCountries(){
+  if(intlCache.countries.data&&Date.now()-intlCache.countries.at<INTL_CATALOG_TTL)return intlCache.countries.data;
+  const r=await intlRequest("countries",{});
+  if(!r.success||!Array.isArray(r.data?.data))throw new Error(intlMsg(r));
+  const list=r.data.data.map(c=>({isoName:clean(c.isoName).toUpperCase(),name:clean(c.name),flag:clean(c.flag),currencyCode:clean(c.currencyCode),callingCodes:(Array.isArray(c.callingCodes)?c.callingCodes:[]).map(x=>String(x).replace(/\D/g,"")).filter(Boolean)})).filter(c=>c.isoName&&c.name).sort((a,b)=>a.name.localeCompare(b.name));
+  intlCache.countries={at:Date.now(),data:list};
+  return list;
+}
+async function intlCountry(iso){const list=await getIntlCountries();return list.find(c=>c.isoName===String(iso||"").toUpperCase())||null;}
+function normalizeIntlPhone(raw,country){
+  let d=String(raw||"").replace(/\D/g,"");
+  if(d.startsWith("00"))d=d.slice(2);
+  const cc=country?.callingCodes?.[0]||"";
+  if(cc&&!(d.startsWith(cc)&&d.length>=cc.length+6))d=cc+d.replace(/^0+/,"");
+  return d;
+}
+const round2=n=>Number(Number(n).toFixed(2));
+function trimIntlOperator(o){
+  const rate=Number(o.fx?.rate||0),type=clean(o.denominationType).toUpperCase();
+  const toLocal=v=>rate>0&&Number.isFinite(Number(v))?round2(Number(v)*rate):null;
+  return{id:Number(o.operatorId||o.id),name:clean(o.name),data:o.data===true,bundle:o.bundle===true,pin:o.pin===true,denominationType:type,currency:clean(o.destinationCurrencyCode||o.fx?.currencyCode),
+    fixed:type==="FIXED"?(Array.isArray(o.localFixedAmounts)?o.localFixedAmounts.map(Number):(Array.isArray(o.fixedAmounts)?o.fixedAmounts.map(toLocal).filter(v=>v!=null):[])):[],
+    min:type==="RANGE"?(o.localMinAmount!=null?Number(o.localMinAmount):toLocal(o.minAmount)):null,max:type==="RANGE"?(o.localMaxAmount!=null?Number(o.localMaxAmount):toLocal(o.maxAmount)):null,
+    descriptions:o.localFixedAmountsDescriptions&&typeof o.localFixedAmountsDescriptions==="object"?o.localFixedAmountsDescriptions:null,approx:o.localFixedAmounts==null&&o.localMinAmount==null};
+}
+async function getIntlOperators(countryCode,type){
+  const key=countryCode+"|"+(type||"");const c=intlCache.operators.get(key);
+  if(c&&Date.now()-c.at<INTL_OPERATOR_TTL)return c.data;
+  const payload={country_code:countryCode};if(type==="data")payload.type="data";
+  const r=await intlRequest("operators",payload);
+  if(!r.success||!Array.isArray(r.data?.data))throw new Error(intlMsg(r));
+  let list=r.data.data.map(trimIntlOperator).filter(o=>o.id>0&&o.name);
+  if(type!=="data")list=list.filter(o=>!o.data&&!o.bundle);
+  intlCache.operators.set(key,{at:Date.now(),data:list});
+  return list;
+}
+async function intlQuote(operatorId,amount,{fresh=false}={}){
+  const key=operatorId+"|"+amount;const c=intlCache.fx.get(key);
+  if(!fresh&&c&&Date.now()-c.at<INTL_FX_TTL)return c.data;
+  const r=await intlRequest("fxrate",{operator_id:operatorId,amount});
+  const cost=Number(r.data?.data?.charged_to_user);
+  if(!r.success||!(cost>0))throw new Error(intlMsg(r));
+  const out={cost,operatorName:clean(r.data.data.operator_name),currency:clean(r.data.data.currency_code)};
+  intlCache.fx.set(key,{at:Date.now(),data:out});
+  if(intlCache.fx.size>500)intlCache.fx.clear();
+  return out;
+}
+async function intlService(userId){
+  const svc=await getService("international");
+  if(!svc||svc.enabled===false)return{error:{success:false,statusCode:503,message:"International top-up is currently unavailable."}};
+  if(svc.maintenance===true)return{error:{success:false,statusCode:503,message:"International top-up is currently under maintenance."}};
+  const agent=await getEffectiveAgentService(userId,"international");
+  if(agent.isAgent)return{error:{success:false,statusCode:403,message:"International top-up is not available on Agent accounts yet."}};
+  return{svc};
+}
+const intlPrice=(cost,svc)=>customerPriceFromCost(cost,pricingConfig(svc));
+function intlValidateCommon(b){
+  const countryCode=clean(b.country_code||b.countryCode).toUpperCase();
+  if(!/^[A-Z]{2}$/.test(countryCode))return{error:{success:false,statusCode:400,message:"Choose a country."}};
+  return{countryCode};
+}
+async function intlDetect(user,b){
+  const s=await intlService(user.user_id);if(s.error)return s.error;
+  const v=intlValidateCommon(b);if(v.error)return v.error;
+  try{
+    const country=await intlCountry(v.countryCode);if(!country)return{success:false,statusCode:400,message:"Unsupported country."};
+    const phone=normalizeIntlPhone(b.phone_number||b.phone,country);
+    if(!/^\d{8,15}$/.test(phone))return{success:false,statusCode:400,message:"Enter a valid phone number."};
+    const r=await intlRequest("detectoperator",{phone_number:phone,country_code:v.countryCode});
+    const d=r.data?.data;
+    if(!r.success||!d||!(Number(d.operatorId||d.id)>0))return{success:false,statusCode:422,detectFailed:true,message:"We couldn't detect this number's network. Please choose it from the list."};
+    return{success:true,phone,operator:trimIntlOperator({...d,fx:null})};
+  }catch(e){console.error("INTL DETECT ERROR:",e.message);return{success:false,statusCode:502,detectFailed:true,message:"We couldn't detect this number's network. Please choose it from the list."};}
+}
+async function intlQuoteRoute(user,b){
+  const s=await intlService(user.user_id);if(s.error)return s.error;
+  const operatorId=Number(b.operator_id),amount=Number(b.amount);
+  if(!Number.isInteger(operatorId)||operatorId<=0)return{success:false,statusCode:400,message:"Choose an operator."};
+  if(!(amount>0)||amount>1000000)return{success:false,statusCode:400,message:"Enter a valid amount."};
+  try{const q=await intlQuote(operatorId,amount);const price=intlPrice(q.cost,s.svc);if(!(price>0))throw new Error("price");return{success:true,operatorId,operatorName:q.operatorName,amount,currency:q.currency,price,validForSeconds:60};}
+  catch(e){console.error("INTL QUOTE ERROR:",e.message);return{success:false,statusCode:502,message:"Couldn't get a price for this amount right now. Check the amount and try again."};}
+}
+const intlSafeData=d=>({transaction_id:d?.transaction_id??null,operator_name:d?.operator_name??null,country_code:d?.country_code??null,recipient_number:d?.recipient_number??null,requested_amount:d?.requested_amount??null,requested_amount_currency:d?.requested_amount_currency??null,delivered_amount:d?.delivered_amount??null,delivered_amount_currency:d?.delivered_amount_currency??null,pin_detail:d?.pin_detail??null,provider_status:d?.provider_status??null});
+async function processInternationalTopup(user,data){
+  const userId=clean(user?.user_id);
+  if(!userId)return{success:false,statusCode:401,message:"Unauthorized."};
+  const s=await intlService(userId);if(s.error)return s.error;
+  const v=intlValidateCommon(data);if(v.error)return v.error;
+  const countryCode=v.countryCode,amount=Number(data.amount);
+  if(!(amount>0)||amount>1000000)return{success:false,statusCode:400,message:"Enter a valid amount."};
+  let country;try{country=await intlCountry(countryCode);}catch(e){return{success:false,statusCode:503,message:"Network not available. Please try again later."};}
+  if(!country)return{success:false,statusCode:400,message:"Unsupported country."};
+  const phone=normalizeIntlPhone(data.phone_number||data.phone,country);
+  if(!/^\d{8,15}$/.test(phone))return{success:false,statusCode:400,message:"Enter a valid phone number."};
+  const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);
+  if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
+  const suppliedPin=String(data.transactionPin||"");
+  if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
+  let operatorId=Number(data.operator_id);
+  if(!Number.isInteger(operatorId)||operatorId<=0){
+    if(clean(data.type)==="data")return{success:false,statusCode:400,message:"Choose a data bundle operator."};
+    const det=await intlDetect(user,{country_code:countryCode,phone_number:phone});
+    if(!det.success)return{success:false,statusCode:400,message:det.message};
+    operatorId=det.operator.id;
+  }
+  let q;try{q=await intlQuote(operatorId,amount,{fresh:true});}catch(e){console.error("INTL PURCHASE QUOTE ERROR:",e.message);return{success:false,statusCode:502,message:"Couldn't confirm the price right now. Please try again."};}
+  const price=intlPrice(q.cost,s.svc);
+  if(!(price>0))return{success:false,statusCode:400,message:"Unable to price this top-up."};
+  const expected=Number(data.expectedPrice);
+  if(Number.isFinite(expected)&&expected>0&&price>expected*1.01+0.01)return{success:false,statusCode:409,priceChanged:true,newPrice:price,message:`The price has changed to \u20A6${price.toLocaleString("en-NG",{minimumFractionDigits:2})}. Please confirm to continue.`};
+  const ref=reference("BOLTIV-TX");
+  const idem=clean(data.idempotencyKey||data.idempotency_key);
+  const meta={provider:"vtugate",request:{operator_id:operatorId,country_code:countryCode,amount,recipient_number:phone},
+    pricing:{providerCost:q.cost,customerPrice:price,grossProfit:round2(price-q.cost),network:q.operatorName,plan:`${amount} ${q.currency}`},
+    international:{country_code:countryCode,country:country.name,operator_id:operatorId,operator_name:q.operatorName,amount,currency_code:q.currency}};
+  const reserved=await createVTUTransactionAndDebit({userId,service:"international",amount:price,reference:ref,recipient:phone,idempotencyKey:idem||null,useBonus:data.useBonus===true,metadata:meta});
+  if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};
+  if(reserved.existing){const t=reserved.transaction,w=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",statusCode:200,message:t.status==="successful"?"Transaction successful.":(t.status==="refunded"?"Transaction failed. Your wallet has been refunded.":"Your transaction is being processed."),reference:t.reference,providerReference:t.provider_reference||null,balance:w?.balance??0,status:t.status==="processing"?"pending":t.status,amountCharged:Number(t.amount)};}
+  let pr;
+  try{pr=await intlRequest("topup",{operator_id:operatorId,amount,country_code:countryCode,recipient_number:phone},{timeoutMs:Number(process.env.VTUGATE_INTL_TIMEOUT_MS||90000)});}
+  catch(e){pr={success:false,outcome:"unknown",statusCode:502,data:{},message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
+  const pd=pr.data?.data&&typeof pr.data.data==="object"&&!Array.isArray(pr.data.data)?pr.data.data:{};
+  const providerReference=pd.transaction_id!=null?String(pd.transaction_id):(pr.providerReference||null);
+  // A clean 4xx rejection with no provider transaction id means nothing was sent -> safe to refund.
+  const rejected=!pr.success&&pr.outcome==="unknown"&&pr.data?.status===false&&[400,401,403,404,422].includes(pr.statusCode)&&!pd.transaction_id;
+  const outcome=rejected?"failed":(pr.outcome||"unknown");
+  if(!pr.success)console.error("INTERNATIONAL TOPUP NOT CONFIRMED:",JSON.stringify({operatorId,countryCode,outcome,statusCode:pr.statusCode,message:pr.message,raw:JSON.stringify(pr.data||{}).slice(0,500)}));
+  if(pr.success&&pd.charged_to_user!=null&&Number(pd.charged_to_user)>q.cost*1.02)console.error("INTERNATIONAL COST HIGHER THAN QUOTED:",JSON.stringify({reference:ref,quoted:q.cost,charged:pd.charged_to_user}));
+  const safe=intlSafeData(pd);
+  const finalized=await finalizeVTUTransaction(reserved.transaction.id,outcome,safe,providerReference);
+  const wallet=await getWallet(userId);
+  if(finalized.status==="refunded")return{success:false,statusCode:pr.statusCode>=500?502:400,message:(()=>{const m=clean(pr.data?.message||pr.message);return m&&!/insufficient|balance|wallet|fund|credit|api key|unauthor/i.test(m)?m+(/refund/i.test(m)?"":". Your wallet has been refunded."):"The top-up could not be completed. Your wallet has been refunded.";})(),reference:reserved.transaction.reference,balance:wallet?.balance??0,status:"refunded"};
+  return{success:true,statusCode:200,message:finalized.status==="pending"?"Your top-up is being processed. We'll confirm it shortly \u2014 check your Activity page.":"International top-up was successful.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,amountCharged:price,delivered:{amount:pd.delivered_amount??null,currency:pd.delivered_amount_currency??null},operatorName:q.operatorName,country:country.name,pin:pd.pin_detail??null};
+}
+
+/* ===================== SMS (VTUGATE sendsms / sendbulksms / registersenderid) =====================
+   One BOLTIV transaction per send request (single or bulk). The wallet is debited up front using
+   the route's per-page price from VTUGATE's catalogue plus BOLTIV's markup; on a bulk send the
+   share belonging to numbers that explicitly failed is refunded to the wallet. Sender IDs are
+   registered on BOLTIV's VTUGATE account, so customer requests are reviewed by an admin first. */
+const SMS_MAX_RECIPIENTS=1000,SMS_MAX_CHARS=765;
+const SMS_DAILY_RECIPIENT_CAP=Number(process.env.SMS_DAILY_RECIPIENT_CAP||2000);
+const smsRouteCache={at:0,data:[]};
+let smsSenderSyncAt=0;
+const SMS_GSM_BASIC="@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+const SMS_GSM_EXT="^{}\\[~]|€";
+function smsAnalyze(message){
+  let gsmLen=0,gsm=true;
+  for(const ch of String(message)){
+    if(SMS_GSM_BASIC.includes(ch))gsmLen+=1;
+    else if(SMS_GSM_EXT.includes(ch))gsmLen+=2;
+    else{gsm=false;break;}
+  }
+  const characters=gsm?gsmLen:String(message).length;
+  const single=gsm?160:70,multi=gsm?153:67;
+  const pages=characters<=single?1:Math.ceil(characters/multi);
+  return{encoding:gsm?"gsm":"unicode",characters,pages};
+}
+function smsRouteFromRow(row){
+  const id=Number(row?.service_id??row?.serviceId??row?.id);
+  const label=clean(row?.route_type||row?.route||row?.label||row?.name||row?.service_name||"SMS");
+  let unit=null;
+  for(const k of ["price","unit_price","amount","cost","rate","sms_price","price_per_page","charge","vendor_price"]){const n=Number(row?.[k]);if(Number.isFinite(n)&&n>0){unit=n;break;}}
+  return{service_id:id,label,unit,dnd:/dnd/i.test(label+" "+clean(row?.description))};
+}
+async function getSmsRoutes(){
+  if(smsRouteCache.data.length&&Date.now()-smsRouteCache.at<300000)return smsRouteCache.data;
+  const pull=r=>Array.isArray(r.data?.data)?r.data.data:(Array.isArray(r.data?.services)?r.data.services:[]);
+  let rows=[];
+  const a=await vtugateRequest("api/v1/fetchservices",{service_type:"sms"});
+  if(a.success)rows=pull(a).filter(x=>{const t=clean(x.service_type).toLowerCase();return !t||t==="sms";});
+  if(!rows.length){const b=await fetchVTUGATEServices(true);if(!b.success)throw new Error(b.message||"Unable to load SMS routes.");rows=pull(b).filter(x=>clean(x.service_type).toLowerCase()==="sms");}
+  if(rows.length)console.log("SMS ROUTE CATALOGUE SAMPLE ROW:",JSON.stringify(rows[0]).slice(0,600));
+  const routes=rows.map(smsRouteFromRow).filter(r=>r.service_id>0&&r.unit>0);
+  if(rows.length&&!routes.length)console.error("SMS ROUTES FOUND BUT NO PRICE FIELD RECOGNISED. Row keys:",Object.keys(rows[0]||{}).join(","));
+  smsRouteCache.at=Date.now();smsRouteCache.data=routes;
+  return routes;
+}
+async function smsService(){
+  const svc=await getService("sms");
+  if(!svc||svc.enabled===false)return{error:{success:false,statusCode:503,message:"SMS is currently unavailable."}};
+  if(svc.maintenance===true)return{error:{success:false,statusCode:503,message:"SMS is currently under maintenance."}};
+  return{svc};
+}
+const smsPrice=(cost,svc)=>customerPriceFromCost(cost,pricingConfig(svc));
+function smsPriceFor(route,pages,recipients,svc){
+  const cost=Number((route.unit*pages*recipients).toFixed(4));
+  return{cost,price:smsPrice(cost,svc)};
+}
+async function smsSyncSenderIds(force=false){
+  if(!force&&Date.now()-smsSenderSyncAt<10*60*1000)return;
+  smsSenderSyncAt=Date.now();
+  const pending=await db(`SELECT 1 FROM sms_sender_ids WHERE status='pending' LIMIT 1`);
+  if(!pending.rows.length)return;
+  const r=await vtugateRequest("api/v1/listsenderids",{});
+  const list=Array.isArray(r.data?.data)?r.data.data:null;
+  if(r.data?.status!==true||!list)return;
+  for(const x of list){
+    const st=clean(x.status).toLowerCase();
+    if(!["approved","rejected","pending"].includes(st))continue;
+    await db(`UPDATE sms_sender_ids SET status=$1,notes=COALESCE($2,notes),updated_at=NOW() WHERE status IN ('pending','approved','rejected') AND (provider_id=$3 OR sender_id=$4) AND status<>$1`,[st,x.notes||null,Number(x.id)||null,clean(x.sender_id)]);
+  }
+}
+function validateSenderIdRequest(b){
+  const sender=clean(b.sender_id);
+  if(!/^[A-Za-z0-9]{1,11}$/.test(sender))return{error:"Sender ID must be 1-11 letters or numbers, with no spaces or symbols."};
+  const f={company_name:clean(b.company_name),company_website:clean(b.company_website),nature_of_business:clean(b.nature_of_business),sample_sms:clean(b.sample_sms),sms_type:clean(b.sms_type).toLowerCase(),phone_number:clean(b.phone_number),purpose:clean(b.purpose)};
+  for(const [k,v] of Object.entries(f))if(!v)return{error:`Please fill in ${k.replace(/_/g," ")}.`};
+  if(!["transactional","corporate","marketing"].includes(f.sms_type))return{error:"Choose a valid SMS type."};
+  if(!/^0\d{10}$/.test(f.phone_number))return{error:"Enter a valid 11-digit phone number."};
+  if(!/^https?:\/\/[^\s]+\.[^\s]+$/i.test(f.company_website))return{error:"Enter a valid company website (starting with https://)."};
+  if(f.sample_sms.length>300||f.purpose.length>300||f.company_name.length>120||f.nature_of_business.length>120)return{error:"One of the fields is too long."};
+  return{sender,details:f};
+}
+async function smsRequestSenderId(user,b){
+  const v=validateSenderIdRequest(b);if(v.error)return{success:false,statusCode:400,message:v.error};
+  const dup=await db(`SELECT user_id,status FROM sms_sender_ids WHERE sender_id=$1 AND status<>'rejected' LIMIT 1`,[v.sender]);
+  if(dup.rows.length)return{success:false,statusCode:409,message:"This sender ID is already registered or requested. Please choose another."};
+  const mine=await db(`SELECT COUNT(*)::int c FROM sms_sender_ids WHERE user_id=$1 AND status IN ('requested','pending')`,[user.user_id]);
+  if(mine.rows[0].c>=3)return{success:false,statusCode:400,message:"You already have 3 sender IDs awaiting approval. Please wait for them to be reviewed."};
+  await db(`INSERT INTO sms_sender_ids(user_id,sender_id,status,details) VALUES($1,$2,'requested',$3::jsonb)`,[user.user_id,v.sender,JSON.stringify(v.details)]);
+  return{success:true,message:"Sender ID request received. We'll review it and submit it for approval \u2014 this usually takes 1-3 days."};
+}
+async function smsConfig(user){
+  const s=await smsService();if(s.error)return s.error;
+  try{await smsSyncSenderIds();}catch(e){console.error("SMS SENDER SYNC ERROR:",e.message);}
+  let routes=[];try{routes=await getSmsRoutes();}catch(e){console.error("SMS ROUTES ERROR:",e.message);}
+  const ids=await db(`SELECT id,sender_id,status,notes,user_id,created_at FROM sms_sender_ids WHERE user_id IS NULL OR user_id=$1 ORDER BY created_at DESC LIMIT 100`,[user.user_id]);
+  return{success:true,maxRecipients:SMS_MAX_RECIPIENTS,maxChars:SMS_MAX_CHARS,
+    routes:routes.map(r=>({service_id:r.service_id,label:r.label,dnd:r.dnd,unitPrice:smsPrice(r.unit,s.svc)})),
+    senderIds:ids.rows.map(x=>({id:Number(x.id),sender_id:x.sender_id,status:x.status,notes:x.status==="rejected"?(x.notes||null):null,mine:x.user_id!=null,sendable:x.status==="approved"}))};
+}
+async function smsPrepare(user,b){
+  const s=await smsService();if(s.error)return{error:s.error};
+  const message=String(b.message??"");
+  if(!message.trim())return{error:{success:false,statusCode:400,message:"Enter your message."}};
+  if(message.length>SMS_MAX_CHARS)return{error:{success:false,statusCode:400,message:`Message is too long (max ${SMS_MAX_CHARS} characters).`}};
+  const an=smsAnalyze(message);
+  if(an.pages>5)return{error:{success:false,statusCode:400,message:"Message is too long for its character set (max 5 pages). Remove emoji or accented characters, or shorten it."}};
+  const phones=parseBulkPhones(b.recipients??b.recipient);
+  if(!phones.length)return{error:{success:false,statusCode:400,message:"Add at least one recipient."}};
+  const invalid=phones.filter(p=>!/^0\d{10}$/.test(p));
+  if(invalid.length)return{error:{success:false,statusCode:400,message:`${invalid.length} number${invalid.length>1?"s are":" is"} not valid. Fix or remove ${invalid.length>1?"them":"it"} and try again.`,invalidNumbers:invalid.slice(0,20)}};
+  if(phones.length>SMS_MAX_RECIPIENTS)return{error:{success:false,statusCode:400,message:`You can send to up to ${SMS_MAX_RECIPIENTS} numbers at a time.`}};
+  let routes;try{routes=await getSmsRoutes();}catch(e){console.error("SMS ROUTES ERROR:",e.message);return{error:{success:false,statusCode:503,message:"SMS is not available right now. Please try again later."}};}
+  const route=routes.find(r=>r.service_id===Number(b.service_id));
+  if(!route)return{error:{success:false,statusCode:400,message:"Choose a sending route."}};
+  const pr=smsPriceFor(route,an.pages,phones.length,s.svc);
+  if(!(pr.price>0))return{error:{success:false,statusCode:400,message:"Unable to price this message."}};
+  return{svc:s.svc,message,an,phones,route,cost:pr.cost,price:pr.price};
+}
+async function smsQuote(user,b){
+  const p=await smsPrepare(user,b);if(p.error)return p.error;
+  return{success:true,pages:p.an.pages,characters:p.an.characters,encoding:p.an.encoding,recipients:p.phones.length,total:p.price};
+}
+// Refund part of a processing transaction (numbers that explicitly failed) before it is finalised as successful.
+async function smsPartialRefund(txId,refundAmount,failedPhones){
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const q=await client.query(`SELECT * FROM transactions WHERE id=$1 FOR UPDATE`,[txId]);
+    const tx=q.rows[0];
+    if(!tx||tx.status!=="processing"||tx.refunded_at){await client.query("ROLLBACK");return false;}
+    const amt=Math.min(Number(refundAmount),Number(tx.amount));
+    if(!(amt>0)){await client.query("ROLLBACK");return false;}
+    const wr=await client.query(`UPDATE wallets SET balance=balance+$1,updated_at=NOW() WHERE user_id=$2 RETURNING balance`,[amt,tx.user_id]);
+    if(!wr.rows.length)throw new Error("Wallet could not be credited for partial refund.");
+    await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_id,direction:"credit",amount:amt,balanceAfter:Number(wr.rows[0].balance),reference:`WALLET-PARTIAL-REFUND-${tx.reference}`,transactionId:tx.id,category:"vtu_refund",description:"Partial refund for SMS",metadata:{failed_count:failedPhones.length}});
+    const meta=tx.metadata&&typeof tx.metadata==="object"?tx.metadata:{};
+    const newAmount=Number((Number(tx.amount)-amt).toFixed(2));
+    const ratio=Number(tx.amount)>0?newAmount/Number(tx.amount):1;
+    const pricing=meta.pricing&&typeof meta.pricing==="object"?{...meta.pricing}:{};
+    if(pricing.providerCost!=null)pricing.providerCost=Number((Number(pricing.providerCost)*ratio).toFixed(2));
+    pricing.customerPrice=newAmount;pricing.grossProfit=pricing.providerCost!=null?Number((newAmount-pricing.providerCost).toFixed(2)):0;
+    await client.query(`UPDATE transactions SET amount=$2,metadata=$3::jsonb WHERE id=$1`,[txId,newAmount,JSON.stringify({...meta,pricing,partial_refund:{amount:amt,failed_count:failedPhones.length,failed:failedPhones.slice(0,200)}})]);
+    await client.query("COMMIT");
+    return true;
+  }catch(e){try{await client.query("ROLLBACK")}catch{};throw e;}finally{client.release();}
+}
+async function processSendSms(user,data){
+  const userId=clean(user?.user_id);
+  if(!userId)return{success:false,statusCode:401,message:"Unauthorized."};
+  const p=await smsPrepare(user,data);if(p.error)return p.error;
+  const sid=await db(`SELECT sender_id FROM sms_sender_ids WHERE sender_id=$1 AND status='approved' AND (user_id IS NULL OR user_id=$2) LIMIT 1`,[clean(data.sender_id),userId]);
+  if(!sid.rows.length)return{success:false,statusCode:400,message:"Choose an approved sender ID."};
+  const senderId=sid.rows[0].sender_id;
+  const security=await db(`SELECT transaction_pin_hash FROM user_security WHERE user_id=$1 LIMIT 1`,[userId]);
+  if(!security.rows[0]?.transaction_pin_hash)return{success:false,statusCode:400,message:"Please set your Transaction PIN before making a purchase."};
+  const suppliedPin=String(data.transactionPin||"");
+  if(!/^\d{4}$/.test(suppliedPin)||!verifyPassword(suppliedPin,security.rows[0].transaction_pin_hash))return{success:false,statusCode:400,message:"Incorrect Transaction PIN."};
+  const used=await db(`SELECT COALESCE(SUM((metadata->'sms'->>'recipients')::int),0)::int n FROM transactions WHERE user_id=$1 AND service='sms' AND status IN ('processing','pending','successful') AND date>NOW()-INTERVAL '24 hours'`,[userId]);
+  if(used.rows[0].n+p.phones.length>SMS_DAILY_RECIPIENT_CAP)return{success:false,statusCode:429,message:`Daily SMS limit reached (${SMS_DAILY_RECIPIENT_CAP} recipients per 24 hours). Please try again later.`};
+  const bulk=p.phones.length>1;
+  const ref=reference("BOLTIV-TX");
+  const idem=clean(data.idempotencyKey||data.idempotency_key);
+  const meta={provider:"vtugate",request:{service_id:p.route.service_id,sender_id:senderId,recipients:p.phones.length},
+    pricing:{providerCost:Number(p.cost.toFixed(2)),customerPrice:p.price,grossProfit:Number((p.price-p.cost).toFixed(2)),network:p.route.label,plan:`${p.an.pages} page${p.an.pages>1?"s":""}`},
+    sms:{sender_id:senderId,route:p.route.label,pages:p.an.pages,encoding:p.an.encoding,characters:p.an.characters,recipients:p.phones.length,message:p.message,numbers:bulk?undefined:p.phones[0]}};
+  const reserved=await createVTUTransactionAndDebit({userId,service:"sms",amount:p.price,reference:ref,recipient:bulk?`${p.phones.length} recipients`:p.phones[0],idempotencyKey:idem||null,useBonus:false,metadata:meta});
+  if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};
+  if(reserved.existing){const t=reserved.transaction,w=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",statusCode:200,message:t.status==="successful"?"SMS sent.":(t.status==="refunded"?"SMS could not be sent. Your wallet has been refunded.":"Your SMS is being processed."),reference:t.reference,balance:w?.balance??0,status:t.status==="processing"?"pending":t.status,amountCharged:Number(t.amount)};}
+  let pr;
+  try{pr=bulk
+    ?await vtugateRequest("api/v1/sendbulksms",{sender_id:senderId,recipient:p.phones.join(","),message:p.message,service_id:p.route.service_id},{timeoutMs:Number(process.env.VTUGATE_BULK_SMS_TIMEOUT_MS||180000)})
+    :await vtugateRequest("api/v1/sendsms",{sender_id:senderId,recipient:p.phones[0],message:p.message,service_id:p.route.service_id},{timeoutMs:60000});}
+  catch(e){pr={success:false,outcome:"unknown",statusCode:502,data:{},message:"VTUGATE connection could not be confirmed."};}
+  const pd=pr.data?.data&&typeof pr.data.data==="object"&&!Array.isArray(pr.data.data)?pr.data.data:{};
+  const rows=Array.isArray(pd.results)?pd.results:[];
+  const providerReference=!bulk&&pd.transaction_id!=null?String(pd.transaction_id):null;
+  const rejected=!pr.success&&pr.outcome==="unknown"&&pr.data?.status===false&&[400,401,403,404,422].includes(pr.statusCode)&&!pd.transaction_id&&!rows.length;
+  if(!pr.success&&!rows.length)console.error("SMS SEND NOT CONFIRMED:",JSON.stringify({bulk,outcome:pr.outcome,statusCode:pr.statusCode,message:pr.message,raw:JSON.stringify(pr.data||{}).slice(0,500)}));
+  let outcome,sent=0,failedPhones=[];
+  if(!bulk){
+    outcome=rejected?"failed":(pr.outcome||"unknown");
+    if(pr.success&&pd.charged_to_user!=null&&Number(pd.charged_to_user)>p.cost*1.05)console.error("SMS COST HIGHER THAN ESTIMATE:",JSON.stringify({reference:ref,estimatedCost:p.cost,charged:pd.charged_to_user}));
+    sent=outcome==="successful"?1:0;
+  }else if(rejected){outcome="failed";}
+  else if(!rows.length){outcome=pr.success?"pending":(pr.outcome||"unknown");}
+  else{
+    const key=x=>bulkPhoneKey(x);
+    const state=new Map();
+    for(const r of rows){const st=String(r.status||"").trim().toLowerCase();state.set(key(r.recipient),/^(success|successful|sent|delivered)$/.test(st)?"ok":(/(fail|error|reject|invalid|insufficient|cancel)/.test(st)?"fail":"unknown"));}
+    for(const ph of p.phones){const st=state.get(key(ph))||"unknown";if(st==="ok")sent++;else if(st==="fail")failedPhones.push(ph);}
+    if(Number(pd.total_charged)>p.price*1.05)console.error("BULK SMS CHARGED MORE THAN ESTIMATE:",JSON.stringify({reference:ref,estimatedCost:p.cost,totalCost:pd.total_cost,totalCharged:pd.total_charged}));
+    if(failedPhones.length===p.phones.length)outcome="failed";
+    else{
+      outcome="successful";
+      if(failedPhones.length){
+        const refund=Number((p.price-p.price*(p.phones.length-failedPhones.length)/p.phones.length).toFixed(2));
+        try{await smsPartialRefund(reserved.transaction.id,refund,failedPhones);}catch(e){console.error("SMS PARTIAL REFUND ERROR:",JSON.stringify({reference:ref,error:e?.message}));}
+      }
+    }
+  }
+  const safe={sender_id:senderId,message_pages:pd.message_pages??null,encoding:pd.encoding??null,total_requested:pd.total_requested??null,total_successful:pd.total_successful??null,total_failed:pd.total_failed??null,provider_status:pd.provider_status??null};
+  const finalized=await finalizeVTUTransaction(reserved.transaction.id,outcome,safe,providerReference);
+  const wallet=await getWallet(userId);
+  if(finalized.status==="refunded")return{success:false,statusCode:pr.statusCode>=500?502:400,message:(()=>{const m=clean(pr.data?.message||pr.message);return m&&!/insufficient|balance|wallet|fund|credit|api key|unauthor/i.test(m)?m+(/refund/i.test(m)?"":". Your wallet has been refunded."):"Your SMS could not be sent. Your wallet has been refunded.";})(),reference:reserved.transaction.reference,balance:wallet?.balance??0,status:"refunded"};
+  const total=p.phones.length;
+  return{success:true,statusCode:200,message:finalized.status==="pending"?"Your SMS is being processed. We'll confirm it shortly \u2014 check your Activity page.":(bulk?`Bulk SMS processed: ${sent} sent, ${failedPhones.length} failed`:"SMS sent successfully."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,recipients:total,sent:finalized.status==="pending"?null:sent,failed:failedPhones.length,failedNumbers:failedPhones.slice(0,200),pages:p.an.pages,amountCharged:Number((p.price-(failedPhones.length?Number((p.price-p.price*(total-failedPhones.length)/total).toFixed(2)):0)).toFixed(2))};
+}
+/* ----- admin: sender ID review ----- */
+async function adminSmsSenderIds(req,path,b){
+  const admin=await adminFromToken(req);if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  if(req.method==="GET"){
+    try{await smsSyncSenderIds(true);}catch(e){console.error("SMS SENDER SYNC ERROR:",e.message);}
+    const r=await db(`SELECT s.id,s.sender_id,s.status,s.notes,s.details,s.user_id,s.created_at,u.name,u.email FROM sms_sender_ids s LEFT JOIN users u ON u.user_id=s.user_id ORDER BY (s.status='requested') DESC,s.created_at DESC LIMIT 300`);
+    return{success:true,senderIds:r.rows};
+  }
+  if(path==="/api/admin/sms/sender-ids/sync"){try{await smsSyncSenderIds(true);}catch(e){return{success:false,statusCode:502,message:"Sync failed."};}return{success:true};}
+  const submitNew=async(row)=>{
+    const d=row.details||{};
+    const r=await vtugateRequest("api/v1/registersenderid",{sender_id:row.sender_id,company_name:d.company_name,company_website:d.company_website,nature_of_business:d.nature_of_business,sample_sms:d.sample_sms,sms_type:d.sms_type,phone_number:d.phone_number,purpose:d.purpose});
+    if(r.data?.status!==true)return{success:false,statusCode:400,message:clean(r.data?.message||r.message)||"VTUGATE rejected the request."};
+    const pid=Number(r.data?.data?.id)||null;
+    await db(`UPDATE sms_sender_ids SET status='pending',provider_id=$2,updated_at=NOW() WHERE id=$1`,[row.id,pid]);
+    return{success:true,message:clean(r.data?.message)||"Submitted for approval."};
+  };
+  if(path==="/api/admin/sms/sender-ids"&&req.method==="POST"){
+    const v=validateSenderIdRequest(b);if(v.error)return{success:false,statusCode:400,message:v.error};
+    const dup=await db(`SELECT 1 FROM sms_sender_ids WHERE sender_id=$1 AND status<>'rejected' LIMIT 1`,[v.sender]);
+    if(dup.rows.length)return{success:false,statusCode:409,message:"This sender ID is already registered or requested."};
+    const ins=await db(`INSERT INTO sms_sender_ids(user_id,sender_id,status,details) VALUES(NULL,$1,'requested',$2::jsonb) RETURNING id,sender_id,details`,[v.sender,JSON.stringify(v.details)]);
+    return submitNew(ins.rows[0]);
+  }
+  const m=path.match(/^\/api\/admin\/sms\/sender-ids\/(\d+)\/(submit|reject)$/);
+  if(m&&req.method==="POST"){
+    const row=(await db(`SELECT id,sender_id,details,status,user_id FROM sms_sender_ids WHERE id=$1 LIMIT 1`,[Number(m[1])])).rows[0];
+    if(!row)return{success:false,statusCode:404,message:"Not found."};
+    if(row.status!=="requested")return{success:false,statusCode:400,message:"Only requested sender IDs can be reviewed."};
+    if(m[2]==="reject"){
+      const notes=clean(b.notes).slice(0,300)||"Not approved.";
+      await db(`UPDATE sms_sender_ids SET status='rejected',notes=$2,updated_at=NOW() WHERE id=$1`,[row.id,notes]);
+      if(row.user_id){try{await addNotificationOnce(row.user_id,"Sender ID not approved",`Your sender ID "${row.sender_id}" was not approved: ${notes}`,"info",`smsid-reject-${row.id}`);}catch{}}
+      return{success:true};
+    }
+    const res=await submitNew(row);
+    if(res.success&&row.user_id){try{await addNotificationOnce(row.user_id,"Sender ID submitted",`Your sender ID "${row.sender_id}" was submitted for approval. This usually takes 24-72 hours.`,"info",`smsid-submit-${row.id}`);}catch{}}
+    return res;
+  }
+  return{success:false,statusCode:404,message:"Not found."};
 }
 
 async function verifyVTUGATECable(req,user){const b=await body(req);const providerName=clean(b.provider).toUpperCase();let serviceId;try{serviceId=await getVTUGATEServiceId("cable",providerName);}catch(e){console.error("VTUGATE unavailable (Unable to verify the cable TV service for this provider right now.):",e.message);return{success:false,statusCode:503,message:"Network not available. Please try again later."};}const iucnumber=clean(b.smartcard||b.iucnumber);if(!/^\d{8,20}$/.test(iucnumber))return{success:false,statusCode:400,message:"Invalid smartcard/IUC number."};const phoneVal=clean(b.phone||"08000000000");const result=await vtugateRequest("api/v1/verifycabletv",{service_id:serviceId,provider:providerName,iucnumber,smartcard:iucnumber,phone:phoneVal,phone_number:phoneVal,msisdn:phoneVal});
@@ -1241,7 +1762,7 @@ async function adminReferralSummary(){
   return{enabled:await referralEnabled(),total:Number(r.rows[0]?.total||0),rewarded:Number(r.rows[0]?.rewarded||0),paid:Number(r.rows[0]?.paid||0)};
 }
 
-async function finalizeVTUTransaction(transactionId,outcome,providerData={},providerReference=null){
+async function finalizeVTUTransaction(transactionId,outcome,providerData={},providerReference=null,opts={}){
 const client=await pool.connect();
 try{
 await client.query("BEGIN");
@@ -1260,7 +1781,7 @@ const referralResult=await checkReferralQualificationTx(client,fresh);
 await client.query("COMMIT");
 // Notifications are created after the transaction commit so a notification
 // failure can never roll back a successful customer purchase.
-try{
+if(!opts.quiet)try{
   const meta=fresh.metadata&&typeof fresh.metadata==="object"?fresh.metadata:{};
   let detail=`Your ${String(fresh.service||"service")} purchase of ₦${Number(fresh.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} was successful.`;
   if(String(fresh.service).toLowerCase()==="data"){
@@ -1270,7 +1791,7 @@ try{
   }
   await addNotificationOnce(fresh.user_id,"Transaction successful",detail,"transaction",`tx-success-${fresh.id}`);
 }catch(error){console.error("TRANSACTION NOTIFICATION ERROR:",error?.stack||error?.message||error);}
-try{ await sendTransactionEmail(fresh.user_id,fresh,"successful"); }catch(error){ console.error("TRANSACTION EMAIL HOOK ERROR:",error?.stack||error?.message||error); }
+if(!opts.quiet)try{ await sendTransactionEmail(fresh.user_id,fresh,"successful"); }catch(error){ console.error("TRANSACTION EMAIL HOOK ERROR:",error?.stack||error?.message||error); }
 if(cashbackEarned>0){try{await addNotificationOnce(fresh.user_id,"Cashback earned",`You earned ₦${Number(cashbackEarned).toLocaleString("en-NG",{minimumFractionDigits:2})} cashback on your data purchase. It is in your Bonus Balance and expires in ${BONUS_EXPIRY_DAYS} days.`,"transaction",`cashback-${fresh.id}`);}catch(error){console.error("CASHBACK NOTIFICATION ERROR:",error?.stack||error?.message||error);}}
 if(referralResult){try{
 if(referralResult.friendPaid>0)await addNotificationOnce(referralResult.referredId,"Referral bonus unlocked",`You unlocked a \u20A6${referralResult.friendPaid} welcome bonus. It is in your Bonus Balance and expires in ${BONUS_EXPIRY_DAYS} days.`,"info",`referral-friend-${fresh.id}`);
@@ -1289,8 +1810,8 @@ await addFinancialLedger(client,{accountType:"customer_wallet",ownerId:tx.user_i
 await client.query(`UPDATE transactions SET status='refunded',provider_reference=COALESCE(provider_reference,$2),refunded_at=COALESCE(refunded_at,NOW()),completed_at=COALESCE(completed_at,NOW()),last_provider_status=$4,refund_reason=$5,metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData,refund_reason:outcome}),outcome,outcome]);
 const fresh=(await client.query(`SELECT * FROM transactions WHERE id=$1`,[transactionId])).rows[0];
 if(!tx.refunded_at)await recordRevenueRefund(client,fresh);
-await client.query("COMMIT");if(!tx.refunded_at){try{await addNotificationOnce(tx.user_id,"Transaction refunded",`Your ${String(tx.service||"service")} transaction of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} could not be completed. The amount has been returned to your wallet.` ,"transaction",`tx-refund-${tx.id}`);}catch{}}
-if(!tx.refunded_at){try{await sendTransactionEmail(tx.user_id,fresh,"refunded");}catch(error){console.error("REFUND EMAIL HOOK ERROR:",error?.stack||error?.message||error);}}
+await client.query("COMMIT");if(!tx.refunded_at&&!opts.quiet){try{await addNotificationOnce(tx.user_id,"Transaction refunded",`Your ${String(tx.service||"service")} transaction of ₦${Number(tx.amount).toLocaleString("en-NG",{minimumFractionDigits:2})} could not be completed. The amount has been returned to your wallet.` ,"transaction",`tx-refund-${tx.id}`);}catch{}}
+if(!tx.refunded_at&&!opts.quiet){try{await sendTransactionEmail(tx.user_id,fresh,"refunded");}catch(error){console.error("REFUND EMAIL HOOK ERROR:",error?.stack||error?.message||error);}}
 return {success:true,status:"refunded",refunded:!tx.refunded_at};
 }
 await client.query(`UPDATE transactions SET status='pending',provider_reference=COALESCE(provider_reference,$2),last_provider_status='pending',metadata=COALESCE(metadata,'{}'::jsonb)||$3::jsonb WHERE id=$1`,[transactionId,ref,JSON.stringify({provider_response:providerData})]);
@@ -2015,7 +2536,11 @@ await db(`ALTER TABLE services ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ N
 await db(`CREATE TABLE IF NOT EXISTS security_events(id BIGSERIAL PRIMARY KEY,admin_id BIGINT,event_type TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'info',details JSONB,ip TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
 await db(`CREATE INDEX IF NOT EXISTS security_events_created_idx ON security_events(created_at DESC)`);
 for(const [key,name,icon] of [['airtime','Airtime','📱'],['data','Data','🌐'],['electricity','Electricity','💡'],['cable','Cable TV','📺'],['exam_pin','Exam PINs','🎓']]) await db(`INSERT INTO services(key,name,icon) VALUES($1,$2,$3) ON CONFLICT(key) DO NOTHING`,[key,name,icon]);
-await db(`DELETE FROM services WHERE key NOT IN ('airtime','data','electricity','cable','exam_pin')`);
+await db(`INSERT INTO services(key,name,icon,config) VALUES('international','International Top-up','🌍',$1::jsonb) ON CONFLICT(key) DO NOTHING`,[JSON.stringify({pricing:{mode:'discount',discount_pct:5,fixed_profit:0}})]);
+await db(`INSERT INTO services(key,name,icon,config) VALUES('sms','Bulk SMS','💬',$1::jsonb) ON CONFLICT(key) DO NOTHING`,[JSON.stringify({pricing:{mode:'discount',discount_pct:20,fixed_profit:0}})]);
+await db(`CREATE TABLE IF NOT EXISTS sms_sender_ids(id BIGSERIAL PRIMARY KEY,user_id TEXT,sender_id TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'requested',provider_id BIGINT,details JSONB NOT NULL DEFAULT '{}'::jsonb,notes TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+await db(`CREATE UNIQUE INDEX IF NOT EXISTS sms_sender_ids_active_uq ON sms_sender_ids(sender_id) WHERE status<>'rejected'`);
+await db(`DELETE FROM services WHERE key NOT IN ('airtime','data','electricity','cable','exam_pin','international','sms')`);
 // "Fixed profit per sale" pricing has been removed in favor of percentage-only pricing —
 // migrate any service still configured that way over to discount/percentage mode.
 await db(`UPDATE services SET config=jsonb_set(jsonb_set(config,'{pricing,mode}','"discount"'::jsonb,true),'{pricing,fixed_profit}','0'::jsonb,true),updated_at=NOW() WHERE config->'pricing'->>'mode' IN ('fixed','fixed_profit')`);
@@ -6277,6 +6802,69 @@ if(req.method==="POST"&&path==="/api/vtu/cable/verify"){const user=await userFro
 if(req.method==="POST"&&path==="/api/vtu/electricity/verify"){const user=await userFromToken(req);if(!user)return send(res,401,{success:false,message:"Unauthorized."});const r=await verifyVTUGATEElectricity(req);return send(res,r.success?200:(r.statusCode||400),r);}
 
 /*
+SMS
+*/
+if(path.startsWith("/api/sms/")){
+const rl=rateLimit(req,"sms",path.endsWith("/send")?10:40,60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+let result=null;
+if(req.method==="GET"&&path==="/api/sms/config")result=await smsConfig(user);
+else if(req.method==="POST"){
+const b=await body(req);
+if(path==="/api/sms/quote")result=await smsQuote(user,b);
+else if(path==="/api/sms/send")result=await processSendSms(user,b);
+else if(path==="/api/sms/sender-ids")result=await smsRequestSenderId(user,b);
+}
+if(result)return send(res,result.success?200:(result.statusCode||400),result);
+}
+if(path.startsWith("/api/admin/sms/sender-ids")){
+const b=req.method==="POST"?await body(req):{};
+const result=await adminSmsSenderIds(req,path,b);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+
+/*
+INTERNATIONAL TOP-UP
+*/
+if(path.startsWith("/api/vtu/international/")){
+const rl=rateLimit(req,"vtu-international",path.endsWith("/topup")?10:40,60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+if(req.method==="GET"&&path==="/api/vtu/international/countries"){
+const s=await intlService(user.user_id);if(s.error)return send(res,s.error.statusCode,s.error);
+try{return send(res,200,{success:true,countries:await getIntlCountries()});}catch(e){console.error("INTL COUNTRIES ERROR:",e.message);return send(res,502,{success:false,message:"Unable to load countries right now."});}
+}
+if(req.method==="POST"){
+const b=await body(req);let result=null;
+if(path==="/api/vtu/international/operators"){
+const s=await intlService(user.user_id);if(s.error)return send(res,s.error.statusCode,s.error);
+const v=intlValidateCommon(b);if(v.error)return send(res,400,v.error);
+try{result={success:true,operators:await getIntlOperators(v.countryCode,clean(b.type)==="data"?"data":"")};}catch(e){console.error("INTL OPERATORS ERROR:",e.message);result={success:false,statusCode:502,message:"Unable to load operators right now."};}
+}
+else if(path==="/api/vtu/international/detect")result=await intlDetect(user,b);
+else if(path==="/api/vtu/international/quote")result=await intlQuoteRoute(user,b);
+else if(path==="/api/vtu/international/topup")result=await processInternationalTopup(user,b);
+if(result)return send(res,result.success?200:(result.statusCode||400),result);
+}
+}
+
+/*
+BULK AIRTIME
+*/
+if(req.method==="POST"&&path==="/api/vtu/airtime/bulk"){
+const rl=rateLimit(req,"vtu-bulk-airtime",5,60*1000);
+if(!rl.allowed)return rateLimitedResponse(res,rl);
+const user=await userFromToken(req);
+if(!user)return send(res,401,{success:false,message:"Unauthorized."});
+const b=await body(req);
+const result=await processBulkAirtime(user,b);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+
+/*
 VTU TRANSACTION
 */
 
@@ -6482,13 +7070,13 @@ return;
 PUBLIC PLATFORM CONFIGURATION
 */
 if(req.method==='GET'&&path==='/api/pricing'){
-  const keys=['airtime','data','cable','electricity','exam_pin'];
+  const keys=['airtime','data','cable','electricity','exam_pin','international','sms'];
   const out={};
   for(const key of keys){const svc=await getService(key);const p=pricingConfig(svc);out[key]={available:Boolean(svc&&svc.enabled!==false&&svc.maintenance!==true)};if(key==='electricity')Object.assign(out[key],{markupPct:Number(p.markup_pct||0),serviceFee:Number(p.service_fee||0),minAmount:MIN_ELECTRICITY_AMOUNT});}
   return send(res,200,{success:true,pricing:out});
 }
 
-if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,maintenance FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin') ORDER BY key`);return send(res,200,{success:true,services:r.rows.map(x=>({...x,available:x.enabled!==false&&x.maintenance!==true}))});}
+if(req.method==='GET'&&path==='/api/services'){const r=await db(`SELECT key,name,icon,enabled,maintenance FROM services WHERE key IN ('airtime','data','electricity','cable','exam_pin','international','sms') ORDER BY key`);return send(res,200,{success:true,services:r.rows.map(x=>({...x,available:x.enabled!==false&&x.maintenance!==true}))});}
 if(req.method==='GET'&&path==='/api/platform/settings'){const fallback=[{text:'Welcome to BOLTIV — Fast. Simple. Powerful.',enabled:true}]; let items=await getPlatformSetting('announcement_items',fallback); if(!Array.isArray(items))items=fallback; items=items.filter(x=>x&&x.text&&x.enabled!==false).slice(0,10); return send(res,200,{success:true,settings:{maintenance_mode:Boolean(await getPlatformSetting('maintenance_mode',false)),registration_enabled:Boolean(await getPlatformSetting('registration_enabled',true)),announcement_enabled:Boolean(await getPlatformSetting('announcement_enabled',true)),announcement_text:String(await getPlatformSetting('announcement_text',items[0]?.text||fallback[0].text)),announcement_items:items}});}
 
 /*
@@ -6606,6 +7194,7 @@ setInterval(()=>verifyRecentSuccessfulTransactions(),15*60*1000).unref();
 
 // AutoPay: check for due runs and day-before reminders every minute.
 setTimeout(()=>autopayTick().catch(e=>console.error("AUTOPAY INITIAL TICK ERROR:",e)),25000).unref();
+setInterval(()=>smsSyncSenderIds(true).catch(e=>console.error("SMS SENDER SYNC ERROR",e?.message)),30*60*1000).unref();
 setInterval(()=>autopayTick().catch(e=>console.error("AUTOPAY TICK ERROR:",e)),60*1000).unref();
 
 // Data expiry reminders: check every 30 minutes.

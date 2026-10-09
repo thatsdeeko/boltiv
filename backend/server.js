@@ -2544,7 +2544,6 @@ await db(`DELETE FROM services WHERE key NOT IN ('airtime','data','electricity',
 // "Fixed profit per sale" pricing has been removed in favor of percentage-only pricing —
 // migrate any service still configured that way over to discount/percentage mode.
 await db(`UPDATE services SET config=jsonb_set(jsonb_set(config,'{pricing,mode}','"discount"'::jsonb,true),'{pricing,fixed_profit}','0'::jsonb,true),updated_at=NOW() WHERE config->'pricing'->>'mode' IN ('fixed','fixed_profit')`);
-await db(`DELETE FROM services WHERE key IN ('education','betting','sms')`);
 for(const [key,value] of [['maintenance_mode',false],['registration_enabled',true],['announcement_enabled',true],['announcement_text','Welcome to BOLTIV — Fast. Simple. Powerful.'],['announcement_items',[{text:'Welcome to BOLTIV — Fast. Simple. Powerful.',enabled:true}]]]) await db(`INSERT INTO platform_settings(key,value) VALUES($1,$2::jsonb) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 
 // GLOBAL Agent pricing — one configuration row per service, applied identically to every

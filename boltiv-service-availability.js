@@ -6,8 +6,8 @@
    Fails OPEN: if the check can't be made, nothing changes. The server still refuses purchases for a service that is off. */
 (function(){
   "use strict";
-  var KEYS={"/airtime":"airtime","/data":"data","/cable":"cable","/electricity":"electricity","/exam-pin":"exam_pin"};
-  var NAMES={airtime:"Airtime",data:"Data",cable:"Cable TV",electricity:"Electricity",exam_pin:"Exam PINs"};
+  var KEYS={"/airtime":"airtime","/bulk-airtime":"airtime","/international":"international","/sms":"sms","/data":"data","/cable":"cable","/electricity":"electricity","/exam-pin":"exam_pin"};
+  var NAMES={airtime:"Airtime",data:"Data",cable:"Cable TV",electricity:"Electricity",exam_pin:"Exam PINs",international:"International Top-up",sms:"Bulk SMS"};
   var CACHE="bvServices";
   var path=(location.pathname||"/").toLowerCase().replace(/\/+$/,"").replace(/\.html$/,"")||"/";
   var pageKey=KEYS[path]||"";

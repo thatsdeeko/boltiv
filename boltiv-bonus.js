@@ -5,7 +5,7 @@
 (function(){
   'use strict';
   var API=window.BOLTIV_API_BASE||'';
-  var PURCHASE_PATHS=['/api/vtu/purchase','/api/vtu/airtime','/api/vtu/data','/api/vtu/cable','/api/vtu/electricity','/api/vtu/exam-pin'];
+  var PURCHASE_PATHS=['/api/vtu/purchase','/api/vtu/airtime','/api/vtu/airtime/bulk','/api/vtu/international/topup','/api/vtu/data','/api/vtu/cable','/api/vtu/electricity','/api/vtu/exam-pin'];
   var useBonus=false;          // only becomes true when the switch exists and is on
   var bonus=null;
 

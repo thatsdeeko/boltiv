@@ -2,7 +2,7 @@
    Runs in <head> so the right theme is applied before the first paint (no white flash).
    To launch softly (dark only for people who opt in), change DEFAULT to "light". */
 (function(){
-  var DEFAULT="dark", KEY="boltiv-theme", COOKIE="boltiv_theme", DARK_BAR="#0c0e11";
+  var DEFAULT="system", KEY="boltiv-theme", COOKIE="boltiv_theme", DARK_BAR="#0c0e11";
   var root=document.documentElement, mq=null;
   try{mq=window.matchMedia("(prefers-color-scheme: dark)");}catch(e){}
   function valid(v){return v==="light"||v==="dark"||v==="system";}

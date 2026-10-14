@@ -119,6 +119,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="side-label">PLATFORM</div>
 <div class="nav">
 <button data-page="services">◈ Services</button>
+<button data-page="cards">▭ Cards</button>
 <button data-page="smsid">✉ SMS Sender IDs</button>
 <button data-page="agent-pricing">₦ Agent Pricing</button>
 <button data-page="notifications">♢ Notifications</button>
@@ -221,6 +222,27 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="section"><div class="section-head"><h2>LEDGER CHECK</h2><button class="btn primary" onclick="runReconciliation()">RUN CHECK</button></div><div class="section-body" id="reconciliationArea"><div class="loading">Loading...</div></div></div>
 <div class="section"><div class="section-head"><h2>FLUTTERWAVE CASH &amp; SETTLEMENT</h2><button class="btn primary" onclick="loadFlutterwaveCashReconciliation()">CHECK FLUTTERWAVE</button></div><div class="section-body" id="flutterwaveReconArea"><div class="loading">Loading...</div></div></div>
 <div class="section"><div class="section-head"><h2>RECENT FINANCIAL LEDGER</h2><button class="btn" onclick="loadLedger()">REFRESH</button></div><div class="section-body" id="ledgerArea"><div class="loading">Loading...</div></div></div>
+</section>
+<section class="page" id="page-cards">
+<div class="heading"><h1>Cards</h1><p>BOLTIV USD virtual cards (Payscribe): wallet balance, pricing and orders.</p></div>
+<div class="stats">
+<div class="stat"><div class="stat-label">PAYSCRIBE USD WALLET</div><div class="stat-value" id="cdUsd">—</div></div>
+<div class="stat"><div class="stat-label">CARDS ISSUED</div><div class="stat-value" id="cdCards">0</div></div>
+<div class="stat"><div class="stat-label">NEEDS ATTENTION</div><div class="stat-value" id="cdOpen">0</div></div>
+<div class="stat"><div class="stat-label">TODAY (ORDERS · NGN)</div><div class="stat-value" id="cdToday">0</div></div>
+</div>
+<div class="section"><div class="section-head"><h2>PRICING &amp; LIMITS</h2><button class="btn primary" onclick="saveCardSettings()">SAVE</button></div><div class="section-body">
+<div class="grid2">
+<label>Cards enabled<select id="cdEnabled"><option value="true">On</option><option value="false">Off (maintenance)</option></select></label>
+<label>Margin per $1 (₦)<input id="cdMargin" type="number" min="0" step="1"/></label>
+<label>Card creation fee ($)<input id="cdFee" type="number" min="0" step="0.5"/></label>
+<label>Min load ($)<input id="cdMin" type="number" min="1" step="1"/></label>
+<label>Max load ($)<input id="cdMax" type="number" min="1" step="1"/></label>
+<label>Rate refresh (minutes)<input id="cdCache" type="number" min="1" step="1"/></label>
+</div>
+<p style="margin-top:10px;font-size:12px;color:#777">Customers pay (amount + creation fee) × (Payscribe live rate + margin). Payscribe gives 20 free rate lookups a day, then $0.30 each, so keep the refresh at 60+ minutes. Use a $1 creation fee only if you are on the Business Pro plan.</p>
+</div></div>
+<div class="section"><div class="section-head"><h2>RECENT CARD ORDERS</h2><button class="btn" onclick="loadCards()">REFRESH</button></div><div class="section-body" id="cdOrders"><div class="loading">Loading...</div></div></div>
 </section>
 <section class="page" id="page-alerts">
 <div class="heading"><h1>Platform Alerts</h1><p>Automated financial, provider and operational warnings.</p></div>
@@ -719,13 +741,33 @@ function showApp(){$("loginPage").classList.add("hidden");$("app").classList.rem
 function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
 async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});showApp();}catch(e){showMsg(e.message)}}
 $("loginButton").onclick=login;
-function go(page){if(window.innerWidth<=900&&$("sidebar")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show");}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="smsid")loadSmsIds();if(page==="users")loadUsers();if(page==="agents"){loadAgents();loadAgentAnalytics();loadAgentLimits();}if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="reconciliation"){loadReconciliation();loadLedger();loadFlutterwaveCashReconciliation();}if(page==="alerts")loadAlerts();if(page==="announcements")loadAnnouncementSettings();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="notifications")loadNotificationHistory();if(page==="services")loadServices();if(page==="agent-pricing")loadAgentPricingPage();if(page==="security")loadSecurity();if(page==="settings")loadSettings();if(page==="analytics")loadAnalytics();if(page==="dashboard")loadMonitoring();}
+function go(page){if(window.innerWidth<=900&&$("sidebar")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show");}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="smsid")loadSmsIds();if(page==="users")loadUsers();if(page==="agents"){loadAgents();loadAgentAnalytics();loadAgentLimits();}if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="reconciliation"){loadReconciliation();loadLedger();loadFlutterwaveCashReconciliation();}if(page==="alerts")loadAlerts();if(page==="cards")loadCards();if(page==="announcements")loadAnnouncementSettings();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="notifications")loadNotificationHistory();if(page==="services")loadServices();if(page==="agent-pricing")loadAgentPricingPage();if(page==="security")loadSecurity();if(page==="settings")loadSettings();if(page==="analytics")loadAnalytics();if(page==="dashboard")loadMonitoring();}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
 if($("menu"))$("menu").onclick=()=>{const open=$("sidebar").classList.toggle("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.toggle("show",open)};
 document.addEventListener("click",e=>{if(window.innerWidth<=900&&$("sidebar").classList.contains("open")&&!e.target.closest("#sidebar")&&!e.target.closest("#menu")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show")}});
 if($("supportSearch"))$("supportSearch").oninput=filterSupport;if($("supportFilter"))$("supportFilter").onchange=filterSupport;if($("auditSearch"))$("auditSearch").oninput=filterAudit;if($("auditType"))$("auditType").onchange=filterAudit;if($("notifyRecipient"))$("notifyRecipient").onchange=toggleNotifyRecipientBox;if($("notifyTitle"))$("notifyTitle").oninput=updateNotificationPreview;if($("notifyMessage"))$("notifyMessage").oninput=updateNotificationPreview;if($("notifyType"))$("notifyType").onchange=updateNotificationPreview;
 function closeModal(){$("adminModal").classList.remove("show")}
 function openModal(title,html){$("modalTitle").textContent=title;$("modalBody").innerHTML=html;$("adminModal").classList.add("show")}
+async function loadCards(){
+  try{
+    const d=await api('/api/admin/cards/overview');const st=d.settings||{};
+    $('cdUsd').textContent=d.usdBalance==null?'—':'$'+Number(d.usdBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    $('cdCards').textContent=d.cards;$('cdOpen').textContent=d.open;$('cdToday').textContent=d.todayOrders+' · ₦'+Number(d.todayNgn).toLocaleString('en-NG');
+    $('cdOpen').style.color=d.open?'#b94c4c':'';
+    $('cdEnabled').value=String(st.enabled!==false);$('cdMargin').value=st.margin;$('cdFee').value=st.feeUsd;$('cdMin').value=st.minUsd;$('cdMax').value=st.maxUsd;$('cdCache').value=st.cacheMin;
+    const rows=d.orders||[];
+    $('cdOrders').innerHTML=(d.configured?'':'<p style="color:#b94c4c;margin-bottom:10px">Payscribe is not configured (PAYSCRIBE_API_KEY missing).</p>')+(rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>CUSTOMER</th><th>TYPE</th><th>USD</th><th>CHARGED</th><th>STATUS</th><th></th></tr></thead><tbody>'+rows.map(o=>{
+      const open=o.status==='pending'||o.status==='processing';
+      return `<tr><td>${esc(new Date(o.created_at).toLocaleString('en-NG'))}</td><td>${esc(o.email||o.user_id)}</td><td>${o.kind==='create'?'Create':'Top-up'}</td><td>$${Number(o.usd_amount).toFixed(2)}${Number(o.fee_usd)?` + $${Number(o.fee_usd).toFixed(2)}`:''}</td><td>₦${Number(o.ngn_charged).toLocaleString('en-NG')}</td><td><b style="color:${open?'#b94c4c':o.status==='success'?'#17833d':'#777'}">${esc(o.status.toUpperCase())}</b>${o.error?`<div style="font-size:10px;color:#777">${esc(o.error)}</div>`:''}</td><td>${open?`<button class="btn" onclick="refundCardOrder('${esc(o.reference)}')">REFUND</button>`:''}</td></tr>`}).join('')+'</tbody></table></div>':'<p>No card orders yet.</p>');
+  }catch(e){$('cdOrders').innerHTML='<p style="color:#b94c4c">'+esc(e.message)+'</p>'}
+}
+async function saveCardSettings(){
+  try{const d=await api('/api/admin/cards/settings',{method:'POST',body:JSON.stringify({enabled:$('cdEnabled').value==='true',margin:$('cdMargin').value,feeUsd:$('cdFee').value,minUsd:$('cdMin').value,maxUsd:$('cdMax').value,cacheMin:$('cdCache').value})});showMsg('Card settings saved.',true);loadCards()}catch(e){showMsg(e.message)}
+}
+async function refundCardOrder(ref){
+  if(!confirm('Refund this order to the customer wallet?\n\nOnly do this if the card or top-up does NOT appear in the Payscribe dashboard. If Payscribe did process it, refunding means you pay for it twice.'))return;
+  try{const d=await api('/api/admin/cards/refund',{method:'POST',body:JSON.stringify({reference:ref})});showMsg(d.message||'Done.',true);loadCards()}catch(e){showMsg(e.message)}
+}
 async function loadAll(){
   await Promise.allSettled([loadStats(),loadMe(),loadAdminWallet(),loadUsers(),loadPayments(),loadTransactions(),loadSupport(),loadAudit(),loadServices(),loadSecurity(),loadSettings(),loadAnalytics(),loadReconciliation(),loadLedger(),loadFlutterwaveCashReconciliation(),loadAlerts()]);
 }

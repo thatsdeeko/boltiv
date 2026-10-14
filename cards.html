@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en"><head><script src="/boltiv-theme.js?v=20261004-dark2"></script><link href="/boltiv-theme.css?v=20261004-dark2" rel="stylesheet"/><script src="/boltiv-api-config.js?v=1"></script><base href="/"><meta content="index,follow" name="robots"/><script src="boltiv-client.js?v=20260820-nostorage"></script><script src="boltiv-lock.js?v=20261004-dark"></script><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="#f7f7f5" name="theme-color"/><meta content="Get a BOLTIV USD virtual card for online payments." name="description"/>
+<title>BOLTIV — USD Virtual Card</title><link href="style.css?v=20261004-dark" rel="stylesheet"/><script src="transaction-pin.js?v=20261004-dark"></script><script>boltivRequireAuth();</script>
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png"/><link href="https://boltiv.ng/cards" rel="canonical"/>
+<style>
+.cd-page{min-height:100vh;padding-bottom:110px}.cd-header{display:flex;align-items:center;gap:13px;padding:18px 0 20px}
+.cd-back{width:40px;height:40px;border-radius:12px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:#D4AF37;font-size:22px}
+.cd-title{color:#D4AF37;font-size:20.9px;font-weight:1000}.cd-sub{color:var(--t-fg-666666);font-size:10px;margin-top:4px}
+.cd-box{padding:18px;border-radius:20px;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1);margin:14px 0}
+.cd-box h3{font-size:13px;font-weight:1000;margin:0 0 8px;color:var(--t-fg-171717)}.cd-box p,.cd-box li{font-size:12px;line-height:1.55;color:var(--t-fg-555555,#555)}
+.cd-box ol,.cd-box ul{margin:6px 0 0;padding-left:18px}
+.cd-label{display:block;font-size:10px;font-weight:900;letter-spacing:.6px;color:var(--t-fg-777777);margin:12px 0 6px}
+.cd-in{width:100%;box-sizing:border-box;padding:13px;border-radius:12px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:var(--t-fg-171717);font-size:14px}
+.cd-row{display:flex;gap:10px}.cd-row>*{flex:1;min-width:0}
+.cd-btn{width:100%;margin-top:16px;padding:15px;border:0;border-radius:14px;background:linear-gradient(135deg,#D4AF37,#b88f1f);color:#111;font-weight:1000;font-size:13px;letter-spacing:.5px}
+.cd-btn[disabled]{opacity:.55}.cd-btn.ghost{background:transparent;border:1px solid #D4AF37;color:#D4AF37;margin-top:10px}
+.cd-pills{display:flex;gap:8px}.cd-pill{flex:1;padding:11px;border-radius:12px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:var(--t-fg-171717);font-weight:900;font-size:12px}
+.cd-pill.on{border-color:#D4AF37;box-shadow:0 0 0 2px rgba(212,175,55,.35)}
+.cd-msg{margin:12px 0 0;padding:11px 13px;border-radius:12px;font-size:12px;font-weight:700;display:none}.cd-msg.err{display:block;background:rgba(185,76,76,.12);color:#b94c4c}.cd-msg.ok{display:block;background:rgba(23,131,61,.12);color:#17833d}
+.cd-quote{margin-top:12px;padding:12px;border-radius:12px;background:var(--t-bg-fffdf4,#fffdf4);border:1px solid var(--t-bd-ead58a,#ead58a);font-size:12px}
+.cd-quote div{display:flex;justify-content:space-between;padding:3px 0}.cd-quote .tot{border-top:1px dashed #D4AF37;margin-top:6px;padding-top:8px;font-weight:1000}
+/* ---- the card ---- */
+.bcard{position:relative;aspect-ratio:1.586;border-radius:22px;padding:20px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.22);display:flex;flex-direction:column;justify-content:space-between;max-width:420px;margin:0 auto}
+.bcard.dark{background:radial-gradient(circle at 85% 0%,rgba(212,175,55,.28),transparent 45%),linear-gradient(145deg,#121212,#26210f);color:#f6ecc8;border:1px solid rgba(212,175,55,.35)}
+.bcard.light{background:radial-gradient(circle at 85% 0%,rgba(212,175,55,.35),transparent 45%),linear-gradient(145deg,#fffdf6,#efe2bb);color:#2a2410;border:1px solid rgba(160,120,20,.35)}
+.bc-top{display:flex;align-items:center;justify-content:space-between}.bc-brand{display:flex;align-items:center;gap:9px;font-weight:1000;letter-spacing:2px;font-size:15px}.bc-brand img{height:34px;width:auto}
+.bc-usd{font-size:11px;font-weight:900;letter-spacing:1.5px;opacity:.8}
+.bc-chip{width:40px;height:30px;border-radius:7px;background:linear-gradient(135deg,#e8c867,#a8821c);opacity:.95}
+.bc-num{font-size:19px;letter-spacing:2.5px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:6px}
+.bc-bot{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.bc-bot>div:first-child{flex:1;min-width:0}.bc-name{font-size:12px;font-weight:900;letter-spacing:1px;text-transform:uppercase;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bc-exp{font-size:10px;opacity:.75;margin-top:3px}.bc-net{font-weight:1000;font-style:italic;font-size:19px}.bc-mc{display:flex}.bc-mc i{width:26px;height:26px;border-radius:50%;display:block}.bc-mc i:first-child{background:#eb001b}.bc-mc i:last-child{background:#f79e1b;margin-left:-10px;mix-blend-mode:multiply}
+.bcard.frozen::after{content:"FROZEN";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,10,.55);color:#fff;font-weight:1000;letter-spacing:6px;font-size:22px}
+.cd-bal{text-align:center;margin:14px 0 4px;font-size:11px;font-weight:900;color:var(--t-fg-777777);letter-spacing:1px}.cd-bal b{display:block;font-size:26px;color:var(--t-fg-171717);letter-spacing:0;margin-top:3px}
+.cd-acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.cd-act{padding:12px 6px;border-radius:14px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:var(--t-fg-171717);font-size:11px;font-weight:900}
+.cd-rev{margin-top:12px;padding:14px;border-radius:14px;border:1px dashed #D4AF37;font-size:13px;font-weight:800;line-height:1.9;word-break:break-all}
+.cd-tx{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--t-bd-e5e5e1);font-size:12px}.cd-tx:last-child{border:0}
+</style></head>
+<body><div class="page cd-page"><div class="container">
+<div class="cd-header"><button class="cd-back" onclick="history.length>1?history.back():location.href='/dashboard'">‹</button><div><div class="cd-title">BOLTIV Card</div><div class="cd-sub">USD VIRTUAL CARD</div></div></div>
+
+<div id="main"><div class="cd-box"><p>Loading your card…</p></div></div>
+
+<div class="cd-box" id="how">
+<h3>How the BOLTIV Card works</h3>
+<ol>
+<li><b>Verify once.</b> Payscribe, our card partner, confirms your identity (BVN plus a valid ID and photos).</li>
+<li><b>Create your card.</b> Choose Visa or Mastercard and the dollar amount to load. We take the naira equivalent from your BOLTIV wallet.</li>
+<li><b>Fund any time.</b> Top up the card from your wallet whenever you need more dollars.</li>
+<li><b>Spend online.</b> Use it on websites and apps that accept Visa or Mastercard in USD. Freeze it any time if you are unsure.</li>
+</ol>
+<h3 style="margin-top:14px">What it costs</h3>
+<ul><li>You pay the dollar amount plus any card fee charged by our partner, converted to naira at the live rate shown before you confirm. The exact naira total is always shown first.</li><li>Funding the card adds no extra card fee.</li><li>A declined payment for insufficient funds costs about $0.50, and the card is closed after 3 such declines, so keep it funded.</li><li>Spending in a currency other than USD can attract an extra charge of 2% + $0.75 per payment.</li></ul>
+<h3 style="margin-top:14px">Good to know</h3>
+<ul><li>You can have one card on your account.</li><li>It works mostly with US merchants. Money transfer, crypto, betting and gambling, dating, adult services and similar merchants are blocked and may be declined.</li><li>Your card number and CVV are only shown after you enter your Transaction PIN, and are never stored by BOLTIV.</li><li>If a card request fails, your wallet is refunded automatically.</li></ul>
+</div>
+
+<nav class="bottom-nav"><button class="nav-item" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button><button class="nav-item" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button><button class="nav-item" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button><button class="nav-item" onclick="location.href='/profile'"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span>Profile</button></nav>
+</div></div>
+<script>
+const API=window.BOLTIV_API_BASE,main=document.getElementById("main");
+const tok=()=>boltivMemoryStorage.getItem("boltivAuthToken")||"";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ngn=n=>"₦"+Number(n).toLocaleString("en-NG");
+async function api(path,body){
+  try{const r=await fetch(API+path,{method:body!==undefined?"POST":"GET",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok()},body:body!==undefined?JSON.stringify(body):undefined});
+    let d={};try{d=await r.json()}catch{}return d.success!==undefined?d:{success:false,message:"Something went wrong. Please try again."};}
+  catch{return{success:false,message:"Network problem. Check your connection and try again."}}}
+function msg(id,text,ok){const m=document.getElementById(id);if(!m)return;m.className="cd-msg "+(text?(ok?"ok":"err"):"");m.textContent=text||""}
+function cardHTML(c,design){
+  const d=design||c?.design||"dark",logo=d==="dark"?"assets/boltiv-logo-dark.webp":"assets/boltiv-logo.webp";
+  const last=c?.last_four?c.last_four:"0000",net=(c?.brand||"VISA").toUpperCase()==="MASTERCARD"?'<span class="bc-mc"><i></i><i></i></span>':'<span class="bc-net">VISA</span>';
+  return `<div class="bcard ${d}${c?.status==="frozen"?" frozen":""}" id="theCard"><div class="bc-top"><div class="bc-brand"><img src="${logo}" alt="BOLTIV"/>BOLTIV</div><div class="bc-usd">USD</div></div>
+  <div><div class="bc-chip"></div><div class="bc-num">••••&nbsp;••••&nbsp;••••&nbsp;${esc(last)}</div></div>
+  <div class="bc-bot"><div><div class="bc-name">${esc(c?.holder_name||"YOUR NAME")}</div><div class="bc-exp">VIRTUAL CARD</div></div>${net}</div></div>`}
+let CFG={},ME={};
+async function load(){
+  const [c,m]=await Promise.all([api("/api/cards/config"),api("/api/cards/me?sync=1")]);CFG=c;ME=m;
+  if(!m.success){main.innerHTML=`<div class="cd-box"><p>${esc(m.message||"Could not load your card.")}</p></div>`;return}
+  if(m.card)return viewCard();
+  if(m.pending)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Confirming your card</h3><p>We are confirming your ${m.pending==="create"?"new card":"top-up"} with our partner. This can take a few minutes. You will get a notification, and your wallet is refunded automatically if it fails.</p><button class="cd-btn ghost" onclick="load()">REFRESH</button></div>`;
+  if(!c.success||!c.enabled||!c.ready)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Cards are not available right now</h3><p>${c.enabled===false?"BOLTIV cards are temporarily switched off.":"Card pricing is unavailable at the moment."} Please check again shortly.</p></div>`;
+  return m.verified?viewCreate():viewKyc();
+}
+/* ---------- verification ---------- */
+function viewKyc(){
+  let u={};try{u=JSON.parse(boltivMemoryStorage.getItem("boltivUser")||"{}")}catch{}const parts=String(u.name||u.fullName||"").trim().split(/\s+/);
+  main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Verify your identity</h3><p>Our card partner needs these details once, to issue a card in your name. Use your real details exactly as on your ID. Your BVN and ID images are sent securely to our partner and are not kept by BOLTIV.</p>
+  <div class="cd-row"><div><label class="cd-label">FIRST NAME</label><input class="cd-in" id="k_fn" value="${esc(parts[0]||"")}"/></div><div><label class="cd-label">LAST NAME</label><input class="cd-in" id="k_ln" value="${esc(parts.slice(1).join(" "))}"/></div></div>
+  <label class="cd-label">DATE OF BIRTH</label><input class="cd-in" id="k_dob" type="date"/>
+  <label class="cd-label">STREET ADDRESS (letters, numbers and commas only)</label><input class="cd-in" id="k_st" placeholder="12 Broad Street"/>
+  <div class="cd-row"><div><label class="cd-label">CITY</label><input class="cd-in" id="k_ci"/></div><div><label class="cd-label">STATE</label><input class="cd-in" id="k_sa"/></div></div>
+  <label class="cd-label">POSTAL CODE</label><input class="cd-in" id="k_pc" inputmode="numeric" placeholder="100001"/>
+  <label class="cd-label">BVN (11 digits)</label><input class="cd-in" id="k_bvn" inputmode="numeric" maxlength="11" autocomplete="off"/>
+  <div class="cd-row"><div><label class="cd-label">ID TYPE</label><select class="cd-in" id="k_it"><option value="NIN">NIN</option><option value="PASSPORT">International passport</option><option value="VIN">Voter's card</option></select></div><div><label class="cd-label">ID NUMBER</label><input class="cd-in" id="k_in" autocomplete="off"/></div></div>
+  <label class="cd-label">YOUR PHOTO (clear selfie)</label><input class="cd-in" id="k_ph" type="file" accept="image/*" capture="user"/>
+  <label class="cd-label">PHOTO OF YOUR ID</label><input class="cd-in" id="k_im" type="file" accept="image/*"/>
+  <div class="cd-msg" id="kMsg"></div><button class="cd-btn" id="kBtn">VERIFY ME</button></div>`;
+  document.getElementById("kBtn").onclick=submitKyc;
+}
+function shrink(file){return new Promise((res,rej)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(1,900/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);URL.revokeObjectURL(url);res(cv.toDataURL("image/jpeg",.8))};img.onerror=()=>rej(new Error("bad image"));img.src=url})}
+async function submitKyc(){
+  const v=id=>document.getElementById(id).value.trim(),btn=document.getElementById("kBtn");msg("kMsg","");
+  const f={firstName:v("k_fn"),lastName:v("k_ln"),dob:v("k_dob"),street:v("k_st"),city:v("k_ci"),state:v("k_sa"),postalCode:v("k_pc"),bvn:v("k_bvn"),idType:v("k_it"),idNumber:v("k_in")};
+  const ph=document.getElementById("k_ph").files[0],im=document.getElementById("k_im").files[0];
+  if(Object.values(f).some(x=>!x)||!ph||!im)return msg("kMsg","Please fill in every field and add both photos.");
+  btn.disabled=true;btn.textContent="VERIFYING…";
+  try{
+    const a=await api("/api/cards/kyc-upload",{dataUrl:await shrink(ph)});if(!a.success)throw new Error(a.message);
+    const b=await api("/api/cards/kyc-upload",{dataUrl:await shrink(im)});if(!b.success)throw new Error(b.message);
+    const r=await api("/api/cards/kyc",{...f,photoId:a.fileId,idImageId:b.fileId});if(!r.success)throw new Error(r.message);
+    await load();
+  }catch(e){msg("kMsg",e.message||"Verification failed. Check your details and try again.");btn.disabled=false;btn.textContent="VERIFY ME"}
+}
+/* ---------- create ---------- */
+let design="dark",brand="VISA",qTimer=null;
+function viewCreate(){
+  design="dark";brand="VISA";
+  main.innerHTML=`<div id="prev">${cardHTML(null,design)}</div><div class="cd-box"><h3>Create your card</h3>
+  <label class="cd-label">CARD STYLE</label><div class="cd-pills"><button class="cd-pill on" data-d="dark">Dark</button><button class="cd-pill" data-d="light">Light</button></div>
+  <label class="cd-label">CARD TYPE</label><div class="cd-pills"><button class="cd-pill on" data-b="VISA">Visa</button><button class="cd-pill" data-b="MASTERCARD">Mastercard</button></div>
+  <label class="cd-label">AMOUNT TO LOAD (USD, $${CFG.minUsd}–$${CFG.maxUsd})</label><input class="cd-in" id="c_amt" inputmode="decimal" placeholder="10"/>
+  <div id="quote"></div><div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn">CREATE CARD</button></div>`;
+  main.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{design=b.dataset.d;main.querySelectorAll("[data-d]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
+  main.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{brand=b.dataset.b;main.querySelectorAll("[data-b]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
+  document.getElementById("c_amt").oninput=()=>quote("create","c_amt");
+  document.getElementById("cBtn").onclick=createCard;
+}
+async function quote(kind,inputId){
+  clearTimeout(qTimer);const box=document.getElementById("quote"),usd=Number(document.getElementById(inputId).value);
+  if(!(usd>0)){box.innerHTML="";return}
+  qTimer=setTimeout(async()=>{const q=await api("/api/cards/quote",{kind,usd});
+    box.innerHTML=q.success?`<div class="cd-quote"><div><span>Card amount</span><b>$${q.quote.usd.toFixed(2)}</b></div>${q.quote.feeUsd?`<div><span>Card creation fee</span><b>$${q.quote.feeUsd.toFixed(2)}</b></div>`:""}<div><span>Rate</span><b>${ngn(q.quote.ratePerUsd)} / $1</b></div><div class="tot"><span>You pay</span><b>${ngn(q.quote.ngnTotal)}</b></div></div>`:`<div class="cd-quote">${esc(q.message)}</div>`},350)}
+async function createCard(){
+  const usd=Number(document.getElementById("c_amt").value),btn=document.getElementById("cBtn");msg("cMsg","");
+  if(!(usd>=CFG.minUsd&&usd<=CFG.maxUsd))return msg("cMsg",`Enter an amount between $${CFG.minUsd} and $${CFG.maxUsd}.`);
+  const pin=await boltivGetTransactionPin();if(!pin)return;
+  btn.disabled=true;btn.textContent="CREATING…";
+  const r=await api("/api/cards/create",{usd,brand,design,transactionPin:pin,idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
+  btn.disabled=false;btn.textContent="CREATE CARD";
+  if(r.success)return load();
+  msg("cMsg",r.message||"Could not create the card.");
+}
+/* ---------- existing card ---------- */
+function viewCard(){
+  const c=ME.card;
+  main.innerHTML=`<div id="prev">${cardHTML(c)}</div><div class="cd-bal">BALANCE<b>$${c.balance_usd.toFixed(2)}</b></div>
+  <div class="cd-acts"><button class="cd-act" id="aFund">＋ Fund</button><button class="cd-act" id="aFreeze">${c.status==="frozen"?"Unfreeze":"Freeze"}</button><button class="cd-act" id="aShow">Show details</button></div>
+  <div class="cd-msg" id="aMsg"></div><div id="fundBox"></div><div id="revBox"></div>
+  <div class="cd-box"><h3>Card style</h3><div class="cd-pills"><button class="cd-pill ${c.design==="dark"?"on":""}" data-d="dark">Dark</button><button class="cd-pill ${c.design==="light"?"on":""}" data-d="light">Light</button></div></div>
+  <div class="cd-box"><h3>Recent card activity</h3><div id="txBox"><p>Loading…</p></div></div>`;
+  main.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const r=await api("/api/cards/design",{design:b.dataset.d});if(r.success){ME.card.design=r.design;viewCard()}});
+  document.getElementById("aFund").onclick=openFund;
+  document.getElementById("aFreeze").onclick=toggleFreeze;
+  document.getElementById("aShow").onclick=reveal;
+  loadTx();
+}
+function openFund(){
+  document.getElementById("fundBox").innerHTML=`<div class="cd-box"><h3>Fund your card</h3><label class="cd-label">AMOUNT (USD)</label><input class="cd-in" id="f_amt" inputmode="decimal" placeholder="10"/><div id="quote"></div><div class="cd-msg" id="fMsg"></div><button class="cd-btn" id="fBtn">FUND CARD</button></div>`;
+  document.getElementById("f_amt").oninput=()=>quote("topup","f_amt");
+  document.getElementById("fBtn").onclick=async()=>{
+    const usd=Number(document.getElementById("f_amt").value),btn=document.getElementById("fBtn");msg("fMsg","");
+    if(!(usd>=CFG.minUsd&&usd<=CFG.maxUsd))return msg("fMsg",`Enter an amount between $${CFG.minUsd} and $${CFG.maxUsd}.`);
+    const pin=await boltivGetTransactionPin();if(!pin)return;btn.disabled=true;btn.textContent="FUNDING…";
+    const r=await api("/api/cards/topup",{usd,transactionPin:pin,idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
+    btn.disabled=false;btn.textContent="FUND CARD";
+    if(r.success&&r.status==="success")return load();
+    msg("fMsg",r.message||"Could not fund the card.",r.success);
+  };
+}
+async function toggleFreeze(){
+  const c=ME.card,un=c.status==="frozen";let pin;if(un){pin=await boltivGetTransactionPin();if(!pin)return}
+  const r=await api("/api/cards/freeze",{action:un?"unfreeze":"freeze",transactionPin:pin});
+  if(r.success)return load();msg("aMsg",r.message||"Could not update the card.");
+}
+async function reveal(){
+  const pin=await boltivGetTransactionPin();if(!pin)return;msg("aMsg","");
+  const r=await api("/api/cards/reveal",{transactionPin:pin});if(!r.success)return msg("aMsg",r.message||"Could not load card details.");
+  const box=document.getElementById("revBox");
+  box.innerHTML=`<div class="cd-rev">Card number: ${esc(String(r.number).replace(/(\d{4})(?=\d)/g,"$1 "))}<br>Expiry: ${esc(r.expiry)} &nbsp; CVV: ${esc(r.cvv)}<br><small style="font-weight:600;opacity:.75">Hidden again in 30 seconds.</small></div>`;
+  setTimeout(()=>{box.innerHTML=""},30000);
+}
+async function loadTx(){
+  const r=await api("/api/cards/transactions"),box=document.getElementById("txBox");if(!box)return;
+  const list=Array.isArray(r.transactions)?r.transactions:[];
+  box.innerHTML=!r.success?`<p>${esc(r.message||"Activity is unavailable right now.")}</p>`:list.length?list.slice(0,15).map(t=>`<div class="cd-tx"><span>${esc(t.acceptor_name||t.description||t.type||"Card activity")}</span><b>${t.amount!=null?"$"+Number(t.amount).toFixed(2):""}</b></div>`).join(""):"<p>No card activity in the last 30 days.</p>";
+}
+load();
+</script>
+<script src="/boltiv-install.js?v=20261004-dark"></script><script src="boltiv-footer.js?v=20261004-dark"></script>
+</body></html>

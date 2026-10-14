@@ -181,6 +181,10 @@ body.modal-open{overflow:hidden!important}
 <a class="home-service-card" href="/electricity"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.8 5.8 13h5.3l-.8 8.2L18.2 11h-5.1l.4-8.2Z"></path></svg></span><strong>Electricity</strong><small>Pay your meter</small></a><a class="home-service-card" href="/exam-pin"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span><strong>Exam PINs</strong><small></small></a><a class="home-service-card" href="/bulk-airtime"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="11" height="14" rx="2"/><path d="M9 3h9a2 2 0 0 1 2 2v12"/></svg></span><strong>Bulk Airtime</strong><small></small></a><a class="home-service-card" href="/international"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></span><strong>International</strong><small></small></a><a class="home-service-card" href="/sms"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/></svg></span><strong>Bulk SMS</strong><small></small></a>
 </div>
 </section>
+<section class="section home-card-section" id="cardSection" aria-label="BOLTIV Card">
+<div class="section-head"><h2 class="section-title">BOLTIV CARD</h2><a class="section-link" href="/cards">How it works →</a></div>
+<a class="home-card-teaser" href="/cards"><span class="hc-card"><img src="assets/boltiv-logo-dark.webp" alt="BOLTIV"/><i></i></span><span class="hc-text"><strong id="hcTitle">Spend dollars online</strong><small id="hcSub">Get a USD virtual card, funded from your wallet.</small></span><span class="hc-go">›</span></a>
+</section>
 <section class="section home-smart-feature-section" aria-labelledby="smartFeaturesHeading">
 <a class="home-smart-feature-panel" href="/smart-features.html">
 <div class="home-smart-feature-copy">
@@ -432,5 +436,9 @@ setInterval(loadHome,30000);
 <script src="boltiv-referral.js?v=20261010-pm"></script>
 <script src="/boltiv-install.js?v=20261010-pm"></script>
 <script src="boltiv-service-availability.js?v=20261009"></script><script src="boltiv-footer.js?v=20261010-pm"></script>
-<script src="/boltiv-motion.js?v=20261010-pm"></script></body>
+<script src="/boltiv-motion.js?v=20261010-pm"></script><style>.home-card-section{margin-top:22px}.home-card-teaser{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--t-bg-ffffff);text-decoration:none;color:inherit;box-shadow:0 5px 18px rgba(25,25,20,.035)}
+.hc-card{position:relative;flex:0 0 86px;height:54px;border-radius:10px;background:radial-gradient(circle at 85% 0%,rgba(212,175,55,.3),transparent 50%),linear-gradient(145deg,#121212,#26210f);border:1px solid rgba(212,175,55,.4);display:block}.hc-card img{position:absolute;left:8px;top:7px;height:20px;width:auto}.hc-card i{position:absolute;left:8px;bottom:7px;width:16px;height:11px;border-radius:3px;background:linear-gradient(135deg,#e8c867,#a8821c)}
+.hc-text{flex:1;min-width:0}.hc-text strong{display:block;font-size:12.5px}.hc-text small{display:block;margin-top:3px;color:var(--t-fg-85827a);font-size:10px;line-height:1.35}.hc-go{color:#D4AF37;font-size:22px;font-weight:900}</style>
+<script>(function(){try{var A=window.BOLTIV_API_BASE,t=(window.boltivMemoryStorage&&boltivMemoryStorage.getItem("boltivAuthToken"))||"";if(!A||!t)return;fetch(A+"/api/cards/me",{headers:{Authorization:"Bearer "+t}}).then(function(r){return r.json()}).then(function(d){if(d&&d.success&&d.card){document.getElementById("hcTitle").textContent="Your BOLTIV Card";document.getElementById("hcSub").textContent="Balance $"+Number(d.card.balance_usd).toFixed(2)+(d.card.status==="frozen"?" \u00b7 Frozen":"")}else if(d&&d.success&&d.pending){document.getElementById("hcSub").textContent="Your card request is being confirmed."}}).catch(function(){})}catch(e){}})();</script>
+</body>
 </html>

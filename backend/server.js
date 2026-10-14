@@ -2,6 +2,7 @@ const http=require("node:http");
 const crypto=require("node:crypto");
 const zlib=require("node:zlib");
 const {Pool}=require("pg");
+const createCards=require("./payscribe-cards");
 
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
@@ -7117,6 +7118,15 @@ if(userHandled){
 return;
 }
 
+
+/*
+BOLTIV USD CARDS (Payscribe) - see payscribe-cards.js
+*/
+if(path.startsWith("/api/cards")||path.startsWith("/api/admin/cards")||path==="/api/payscribe/webhook"){
+if(!global.__boltivCards)global.__boltivCards=createCards({db,pool,send,body,clean,userFromToken,verifyPassword,reference,addFinancialLedger,addNotification,insertVTUTransaction,getPlatformSetting,rateLimit,rateLimitedResponse,adminFromToken,requireAdminCsrf,backendUrl:BACKEND_PUBLIC_URL||"https://boltiv-production.up.railway.app"});
+const cardsHandled=await global.__boltivCards.handle(req,res,path);
+if(cardsHandled!==false)return;
+}
 
 /*
 UNKNOWN ROUTE

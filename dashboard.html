@@ -136,7 +136,7 @@ body.modal-open{overflow:hidden!important}
 <div class="page boltiv-home">
 <div class="container">
 <header class="header home-header">
-<a aria-label="BOLTIV dashboard" class="home-brand" href="/dashboard"><img alt="BOLTIV" src="assets/boltiv-logo.webp"/><span>BOLTIV</span></a>
+<a aria-label="BOLTIV dashboard" class="home-brand" href="/dashboard"><img alt="BOLTIV" src="assets/boltiv-logo-dark-2.webp"/><span>BOLTIV</span></a>
 <div class="home-header-actions"> <button aria-label="Switch to dark mode" class="icon-button theme-toggle" data-theme-toggle="" type="button"><svg class="tt-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"></path></svg><svg class="tt-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"></path></svg></button> 
 <button aria-label="Notifications" class="icon-button notification-button" onclick="location.href='/notifications'">
 <svg aria-hidden="true" class="notification-icon" viewbox="0 0 24 24">
@@ -183,7 +183,7 @@ body.modal-open{overflow:hidden!important}
 </section>
 <section class="section home-card-section" id="cardSection" aria-label="BOLTIV Card">
 <div class="section-head"><h2 class="section-title">BOLTIV CARD</h2><a class="section-link" href="/cards">How it works →</a></div>
-<a class="home-card-teaser" href="/cards"><span class="hc-card"><img src="assets/boltiv-logo.webp" alt="BOLTIV"/><i></i></span><span class="hc-text"><strong id="hcTitle">Spend dollars online</strong><small id="hcSub">Get a USD virtual card, funded from your wallet.</small></span><span class="hc-go">›</span></a>
+<a class="home-card-teaser" href="/cards"><span class="hc-card"><img src="assets/boltiv-logo-dark-2.webp" alt="BOLTIV"/><i></i></span><span class="hc-text"><strong id="hcTitle">Spend dollars online</strong><small id="hcSub">Get a USD virtual card, funded from your wallet.</small></span><span class="hc-go">›</span></a>
 </section>
 <section class="section home-smart-feature-section" aria-labelledby="smartFeaturesHeading">
 <a class="home-smart-feature-panel" href="/smart-features.html">
@@ -437,7 +437,7 @@ setInterval(loadHome,30000);
 <script src="/boltiv-install.js?v=20261010-pm"></script>
 <script src="boltiv-service-availability.js?v=20261009"></script><script src="boltiv-footer.js?v=20261010-pm"></script>
 <script src="/boltiv-motion.js?v=20261010-pm"></script><style>.home-card-section{margin-top:22px}.home-card-teaser{display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:18px;background:var(--t-bg-ffffff);text-decoration:none;color:inherit;box-shadow:0 5px 18px rgba(25,25,20,.035)}
-.hc-card{position:relative;flex:0 0 86px;height:54px;border-radius:10px;background:repeating-radial-gradient(circle at 108% 114%,rgba(212,175,55,.16) 0 1px,transparent 1px 5px),radial-gradient(circle at 85% 0%,rgba(212,175,55,.34),transparent 50%),linear-gradient(145deg,#0b0b0b,#2c2310);border:1px solid rgba(212,175,55,.55);box-shadow:inset 0 1px 0 rgba(255,240,190,.25);display:block;overflow:hidden}.hc-card img{position:absolute;left:8px;top:6px;width:15px;height:18px;object-fit:contain}.hc-card i{position:absolute;left:8px;bottom:7px;width:16px;height:11px;border-radius:3px;background:linear-gradient(135deg,#e8c867,#a8821c)}
+.hc-card{position:relative;flex:0 0 86px;height:54px;border-radius:10px;background:linear-gradient(140deg,#1d1f25,#0d0e11);border:1px solid rgba(212,175,55,.5);display:block;overflow:hidden}.hc-card img{position:absolute;left:8px;top:6px;width:15px;height:18px;object-fit:contain}.hc-card i{position:absolute;left:8px;bottom:7px;width:16px;height:11px;border-radius:3px;background:linear-gradient(135deg,#e8c867,#a8821c)}
 .hc-text{flex:1;min-width:0}.hc-text strong{display:block;font-size:12.5px}.hc-text small{display:block;margin-top:3px;color:var(--t-fg-85827a);font-size:10px;line-height:1.35}.hc-go{color:#D4AF37;font-size:22px;font-weight:900}</style>
 <script>(function(){try{var A=window.BOLTIV_API_BASE,t=(window.boltivMemoryStorage&&boltivMemoryStorage.getItem("boltivAuthToken"))||"";if(!A||!t)return;fetch(A+"/api/cards/me",{headers:{Authorization:"Bearer "+t}}).then(function(r){return r.json()}).then(function(d){if(d&&d.success&&d.card){document.getElementById("hcTitle").textContent="Your BOLTIV Card";document.getElementById("hcSub").textContent="Balance $"+Number(d.card.balance_usd).toFixed(2)+(d.card.status==="frozen"?" \u00b7 Frozen":"")}else if(d&&d.success&&d.pending){document.getElementById("hcSub").textContent="Your card request is being confirmed."}}).catch(function(){})}catch(e){}})();</script>
 </body>

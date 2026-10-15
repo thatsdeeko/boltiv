@@ -58,7 +58,7 @@
       var img=new Image();
       img.onload=function(){logoImg=img;resolve(img);};
       img.onerror=function(){resolve(null);};
-      img.src='/assets/boltiv-logo.webp';
+      img.src='/assets/boltiv-logo-dark-2.webp';
     });
     return logoReady;
   }

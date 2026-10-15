@@ -90,7 +90,7 @@
         .boltiv-lock-logout{margin-top:26px;background:transparent;border:0;color:var(--t-fg-b8860b);font-size:13px;font-weight:700;text-decoration:underline;padding:10px;align-self:center}
         @media(max-width:360px){.boltiv-lock-box{width:46px;height:46px}.boltiv-lock-key{height:56px}}
       </style>
-      <div class="boltiv-lock-avatar"><img src="/assets/boltiv-logo.webp" alt="BOLTIV"/></div>
+      <div class="boltiv-lock-avatar"><img src="/assets/boltiv-logo-dark-2.webp" alt="BOLTIV"/></div>
       <div class="boltiv-lock-title"><span class="gold">Welcome Back</span>${firstName(user)?" <span class=\"name\">"+esc(firstName(user))+"</span>":""}</div>
       <div class="boltiv-lock-sub">Enter your 4-Digit PIN</div>
       <div class="boltiv-lock-boxes" id="boltivLockBoxes"></div>

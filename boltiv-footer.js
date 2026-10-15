@@ -43,7 +43,7 @@ and every page picks up the change automatically.
     footer.innerHTML =
       '<div class="boltiv-global-footer-inner">' +
         '<div class="boltiv-global-footer-brand">' +
-          '<img src="assets/boltiv-logo.webp" alt="" onerror="this.style.display=\'none\'"/>' +
+          '<img src="assets/boltiv-logo-dark-2.webp" alt="" onerror="this.style.display=\'none\'"/>' +
           "<span>BOLTIV</span>" +
         "</div>" +
         '<nav class="boltiv-global-footer-links" aria-label="Footer">' +

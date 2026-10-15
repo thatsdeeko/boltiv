@@ -103,7 +103,7 @@ html[data-theme] body .auth-links{display:flex;justify-content:space-between;gap
 html[data-theme] body .auth-links a{font-size:14px;font-weight:700;padding:10px 4px;color:var(--pm-gt);text-decoration:none}
 html[data-theme] body .auth-btn{min-height:50px;font-size:15px}
 /* wallet */
-html[data-page=wallet] .brand-name::before{content:"";display:inline-block;width:28px;height:28px;margin-right:8px;vertical-align:middle;background:url(/assets/boltiv-logo.webp) center/contain no-repeat}
+html[data-page=wallet] .brand-name::before{content:"";display:inline-block;width:28px;height:28px;margin-right:8px;vertical-align:middle;background:url(/assets/boltiv-logo-dark-2.webp) center/contain no-repeat}
 html[data-page=wallet] .brand-tagline{display:none}
 html[data-theme] body .balance-card{background:radial-gradient(420px 220px at 90% -20%,rgba(236,201,105,.28),transparent 70%),linear-gradient(160deg,#1d1b14,#0d0e11 70%)!important;border:1px solid rgba(212,175,55,.35)!important;border-radius:24px;box-shadow:0 18px 50px rgba(0,0,0,.25)}
 html[data-theme] body .balance-card .balance-label{color:#cdbb85!important}

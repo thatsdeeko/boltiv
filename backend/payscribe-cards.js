@@ -62,12 +62,14 @@ module.exports = function createCards(d) {
   }
 
   /* ---------- live rate (cached: Payscribe gives only 20 free rate calls per day) ---------- */
-  let rateCache = { v: 0, t: 0 };
+  let rateCache = { v: 0, t: 0 }, lastRateError = null;
   async function liveRate(c) {
     if (rateCache.v && Date.now() - rateCache.t < c.cacheMin * 60000) return rateCache.v;
     const r = await ps("GET", "/fx/rate?from=USD&to=NGN");
     const rate = Number(r.data?.message?.details?.rate);
-    if (r.outcome === "success" && rate > 0) { rateCache = { v: rate, t: Date.now() }; return rate; }
+    if (r.outcome === "success" && rate > 0) { rateCache = { v: rate, t: Date.now() }; lastRateError = null; return rate; }
+    lastRateError = !KEY ? "PAYSCRIBE_API_KEY is not set on the server." : (r.outcome === "success" ? "Rate response had no usable rate." : `${r.code ? "HTTP/API " + r.code + ": " : ""}${r.message || r.outcome}`);
+    console.error("CARD RATE ERROR:", lastRateError, "| base:", BASE);
     if (rateCache.v && Date.now() - rateCache.t < 3 * 3600000) return rateCache.v; // stale but recent
     return 0; // fail closed: never sell dollars at an unknown price
   }
@@ -275,7 +277,7 @@ module.exports = function createCards(d) {
     if (path.startsWith("/api/admin/cards")) {
       if (M === "GET" && path === "/api/admin/cards/overview") {
         const a = await adminFromToken(req); if (!a) return send(res, 401, { success: false, message: "Unauthorized." }), true;
-        const c = await cfg();
+        const c = await cfg(); await liveRate(c);
         const [cards, open, today, orders, bal] = await Promise.all([
           db(`SELECT COUNT(*)::int AS n FROM user_cards`),
           db(`SELECT COUNT(*)::int AS n FROM card_orders WHERE status IN ('pending','processing')`),
@@ -285,7 +287,7 @@ module.exports = function createCards(d) {
         let usd = null;
         const list = bal.data?.message?.details;
         if (Array.isArray(list)) { const r = list.find(x => String(x.currency || "").toUpperCase() === "USD"); if (r) usd = Number(r.available_balance); }
-        return send(res, 200, { success: true, settings: c, configured: !!KEY, usdBalance: Number.isFinite(usd) ? usd : null,
+        return send(res, 200, { success: true, settings: c, configured: !!KEY, rateError: lastRateError, baseUrl: BASE, hashKeySet: /^[0-9a-f]{64}$/i.test(HASH_KEY), usdBalance: Number.isFinite(usd) ? usd : null,
           cards: cards.rows[0].n, open: open.rows[0].n, todayOrders: today.rows[0].n, todayNgn: Number(today.rows[0].ngn), orders: orders.rows }), true;
       }
       if (M === "POST" && path === "/api/admin/cards/settings") {

@@ -52,7 +52,7 @@ module.exports = function createCards(d) {
         body: payload ? JSON.stringify(payload) : undefined });
       let j = {}; try { j = await r.json(); } catch { }
       const code = Number(j.status_code || r.status);
-      const message = clean(j.description || j.message?.description || (typeof j.message === "string" ? j.message : ""));
+      const message = clean(j.description || j.message?.description || (typeof j.message === "string" ? j.message : "")).replace(/payscribe/gi, "our card service");
       if (j.status === true && code === 200) return { outcome: "success", message, data: j };
       if (code === 201 || code >= 500 || r.status >= 500) return { outcome: "unknown", message, data: j };
       return { outcome: "failed", message: message || "Request was not accepted.", code, data: j };

@@ -20,27 +20,26 @@
 .cd-quote{margin-top:12px;padding:12px;border-radius:12px;background:var(--t-bg-fffdf4,#fffdf4);border:1px solid var(--t-bd-ead58a,#ead58a);font-size:12px}
 .cd-quote div{display:flex;justify-content:space-between;padding:3px 0}.cd-quote .tot{border-top:1px dashed #D4AF37;margin-top:6px;padding-top:8px;font-weight:1000}
 /* ---- the card ---- */
-.bcard{position:relative;aspect-ratio:1.586;border-radius:22px;padding:19px 21px 17px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;max-width:420px;margin:0 auto;isolation:isolate}
-.bcard>*{position:relative;z-index:1}
-.bcard::before{content:"";position:absolute;z-index:0;right:-70px;top:-80px;width:250px;height:250px;border-radius:50%;pointer-events:none}
-.bcard.dark{background:linear-gradient(140deg,#1d1f25 0%,#0d0e11 62%);color:#f4efe0;box-shadow:0 18px 40px rgba(0,0,0,.5),inset 0 0 0 1px rgba(212,175,55,.45)}
-.bcard.dark::before{background:radial-gradient(circle,rgba(212,175,55,.2),transparent 68%)}
-.bcard.light{background:linear-gradient(140deg,#ffffff 0%,#efebdd 100%);color:#1c1a14;box-shadow:0 16px 36px rgba(60,50,20,.2),inset 0 0 0 1px rgba(184,146,31,.55)}
-.bcard.light::before{background:radial-gradient(circle,rgba(212,175,55,.26),transparent 68%)}
-.bc-top{display:flex;align-items:center;justify-content:space-between}
-.bc-brand{display:flex;align-items:center;gap:10px}.bc-brand img{width:28px;height:34px;object-fit:contain}
-.bc-word{color:#D4AF37;font-weight:950;letter-spacing:2.8px;font-size:19px;line-height:1}.bcard.light .bc-word{color:#b8921f}
-.bc-tr{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:900;letter-spacing:1.6px;opacity:.85}.bc-tr svg{width:20px;height:20px}
-.bc-mid{display:flex;align-items:center}.bc-chip{width:44px;height:33px}
-.bc-num{font-size:20px;letter-spacing:2.4px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}.bc-num .l{color:#D4AF37;font-weight:900}.bcard.light .bc-num .l{color:#a67f12}
-.bc-meta{font-size:7px;letter-spacing:1.6px;font-weight:800;opacity:.6;margin-top:6px}.bc-meta b{font-size:9px;letter-spacing:1.5px;margin-left:4px}
-.bc-bot{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.bc-bot>div:first-child{flex:1;min-width:0}
-.bc-name{font-size:12px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bc-exp{font-size:8px;letter-spacing:1.4px;font-weight:700;opacity:.6;margin-top:3px}
-.bc-net{font-weight:1000;font-style:italic;font-size:20px}.bc-mc{display:flex}.bc-mc i{width:26px;height:26px;border-radius:50%;display:block}.bc-mc i:first-child{background:#eb001b}.bc-mc i:last-child{background:#f79e1b;margin-left:-10px;mix-blend-mode:multiply}
-.bcard.frozen::after{content:"FROZEN";position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(10,10,10,.55);color:#fff;font-weight:1000;letter-spacing:6px;font-size:22px}
+.bcard{position:relative;aspect-ratio:1.59;border-radius:22px;padding:22px 24px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;max-width:420px;margin:0 auto;isolation:isolate}
+.bcard>*{position:relative;z-index:2}
+.bcard::before,.bcard::after{content:"";position:absolute;z-index:0;pointer-events:none;border-radius:60px}
+.bcard::before{width:230px;height:120px;left:-60px;top:62px;transform:rotate(-24deg)}
+.bcard::after{width:260px;height:130px;right:-90px;top:-10px;transform:rotate(-24deg)}
+.bcard.dark{background:radial-gradient(120% 90% at 100% 110%,rgba(212,175,55,.45),transparent 58%),linear-gradient(165deg,#0a0c11 0%,#10131b 55%,#17140a 100%);color:#fff;box-shadow:0 16px 36px rgba(0,0,0,.4)}
+.bcard.dark::before,.bcard.dark::after{background:rgba(255,255,255,.035)}
+.bcard.light{background:radial-gradient(120% 90% at 100% 110%,rgba(212,175,55,.5),transparent 58%),linear-gradient(165deg,#ffffff 0%,#f6f3ea 60%,#efe6cc 100%);color:#15130d;box-shadow:0 14px 32px rgba(60,50,20,.2),inset 0 0 0 1px rgba(212,175,55,.35)}
+.bcard.light::before,.bcard.light::after{background:rgba(160,120,20,.06)}
+.bc-top{display:flex;align-items:flex-start;justify-content:space-between}
+.bc-brand{display:flex;align-items:center;gap:10px}.bc-brand img{width:32px;height:39px;object-fit:contain}
+.bc-word{color:#D4AF37;font-weight:950;letter-spacing:3px;font-size:24px;line-height:1}.bcard.light .bc-word{color:#b8921f}
+.bc-netbox{text-align:right}.bc-net{display:block;font-weight:1000;font-style:italic;font-size:30px;line-height:1;letter-spacing:-1px}
+.bc-mc{display:flex;justify-content:flex-end}.bc-mc i{width:30px;height:30px;border-radius:50%;display:block}.bc-mc i:first-child{background:#eb001b}.bc-mc i:last-child{background:#f79e1b;margin-left:-11px;mix-blend-mode:screen;opacity:.95}
+.bcard.light .bc-mc i:last-child{mix-blend-mode:multiply}
+.bc-sub{font-size:10.5px;font-weight:600;letter-spacing:.4px;opacity:.85;margin-top:5px}
+.bc-last{font-size:25px;font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums}.bc-last .d{letter-spacing:2px;margin-right:6px}
+.bcard.frozen::after{content:"FROZEN";position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(10,10,10,.55);color:#fff;font-weight:1000;letter-spacing:6px;font-size:22px;width:auto;height:auto;transform:none;border-radius:0}
 .cd-bal{text-align:center;margin:14px 0 4px;font-size:11px;font-weight:900;color:var(--t-fg-777777);letter-spacing:1px}.cd-bal b{display:block;font-size:26px;color:var(--t-fg-171717);letter-spacing:0;margin-top:3px}
-.cd-acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}.cd-act{padding:12px 6px;border-radius:14px;border:1px solid var(--t-bd-e5e5e1);background:var(--t-bg-ffffff);color:var(--t-fg-171717);font-size:11px;font-weight:900}
+
 .cd-rev{margin-top:12px;padding:14px;border-radius:14px;border:1px dashed #D4AF37;font-size:13px;font-weight:800;line-height:1.9;word-break:break-all}
 .cd-tx{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--t-bd-e5e5e1);font-size:12px}.cd-tx:last-child{border:0}
 
@@ -56,6 +55,9 @@ html[data-theme="dark"] .cd-in::placeholder{color:#9aa0a8}
 .cd-acc summary::-webkit-details-marker{display:none}.cd-acc summary::after{content:"+";color:#D4AF37;font-size:22px;font-weight:700;line-height:1}.cd-acc details[open] summary::after{content:"\2013"}
 .cd-acc details[open] summary{color:#D4AF37}.cd-acc .body{padding:0 2px 14px}
 html[data-theme="dark"] .cd-acc summary{color:#f4f4f1}html[data-theme="dark"] .cd-acc details[open] summary{color:#D4AF37}
+.cd-acts{display:flex;justify-content:center;gap:34px;margin:18px 0 6px}.cd-ra{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:0;padding:0;color:var(--t-fg-171717);font-size:12px;font-weight:800;-webkit-tap-highlight-color:transparent}
+.cd-ra .ci{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1);box-shadow:0 3px 10px rgba(0,0,0,.1);color:#D4AF37}.cd-ra .ci svg{width:25px;height:25px}
+html[data-theme="dark"] .cd-ra{color:#e6e7ea}
 </style></head>
 <body><div class="page cd-page"><div class="container">
 <div class="cd-header"><button class="cd-back" onclick="history.length>1?history.back():location.href='/dashboard'">‹</button><div><div class="cd-title">BOLTIV Card</div><div class="cd-sub">USD VIRTUAL CARD</div></div></div>
@@ -91,11 +93,10 @@ const CHIP='<svg class="bc-chip" viewBox="0 0 44 33" aria-hidden="true"><defs><l
 const WAVES='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8.5 8.5a5 5 0 0 1 0 7"/><path d="M12 5.8a9 9 0 0 1 0 12.4"/><path d="M15.5 3.2a13 13 0 0 1 0 17.6"/></svg>';
 function cardHTML(c,design){
   const d=design||c?.design||"dark",last=c?.last_four?c.last_four:"0000",net=(c?.brand||"VISA").toUpperCase()==="MASTERCARD"?'<span class="bc-mc"><i></i><i></i></span>':'<span class="bc-net">VISA</span>';
+  const kind=(c?.brand||"VISA").toUpperCase();
   return `<div class="bcard ${d}${c?.status==="frozen"?" frozen":""}" id="theCard">
-  <div class="bc-top"><div class="bc-brand"><img src="assets/boltiv-logo-dark-2.webp" alt="BOLTIV"/><div class="bc-word">BOLTIV</div></div><div class="bc-tr">${WAVES}<span>USD</span></div></div>
-  <div class="bc-mid">${CHIP}</div>
-  <div><div class="bc-num">••••&nbsp;••••&nbsp;••••&nbsp;<span class="l">${esc(last)}</span></div><div class="bc-meta">VALID THRU<b>••/••</b></div></div>
-  <div class="bc-bot"><div><div class="bc-name">${esc(c?.holder_name||"YOUR NAME")}</div><div class="bc-exp">VIRTUAL CARD</div></div>${net}</div></div>`}
+  <div class="bc-top"><div class="bc-brand"><img src="assets/boltiv-logo-dark-2.webp" alt="BOLTIV"/><div class="bc-word">BOLTIV</div></div><div class="bc-netbox">${kind==="MASTERCARD"?'<span class="bc-mc"><i></i><i></i></span>':'<span class="bc-net">VISA</span>'}<div class="bc-sub">Virtual · USD</div></div></div>
+  <div class="bc-last"><span class="d">••••</span>${esc(last)}</div></div>`}
 let CFG={},ME={};
 async function load(){
   const [c,m]=await Promise.all([api("/api/cards/config"),api("/api/cards/me?sync=1")]);CFG=c;ME=m;
@@ -168,7 +169,7 @@ async function createCard(){
 function viewCard(){
   const c=ME.card;
   main.innerHTML=`<div id="prev">${cardHTML(c)}</div><div class="cd-bal">BALANCE<b>$${c.balance_usd.toFixed(2)}</b></div>
-  <div class="cd-acts"><button class="cd-act" id="aFund">＋ Fund</button><button class="cd-act" id="aFreeze">${c.status==="frozen"?"Unfreeze":"Freeze"}</button><button class="cd-act" id="aShow">Show details</button></div>
+  <div class="cd-acts"><button class="cd-ra" id="aShow"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>Details</button><button class="cd-ra" id="aFreeze"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.5 4.5 12 6.5l2.5-2M9.5 19.5l2.5-2 2.5 2"/></svg></span>${c.status==="frozen"?"Unfreeze":"Freeze"}</button><button class="cd-ra" id="aFund"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Fund</button></div>
   <div class="cd-msg" id="aMsg"></div><div id="fundBox"></div><div id="revBox"></div>
   <div class="cd-box"><h3>Card style</h3><div class="cd-pills"><button class="cd-pill ${c.design==="dark"?"on":""}" data-d="dark">Dark</button><button class="cd-pill ${c.design==="light"?"on":""}" data-d="light">Light</button></div></div>
   <div class="cd-box"><h3>Recent card activity</h3><div id="txBox"><p>Loading…</p></div></div>`;

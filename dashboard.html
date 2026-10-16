@@ -107,17 +107,6 @@ body.modal-open{overflow:hidden!important}
 .bottom-nav .nav-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.bottom-nav .nav-icon.nav-icon-text{font-size:18px!important;font-weight:900}
 @media(max-width:899px){.home-balance-card{border-radius:22px!important}.home-service-card .service-icon{width:38px;height:38px;border-radius:12px}.service-icon svg{width:18px;height:18px}}
 <style id="boltiv-smart-feature-dashboard">
-.home-smart-feature-section{margin-top:22px!important}
-.home-smart-feature-panel{display:flex;align-items:stretch;justify-content:space-between;gap:22px;position:relative;overflow:hidden;text-decoration:none;background:linear-gradient(135deg,#171717 0%,#211f18 55%,#2d2616 100%);border:1px solid rgba(212,175,55,.48);border-radius:24px;padding:26px;box-shadow:0 18px 44px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.05);color:#fff}
-.home-smart-feature-panel:before{content:"";position:absolute;width:220px;height:220px;right:-70px;top:-90px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,.28),transparent 67%);pointer-events:none}
-.home-smart-feature-copy{position:relative;z-index:1;max-width:640px}
-.smart-feature-kicker{font-size:11px;font-weight:900;letter-spacing:.16em;color:#e2c453;margin-bottom:10px}
-.home-smart-feature-panel h2{margin:0;font-size:clamp(22px,3vw,34px);line-height:1.12;letter-spacing:-.025em;color:#fff}
-.home-smart-feature-panel p{margin:11px 0 18px;max-width:570px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.72)}
-.smart-feature-cta{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:850;color:#e6c75a}
-.home-smart-feature-mark{position:relative;z-index:1;align-self:center;flex:0 0 72px;width:72px;height:72px;border-radius:22px;display:grid;place-items:center;border:1px solid rgba(228,206,122,.5);background:rgba(212,175,55,.12);color:#e4c34a;font-size:30px;box-shadow:0 12px 28px rgba(0,0,0,.18)}
-.home-smart-feature-panel:hover{transform:translateY(-2px);border-color:rgba(228,206,122,.75);box-shadow:0 22px 52px rgba(0,0,0,.22)}
-@media(max-width:560px){.home-smart-feature-panel{padding:22px 20px;border-radius:21px}.home-smart-feature-mark{display:none}.home-smart-feature-panel h2{font-size:24px}.home-smart-feature-panel p{font-size:12px}}
 </style>
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet"><link href="/boltiv-premium.css?v=20261010-pm" rel="stylesheet"></head>
@@ -185,16 +174,17 @@ body.modal-open{overflow:hidden!important}
 <div class="section-head"><h2 class="section-title">BOLTIV CARD</h2><a class="section-link" href="/cards" id="hcLink">Learn more →</a></div>
 <div class="hc-wrap" id="hcWrap"></div>
 </section>
-<section class="section home-smart-feature-section" aria-labelledby="smartFeaturesHeading">
-<a class="home-smart-feature-panel" href="/smart-features.html">
-<div class="home-smart-feature-copy">
-<div class="smart-feature-kicker">BOLTIV SMART FEATURES</div>
-<h2 id="smartFeaturesHeading">Smarter ways to manage your everyday digital services.</h2>
-<p>Automate routine payments, simplify repeat purchases and stay in control with smarter tools built into BOLTIV.</p>
-<span class="smart-feature-cta">Explore Smart Features <span aria-hidden="true">→</span></span>
+<section class="section home-smart-feature-section" id="smartFeaturesSection" aria-labelledby="smartFeaturesHeading">
+<div class="section-head"><h2 class="section-title" id="smartFeaturesHeading">SMART FEATURES</h2><a class="section-link" href="/smart-features">View all →</a></div>
+<div class="sf-wrap">
+<p class="sf-intro">Automate routine payments, simplify repeat purchases and stay in control, all built into BOLTIV.</p>
+<div class="sf-grid">
+<a class="sf-tile" href="/autopay"><span class="sf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-13.7 5.6M4 12a8 8 0 0 1 13.7-5.6"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span><strong>AutoPay</strong><small>Pay recurring bills automatically</small></a>
+<a class="sf-tile" href="/scheduled-payments"><span class="sf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17M8 14.5h3"/></svg></span><strong>Scheduled</strong><small>Plan payments for later</small></a>
+<a class="sf-tile" href="/favorites"><span class="sf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8L3.5 9.7l5.9-.9L12 3.5Z"/></svg></span><strong>Favorites</strong><small>Save numbers you pay often</small></a>
+<a class="sf-tile" href="/smart-features"><span class="sf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><strong>Insights</strong><small>Track your spending</small></a>
 </div>
-<div class="home-smart-feature-mark" aria-hidden="true"><span>✦</span></div>
-</a>
+</div>
 </section>
 <section class="section home-repeat-section" aria-label="Buy again">
 <div class="section-head"><h2 class="section-title">BUY AGAIN</h2><a class="section-link" href="/transactions">See all →</a></div>
@@ -469,6 +459,16 @@ setInterval(loadHome,30000);
 .hc-btn.primary{background:linear-gradient(135deg,#D4AF37,#b88f1f);color:#111}.hc-btn.ghost{border:1px solid #D4AF37;color:#b8921f;background:transparent}
 html[data-theme="dark"] .hc-title,html[data-theme="dark"] .hc-bal b{color:#f4f4f1}html[data-theme="dark"] .hc-sub,html[data-theme="dark"] .hc-bal small{color:#b9bdc4}
 html[data-theme="dark"] .hc-chip,html[data-theme="dark"] .hc-state.wait{color:#e8c860}
+.home-smart-feature-section{margin-top:24px!important}
+.sf-wrap{padding:16px;border:1px solid var(--line);border-radius:24px;background:var(--t-bg-ffffff);box-shadow:0 6px 22px rgba(25,25,20,.05)}
+.sf-intro{margin:0 2px 14px;font-size:11.5px;line-height:1.55;color:var(--t-fg-777777)}
+.sf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sf-tile{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(212,175,55,.07),rgba(212,175,55,0) 70%);text-decoration:none;color:inherit;transition:transform .15s,border-color .15s}
+.sf-tile:active{transform:scale(.98)}.sf-tile:hover{border-color:rgba(212,175,55,.6)}
+.sf-ico{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;color:#b8921f;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.35)}.sf-ico svg{width:21px;height:21px}
+.sf-tile strong{font-size:13px;font-weight:1000;color:var(--t-fg-171717)}.sf-tile small{font-size:10.5px;line-height:1.4;color:var(--t-fg-777777)}
+html[data-theme="dark"] .sf-tile strong{color:#f4f4f1}html[data-theme="dark"] .sf-tile small,html[data-theme="dark"] .sf-intro{color:#b9bdc4}html[data-theme="dark"] .sf-ico{color:#e8c860}
+
 </style>
 <script>(function(){
 var sec=document.getElementById("cardSection"),wrap=document.getElementById("hcWrap");if(!sec||!wrap)return;

@@ -143,6 +143,30 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 
 </style>
 <style>/* Phase 3 accessibility polish */ :focus-visible{outline:3px solid #C9A227;outline-offset:3px} @media (prefers-reduced-motion: reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}</style><link rel="manifest" href="/manifest.webmanifest">
+<style>/* ---- the card ---- */
+.bcard{position:relative;aspect-ratio:1.59;border-radius:22px;padding:22px 24px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;max-width:420px;margin:0 auto;isolation:isolate}
+.bcard>*{position:relative;z-index:2}
+.bcard::before,.bcard::after{content:"";position:absolute;z-index:0;pointer-events:none;border-radius:60px}
+.bcard::before{width:230px;height:120px;left:-60px;top:62px;transform:rotate(-24deg)}
+.bcard::after{width:260px;height:130px;right:-90px;top:-10px;transform:rotate(-24deg)}
+.bcard.dark{background:radial-gradient(120% 90% at 100% 110%,rgba(212,175,55,.45),transparent 58%),linear-gradient(165deg,#0a0c11 0%,#10131b 55%,#17140a 100%);color:#fff;box-shadow:0 16px 36px rgba(0,0,0,.4)}
+.bcard.dark::before,.bcard.dark::after{background:rgba(255,255,255,.035)}
+.bcard.light{background:radial-gradient(120% 90% at 100% 110%,rgba(212,175,55,.5),transparent 58%),linear-gradient(165deg,#ffffff 0%,#f6f3ea 60%,#efe6cc 100%);color:#15130d;box-shadow:0 14px 32px rgba(60,50,20,.2),inset 0 0 0 1px rgba(212,175,55,.35)}
+.bcard.light::before,.bcard.light::after{background:rgba(160,120,20,.06)}
+.bc-top{display:flex;align-items:flex-start;justify-content:space-between}
+.bc-brand{display:flex;align-items:center;gap:10px}.bc-brand img{width:32px;height:39px;object-fit:contain}
+.bc-word{color:#D4AF37;font-weight:950;letter-spacing:3px;font-size:24px;line-height:1}.bcard.light .bc-word{color:#b8921f}
+.bc-netbox{text-align:right}.bc-net{display:block;font-weight:1000;font-style:italic;font-size:30px;line-height:1;letter-spacing:-1px}
+.bc-mc{display:flex;justify-content:flex-end}.bc-mc i{width:30px;height:30px;border-radius:50%;display:block}.bc-mc i:first-child{background:#eb001b}.bc-mc i:last-child{background:#f79e1b;margin-left:-11px;mix-blend-mode:screen;opacity:.95}
+.bcard.light .bc-mc i:last-child{mix-blend-mode:multiply}
+.bc-sub{font-size:10.5px;font-weight:600;letter-spacing:.4px;opacity:.85;margin-top:5px}
+.bc-last{font-size:25px;font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums}.bc-last .d{letter-spacing:2px;margin-right:6px}
+.bcard.frozen::after{content:"FROZEN";position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(10,10,10,.55);color:#fff;font-weight:1000;letter-spacing:6px;font-size:22px;width:auto;height:auto;transform:none;border-radius:0}
+
+.seo-cardshow{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;max-width:880px;margin:32px auto 0}.seo-cardshow figure{margin:0}.seo-cardshow figcaption{text-align:center;margin-top:14px;font-size:12px;font-weight:900;letter-spacing:1.2px;color:var(--t-fg-777777)}
+.seo-cardshow .bcard{max-width:none}
+@media(max-width:720px){.seo-cardshow{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 <div class="seo-page">
@@ -162,7 +186,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <div>
 <div class="seo-kicker">BOLTIV DIGITAL SERVICES</div>
 <h1>EVERYDAY SERVICES.<br/><span>ONE SIMPLE PLACE.</span></h1>
-<p>Buy airtime and data, send bulk airtime and international top-ups, pay electricity bills, renew cable TV, send bulk SMS, manage your wallet and use smarter tools for everyday payments all from one simple BOLTIV account.</p>
+<p>Buy airtime and data, send bulk airtime and international top-ups, pay electricity bills, renew cable TV, send bulk SMS, manage your wallet, spend dollars online with a virtual card and use smarter tools for everyday payments all from one simple BOLTIV account.</p>
 <div class="seo-hero-actions">
 <a class="seo-btn primary" href="/register">Create your account</a>
 <a class="seo-btn secondary" href="#services" id="explore-services">Explore services</a>
@@ -178,6 +202,9 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <h2>Everyday services, one simple place</h2>
 <p class="seo-section-intro">Choose a service, follow a few clear steps and keep your activity together inside your BOLTIV account.</p>
 <div class="seo-grid">
+<a class="seo-service" href="/virtual-card" style="text-decoration:none;color:inherit">
+<div class="icon">$</div><strong>BOLTIV Card</strong><span>Create a USD virtual card, fund it from your wallet and pay online.</span>
+</a>
 <a class="seo-service" href="/airtime" style="text-decoration:none;color:inherit">
 <div class="icon">₦</div><strong>Airtime</strong><span>Recharge supported networks quickly and keep your phone connected.</span>
 </a>
@@ -255,6 +282,20 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <div class="seo-benefit"><div class="icon">?</div><strong>Support</strong><span>Get help when you need assistance with your BOLTIV account or services.</span></div>
 </div>
 </section>
+<section class="seo-section" id="card">
+<div class="seo-kicker" style="text-align:center">BOLTIV CARD</div>
+<h2>Spend dollars online with the BOLTIV Card.</h2>
+<p class="seo-section-intro">Create a USD virtual card inside your BOLTIV account, fund it from your wallet and pay on global websites and apps that accept Visa or Mastercard.</p>
+<div class="seo-cardshow" style="max-width:420px;grid-template-columns:1fr"><figure><div class="bcard dark"><div class="bc-top"><div class="bc-brand"><img src="assets/boltiv-logo-dark-2.webp" alt="BOLTIV"/><div class="bc-word">BOLTIV</div></div><div class="bc-netbox"><span class="bc-net">VISA</span><div class="bc-sub">Virtual · USD</div></div></div><div class="bc-last"><span class="d">••••</span>7421</div></div></figure></div>
+<div class="seo-benefits">
+<div class="seo-benefit"><div class="icon">$</div><strong>Pay in US dollars</strong><span>Use one card for online payments in USD, funded with the naira already in your wallet.</span></div>
+<div class="seo-benefit"><div class="icon">❄</div><strong>Freeze anytime</strong><span>Pause and resume your card in seconds if you are unsure about a payment.</span></div>
+<div class="seo-benefit"><div class="icon">●</div><strong>Protected details</strong><span>Your card number and CVV stay hidden until you confirm your Transaction PIN.</span></div>
+</div>
+<div style="text-align:center;margin-top:32px">
+<a class="seo-btn primary" href="/virtual-card">Learn more about the BOLTIV Card</a>
+</div>
+</section>
 <section class="seo-section alt" id="smart-features">
 <div class="seo-kicker" style="text-align:center">BOLTIV SMART FEATURES</div>
 <h2>Make everyday payments work smarter.</h2>
@@ -302,6 +343,7 @@ body{margin:0;background:var(--boltiv-soft);color:var(--boltiv-text);font-family
 <h2>Frequently asked questions</h2>
 <p class="seo-section-intro">Quick answers to common questions about using BOLTIV.</p>
 <div class="seo-faq">
+<details><summary>What is the BOLTIV Card?</summary><p>The BOLTIV Card is a USD virtual card you can create inside your account, fund from your wallet and use for online payments wherever Visa or Mastercard is accepted. Card issuance requires a one-time identity verification. <a href="/virtual-card">Learn more</a>.</p></details>
 <details><summary>What is BOLTIV?</summary><p>BOLTIV is a digital services and payments platform that brings everyday services such as airtime, data, electricity and cable TV together with wallet payments and smart tools for managing supported transactions.</p></details>
 <details><summary>What are BOLTIV Smart Features?</summary><p>Smart Features are built-in tools that make supported payments easier to manage, including AutoPay, Scheduled Payments, Favorites, Buy Again, Spending Insights and Transaction Alerts.</p></details>
 <details><summary>How do I get started?</summary><p>Create a BOLTIV account, complete the required account setup and then sign in to access the services available to you.</p></details>

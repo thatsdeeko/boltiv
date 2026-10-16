@@ -239,8 +239,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <label>Min load ($)<input id="cdMin" type="number" min="1" step="1"/></label>
 <label>Max load ($)<input id="cdMax" type="number" min="1" step="1"/></label>
 <label>Rate refresh (minutes)<input id="cdCache" type="number" min="1" step="1"/></label>
+<label>Payment processing fee (%)<input id="cdColPct" type="number" min="0" step="0.05"/></label>
+<label>Processing fee cap (₦)<input id="cdColCap" type="number" min="0" step="10"/></label>
+<label>Payment window (minutes)<input id="cdExpiry" type="number" min="5" step="5"/></label>
+<label>Auto-convert collected ₦ to USD<select id="cdAuto"><option value="false">Off (convert manually)</option><option value="true">On</option></select></label>
 </div>
-<p style="margin-top:10px;font-size:12px;color:#777">Customers pay (amount + creation fee) × (Payscribe live rate + margin). Payscribe gives 20 free rate lookups a day, then $0.30 each, so keep the refresh at 60+ minutes. Use a $1 creation fee only if you are on the Business Pro plan.</p>
+<p style="margin-top:10px;font-size:12px;color:#777">Customers pay (amount + creation fee) × (Payscribe live rate + margin) plus the payment processing fee, by bank transfer to a one-time account. Payscribe gives 20 free rate lookups a day, then $0.30 each, so keep the refresh at 60+ minutes. Use a $1 creation fee only if you are on the Business Pro plan.</p>
 </div></div>
 <div class="section"><div class="section-head"><h2>RECENT CARD ORDERS</h2><button class="btn" onclick="loadCards()">REFRESH</button></div><div class="section-body" id="cdOrders"><div class="loading">Loading...</div></div></div>
 </section>
@@ -754,15 +758,15 @@ async function loadCards(){
     $('cdUsd').textContent=d.usdBalance==null?'—':'$'+Number(d.usdBalance).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     $('cdCards').textContent=d.cards;$('cdOpen').textContent=d.open;$('cdToday').textContent=d.todayOrders+' · ₦'+Number(d.todayNgn).toLocaleString('en-NG');
     $('cdOpen').style.color=d.open?'#b94c4c':'';
-    $('cdEnabled').value=String(st.enabled!==false);$('cdMargin').value=st.margin;$('cdFee').value=st.feeUsd;$('cdMin').value=st.minUsd;$('cdMax').value=st.maxUsd;$('cdCache').value=st.cacheMin;
+    $('cdEnabled').value=String(st.enabled!==false);$('cdMargin').value=st.margin;$('cdFee').value=st.feeUsd;$('cdMin').value=st.minUsd;$('cdMax').value=st.maxUsd;$('cdCache').value=st.cacheMin;$('cdColPct').value=st.collectionPct;$('cdColCap').value=st.collectionCap;$('cdExpiry').value=st.expiryMin;$('cdAuto').value=String(!!st.autoConvert);
     const rows=d.orders||[];
     $('cdOrders').innerHTML=('<p style="font-size:12px;margin-bottom:10px;color:'+(d.rateError||!d.configured?'#b94c4c':'#17833d')+'">Connection: '+esc(d.baseUrl||'')+' · API key '+(d.configured?'set':'MISSING')+' · Merchant hash key '+(d.hashKeySet?'set':'MISSING')+' · Rate: '+(d.rateError?esc(d.rateError):'OK')+'</p>')+(rows.length?'<div class="table-wrap"><table><thead><tr><th>DATE</th><th>CUSTOMER</th><th>TYPE</th><th>USD</th><th>CHARGED</th><th>STATUS</th><th></th></tr></thead><tbody>'+rows.map(o=>{
-      const open=o.status==='pending'||o.status==='processing';
-      return `<tr><td>${esc(new Date(o.created_at).toLocaleString('en-NG'))}</td><td>${esc(o.email||o.user_id)}</td><td>${o.kind==='create'?'Create':'Top-up'}</td><td>$${Number(o.usd_amount).toFixed(2)}${Number(o.fee_usd)?` + $${Number(o.fee_usd).toFixed(2)}`:''}</td><td>₦${Number(o.ngn_charged).toLocaleString('en-NG')}</td><td><b style="color:${open?'#b94c4c':o.status==='success'?'#17833d':'#777'}">${esc(o.status.toUpperCase())}</b>${o.error?`<div style="font-size:10px;color:#777">${esc(o.error)}</div>`:''}</td><td>${open?`<button class="btn" onclick="refundCardOrder('${esc(o.reference)}')">REFUND</button>`:''}</td></tr>`}).join('')+'</tbody></table></div>':'<p>No card orders yet.</p>');
+      const open=o.status==='pending'||o.status==='processing'||o.status==='needs_review';
+      return `<tr><td>${esc(new Date(o.created_at).toLocaleString('en-NG'))}</td><td>${esc(o.email||o.user_id)}</td><td>${o.kind==='create'?'Create':'Top-up'}</td><td>$${Number(o.usd_amount).toFixed(2)}${Number(o.fee_usd)?` + $${Number(o.fee_usd).toFixed(2)}`:''}</td><td>₦${Number(o.ngn_charged).toLocaleString('en-NG')}</td><td><b style="color:${open?'#b94c4c':o.status==='success'?'#17833d':o.status==='awaiting_payment'?'#8a6d12':'#777'}">${esc(o.status.toUpperCase())}</b>${o.error?`<div style="font-size:10px;color:#777">${esc(o.error)}</div>`:''}${o.conversion_status?`<div style="font-size:10px;color:#777">Conversion: ${esc(o.conversion_status)}${o.conversion_note?' · '+esc(o.conversion_note):''}</div>`:''}</td><td>${open?`<button class="btn" onclick="refundCardOrder('${esc(o.reference)}')">REFUND</button>`:''}</td></tr>`}).join('')+'</tbody></table></div>':'<p>No card orders yet.</p>');
   }catch(e){$('cdOrders').innerHTML='<p style="color:#b94c4c">'+esc(e.message)+'</p>'}
 }
 async function saveCardSettings(){
-  try{const d=await api('/api/admin/cards/settings',{method:'POST',body:JSON.stringify({enabled:$('cdEnabled').value==='true',margin:$('cdMargin').value,feeUsd:$('cdFee').value,minUsd:$('cdMin').value,maxUsd:$('cdMax').value,cacheMin:$('cdCache').value})});showMsg('Card settings saved.',true);loadCards()}catch(e){showMsg(e.message)}
+  try{const d=await api('/api/admin/cards/settings',{method:'POST',body:JSON.stringify({enabled:$('cdEnabled').value==='true',margin:$('cdMargin').value,feeUsd:$('cdFee').value,minUsd:$('cdMin').value,maxUsd:$('cdMax').value,cacheMin:$('cdCache').value,collectionPct:$('cdColPct').value,collectionCap:$('cdColCap').value,expiryMin:$('cdExpiry').value,autoConvert:$('cdAuto').value==='true'})});showMsg('Card settings saved.',true);loadCards()}catch(e){showMsg(e.message)}
 }
 async function refundCardOrder(ref){
   if(!confirm('Refund this order to the customer wallet?\n\nOnly do this if the card or top-up does NOT appear in the Payscribe dashboard. If Payscribe did process it, refunding means you pay for it twice.'))return;

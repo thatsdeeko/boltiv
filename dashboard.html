@@ -476,15 +476,17 @@ var API=window.BOLTIV_API_BASE,tok=(window.boltivMemoryStorage&&boltivMemoryStor
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function face(c,design){var dsg=design||(c&&c.design)||"dark",net=(c&&c.brand||"VISA").toUpperCase()==="MASTERCARD"?'<span class="bc-mc"><i></i><i></i></span>':'<span class="bc-net">VISA</span>';
 return '<div class="bcard '+dsg+((c&&c.status==="frozen")?" frozen":"")+'"><div class="bc-top"><div class="bc-brand"><img src="assets/boltiv-logo-dark-2.webp" alt="BOLTIV"/><div class="bc-word">BOLTIV</div></div><div class="bc-netbox">'+net+'<div class="bc-sub">Virtual \u00b7 USD</div></div></div><div class="bc-last"><span class="d">\u2022\u2022\u2022\u2022</span>'+(c?esc(c.last_four):"")+'</div></div>'}
-function promo(){wrap.innerHTML=face(null,"dark")+'<div class="hc-title">Spend dollars anywhere online</div><p class="hc-sub">A USD virtual card from BOLTIV. Fund it from your wallet and pay on global websites and apps.</p><div class="hc-chips"><span class="hc-chip">Ready in minutes</span><span class="hc-chip">Visa or Mastercard</span><span class="hc-chip">Freeze anytime</span></div><div class="hc-actions"><a class="hc-btn primary" href="/cards">Get your card</a></div>'}
+function promo(){wrap.innerHTML=face(null,"dark")+'<div class="hc-title">Spend dollars anywhere online</div><p class="hc-sub">A USD virtual card from BOLTIV. Pay by bank transfer and spend on global websites and apps.</p><div class="hc-chips"><span class="hc-chip">Ready in minutes</span><span class="hc-chip">Visa or Mastercard</span><span class="hc-chip">Freeze anytime</span></div><div class="hc-actions"><a class="hc-btn primary" href="/cards">Get your card</a></div>'}
 function have(c){var f=c.status==="frozen";document.getElementById("hcLink").textContent="Manage card \u2192";
 wrap.innerHTML=face(c)+'<div class="hc-meta"><div class="hc-bal"><small>CARD BALANCE</small><b>$'+Number(c.balance_usd).toFixed(2)+'</b></div><span class="hc-state'+(f?" off":"")+'">'+(f?"FROZEN":"ACTIVE")+'</span></div><div class="hc-actions"><a class="hc-btn primary" href="/cards#fund">Fund card</a><a class="hc-btn ghost" href="/cards">View details</a></div>'}
+function owe(){document.getElementById("hcLink").textContent="Complete payment \\u2192";wrap.innerHTML=face(null,"dark")+'<div class="hc-meta"><div class="hc-bal"><small>YOUR REQUEST</small><b style="font-size:15px">Payment waiting</b></div><span class="hc-state wait">PAY NOW</span></div><p class="hc-sub" style="margin-top:8px">Transfer to the account shown on your card page to finish.</p><div class="hc-actions"><a class="hc-btn primary" href="/cards">Complete payment</a></div>'}
 function wait(){document.getElementById("hcLink").textContent="View status \u2192";wrap.innerHTML=face(null,"dark")+'<div class="hc-meta"><div class="hc-bal"><small>YOUR REQUEST</small><b style="font-size:15px">Being processed</b></div><span class="hc-state wait">PENDING</span></div><p class="hc-sub" style="margin-top:8px">We will notify you as soon as it is complete.</p><div class="hc-actions"><a class="hc-btn ghost" href="/cards">View status</a></div>'}
 promo();
 if(!API||!tok)return;
 var h={headers:{Authorization:"Bearer "+tok}};
 Promise.all([fetch(API+"/api/cards/config",h).then(function(r){return r.json()}).catch(function(){return{}}),fetch(API+"/api/cards/me",h).then(function(r){return r.json()}).catch(function(){return{}})]).then(function(x){
 var cfg=x[0],me=x[1];
+if(me&&me.success&&me.open)return owe();
 if(me&&me.success&&me.card)return have(me.card);
 if(me&&me.success&&me.pending)return wait();
 if(cfg&&cfg.success&&cfg.enabled===false)sec.hidden=true;

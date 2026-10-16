@@ -58,6 +58,11 @@ html[data-theme="dark"] .cd-acc summary{color:#f4f4f1}html[data-theme="dark"] .c
 .cd-acts{display:flex;justify-content:center;gap:34px;margin:18px 0 6px}.cd-ra{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:0;padding:0;color:var(--t-fg-171717);font-size:12px;font-weight:800;-webkit-tap-highlight-color:transparent}
 .cd-ra .ci{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1);box-shadow:0 3px 10px rgba(0,0,0,.1);color:#D4AF37}.cd-ra .ci svg{width:25px;height:25px}
 html[data-theme="dark"] .cd-ra{color:#e6e7ea}
+.cd-pay{margin:12px 0;border:1px solid var(--t-bd-e5e5e1);border-radius:16px;overflow:hidden}.cd-pay>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;border-bottom:1px solid var(--t-bd-e5e5e1)}.cd-pay>div:last-child{border:0}
+.cd-pay small{font-size:9.5px;font-weight:900;letter-spacing:1.2px;color:var(--t-fg-777777)}.cd-pay b{font-size:14px;color:var(--t-fg-171717);text-align:right;word-break:break-word}
+.cd-copy{margin-left:8px;padding:6px 10px;border-radius:999px;border:1px solid #D4AF37;background:transparent;color:#b8921f;font-size:10px;font-weight:1000}
+.cd-wait{margin:12px 0 0;font-size:12.5px;font-weight:800;color:var(--t-fg-171717)}.cd-wait span{color:#b8921f;margin-left:6px;font-variant-numeric:tabular-nums}
+html[data-theme="dark"] .cd-pay b,html[data-theme="dark"] .cd-wait{color:#f4f4f1}html[data-theme="dark"] .cd-pay small{color:#c4c8cf}html[data-theme="dark"] .cd-copy{color:#e8c860}
 </style></head>
 <body><div class="page cd-page"><div class="container">
 <div class="cd-header"><button class="cd-back" onclick="history.length>1?history.back():location.href='/dashboard'">‹</button><div><div class="cd-title">BOLTIV Card</div><div class="cd-sub">USD VIRTUAL CARD</div></div></div>
@@ -68,13 +73,13 @@ html[data-theme="dark"] .cd-ra{color:#e6e7ea}
 <h3>About the BOLTIV Card</h3>
 <details><summary>How it works</summary><div class="body"><ol>
 <li><b>Verify your identity.</b> A one-time check using your BVN, a valid government ID and two photos, so we can issue a card in your name.</li>
-<li><b>Create your card.</b> Choose Visa or Mastercard and the amount in US dollars to load. The naira equivalent is deducted from your BOLTIV wallet.</li>
-<li><b>Fund it whenever you need.</b> Top up instantly from your wallet.</li>
+<li><b>Create your card.</b> Choose Visa or Mastercard and the amount in US dollars to load. You then pay the exact naira amount by bank transfer to a secure account number generated for your request.</li>
+<li><b>Fund it whenever you need.</b> Top up the same way, by bank transfer. Your card is credited automatically once the payment is received.</li>
 <li><b>Spend online.</b> Use it wherever Visa or Mastercard is accepted online in USD. You can freeze or unfreeze it at any time.</li>
 </ol></div></details>
-<details><summary>Pricing</summary><div class="body"><ul><li>You pay the card amount plus a one-time card creation fee, converted to naira at the BOLTIV rate shown before you confirm. The exact naira total is always displayed first.</li><li>Funding your card carries no additional card fee.</li></ul></div></details>
+<details><summary>Pricing</summary><div class="body"><ul><li>You pay the card amount plus a one-time card creation fee and a small payment processing fee, converted to naira at the BOLTIV rate shown before you confirm. The exact naira total is always displayed first.</li><li>Funding your card carries no additional card fee.</li></ul></div></details>
 <details><summary>Important to know</summary><div class="body"><ul><li>Each customer can hold one card.</li><li>The card is intended for online payments, mainly with US merchants. Some categories, including money transfer, cryptocurrency, betting and gambling, dating and adult services, are not supported and may be declined.</li><li>Payments declined for insufficient funds may attract a fee, and a card is closed after repeated insufficient-funds declines. Please keep your card funded.</li><li>Payments in a currency other than USD may attract additional charges.</li></ul></div></details>
-<details><summary>Security</summary><div class="body"><ul><li>Your card number and CVV are shown only after you confirm your Transaction PIN, are hidden automatically after 30 seconds, and are never stored by BOLTIV.</li><li>If a card request cannot be completed, the amount is returned to your wallet automatically.</li></ul></div></details>
+<details><summary>Security</summary><div class="body"><ul><li>Your card number and CVV are shown only after you confirm your Transaction PIN, are hidden automatically after 30 seconds, and are never stored by BOLTIV.</li><li>If a card request cannot be completed after your payment, the amount is refunded to your BOLTIV wallet automatically.</li></ul></div></details>
 </div>
 
 <nav class="bottom-nav"><button class="nav-item" onclick="location.href='/dashboard'"><span class="nav-icon">⌂</span>Home</button><button class="nav-item" onclick="location.href='/wallet'"><span class="nav-icon">₦</span>Wallet</button><button class="nav-item active" onclick="location.href='/cards'"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.6"></rect><path d="M3 10.2h18M7 15h3.2"></path></svg></span>Cards</button><button class="nav-item" onclick="location.href='/transactions'"><span class="nav-icon">↯</span>Activity</button><button class="nav-item" onclick="location.href='/profile'"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20a6.5 6.5 0 0 1 13 0"></path></svg></span>Profile</button></nav>
@@ -101,6 +106,7 @@ let CFG={},ME={};
 async function load(){
   const [c,m]=await Promise.all([api("/api/cards/config"),api("/api/cards/me?sync=1")]);CFG=c;ME=m;
   if(!m.success){main.innerHTML=`<div class="cd-box"><p>${esc(m.message||"Could not load your card.")}</p></div>`;return}
+  if(m.open)return showPay(m.open);
   if(m.card)return viewCard();
   if(m.pending)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Processing your request</h3><p>Your ${m.pending==="create"?"new card":"top-up"} is being processed. This can take a few minutes. You will be notified when it is complete, and your wallet is refunded automatically if it cannot be completed.</p><button class="cd-btn ghost" onclick="load()">REFRESH</button></div>`;
   if(!c.success||!c.enabled||!c.ready)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Cards are temporarily unavailable</h3><p>${c.enabled===false?"The BOLTIV Card service is currently paused.":"We are unable to display card pricing at the moment."} Please try again shortly.</p></div>`;
@@ -144,7 +150,7 @@ function viewCreate(){
   <label class="cd-label">CARD STYLE</label><div class="cd-pills"><button class="cd-pill on" data-d="dark">Dark</button><button class="cd-pill" data-d="light">Light</button></div>
   <label class="cd-label">CARD TYPE</label><div class="cd-pills"><button class="cd-pill on" data-b="VISA">Visa</button><button class="cd-pill" data-b="MASTERCARD">Mastercard</button></div>
   <label class="cd-label">AMOUNT TO LOAD (USD, $${CFG.minUsd}–$${CFG.maxUsd})</label><input class="cd-in" id="c_amt" inputmode="decimal" placeholder="10"/>
-  <div id="quote"></div><div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn">CREATE CARD</button></div>`;
+  <div id="quote"></div><div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn">CONTINUE TO PAYMENT</button></div>`;
   main.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{design=b.dataset.d;main.querySelectorAll("[data-d]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
   main.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{brand=b.dataset.b;main.querySelectorAll("[data-b]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
   document.getElementById("c_amt").oninput=()=>quote("create","c_amt");
@@ -154,16 +160,16 @@ async function quote(kind,inputId){
   clearTimeout(qTimer);const box=document.getElementById("quote"),usd=Number(document.getElementById(inputId).value);
   if(!(usd>0)){box.innerHTML="";return}
   qTimer=setTimeout(async()=>{const q=await api("/api/cards/quote",{kind,usd});
-    box.innerHTML=q.success?`<div class="cd-quote"><div><span>Card amount</span><b>$${q.quote.usd.toFixed(2)}</b></div>${q.quote.feeUsd?`<div><span>Card creation fee</span><b>$${q.quote.feeUsd.toFixed(2)}</b></div>`:""}<div><span>Rate</span><b>${ngn(q.quote.ratePerUsd)} / $1</b></div><div class="tot"><span>You pay</span><b>${ngn(q.quote.ngnTotal)}</b></div></div>`:`<div class="cd-quote">${esc(q.message)}</div>`},350)}
+    box.innerHTML=q.success?`<div class="cd-quote"><div><span>Card amount</span><b>$${q.quote.usd.toFixed(2)}</b></div>${q.quote.feeUsd?`<div><span>Card creation fee</span><b>$${q.quote.feeUsd.toFixed(2)}</b></div>`:""}<div><span>Rate</span><b>${ngn(q.quote.ratePerUsd)} / $1</b></div>${q.quote.collectionFeeNgn?`<div><span>Payment processing fee</span><b>${ngn(q.quote.collectionFeeNgn)}</b></div>`:""}<div class="tot"><span>You pay</span><b>${ngn(q.quote.ngnTotal)}</b></div></div>`:`<div class="cd-quote">${esc(q.message)}</div>`},350)}
 async function createCard(){
   const usd=Number(document.getElementById("c_amt").value),btn=document.getElementById("cBtn");msg("cMsg","");
   if(!(usd>=CFG.minUsd&&usd<=CFG.maxUsd))return msg("cMsg",`Enter an amount between $${CFG.minUsd} and $${CFG.maxUsd}.`);
   const pin=await boltivGetTransactionPin();if(!pin)return;
-  btn.disabled=true;btn.textContent="CREATING…";
+  btn.disabled=true;btn.textContent="PLEASE WAIT…";
   const r=await api("/api/cards/create",{usd,brand,design,transactionPin:pin,idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
-  btn.disabled=false;btn.textContent="CREATE CARD";
-  if(r.success)return load();
-  msg("cMsg",r.message||"Could not create the card.");
+  btn.disabled=false;btn.textContent="CONTINUE TO PAYMENT";
+  if(r.success&&r.order)return showPay(r.order);
+  msg("cMsg",r.message||"Could not start your card request.");
 }
 /* ---------- existing card ---------- */
 function viewCard(){
@@ -181,16 +187,16 @@ function viewCard(){
   if(location.hash==="#fund")openFund();
 }
 function openFund(){
-  document.getElementById("fundBox").innerHTML=`<div class="cd-box"><h3>Fund your card</h3><label class="cd-label">AMOUNT (USD)</label><input class="cd-in" id="f_amt" inputmode="decimal" placeholder="10"/><div id="quote"></div><div class="cd-msg" id="fMsg"></div><button class="cd-btn" id="fBtn">FUND CARD</button></div>`;
+  document.getElementById("fundBox").innerHTML=`<div class="cd-box"><h3>Fund your card</h3><label class="cd-label">AMOUNT (USD)</label><input class="cd-in" id="f_amt" inputmode="decimal" placeholder="10"/><div id="quote"></div><div class="cd-msg" id="fMsg"></div><button class="cd-btn" id="fBtn">CONTINUE TO PAYMENT</button></div>`;
   document.getElementById("f_amt").oninput=()=>quote("topup","f_amt");
   document.getElementById("fBtn").onclick=async()=>{
     const usd=Number(document.getElementById("f_amt").value),btn=document.getElementById("fBtn");msg("fMsg","");
     if(!(usd>=CFG.minUsd&&usd<=CFG.maxUsd))return msg("fMsg",`Enter an amount between $${CFG.minUsd} and $${CFG.maxUsd}.`);
-    const pin=await boltivGetTransactionPin();if(!pin)return;btn.disabled=true;btn.textContent="FUNDING…";
+    const pin=await boltivGetTransactionPin();if(!pin)return;btn.disabled=true;btn.textContent="PLEASE WAIT…";
     const r=await api("/api/cards/topup",{usd,transactionPin:pin,idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
-    btn.disabled=false;btn.textContent="FUND CARD";
-    if(r.success&&r.status==="success")return load();
-    msg("fMsg",r.message||"Could not fund the card.",r.success);
+    btn.disabled=false;btn.textContent="CONTINUE TO PAYMENT";
+    if(r.success&&r.order)return showPay(r.order);
+    msg("fMsg",r.message||"Could not start your top-up.");
   };
 }
 async function toggleFreeze(){
@@ -209,6 +215,38 @@ async function loadTx(){
   const r=await api("/api/cards/transactions"),box=document.getElementById("txBox");if(!box)return;
   const list=Array.isArray(r.transactions)?r.transactions:[];
   box.innerHTML=!r.success?`<p>${esc(r.message||"Activity is unavailable right now.")}</p>`:list.length?list.slice(0,15).map(t=>`<div class="cd-tx"><span>${esc(t.acceptor_name||t.description||t.type||"Card activity")}</span><b>${t.amount!=null?"$"+Number(t.amount).toFixed(2):""}</b></div>`).join(""):"<p>No card activity in the last 30 days.</p>";
+}
+/* ---------- bank-transfer payment panel ---------- */
+let payTimer=null,cdTimer=null;
+function stopPay(){clearInterval(payTimer);clearInterval(cdTimer)}
+function showPay(o){
+  stopPay();
+  const breakdown=`<div class="cd-quote"><div><span>Card amount</span><b>$${o.usd.toFixed(2)}</b></div>${o.feeUsd?`<div><span>Card creation fee</span><b>$${o.feeUsd.toFixed(2)}</b></div>`:""}${o.collectionFeeNgn?`<div><span>Payment processing fee</span><b>${ngn(o.collectionFeeNgn)}</b></div>`:""}<div class="tot"><span>Total to transfer</span><b>${ngn(o.ngnTotal)}</b></div></div>`;
+  main.innerHTML=`<div id="prev">${cardHTML(ME.card||null,design)}</div><div class="cd-box"><h3>Complete your payment</h3>
+  <p>Transfer exactly <b>${ngn(o.ngnTotal)}</b> to the account below using any bank app. Your card will be ${o.kind==="create"?"created":"funded"} automatically as soon as the payment is received.</p>
+  <div class="cd-pay"><div><small>BANK</small><b>${esc(o.bank)}</b></div><div><small>ACCOUNT NUMBER</small><span><b id="payNo">${esc(o.accountNumber)}</b><button class="cd-copy" id="payCopy">COPY</button></span></div><div><small>ACCOUNT NAME</small><b>${esc(o.accountName)}</b></div><div><small>AMOUNT</small><b>${ngn(o.ngnTotal)}</b></div></div>
+  ${breakdown}<p class="cd-wait" id="payState">Waiting for your transfer…<span id="payCd"></span></p><div class="cd-msg" id="payMsg"></div>
+  <button class="cd-btn ghost" id="payCancel">CANCEL REQUEST</button></div>`;
+  document.getElementById("payCopy").onclick=async()=>{try{await navigator.clipboard.writeText(o.accountNumber)}catch{const t=document.createElement("textarea");t.value=o.accountNumber;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove()}document.getElementById("payCopy").textContent="COPIED"};
+  document.getElementById("payCancel").onclick=async()=>{if(!confirm("Cancel this request? Do not transfer if you cancel."))return;stopPay();await api("/api/cards/order/cancel",{reference:o.reference});load()};
+  const end=o.expiresAt?new Date(o.expiresAt).getTime():0;
+  const tick=()=>{const el=document.getElementById("payCd");if(!el||!end)return;const s=Math.max(0,Math.floor((end-Date.now())/1000));el.textContent=s?"  (expires in "+Math.floor(s/60)+":"+String(s%60).padStart(2,"0")+")":""};
+  tick();cdTimer=setInterval(tick,1000);
+  const poll=async()=>{
+    const r=await api("/api/cards/order?ref="+encodeURIComponent(o.reference));if(!r.success||!r.order)return;
+    const st=r.order.status,el=document.getElementById("payState");if(!el)return stopPay();
+    if(st==="awaiting_payment")return;
+    if(st==="paid"||st==="processing"){el.innerHTML="Payment received. Finalising your "+(o.kind==="create"?"card":"top-up")+"…";return}
+    if(st==="pending"){el.textContent="Payment received. This is taking a little longer than usual. You will be notified when it is complete.";return}
+    stopPay();
+    if(st==="success"){el.textContent="Done!";setTimeout(load,700);return}
+    const back='<button class="cd-btn" style="margin-top:12px" onclick="load()">BACK</button>';
+    if(st==="failed"){document.getElementById("payCancel").remove();el.textContent="We could not complete your request. Your payment has been refunded to your BOLTIV wallet."}
+    else if(st==="needs_review"){document.getElementById("payCancel").remove();el.textContent="We received your payment, but the amount did not match. Our team will review it shortly."}
+    else{document.getElementById("payCancel").remove();el.textContent="This payment window has closed. If you already transferred, please contact support."}
+    el.insertAdjacentHTML("afterend",back);
+  };
+  payTimer=setInterval(poll,4000);
 }
 load();
 </script>

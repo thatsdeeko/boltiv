@@ -237,7 +237,7 @@ function showPay(o){
     const st=r.order.status,el=document.getElementById("payState");if(!el)return stopPay();
     if(st==="awaiting_payment")return;
     if(st==="paid"||st==="processing"){el.innerHTML="Payment received. Finalising your "+(o.kind==="create"?"card":"top-up")+"…";return}
-    if(st==="pending"){el.textContent="Payment received. This is taking a little longer than usual. You will be notified when it is complete.";return}
+    if(st==="pending"||st==="needs_funding"){el.textContent="Payment received. This is taking a little longer than usual. You will be notified when it is complete.";return}
     stopPay();
     if(st==="success"){el.textContent="Done!";setTimeout(load,700);return}
     const back='<button class="cd-btn" style="margin-top:12px" onclick="load()">BACK</button>';

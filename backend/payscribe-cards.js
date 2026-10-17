@@ -19,14 +19,14 @@ module.exports = function createCards(d) {
   /* ---------- settings (admin-changeable via platform settings, env/defaults otherwise) ---------- */
   async function cfg() {
     const g = async (k, f) => { try { const v = await getPlatformSetting(k, f); return v === null || v === undefined ? f : v; } catch { return f; } };
-    const [enabled, margin, fee, min, max, cacheMin, colPct, colCap, expMin, autoConv] = await Promise.all([
+    const [enabled, margin, fee, min, max, cacheMin, colPct, colCap, expMin, autoConv, rateMode, rateManual] = await Promise.all([
       g("card_enabled", true), g("card_margin_ngn", 100), g("card_creation_fee_usd", 2),
       g("card_min_usd", 1), g("card_max_usd", 500), g("card_rate_cache_min", 60),
-      g("card_collection_fee_pct", 0.65), g("card_collection_fee_cap", 250), g("card_pay_expiry_min", 30), g("card_auto_convert", false)]);
+      g("card_collection_fee_pct", 0.65), g("card_collection_fee_cap", 250), g("card_pay_expiry_min", 30), g("card_auto_convert", false), g("card_rate_mode", "auto"), g("card_rate_manual", 0)]);
     return { enabled: enabled !== false && enabled !== "false", margin: Number(margin), feeUsd: Number(fee),
       minUsd: Number(min), maxUsd: Number(max), cacheMin: Math.max(1, Number(cacheMin)),
       collectionPct: Math.max(0, Number(colPct)), collectionCap: Math.max(0, Number(colCap)), expiryMin: Math.max(5, Number(expMin)),
-      autoConvert: autoConv === true || autoConv === "true" };
+      autoConvert: autoConv === true || autoConv === "true", rateMode: rateMode === "manual" ? "manual" : "auto", rateManual: Number(rateManual) > 0 ? Number(rateManual) : 0 };
   }
 
   /* ---------- tables ---------- */
@@ -41,7 +41,8 @@ module.exports = function createCards(d) {
         "expires_at TIMESTAMPTZ", "paid_ngn NUMERIC(14,2)", "paid_fee_ngn NUMERIC(14,2)", "conversion_status TEXT", "conversion_note TEXT"])
         await db(`ALTER TABLE card_orders ADD COLUMN IF NOT EXISTS ${col}`);
       await db(`DROP INDEX IF EXISTS card_orders_one_card`);
-      await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_one_card2 ON card_orders(user_id) WHERE kind='create' AND status IN ('awaiting_payment','paid','processing','pending','needs_review','success')`);
+      await db(`DROP INDEX IF EXISTS card_orders_one_card2`);
+      await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_one_card3 ON card_orders(user_id) WHERE kind='create' AND status IN ('awaiting_payment','paid','processing','pending','needs_review','needs_funding','success')`);
       await db(`CREATE INDEX IF NOT EXISTS card_orders_acct ON card_orders(account_id)`);
       await db(`CREATE TABLE IF NOT EXISTS card_webhook_events(event_id TEXT PRIMARY KEY, event_type TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await db(`CREATE TABLE IF NOT EXISTS card_uploads(id TEXT PRIMARY KEY, user_id TEXT NOT NULL, mime TEXT NOT NULL, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
@@ -71,11 +72,13 @@ module.exports = function createCards(d) {
 
   /* ---------- live rate (cached: Payscribe gives only 20 free rate calls per day) ---------- */
   let rateCache = { v: 0, t: 0 }, lastRateError = null;
+  let rateInfo = null;
   async function liveRate(c) {
+    if (c.rateMode === "manual" && c.rateManual > 0) { rateInfo = { source: "manual", base: c.rateManual, at: Date.now() }; return c.rateManual; }
     if (rateCache.v && Date.now() - rateCache.t < c.cacheMin * 60000) return rateCache.v;
     const r = await ps("GET", "/fx/rate?from=USD&to=NGN");
     const rate = Number(r.data?.message?.details?.rate);
-    if (r.outcome === "success" && rate > 0) { rateCache = { v: rate, t: Date.now() }; lastRateError = null; return rate; }
+    if (r.outcome === "success" && rate > 0) { rateCache = { v: rate, t: Date.now() }; lastRateError = null; const dd = r.data?.message?.details || {}; rateInfo = { source: "payscribe", base: rate, mid: Number(dd.rate_mid) || null, spreadBps: Number(dd.spread_bps) || null, at: Date.now() }; return rate; }
     lastRateError = !KEY ? "PAYSCRIBE_API_KEY is not set on the server." : (r.outcome === "success" ? "Rate response had no usable rate." : `${r.code ? "HTTP/API " + r.code + ": " : ""}${r.message || r.outcome}`);
     console.error("CARD RATE ERROR:", lastRateError, "| base:", BASE);
     if (rateCache.v && Date.now() - rateCache.t < 3 * 3600000) return rateCache.v; // stale but recent
@@ -88,6 +91,15 @@ module.exports = function createCards(d) {
     const pct = (c?.collectionPct || 0) / 100;
     const col = pct > 0 && pct < 1 ? Math.min(Math.ceil(subtotal * pct / (1 - pct)), c.collectionCap || 0) : 0;
     return { usd, feeUsd, usdTotal, ratePerUsd: unit, subtotalNgn: subtotal, collectionFeeNgn: col, ngnTotal: subtotal + col };
+  }
+
+  let balCache = { v: null, t: 0 };
+  async function usdBalance() {
+    if (Date.now() - balCache.t < Number(process.env.PAYSCRIBE_BALANCE_CACHE_MS || 45000)) return balCache.v;
+    const r = await ps("GET", "/my-account/balances"); let v = null;
+    const list = r.data?.message?.details;
+    if (r.outcome === "success" && Array.isArray(list)) { const x = list.find(y => String(y.currency || "").toUpperCase() === "USD"); if (x && Number.isFinite(Number(x.available_balance))) v = Number(x.available_balance); }
+    balCache = { v, t: Date.now() }; return v;
   }
 
   /* ---------- helpers ---------- */
@@ -127,7 +139,7 @@ module.exports = function createCards(d) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const o = (await client.query(`UPDATE card_orders SET status='failed', error=$2, updated_at=NOW() WHERE reference=$1 AND status IN ('processing','pending','needs_review') RETURNING *`, [ref, clean(why).slice(0, 300)])).rows[0];
+      const o = (await client.query(`UPDATE card_orders SET status='failed', error=$2, updated_at=NOW() WHERE reference=$1 AND status IN ('processing','pending','needs_review','needs_funding') RETURNING *`, [ref, clean(why).slice(0, 300)])).rows[0];
       if (!o) { await client.query("COMMIT"); return false; }
       const amt = Number(o.paid_ngn ?? o.ngn_charged);
       const w = await client.query(`INSERT INTO wallets(user_id,balance) VALUES($2,$1) ON CONFLICT(user_id) DO UPDATE SET balance=wallets.balance+$1, updated_at=NOW() RETURNING balance`, [amt, o.user_id]);
@@ -164,7 +176,7 @@ module.exports = function createCards(d) {
     await expireStale(uid);
     const open = (await db(`SELECT * FROM card_orders WHERE user_id=$1 AND status='awaiting_payment' ORDER BY id DESC LIMIT 1`, [uid])).rows[0];
     if (open) return { code: 200, status: "awaiting_payment", order: orderView(open), message: "You already have a payment waiting." };
-    const busy = (await db(`SELECT 1 FROM card_orders WHERE user_id=$1 AND status IN ('paid','processing','pending','needs_review') LIMIT 1`, [uid])).rows[0];
+    const busy = (await db(`SELECT 1 FROM card_orders WHERE user_id=$1 AND status IN ('paid','processing','pending','needs_review','needs_funding') LIMIT 1`, [uid])).rows[0];
     if (busy) return { code: 409, message: "Your previous card request is still being processed." };
     const idem = clean(b.idempotencyKey).slice(0, 80) || null;
     if (idem) {
@@ -176,6 +188,10 @@ module.exports = function createCards(d) {
     const rate = await liveRate(c);
     if (!rate) return { code: 503, message: "Card pricing is unavailable right now. Please try again shortly." };
     const p = price(usd, kind === "create" ? c.feeUsd : 0, rate, c.margin, c);
+    if (!c.autoConvert) {
+      const have = await usdBalance();
+      if (have !== null && have < p.usdTotal) { console.error("CARD SALES PAUSED: USD wallet too low", have, "needed", p.usdTotal); return { code: 503, message: "The card service is temporarily unavailable. Please try again later." }; }
+    }
     const ref = reference("BOLTIV-CARD");
     try {
       await db(`INSERT INTO card_orders(user_id,kind,reference,idempotency_key,usd_amount,fee_usd,rate_ngn,margin_ngn,ngn_charged,collection_fee_ngn,brand,design,status,expires_at)
@@ -183,7 +199,7 @@ module.exports = function createCards(d) {
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : null, designOk(b.design) ? b.design : "dark", c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -225,7 +241,7 @@ module.exports = function createCards(d) {
     const ref = o.reference, uid = o.user_id;
     try {
       const c = await cfg();
-      if (c.autoConvert) {
+      if (c.autoConvert && !o.conversion_status) {
         const conv = await convert(Math.floor(Number(o.paid_ngn) - Number(o.paid_fee_ngn || 0)));
         await db(`UPDATE card_orders SET conversion_status=$2, conversion_note=$3 WHERE reference=$1`, [ref, conv.status, clean(conv.note).slice(0, 200)]);
       }
@@ -239,6 +255,12 @@ module.exports = function createCards(d) {
         r = await ps("PATCH", `/cards/${card.payscribe_card_id}/topup`, { amount: usd, ref });
       }
       if (r.outcome === "failed" && r.code === 405) { await db(`UPDATE card_orders SET status='pending', error='Duplicate reference at provider: check the provider dashboard before refunding', updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref]); return; }
+      if (r.outcome === "failed" && (r.code === 410 || /insufficient|can not be less than|not enough/i.test(r.message || ""))) {
+        await db(`UPDATE card_orders SET status='needs_funding', error='Waiting for USD funds in the card wallet', updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref]);
+        addNotification(uid, "Your card is being finalised", "We received your payment and are finalising your card. You will be notified as soon as it is ready.", "transaction").catch(() => { });
+        console.error("CARD NEEDS USD FUNDING:", ref);
+        return;
+      }
       if (r.outcome === "failed") { await refundOrder(ref, r.message); return; }
       if (r.outcome === "unknown") { await db(`UPDATE card_orders SET status='pending', error=$2, updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref, clean(r.message).slice(0, 200)]); return; }
       const det = r.data?.message?.details || {};
@@ -347,14 +369,14 @@ module.exports = function createCards(d) {
         const c = await cfg(); await liveRate(c);
         const [cards, open, today, orders, bal] = await Promise.all([
           db(`SELECT COUNT(*)::int AS n FROM user_cards`),
-          db(`SELECT COUNT(*)::int AS n FROM card_orders WHERE status IN ('pending','processing','needs_review')`),
+          db(`SELECT COUNT(*)::int AS n FROM card_orders WHERE status IN ('pending','processing','needs_review','needs_funding')`),
           db(`SELECT COUNT(*)::int AS n, COALESCE(SUM(ngn_charged),0) AS ngn FROM card_orders WHERE status='success' AND created_at>=date_trunc('day',NOW())`),
           db(`SELECT o.reference,o.user_id,u.email,o.kind,o.usd_amount,o.fee_usd,o.ngn_charged,o.paid_ngn,o.account_number,o.bank_name,o.status,o.error,o.conversion_status,o.conversion_note,o.created_at FROM card_orders o LEFT JOIN users u ON u.user_id=o.user_id ORDER BY o.id DESC LIMIT 60`),
           ps("GET", "/my-account/balances")]);
         let usd = null;
         const list = bal.data?.message?.details;
         if (Array.isArray(list)) { const r = list.find(x => String(x.currency || "").toUpperCase() === "USD"); if (r) usd = Number(r.available_balance); }
-        return send(res, 200, { success: true, settings: c, configured: !!KEY, rateError: lastRateError, baseUrl: BASE, hashKeySet: /^[0-9a-f]{64}$/i.test(HASH_KEY), usdBalance: Number.isFinite(usd) ? usd : null,
+        return send(res, 200, { success: true, settings: c, rate: rateInfo ? { ...rateInfo, ageMin: Math.round((Date.now() - rateInfo.at) / 60000), customerRate: Number((rateInfo.base + c.margin).toFixed(2)) } : null, configured: !!KEY, rateError: lastRateError, baseUrl: BASE, hashKeySet: /^[0-9a-f]{64}$/i.test(HASH_KEY), usdBalance: Number.isFinite(usd) ? usd : null,
           cards: cards.rows[0].n, open: open.rows[0].n, todayOrders: today.rows[0].n, todayNgn: Number(today.rows[0].ngn), orders: orders.rows }), true;
       }
       if (M === "POST" && path === "/api/admin/cards/settings") {
@@ -363,12 +385,13 @@ module.exports = function createCards(d) {
         const v = { card_enabled: b.enabled !== false && b.enabled !== "false", card_margin_ngn: Number(b.margin), card_creation_fee_usd: Number(b.feeUsd),
           card_min_usd: Number(b.minUsd), card_max_usd: Number(b.maxUsd), card_rate_cache_min: Number(b.cacheMin),
           card_collection_fee_pct: Number(b.collectionPct), card_collection_fee_cap: Number(b.collectionCap), card_pay_expiry_min: Number(b.expiryMin),
-          card_auto_convert: b.autoConvert === true || b.autoConvert === "true" };
+          card_auto_convert: b.autoConvert === true || b.autoConvert === "true", card_rate_mode: b.rateMode === "manual" ? "manual" : "auto", card_rate_manual: Number(b.rateManual) || 0 };
         const nums = ["card_margin_ngn", "card_creation_fee_usd", "card_min_usd", "card_max_usd", "card_rate_cache_min", "card_collection_fee_pct", "card_collection_fee_cap", "card_pay_expiry_min"];
         if (nums.some(k => !Number.isFinite(v[k]) || v[k] < 0) || v.card_min_usd < 1 || v.card_max_usd < v.card_min_usd || v.card_rate_cache_min < 1 || v.card_margin_ngn > 5000 || v.card_creation_fee_usd > 50 || v.card_collection_fee_pct > 5 || v.card_pay_expiry_min < 5 || v.card_pay_expiry_min > 240)
           return send(res, 400, { success: false, message: "Check the values: min $1 or more, max not below min, cache 1+ minute, expiry 5-240 minutes, collection fee under 5%." }), true;
+        if (v.card_rate_mode === "manual" && !(v.card_rate_manual >= 100 && v.card_rate_manual <= 100000)) return send(res, 400, { success: false, message: "Enter the manual rate in naira per $1 (for example 1520)." }), true;
         for (const [k, val] of Object.entries(v)) await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`, [k, JSON.stringify(val)]);
-        rateCache = { v: 0, t: 0 };
+        rateCache = { v: 0, t: 0 }; rateInfo = null;
         return send(res, 200, { success: true, settings: await cfg() }), true;
       }
       if (M === "POST" && path === "/api/admin/cards/confirm") {
@@ -390,6 +413,34 @@ module.exports = function createCards(d) {
         if (!claimed) return send(res, 409, { success: false, message: "This order was already processed." }), true;
         send(res, 200, { success: true, message: "Payment confirmed. The card is being set up now." });
         fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message));
+        return true;
+      }
+      if (M === "POST" && path === "/api/admin/cards/retry") {
+        const chk = await requireAdminCsrf(req); if (!chk.success) return send(res, chk.statusCode || 403, chk), true;
+        const b = await body(req); const ref = clean(b.reference);
+        let o = (await db(`UPDATE card_orders SET status='processing', error=NULL, updated_at=NOW() WHERE reference=$1 AND status='needs_funding' RETURNING *`, [ref])).rows[0];
+        if (!o && b.reverseRefund === true) {
+          // the customer was already refunded to their wallet: take that refund back (only if it is still there), then retry
+          const client = await pool.connect();
+          try {
+            await client.query("BEGIN");
+            const x = (await client.query(`SELECT * FROM card_orders WHERE reference=$1 AND status='failed' AND paid_ngn IS NOT NULL FOR UPDATE`, [ref])).rows[0];
+            if (!x) { await client.query("ROLLBACK"); return send(res, 404, { success: false, message: "No refunded order with that reference." }), true; }
+            const amt = Number(x.paid_ngn);
+            const w = await client.query(`UPDATE wallets SET balance=balance-$1, updated_at=NOW() WHERE user_id=$2 AND balance>=$1 RETURNING balance`, [amt, x.user_id]);
+            if (!w.rows.length) { await client.query("ROLLBACK"); return send(res, 409, { success: false, message: "The customer's wallet no longer holds the refunded amount, so it cannot be taken back automatically." }), true; }
+            await addFinancialLedger(client, { accountType: "customer_wallet", ownerId: x.user_id, direction: "debit", amount: -amt, balanceAfter: Number(w.rows[0].balance), reference: `WALLET-REFUND-REVERSAL-${ref}`, category: "card_refund_reversal", description: "Card request retried by admin", metadata: {} });
+            o = (await client.query(`UPDATE card_orders SET status='processing', error=NULL, updated_at=NOW() WHERE id=$1 RETURNING *`, [x.id])).rows[0];
+            await client.query("COMMIT");
+          } catch (e) {
+            try { await client.query("ROLLBACK"); } catch { }
+            if (e.code === "23505") return send(res, 409, { success: false, message: "This customer already has another open card request." }), true;
+            throw e;
+          } finally { client.release(); }
+        }
+        if (!o) return send(res, 404, { success: false, message: "Nothing to retry for that order." }), true;
+        send(res, 200, { success: true, message: "Retrying now. The card is being set up." });
+        fulfillOrder(o).catch(e => console.error("CARD FULFILL ERROR:", e.message));
         return true;
       }
       if (M === "POST" && path === "/api/admin/cards/refund") {
@@ -417,7 +468,7 @@ module.exports = function createCards(d) {
       }
       await expireStale(uid);
       const openRow = (await db(`SELECT * FROM card_orders WHERE user_id=$1 AND status='awaiting_payment' ORDER BY id DESC LIMIT 1`, [uid])).rows[0];
-      const pending = (await db(`SELECT kind FROM card_orders WHERE user_id=$1 AND status IN ('paid','processing','pending','needs_review') LIMIT 1`, [uid])).rows[0];
+      const pending = (await db(`SELECT kind FROM card_orders WHERE user_id=$1 AND status IN ('paid','processing','pending','needs_review','needs_funding') LIMIT 1`, [uid])).rows[0];
       return send(res, 200, { success: true, verified: !!(await getProfile(uid)), card: cardView(card), open: orderView(openRow), pending: pending ? pending.kind : null }), true;
     }
     if (M === "POST" && path === "/api/cards/quote") {

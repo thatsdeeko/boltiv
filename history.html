@@ -996,6 +996,20 @@ getFirstName()
 .charAt(0)
 .toUpperCase();
 
+(async function syncProfileInitial(){
+try{
+const token=boltivMemoryStorage.getItem("boltivAuthToken")||"";
+const h=token?{Authorization:"Bearer "+token}:{};
+const r=await fetch(window.BOLTIV_API_BASE+"/api/me",{headers:h,cache:"no-store"});
+if(!r.ok)return;
+const d=await r.json();
+if(!d||!d.user)return;
+boltivMemoryStorage.setItem("boltivUser",JSON.stringify(d.user));
+const n=String(d.user.firstName||d.user.firstname||d.user.name||"").trim();
+if(n)document.getElementById("profileButton").textContent=n.charAt(0).toUpperCase();
+}catch(e){}
+})();
+
 updateBalance();
 renderHistory();
 

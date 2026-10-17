@@ -239,7 +239,10 @@ fundBtn.onclick=()=>{const v=Number(amount.value);if(!v||v<100)return toast("err
 staticChoice.onclick=()=>setFundingChoice("static");dynamicChoice.onclick=()=>setFundingChoice("dynamic");identityType.onchange=()=>{identityNumber.placeholder=identityType.value.toUpperCase()==="NIN"?"Enter 11-digit NIN":"Enter 11-digit BVN"};
 cancelFunding.onclick=closeModal;closeFunding.onclick=closeModal;
 confirmFunding.onclick=async()=>{if(!pendingAmount)return;if(selectedAccountType==="static"){const identityNumberValue=identityNumber.value.trim();if(!/^\d{11}$/.test(identityNumberValue))return toast("error","Invalid Identity","Enter a valid 11-digit NIN or BVN.");await activateFundingAccount({accountType:"static",identityType:identityType.value,identityNumber:identityNumberValue});}else{await activateFundingAccount({accountType:"dynamic",amount:Number(pendingAmount)});}};
-modal.onclick=e=>{if(e.target===modal)closeModal()};document.onkeydown=e=>{if(e.key==="Escape")closeModal()};profileButton.onclick=()=>location.href="/profile";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);loadFundingAccount().finally(()=>loadWallet());loadWalletSummary();
+modal.onclick=e=>{if(e.target===modal)closeModal()};document.onkeydown=e=>{if(e.key==="Escape")closeModal()};profileButton.onclick=()=>location.href="/profile";document.querySelectorAll(".nav-item").forEach(x=>x.onclick=()=>location.href=x.dataset.page);function setProfileInitial(u){const n=String((u&&(u.firstName||u.firstname||u.name||u.fullName))||"").trim();if(n)profileButton.textContent=n.charAt(0).toUpperCase()}
+setProfileInitial(user());
+API.request("/api/me").then(r=>{if(r&&r.user){boltivMemoryStorage.setItem("boltivUser",JSON.stringify(r.user));setProfileInitial(r.user)}}).catch(()=>{});
+loadFundingAccount().finally(()=>loadWallet());loadWalletSummary();
 /* END OF BOLTIV WALLET */
 </script><script src="/boltiv-install.js?v=20261004-dark"></script>
 <script src="boltiv-footer.js?v=20261004-dark"></script>

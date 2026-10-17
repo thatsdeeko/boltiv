@@ -183,7 +183,7 @@ module.exports = function createCards(d) {
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : null, designOk(b.design) ? b.design : "dark", c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -208,7 +208,7 @@ module.exports = function createCards(d) {
     const acctId = clean(p.customer?.account_id), num = clean(p.customer?.number);
     if (!acctId && !num) return null;
     const o = (await db(`SELECT * FROM card_orders WHERE status IN ('awaiting_payment','expired') AND ((account_id IS NOT NULL AND account_id=$1) OR (account_number IS NOT NULL AND account_number=$2)) ORDER BY id DESC LIMIT 1`, [acctId || "-", num || "-"])).rows[0];
-    if (!o) return null;
+    if (!o) { console.error("CARD PAYMENT WEBHOOK: no matching open order", JSON.stringify({ account_id: acctId, number: num, amount: p.amount })); return null; }
     const amount = Number(p.amount), fee = Number(p.fee || 0), tid = clean(p.trans_id || p.event_id) || null;
     if (clean(p.currency || "NGN").toUpperCase() !== "NGN") return null;
     if (!(amount + 0.01 >= Number(o.ngn_charged))) {
@@ -216,6 +216,9 @@ module.exports = function createCards(d) {
       addNotification(o.user_id, "Payment needs review", `We received ${NGN(amount)} for your card request, which is less than ${NGN(o.ngn_charged)}. Our team will contact you or refund it to your wallet.`, "transaction").catch(() => { });
       return null;
     }
+    return await claimPaid(o, amount, fee, tid);
+  }
+  async function claimPaid(o, amount, fee, tid) {
     return (await db(`UPDATE card_orders SET status='processing', paid_ngn=$2, paid_fee_ngn=$3, payscribe_trans_id=COALESCE($4,payscribe_trans_id), updated_at=NOW() WHERE id=$1 AND status IN ('awaiting_payment','expired') RETURNING *`, [o.id, amount, fee, tid])).rows[0] || null;
   }
   async function fulfillOrder(o) {
@@ -235,6 +238,7 @@ module.exports = function createCards(d) {
         if (!card) throw new Error("No card found for this top-up");
         r = await ps("PATCH", `/cards/${card.payscribe_card_id}/topup`, { amount: usd, ref });
       }
+      if (r.outcome === "failed" && r.code === 405) { await db(`UPDATE card_orders SET status='pending', error='Duplicate reference at provider: check the provider dashboard before refunding', updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref]); return; }
       if (r.outcome === "failed") { await refundOrder(ref, r.message); return; }
       if (r.outcome === "unknown") { await db(`UPDATE card_orders SET status='pending', error=$2, updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref, clean(r.message).slice(0, 200)]); return; }
       const det = r.data?.message?.details || {};
@@ -316,7 +320,7 @@ module.exports = function createCards(d) {
 
     if (M === "POST" && path === "/api/payscribe/webhook") {
       const raw = await readRaw(req);
-      if (!sigOk(req, raw)) return send(res, 401, { success: false, message: "Invalid signature." }), true;
+      if (!sigOk(req, raw)) { console.error("CARD WEBHOOK REJECTED: invalid signature", JSON.stringify({ hasSignature: !!req.headers["x-payscribe-signature"], hasTimestamp: !!req.headers["x-payscribe-timestamp"], hasEventId: !!req.headers["x-payscribe-event-id"], secretIsApiKey: !process.env.PAYSCRIBE_WEBHOOK_SECRET })); return send(res, 401, { success: false, message: "Invalid signature." }), true; }
       let p; try { p = JSON.parse(raw || "{}"); } catch { return send(res, 400, { success: false }), true; }
       const type = clean(req.headers["x-payscribe-event"] || p.event_type || p.event);
       const eid = clean(req.headers["x-payscribe-event-id"] || p.event_id) || null;
@@ -345,7 +349,7 @@ module.exports = function createCards(d) {
           db(`SELECT COUNT(*)::int AS n FROM user_cards`),
           db(`SELECT COUNT(*)::int AS n FROM card_orders WHERE status IN ('pending','processing','needs_review')`),
           db(`SELECT COUNT(*)::int AS n, COALESCE(SUM(ngn_charged),0) AS ngn FROM card_orders WHERE status='success' AND created_at>=date_trunc('day',NOW())`),
-          db(`SELECT o.reference,o.user_id,u.email,o.kind,o.usd_amount,o.fee_usd,o.ngn_charged,o.paid_ngn,o.status,o.error,o.conversion_status,o.conversion_note,o.created_at FROM card_orders o LEFT JOIN users u ON u.user_id=o.user_id ORDER BY o.id DESC LIMIT 60`),
+          db(`SELECT o.reference,o.user_id,u.email,o.kind,o.usd_amount,o.fee_usd,o.ngn_charged,o.paid_ngn,o.account_number,o.bank_name,o.status,o.error,o.conversion_status,o.conversion_note,o.created_at FROM card_orders o LEFT JOIN users u ON u.user_id=o.user_id ORDER BY o.id DESC LIMIT 60`),
           ps("GET", "/my-account/balances")]);
         let usd = null;
         const list = bal.data?.message?.details;
@@ -366,6 +370,27 @@ module.exports = function createCards(d) {
         for (const [k, val] of Object.entries(v)) await db(`INSERT INTO platform_settings(key,value,updated_at) VALUES($1,$2::jsonb,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`, [k, JSON.stringify(val)]);
         rateCache = { v: 0, t: 0 };
         return send(res, 200, { success: true, settings: await cfg() }), true;
+      }
+      if (M === "POST" && path === "/api/admin/cards/confirm") {
+        const chk = await requireAdminCsrf(req); if (!chk.success) return send(res, chk.statusCode || 403, chk), true;
+        const b = await body(req);
+        const o = (await db(`SELECT * FROM card_orders WHERE reference=$1 AND status IN ('awaiting_payment','expired')`, [clean(b.reference)])).rows[0];
+        if (!o) return send(res, 404, { success: false, message: "No awaiting order with that reference." }), true;
+        let amount = Number(o.ngn_charged), fee = Number(o.collection_fee_ngn || 0), tid = null;
+        const sid = clean(b.sessionId);
+        if (sid) {
+          const r = await ps("POST", "/collections/virtual-accounts/confirm-payment", { trans_id: "", session_id: sid, amount: Number(o.ngn_charged), account_number: o.account_number });
+          const d = r.data?.message?.details;
+          if (r.outcome !== "success" || !d) return send(res, 400, { success: false, message: "The payment could not be confirmed: " + (r.message || "no response") }), true;
+          if (d.account?.number && clean(d.account.number) !== clean(o.account_number)) return send(res, 400, { success: false, message: "That payment belongs to a different account number." }), true;
+          amount = Number(d.amount ?? d.transaction?.amount ?? amount); fee = Number(d.fee || 0); tid = clean(d.trans_id) || null;
+          if (!(amount + 0.01 >= Number(o.ngn_charged))) return send(res, 400, { success: false, message: `Confirmed amount ${NGN(amount)} is less than the ${NGN(o.ngn_charged)} required.` }), true;
+        } else if (b.attest !== true) return send(res, 400, { success: false, message: "Enter the bank session ID, or confirm you checked the payment in the Payscribe dashboard." }), true;
+        const claimed = await claimPaid(o, amount, fee, tid);
+        if (!claimed) return send(res, 409, { success: false, message: "This order was already processed." }), true;
+        send(res, 200, { success: true, message: "Payment confirmed. The card is being set up now." });
+        fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message));
+        return true;
       }
       if (M === "POST" && path === "/api/admin/cards/refund") {
         const chk = await requireAdminCsrf(req); if (!chk.success) return send(res, chk.statusCode || 403, chk), true;

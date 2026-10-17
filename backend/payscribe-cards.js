@@ -199,7 +199,7 @@ module.exports = function createCards(d) {
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : null, designOk(b.design) ? b.design : "dark", c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -539,7 +539,12 @@ module.exports = function createCards(d) {
       if (!/^[0-9a-f]{64}$/i.test(HASH_KEY)) return out({ code: 503, message: "Card details are not available yet." });
       const r = await ps("GET", `/cards/${card.payscribe_card_id}`); const sd = r.data?.message?.details?.secure_details;
       if (r.outcome !== "success" || !sd) return out({ code: 503, message: "Could not load card details. Try again." });
-      try { const x = decrypt(sd); res.setHeader("Cache-Control", "no-store"); return out({ code: 200, number: x.number, cvv: x.ccv, expiry: x.expiry }); }
+      try {
+        const x = decrypt(sd); res.setHeader("Cache-Control", "no-store");
+        const bl = r.data?.message?.details?.billing || null;
+        const billing = bl ? { address: clean(bl.address), city: clean(bl.city), state: clean(bl.state), postal_code: clean(bl.postal_code), country: clean(bl.country) } : null;
+        return out({ code: 200, number: x.number, cvv: x.ccv, expiry: x.expiry, billing });
+      }
       catch { return out({ code: 503, message: "Could not read card details." }); }
     }
     if (M === "GET" && path === "/api/cards/transactions") {

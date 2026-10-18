@@ -66,6 +66,7 @@ html[data-theme="dark"] .cd-pay b,html[data-theme="dark"] .cd-wait{color:#f4f4f1
 .cd-note{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.45);font-size:12px;line-height:1.55;color:var(--t-fg-171717)}.cd-note b{display:block;margin-bottom:4px}.cd-note ul{margin:6px 0 0;padding-left:18px}
 .cd-ack{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--t-fg-171717)}.cd-ack input{margin-top:2px;width:18px;height:18px;accent-color:#D4AF37;flex:none}
 html[data-theme="dark"] .cd-note,html[data-theme="dark"] .cd-ack{color:#f4f4f1}
+.cd-help{margin:12px 2px 0;font-size:11.5px;line-height:1.5;color:var(--t-fg-777777)}html[data-theme="dark"] .cd-help{color:#b9bdc4}
 </style></head>
 <body><div class="page cd-page"><div class="container">
 <div class="cd-header"><button class="cd-back" onclick="history.length>1?history.back():location.href='/dashboard'">‹</button><div><div class="cd-title">BOLTIV Card</div><div class="cd-sub">USD VIRTUAL CARD</div></div></div>
@@ -81,7 +82,7 @@ html[data-theme="dark"] .cd-note,html[data-theme="dark"] .cd-ack{color:#f4f4f1}
 <li><b>Spend online.</b> Use it wherever Visa or Mastercard is accepted online in USD. You can freeze or unfreeze it at any time.</li>
 </ol></div></details>
 <details><summary>Pricing</summary><div class="body"><ul><li>You pay the card amount plus a one-time card creation fee and a small payment processing fee, converted to naira at the BOLTIV rate shown before you confirm. The exact naira total is always displayed first.</li><li>Funding your card carries no additional card fee.</li></ul></div></details>
-<details><summary>Important to know</summary><div class="body"><ul><li>Each customer can hold one card.</li><li>Apple Account payments (App Store, iCloud+) on a Nigerian-region account and Apple Pay are not supported.</li><li>Your card’s billing address is the address you entered during verification. Some stores check it, so type it exactly as shown under Details.</li><li>The card is intended for online payments, mainly with US merchants. Some categories, including money transfer, cryptocurrency, betting and gambling, dating and adult services, are not supported and may be declined.</li><li>Payments declined for insufficient funds may attract a fee, and a card is closed after repeated insufficient-funds declines. Please keep your card funded.</li><li>Payments in a currency other than USD may attract additional charges.</li></ul></div></details>
+<details><summary>Important to know</summary><div class="body"><ul><li>Each customer can hold one card.</li><li>BOLTIV Cards are contactless, so they can be added to Apple Pay or Google Pay where your phone and country support it.</li><li>Your card’s billing address is the address you entered during verification. Some stores check it, so type it exactly as shown under Details.</li><li>The card is intended for online payments, mainly with US merchants. Some categories, including money transfer, cryptocurrency, betting and gambling, dating and adult services, are not supported and may be declined.</li><li>Payments declined for insufficient funds may attract a fee, and a card is closed after repeated insufficient-funds declines. Please keep your card funded.</li><li>Payments in a currency other than USD may attract additional charges.</li></ul></div></details>
 <details><summary>Security</summary><div class="body"><ul><li>Your card number and CVV are shown only after you confirm your Transaction PIN, are hidden automatically after a short time, and are never stored by BOLTIV.</li><li>If a card request cannot be completed after your payment, the amount is refunded to your BOLTIV wallet automatically.</li></ul></div></details>
 </div>
 
@@ -154,14 +155,12 @@ function viewCreate(){
   <label class="cd-label">CARD TYPE</label><div class="cd-pills"><button class="cd-pill on" data-b="VISA">Visa</button><button class="cd-pill" data-b="MASTERCARD">Mastercard</button></div>
   <label class="cd-label">AMOUNT TO LOAD (USD, $${CFG.minUsd}–$${CFG.maxUsd})</label><input class="cd-in" id="c_amt" inputmode="decimal" placeholder="10"/>
   <div id="quote"></div>
-  <div class="cd-note"><b>Before you create your card</b>This card is for online payments in USD, mainly with US merchants. It does <b style="display:inline">not</b> work with:<ul><li>Apple Account payments, the App Store and iCloud+ on an Apple Account set to Nigeria, and Apple Pay</li><li>Money transfer, cryptocurrency, betting and gambling, dating and adult services</li></ul>Some subscriptions and stores may also decline it.</div>
-  <label class="cd-ack"><input type="checkbox" id="c_ack"/><span>I understand this card may not work with every service, and I want to continue.</span></label>
-  <div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn" disabled>CONTINUE TO PAYMENT</button></div>`;
+  <p class="cd-help">Not supported: money transfer, cryptocurrency, betting and gambling, dating and adult services. Some stores may also decline the card.</p>
+  <div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn">CONTINUE TO PAYMENT</button></div>`;
   main.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{design=b.dataset.d;main.querySelectorAll("[data-d]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
   main.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{brand=b.dataset.b;main.querySelectorAll("[data-b]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
   document.getElementById("c_amt").oninput=()=>quote("create","c_amt");
   document.getElementById("cBtn").onclick=createCard;
-  document.getElementById("c_ack").onchange=e=>{document.getElementById("cBtn").disabled=!e.target.checked};
 }
 async function quote(kind,inputId){
   clearTimeout(qTimer);const box=document.getElementById("quote"),usd=Number(document.getElementById(inputId).value);
@@ -170,7 +169,6 @@ async function quote(kind,inputId){
     box.innerHTML=q.success?`<div class="cd-quote"><div><span>Card amount</span><b>$${q.quote.usd.toFixed(2)}</b></div>${q.quote.feeUsd?`<div><span>Card creation fee</span><b>$${q.quote.feeUsd.toFixed(2)}</b></div>`:""}<div><span>Rate</span><b>${ngn(q.quote.ratePerUsd)} / $1</b></div>${q.quote.collectionFeeNgn?`<div><span>Payment processing fee</span><b>${ngn(q.quote.collectionFeeNgn)}</b></div>`:""}<div class="tot"><span>You pay</span><b>${ngn(q.quote.ngnTotal)}</b></div></div>`:`<div class="cd-quote">${esc(q.message)}</div>`},350)}
 async function createCard(){
   const usd=Number(document.getElementById("c_amt").value),btn=document.getElementById("cBtn");msg("cMsg","");
-  if(!document.getElementById("c_ack").checked)return msg("cMsg","Please tick the box to confirm you have read the notice.");
   if(!(usd>=CFG.minUsd&&usd<=CFG.maxUsd))return msg("cMsg",`Enter an amount between $${CFG.minUsd} and $${CFG.maxUsd}.`);
   const pin=await boltivGetTransactionPin();if(!pin)return;
   btn.disabled=true;btn.textContent="PLEASE WAIT…";

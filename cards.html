@@ -185,12 +185,14 @@ function viewCard(){
   main.innerHTML=`<div id="prev">${cardHTML(c)}</div><div class="cd-bal">BALANCE<b>$${c.balance_usd.toFixed(2)}</b></div>
   <div class="cd-acts"><button class="cd-ra" id="aShow"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>Details</button><button class="cd-ra" id="aFreeze"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.5 4.5 12 6.5l2.5-2M9.5 19.5l2.5-2 2.5 2"/></svg></span>${c.status==="frozen"?"Unfreeze":"Freeze"}</button><button class="cd-ra" id="aFund"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Fund</button></div>
   <div class="cd-msg" id="aMsg"></div><div id="fundBox"></div><div id="revBox"></div>
+  ${CFG.upgradeEnabled&&!c.contactless&&c.status==="active"?`<div class="cd-box"><h3>Upgrade to a contactless card</h3><p>A contactless card can be added to a phone wallet where your phone and country support it. Your balance moves to the new card automatically. Your card number, expiry and CVV will change, so update any store or subscription that saved your old card. You pay the card creation fee by bank transfer.</p><button class="cd-btn ghost" id="upBtn">UPGRADE MY CARD</button></div>`:""}
   <div class="cd-box"><h3>Card style</h3><div class="cd-pills"><button class="cd-pill ${c.design==="dark"?"on":""}" data-d="dark">Dark</button><button class="cd-pill ${c.design==="light"?"on":""}" data-d="light">Light</button></div></div>
   <div class="cd-box"><h3>Recent card activity</h3><div id="txBox"><p>Loading…</p></div></div>`;
   main.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const r=await api("/api/cards/design",{design:b.dataset.d});if(r.success){ME.card.design=r.design;viewCard()}});
   document.getElementById("aFund").onclick=openFund;
   document.getElementById("aFreeze").onclick=toggleFreeze;
   document.getElementById("aShow").onclick=reveal;
+  const ub=document.getElementById("upBtn");if(ub)ub.onclick=startUpgrade;
   loadTx();
   if(location.hash==="#fund")openFund();
 }
@@ -206,6 +208,15 @@ function openFund(){
     if(r.success&&r.order)return showPay(r.order);
     msg("fMsg",r.message||"Could not start your top-up.");
   };
+}
+async function startUpgrade(){
+  msg("aMsg","");
+  const q=await api("/api/cards/quote",{kind:"upgrade"});if(!q.success)return msg("aMsg",q.message||"Upgrade pricing is unavailable right now.");
+  if(!confirm("Upgrade to a contactless card?\n\nYou pay "+ngn(q.quote.ngnTotal)+" by bank transfer (card creation fee).\nYour balance moves automatically.\nYour card number, expiry and CVV will CHANGE. Update any store or subscription that saved your old card.\n\nThis cannot be undone."))return;
+  const pin=await boltivGetTransactionPin();if(!pin)return;
+  const r=await api("/api/cards/upgrade",{transactionPin:pin,idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
+  if(r.success&&r.order)return showPay(r.order);
+  msg("aMsg",r.message||"Could not start the upgrade.");
 }
 async function toggleFreeze(){
   const c=ME.card,un=c.status==="frozen";let pin;if(un){pin=await boltivGetTransactionPin();if(!pin)return}
@@ -232,9 +243,9 @@ let payTimer=null,cdTimer=null;
 function stopPay(){clearInterval(payTimer);clearInterval(cdTimer)}
 function showPay(o){
   stopPay();
-  const breakdown=`<div class="cd-quote"><div><span>Card amount</span><b>$${o.usd.toFixed(2)}</b></div>${o.feeUsd?`<div><span>Card creation fee</span><b>$${o.feeUsd.toFixed(2)}</b></div>`:""}${o.collectionFeeNgn?`<div><span>Payment processing fee</span><b>${ngn(o.collectionFeeNgn)}</b></div>`:""}<div class="tot"><span>Total to transfer</span><b>${ngn(o.ngnTotal)}</b></div></div>`;
+  const breakdown=`<div class="cd-quote">${o.kind==="upgrade"?"":`<div><span>Card amount</span><b>$${o.usd.toFixed(2)}</b></div>`}${o.feeUsd?`<div><span>Card creation fee</span><b>$${o.feeUsd.toFixed(2)}</b></div>`:""}${o.collectionFeeNgn?`<div><span>Payment processing fee</span><b>${ngn(o.collectionFeeNgn)}</b></div>`:""}<div class="tot"><span>Total to transfer</span><b>${ngn(o.ngnTotal)}</b></div></div>`;
   main.innerHTML=`<div id="prev">${cardHTML(ME.card||null,design)}</div><div class="cd-box"><h3>Complete your payment</h3>
-  <p>Transfer exactly <b>${ngn(o.ngnTotal)}</b> to the account below using any bank app. Your card will be ${o.kind==="create"?"created":"funded"} automatically as soon as the payment is received.</p>
+  <p>Transfer exactly <b>${ngn(o.ngnTotal)}</b> to the account below using any bank app. Your card will be ${o.kind==="create"?"created":o.kind==="upgrade"?"upgraded":"funded"} automatically as soon as the payment is received.</p>
   <div class="cd-pay"><div><small>BANK</small><b>${esc(o.bank)}</b></div><div><small>ACCOUNT NUMBER</small><span><b id="payNo">${esc(o.accountNumber)}</b><button class="cd-copy" id="payCopy">COPY</button></span></div><div><small>ACCOUNT NAME</small><b>${esc(o.accountName)}</b></div><div><small>AMOUNT</small><b>${ngn(o.ngnTotal)}</b></div></div>
   ${breakdown}<p class="cd-wait" id="payState">Waiting for your transfer…<span id="payCd"></span></p><div class="cd-msg" id="payMsg"></div>
   <button class="cd-btn ghost" id="payCancel">CANCEL REQUEST</button></div>`;
@@ -247,7 +258,7 @@ function showPay(o){
     const r=await api("/api/cards/order?ref="+encodeURIComponent(o.reference));if(!r.success||!r.order)return;
     const st=r.order.status,el=document.getElementById("payState");if(!el)return stopPay();
     if(st==="awaiting_payment")return;
-    if(st==="paid"||st==="processing"){el.innerHTML="Payment received. Finalising your "+(o.kind==="create"?"card":"top-up")+"…";return}
+    if(st==="paid"||st==="processing"){el.innerHTML="Payment received. Finalising your "+(o.kind==="create"?"card":o.kind==="upgrade"?"card upgrade":"top-up")+"…";return}
     if(st==="pending"||st==="needs_funding"){el.textContent="Payment received. This is taking a little longer than usual. You will be notified when it is complete.";return}
     stopPay();
     if(st==="success"){el.textContent="Done!";setTimeout(load,700);return}

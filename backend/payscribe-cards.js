@@ -19,14 +19,14 @@ module.exports = function createCards(d) {
   /* ---------- settings (admin-changeable via platform settings, env/defaults otherwise) ---------- */
   async function cfg() {
     const g = async (k, f) => { try { const v = await getPlatformSetting(k, f); return v === null || v === undefined ? f : v; } catch { return f; } };
-    const [enabled, margin, fee, min, max, cacheMin, colPct, colCap, expMin, autoConv, rateMode, rateManual] = await Promise.all([
+    const [enabled, margin, fee, min, max, cacheMin, colPct, colCap, expMin, autoConv, rateMode, rateManual, contactless] = await Promise.all([
       g("card_enabled", true), g("card_margin_ngn", 100), g("card_creation_fee_usd", 2),
       g("card_min_usd", 1), g("card_max_usd", 500), g("card_rate_cache_min", 60),
-      g("card_collection_fee_pct", 0.65), g("card_collection_fee_cap", 250), g("card_pay_expiry_min", 30), g("card_auto_convert", false), g("card_rate_mode", "auto"), g("card_rate_manual", 0)]);
+      g("card_collection_fee_pct", 0.65), g("card_collection_fee_cap", 250), g("card_pay_expiry_min", 30), g("card_auto_convert", false), g("card_rate_mode", "auto"), g("card_rate_manual", 0), g("card_contactless", false)]);
     return { enabled: enabled !== false && enabled !== "false", margin: Number(margin), feeUsd: Number(fee),
       minUsd: Number(min), maxUsd: Number(max), cacheMin: Math.max(1, Number(cacheMin)),
       collectionPct: Math.max(0, Number(colPct)), collectionCap: Math.max(0, Number(colCap)), expiryMin: Math.max(5, Number(expMin)),
-      autoConvert: autoConv === true || autoConv === "true", rateMode: rateMode === "manual" ? "manual" : "auto", rateManual: Number(rateManual) > 0 ? Number(rateManual) : 0 };
+      autoConvert: autoConv === true || autoConv === "true", rateMode: rateMode === "manual" ? "manual" : "auto", rateManual: Number(rateManual) > 0 ? Number(rateManual) : 0, contactless: contactless === true || contactless === "true" };
   }
 
   /* ---------- tables ---------- */
@@ -199,7 +199,7 @@ module.exports = function createCards(d) {
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : null, designOk(b.design) ? b.design : "dark", c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -249,7 +249,7 @@ module.exports = function createCards(d) {
       let r;
       if (o.kind === "create") {
         if (!profile) throw new Error("No verified card profile for this customer");
-        r = await ps("POST", "/cards/create", { customer_id: profile.payscribe_customer_id, currency: "USD", brand: o.brand, amount: usd, type: "virtual", ref });
+        r = await ps("POST", "/cards/create", { customer_id: profile.payscribe_customer_id, currency: "USD", brand: o.brand, amount: usd, type: "virtual", ref, ...(c.contactless ? { contactless: true } : {}) });
       } else {
         if (!card) throw new Error("No card found for this top-up");
         r = await ps("PATCH", `/cards/${card.payscribe_card_id}/topup`, { amount: usd, ref });
@@ -385,7 +385,7 @@ module.exports = function createCards(d) {
         const v = { card_enabled: b.enabled !== false && b.enabled !== "false", card_margin_ngn: Number(b.margin), card_creation_fee_usd: Number(b.feeUsd),
           card_min_usd: Number(b.minUsd), card_max_usd: Number(b.maxUsd), card_rate_cache_min: Number(b.cacheMin),
           card_collection_fee_pct: Number(b.collectionPct), card_collection_fee_cap: Number(b.collectionCap), card_pay_expiry_min: Number(b.expiryMin),
-          card_auto_convert: b.autoConvert === true || b.autoConvert === "true", card_rate_mode: b.rateMode === "manual" ? "manual" : "auto", card_rate_manual: Number(b.rateManual) || 0 };
+          card_auto_convert: b.autoConvert === true || b.autoConvert === "true", card_rate_mode: b.rateMode === "manual" ? "manual" : "auto", card_rate_manual: Number(b.rateManual) || 0, card_contactless: b.contactless === true || b.contactless === "true" };
         const nums = ["card_margin_ngn", "card_creation_fee_usd", "card_min_usd", "card_max_usd", "card_rate_cache_min", "card_collection_fee_pct", "card_collection_fee_cap", "card_pay_expiry_min"];
         if (nums.some(k => !Number.isFinite(v[k]) || v[k] < 0) || v.card_min_usd < 1 || v.card_max_usd < v.card_min_usd || v.card_rate_cache_min < 1 || v.card_margin_ngn > 5000 || v.card_creation_fee_usd > 50 || v.card_collection_fee_pct > 5 || v.card_pay_expiry_min < 5 || v.card_pay_expiry_min > 240)
           return send(res, 400, { success: false, message: "Check the values: min $1 or more, max not below min, cache 1+ minute, expiry 5-240 minutes, collection fee under 5%." }), true;

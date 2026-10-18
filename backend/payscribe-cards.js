@@ -19,14 +19,14 @@ module.exports = function createCards(d) {
   /* ---------- settings (admin-changeable via platform settings, env/defaults otherwise) ---------- */
   async function cfg() {
     const g = async (k, f) => { try { const v = await getPlatformSetting(k, f); return v === null || v === undefined ? f : v; } catch { return f; } };
-    const [enabled, margin, fee, min, max, cacheMin, colPct, colCap, expMin, autoConv, rateMode, rateManual, contactless] = await Promise.all([
+    const [enabled, margin, fee, min, max, cacheMin, colPct, colCap, expMin, autoConv, rateMode, rateManual, contactless, upgradeOn] = await Promise.all([
       g("card_enabled", true), g("card_margin_ngn", 100), g("card_creation_fee_usd", 2),
       g("card_min_usd", 1), g("card_max_usd", 500), g("card_rate_cache_min", 60),
-      g("card_collection_fee_pct", 0.65), g("card_collection_fee_cap", 250), g("card_pay_expiry_min", 30), g("card_auto_convert", false), g("card_rate_mode", "auto"), g("card_rate_manual", 0), g("card_contactless", false)]);
+      g("card_collection_fee_pct", 0.65), g("card_collection_fee_cap", 250), g("card_pay_expiry_min", 30), g("card_auto_convert", false), g("card_rate_mode", "auto"), g("card_rate_manual", 0), g("card_contactless", false), g("card_upgrade_enabled", false)]);
     return { enabled: enabled !== false && enabled !== "false", margin: Number(margin), feeUsd: Number(fee),
       minUsd: Number(min), maxUsd: Number(max), cacheMin: Math.max(1, Number(cacheMin)),
       collectionPct: Math.max(0, Number(colPct)), collectionCap: Math.max(0, Number(colCap)), expiryMin: Math.max(5, Number(expMin)),
-      autoConvert: autoConv === true || autoConv === "true", rateMode: rateMode === "manual" ? "manual" : "auto", rateManual: Number(rateManual) > 0 ? Number(rateManual) : 0, contactless: contactless === true || contactless === "true" };
+      autoConvert: autoConv === true || autoConv === "true", rateMode: rateMode === "manual" ? "manual" : "auto", rateManual: Number(rateManual) > 0 ? Number(rateManual) : 0, contactless: contactless === true || contactless === "true", upgradeEnabled: upgradeOn === true || upgradeOn === "true" };
   }
 
   /* ---------- tables ---------- */
@@ -38,8 +38,9 @@ module.exports = function createCards(d) {
       await db(`CREATE TABLE IF NOT EXISTS card_orders(id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, kind TEXT NOT NULL, reference TEXT UNIQUE NOT NULL, idempotency_key TEXT, usd_amount NUMERIC(14,2) NOT NULL, fee_usd NUMERIC(14,2) NOT NULL DEFAULT 0, rate_ngn NUMERIC(14,4) NOT NULL, margin_ngn NUMERIC(14,2) NOT NULL, ngn_charged NUMERIC(14,2) NOT NULL, brand TEXT, status TEXT NOT NULL DEFAULT 'processing', payscribe_trans_id TEXT, error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_idem ON card_orders(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL`);
       for (const col of ["collection_fee_ngn NUMERIC(14,2) NOT NULL DEFAULT 0", "design TEXT", "account_id TEXT", "account_number TEXT", "account_name TEXT", "bank_name TEXT",
-        "expires_at TIMESTAMPTZ", "paid_ngn NUMERIC(14,2)", "paid_fee_ngn NUMERIC(14,2)", "conversion_status TEXT", "conversion_note TEXT"])
+        "expires_at TIMESTAMPTZ", "paid_ngn NUMERIC(14,2)", "paid_fee_ngn NUMERIC(14,2)", "conversion_status TEXT", "conversion_note TEXT", "upgrade_amount NUMERIC(14,2)", "old_card_id TEXT"])
         await db(`ALTER TABLE card_orders ADD COLUMN IF NOT EXISTS ${col}`);
+      await db(`ALTER TABLE user_cards ADD COLUMN IF NOT EXISTS contactless BOOLEAN NOT NULL DEFAULT false`);
       await db(`DROP INDEX IF EXISTS card_orders_one_card`);
       await db(`DROP INDEX IF EXISTS card_orders_one_card2`);
       await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_one_card3 ON card_orders(user_id) WHERE kind='create' AND status IN ('awaiting_payment','paid','processing','pending','needs_review','needs_funding','success')`);
@@ -52,7 +53,7 @@ module.exports = function createCards(d) {
 
   /* ---------- Payscribe HTTP ---------- */
   // outcome: "success" | "failed" (definitive) | "unknown" (timeout / 5xx / 201 pending: never auto-refund)
-  async function ps(method, path, payload) {
+  async function ps(method, path, payload, opts = {}) {
     if (!KEY) return { outcome: "failed", message: "Card service is not configured yet.", data: {} };
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30000);
     try {
@@ -62,7 +63,7 @@ module.exports = function createCards(d) {
       let j = {}; try { j = await r.json(); } catch { }
       const code = Number(j.status_code || r.status);
       const message = clean(j.description || j.message?.description || (typeof j.message === "string" ? j.message : "")).replace(/payscribe/gi, "our card service");
-      if (j.status === true && code === 200) return { outcome: "success", message, data: j };
+      if ((j.status === true && code === 200) || (opts.emptyOk && r.status >= 200 && r.status < 300 && j.status !== false)) return { outcome: "success", message, data: j };
       if (code === 201 || code >= 500 || r.status >= 500) return { outcome: "unknown", message, data: j };
       return { outcome: "failed", message: message || "Request was not accepted.", code, data: j };
     } catch (e) {
@@ -117,7 +118,7 @@ module.exports = function createCards(d) {
   async function getCard(uid) { return (await db(`SELECT * FROM user_cards WHERE user_id=$1`, [uid])).rows[0] || null; }
   function cardView(c) {
     return c && { brand: c.brand, last_four: c.last_four, first_six: c.first_six, masked: c.masked, holder_name: c.holder_name,
-      status: c.status, balance_usd: Number(c.balance_usd), design: c.design };
+      status: c.status, balance_usd: Number(c.balance_usd), design: c.design, contactless: !!c.contactless };
   }
   function decrypt(sd) {
     const key = Buffer.from(HASH_KEY, "hex");
@@ -146,7 +147,7 @@ module.exports = function createCards(d) {
       if (!w.rows.length) throw new Error("Wallet could not be credited for card refund.");
       await addFinancialLedger(client, { accountType: "customer_wallet", ownerId: o.user_id, direction: "credit", amount: amt, balanceAfter: Number(w.rows[0].balance), reference: `WALLET-REFUND-${ref}`, category: "card_refund", description: `Refund for card ${o.kind}`, metadata: { reason: why } });
       await client.query("COMMIT");
-      addNotification(o.user_id, "Card payment refunded", `We could not complete your card ${o.kind === "create" ? "creation" : "funding"}. ${NGN(amt)} was returned to your BOLTIV wallet.`, "transaction").catch(() => { });
+      addNotification(o.user_id, "Card payment refunded", `We could not complete your card ${o.kind === "create" ? "creation" : o.kind === "upgrade" ? "upgrade" : "funding"}. ${NGN(amt)} was returned to your BOLTIV wallet.`, "transaction").catch(() => { });
       return true;
     } catch (e) { try { await client.query("ROLLBACK"); } catch { } throw e; } finally { client.release(); }
   }
@@ -155,7 +156,7 @@ module.exports = function createCards(d) {
     if (!o) return null;
     await insertVTUTransaction({ userId: o.user_id, type: "debit", service: "card", amount: Number(o.ngn_charged), reference: o.reference, status: "successful", recipient: "BOLTIV USD Card", providerReference: info.transId || null,
       metadata: { provider: "payscribe", payment_method: "bank_transfer", kind: o.kind, usd_amount: Number(o.usd_amount), fee_usd: Number(o.fee_usd), collection_fee_ngn: Number(o.collection_fee_ngn || 0), rate_ngn: Number(o.rate_ngn), margin_ngn: Number(o.margin_ngn) } }).catch(e => console.error("CARD HISTORY ROW ERROR:", e.message));
-    addNotification(o.user_id, o.kind === "create" ? "Your BOLTIV card is ready" : "Card funded", o.kind === "create" ? `Your USD virtual card is ready with $${Number(o.usd_amount).toFixed(2)}.` : `$${Number(o.usd_amount).toFixed(2)} was added to your card.`, "transaction").catch(() => { });
+    addNotification(o.user_id, o.kind === "create" ? "Your BOLTIV card is ready" : o.kind === "upgrade" ? "Your contactless card is ready" : "Card funded", o.kind === "create" ? `Your USD virtual card is ready with $${Number(o.usd_amount).toFixed(2)}.` : o.kind === "upgrade" ? `Your balance of $${Number(o.upgrade_amount || 0).toFixed(2)} was moved to your new contactless card. Your card number, expiry and CVV have changed.` : `$${Number(o.usd_amount).toFixed(2)} was added to your card.`, "transaction").catch(() => { });
     return o;
   }
 
@@ -164,14 +165,20 @@ module.exports = function createCards(d) {
     const uid = clean(user.user_id);
     const c = await cfg();
     if (!c.enabled) return { code: 503, message: "BOLTIV cards are temporarily unavailable." };
-    const usd = num2(b.usd);
-    if (!(usd >= c.minUsd && usd <= c.maxUsd)) return { code: 400, message: `Enter an amount between $${c.minUsd} and $${c.maxUsd}.` };
+    const isUp = kind === "upgrade";
+    const usd = isUp ? 0 : num2(b.usd);
+    if (!isUp && !(usd >= c.minUsd && usd <= c.maxUsd)) return { code: 400, message: `Enter an amount between $${c.minUsd} and $${c.maxUsd}.` };
     const profile = await getProfile(uid); const card = await getCard(uid);
     const brand = clean(b.brand).toUpperCase();
     if (kind === "create") {
       if (!profile) return { code: 400, message: "Please complete card verification first." };
       if (card) return { code: 409, message: "You already have a BOLTIV card." };
       if (!brandOk(brand)) return { code: 400, message: "Choose Visa or Mastercard." };
+    } else if (isUp) {
+      if (!c.upgradeEnabled) return { code: 403, message: "Card upgrades are not available right now." };
+      if (!card || card.status !== "active") return { code: 400, message: "Your card must be active to upgrade it." };
+      if (card.contactless) return { code: 400, message: "Your card is already contactless." };
+      if (Number(card.balance_usd) < c.minUsd) return { code: 400, message: `Your card needs at least $${c.minUsd} to be upgraded. Please fund it first.` };
     } else if (!card || card.status === "terminated") return { code: 400, message: "You do not have an active card." };
     await expireStale(uid);
     const open = (await db(`SELECT * FROM card_orders WHERE user_id=$1 AND status='awaiting_payment' ORDER BY id DESC LIMIT 1`, [uid])).rows[0];
@@ -187,7 +194,7 @@ module.exports = function createCards(d) {
     if (pinErr) return { code: 400, message: pinErr };
     const rate = await liveRate(c);
     if (!rate) return { code: 503, message: "Card pricing is unavailable right now. Please try again shortly." };
-    const p = price(usd, kind === "create" ? c.feeUsd : 0, rate, c.margin, c);
+    const p = price(usd, kind === "topup" ? 0 : c.feeUsd, rate, c.margin, c);
     if (!c.autoConvert) {
       const have = await usdBalance();
       if (have !== null && have < p.usdTotal) { console.error("CARD SALES PAUSED: USD wallet too low", have, "needed", p.usdTotal); return { code: 503, message: "The card service is temporarily unavailable. Please try again later." }; }
@@ -196,10 +203,10 @@ module.exports = function createCards(d) {
     try {
       await db(`INSERT INTO card_orders(user_id,kind,reference,idempotency_key,usd_amount,fee_usd,rate_ngn,margin_ngn,ngn_charged,collection_fee_ngn,brand,design,status,expires_at)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'awaiting_payment',NOW()+make_interval(mins=>$13))`,
-        [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : null, designOk(b.design) ? b.design : "dark", c.expiryMin]);
+        [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : (isUp ? clean(card.brand).toUpperCase() : null), isUp ? (card.design || "dark") : (designOk(b.design) ? b.design : "dark"), c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -237,6 +244,45 @@ module.exports = function createCards(d) {
   async function claimPaid(o, amount, fee, tid) {
     return (await db(`UPDATE card_orders SET status='processing', paid_ngn=$2, paid_fee_ngn=$3, payscribe_trans_id=COALESCE($4,payscribe_trans_id), updated_at=NOW() WHERE id=$1 AND status IN ('awaiting_payment','expired') RETURNING *`, [o.id, amount, fee, tid])).rows[0] || null;
   }
+  /* ---------- upgrade an existing card to a contactless card (resumable, safest order of steps) ---------- */
+  async function fulfillUpgrade(o, c) {
+    const ref = o.reference, uid = o.user_id;
+    const profile = await getProfile(uid), old = await getCard(uid);
+    const hold = async why => { await db(`UPDATE card_orders SET status='needs_review', error=$2, updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref, clean(why).slice(0, 200)]); console.error("CARD UPGRADE NEEDS REVIEW:", ref, why); };
+    if (!profile || !old) throw new Error("No card to upgrade");
+    const oldId = o.old_card_id || old.payscribe_card_id;
+    let moved = o.upgrade_amount === null || o.upgrade_amount === undefined ? null : Number(o.upgrade_amount);
+    if (moved === null) {
+      const g = await ps("GET", `/cards/${oldId}`);
+      const bal = Number(g.data?.message?.details?.balance);
+      if (g.outcome !== "success" || !Number.isFinite(bal)) { await refundOrder(ref, "Could not read the current card balance"); return; }
+      if (bal < c.minUsd) { await refundOrder(ref, "Card balance is below the minimum needed to upgrade"); return; }
+      const w = await ps("PATCH", `/cards/${oldId}/withdraw`, { amount: bal, ref: ref + "-W" });
+      if (w.outcome === "unknown") { await hold("Withdrawal outcome unknown: check the old card balance in the provider dashboard"); return; }
+      if (w.outcome !== "success") { await refundOrder(ref, w.message || "Could not move the card balance"); return; }
+      moved = bal;
+      await db(`UPDATE card_orders SET upgrade_amount=$2, old_card_id=$3 WHERE reference=$1`, [ref, moved, oldId]);
+    }
+    const mk = await ps("POST", "/cards/create", { customer_id: profile.payscribe_customer_id, currency: "USD", brand: old.brand, amount: moved, type: "virtual", contactless: true, ref: ref + "-N" });
+    const det = mk.data?.message?.details || {}; const k = det.card || {};
+    if (mk.outcome !== "success" || !k.id) {
+      if (mk.outcome === "failed" && (mk.code === 410 || /insufficient|can not be less than|not enough/i.test(mk.message || ""))) {
+        await db(`UPDATE card_orders SET status='needs_funding', error='Waiting for USD funds in the card wallet', updated_at=NOW() WHERE reference=$1 AND status='processing'`, [ref]); return;
+      }
+      if (mk.outcome === "failed") {
+        const back = await ps("PATCH", `/cards/${oldId}/topup`, { amount: moved, ref: ref + "-R" });
+        if (back.outcome === "success") { await db(`UPDATE card_orders SET upgrade_amount=NULL, old_card_id=NULL WHERE reference=$1`, [ref]); await refundOrder(ref, mk.message || "Could not create the new card"); }
+        else await hold("URGENT: new card failed and the balance could not be restored to the old card");
+        return;
+      }
+      await hold("New card outcome unknown: check the provider dashboard before doing anything"); return;
+    }
+    await db(`UPDATE user_cards SET payscribe_card_id=$2, brand=$3, first_six=$4, last_four=$5, masked=$6, status='active', balance_usd=$7, contactless=true, updated_at=NOW() WHERE user_id=$1`, [uid, k.id, clean(k.brand) || old.brand, clean(k.first_six), clean(k.last_four), clean(k.masked), moved]);
+    const t = await ps("POST", `/cards/${oldId}/terminate`, { ref: ref + "-T" }, { emptyOk: true });
+    if (t.outcome !== "success") { await db(`UPDATE card_orders SET error=$2 WHERE reference=$1`, [ref, "Old card was not closed automatically: close it in the provider dashboard"]); console.error("CARD UPGRADE: old card not closed", ref, t.message); }
+    await settleSuccess(ref, { transId: det.trans_id });
+  }
+
   async function fulfillOrder(o) {
     const ref = o.reference, uid = o.user_id;
     try {
@@ -245,6 +291,7 @@ module.exports = function createCards(d) {
         const conv = await convert(Math.floor(Number(o.paid_ngn) - Number(o.paid_fee_ngn || 0)));
         await db(`UPDATE card_orders SET conversion_status=$2, conversion_note=$3 WHERE reference=$1`, [ref, conv.status, clean(conv.note).slice(0, 200)]);
       }
+      if (o.kind === "upgrade") { await fulfillUpgrade(o, c); return; }
       const profile = await getProfile(uid), card = await getCard(uid), usd = Number(o.usd_amount);
       let r;
       if (o.kind === "create") {
@@ -267,8 +314,8 @@ module.exports = function createCards(d) {
       if (o.kind === "create") {
         const k = det.card || {};
         if (!k.id) { await db(`UPDATE card_orders SET status='pending', error='Provider returned no card id', payscribe_trans_id=$2, updated_at=NOW() WHERE reference=$1`, [ref, det.trans_id || null]); return; }
-        await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd,design) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9) ON CONFLICT(user_id) DO NOTHING`,
-          [uid, k.id, clean(k.brand) || o.brand, clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || profile.holder_name, usd, designOk(o.design) ? o.design : "dark"]);
+        await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd,design,contactless) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10) ON CONFLICT(user_id) DO NOTHING`,
+          [uid, k.id, clean(k.brand) || o.brand, clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || profile.holder_name, usd, designOk(o.design) ? o.design : "dark", !!c.contactless]);
       } else {
         const nb = Number(det.balance ?? det.card?.balance);
         await db(`UPDATE user_cards SET balance_usd=${Number.isFinite(nb) ? "$2" : "balance_usd+$2"}, updated_at=NOW() WHERE user_id=$1`, [uid, Number.isFinite(nb) ? nb : usd]);
@@ -385,7 +432,7 @@ module.exports = function createCards(d) {
         const v = { card_enabled: b.enabled !== false && b.enabled !== "false", card_margin_ngn: Number(b.margin), card_creation_fee_usd: Number(b.feeUsd),
           card_min_usd: Number(b.minUsd), card_max_usd: Number(b.maxUsd), card_rate_cache_min: Number(b.cacheMin),
           card_collection_fee_pct: Number(b.collectionPct), card_collection_fee_cap: Number(b.collectionCap), card_pay_expiry_min: Number(b.expiryMin),
-          card_auto_convert: b.autoConvert === true || b.autoConvert === "true", card_rate_mode: b.rateMode === "manual" ? "manual" : "auto", card_rate_manual: Number(b.rateManual) || 0, card_contactless: b.contactless === true || b.contactless === "true" };
+          card_auto_convert: b.autoConvert === true || b.autoConvert === "true", card_rate_mode: b.rateMode === "manual" ? "manual" : "auto", card_rate_manual: Number(b.rateManual) || 0, card_contactless: b.contactless === true || b.contactless === "true", card_upgrade_enabled: b.upgradeEnabled === true || b.upgradeEnabled === "true" };
         const nums = ["card_margin_ngn", "card_creation_fee_usd", "card_min_usd", "card_max_usd", "card_rate_cache_min", "card_collection_fee_pct", "card_collection_fee_cap", "card_pay_expiry_min"];
         if (nums.some(k => !Number.isFinite(v[k]) || v[k] < 0) || v.card_min_usd < 1 || v.card_max_usd < v.card_min_usd || v.card_rate_cache_min < 1 || v.card_margin_ngn > 5000 || v.card_creation_fee_usd > 50 || v.card_collection_fee_pct > 5 || v.card_pay_expiry_min < 5 || v.card_pay_expiry_min > 240)
           return send(res, 400, { success: false, message: "Check the values: min $1 or more, max not below min, cache 1+ minute, expiry 5-240 minutes, collection fee under 5%." }), true;
@@ -458,7 +505,7 @@ module.exports = function createCards(d) {
 
     if (M === "GET" && path === "/api/cards/config") {
       const c = await cfg(); const rate = c.enabled ? await liveRate(c) : 0;
-      return send(res, 200, { success: true, enabled: c.enabled, ready: !!KEY && !!rate, feeUsd: c.feeUsd, minUsd: c.minUsd, maxUsd: c.maxUsd, ratePerUsd: rate ? Number((rate + c.margin).toFixed(2)) : null }), true;
+      return send(res, 200, { success: true, enabled: c.enabled, ready: !!KEY && !!rate, upgradeEnabled: c.upgradeEnabled, feeUsd: c.feeUsd, minUsd: c.minUsd, maxUsd: c.maxUsd, ratePerUsd: rate ? Number((rate + c.margin).toFixed(2)) : null }), true;
     }
     if (M === "GET" && path === "/api/cards/me") {
       let card = await getCard(uid);
@@ -472,10 +519,10 @@ module.exports = function createCards(d) {
       return send(res, 200, { success: true, verified: !!(await getProfile(uid)), card: cardView(card), open: orderView(openRow), pending: pending ? pending.kind : null }), true;
     }
     if (M === "POST" && path === "/api/cards/quote") {
-      const b = await body(req); const c = await cfg(); const usd = num2(b.usd); const kind = b.kind === "topup" ? "topup" : "create";
-      if (!(usd >= c.minUsd && usd <= c.maxUsd)) return out({ code: 400, message: `Enter an amount between $${c.minUsd} and $${c.maxUsd}.` });
+      const b = await body(req); const c = await cfg(); const usd = num2(b.usd); const kind = b.kind === "topup" ? "topup" : b.kind === "upgrade" ? "upgrade" : "create";
+      if (kind !== "upgrade" && !(usd >= c.minUsd && usd <= c.maxUsd)) return out({ code: 400, message: `Enter an amount between $${c.minUsd} and $${c.maxUsd}.` });
       const rate = await liveRate(c); if (!rate) return out({ code: 503, message: "Card pricing is unavailable right now." });
-      return out({ code: 200, quote: price(usd, kind === "create" ? c.feeUsd : 0, rate, c.margin, c) });
+      return out({ code: 200, quote: price(kind === "upgrade" ? 0 : usd, kind === "topup" ? 0 : c.feeUsd, rate, c.margin, c) });
     }
     if (M === "GET" && path === "/api/cards/order") {
       const ref = clean(new URL(req.url, "http://x").searchParams.get("ref"));
@@ -518,6 +565,7 @@ module.exports = function createCards(d) {
       return out({ code: 200, message: "Verification complete. You can now create your card." });
     }
     if (M === "POST" && path === "/api/cards/create") { const b = await body(req); return out(await runOrder(user, "create", b)); }
+    if (M === "POST" && path === "/api/cards/upgrade") { const b = await body(req); return out(await runOrder(user, "upgrade", b)); }
     if (M === "POST" && path === "/api/cards/topup") { const b = await body(req); return out(await runOrder(user, "topup", b)); }
     if (M === "POST" && path === "/api/cards/design") {
       const b = await body(req); if (!designOk(b.design)) return out({ code: 400, message: "Invalid design." });

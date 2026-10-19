@@ -155,7 +155,7 @@ function viewCreate(){
   <label class="cd-label">CARD TYPE</label><div class="cd-pills"><button class="cd-pill on" data-b="VISA">Visa</button><button class="cd-pill" data-b="MASTERCARD">Mastercard</button></div>
   <label class="cd-label">AMOUNT TO LOAD (USD, $${CFG.minUsd}–$${CFG.maxUsd})</label><input class="cd-in" id="c_amt" inputmode="decimal" placeholder="10"/>
   <div id="quote"></div>
-  <p class="cd-help">Not supported: money transfer, cryptocurrency, betting and gambling, dating and adult services. Some stores may also decline the card.</p>
+  <p class="cd-help">Not supported: money transfer, cryptocurrency, betting and gambling, dating and adult services.</p>
   <div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn">CONTINUE TO PAYMENT</button></div>`;
   main.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{design=b.dataset.d;main.querySelectorAll("[data-d]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
   main.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{brand=b.dataset.b;main.querySelectorAll("[data-b]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});

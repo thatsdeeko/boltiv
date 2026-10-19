@@ -112,7 +112,7 @@ async function load(){
   if(!m.success){main.innerHTML=`<div class="cd-box"><p>${esc(m.message||"Could not load your card.")}</p></div>`;return}
   if(m.open)return showPay(m.open);
   if(m.card)return viewCard();
-  if(m.pending)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Processing your request</h3><p>Your ${m.pending==="create"?"new card":"top-up"} is being processed. This can take a few minutes. You will be notified when it is complete, and your wallet is refunded automatically if it cannot be completed.</p><button class="cd-btn ghost" onclick="load()">REFRESH</button></div>`;
+  if(m.pending)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Processing your request</h3><p>Your ${m.pending==="create"?"new card":m.pending==="upgrade"?"card upgrade":"top-up"} is being processed. This can take a few minutes. You will be notified when it is complete, and your wallet is refunded automatically if it cannot be completed.</p><button class="cd-btn ghost" onclick="load()">REFRESH</button></div>`;
   if(!c.success||!c.enabled||!c.ready)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Cards are temporarily unavailable</h3><p>${c.enabled===false?"The BOLTIV Card service is currently paused.":"We are unable to display card pricing at the moment."} Please try again shortly.</p></div>`;
   return m.verified?viewCreate():viewKyc();
 }
@@ -155,7 +155,7 @@ function viewCreate(){
   <label class="cd-label">CARD TYPE</label><div class="cd-pills"><button class="cd-pill on" data-b="VISA">Visa</button><button class="cd-pill" data-b="MASTERCARD">Mastercard</button></div>
   <label class="cd-label">AMOUNT TO LOAD (USD, $${CFG.minUsd}–$${CFG.maxUsd})</label><input class="cd-in" id="c_amt" inputmode="decimal" placeholder="10"/>
   <div id="quote"></div>
-  <p class="cd-help">Not supported: money transfer, cryptocurrency, betting and gambling, dating and adult services.</p>
+  <p class="cd-help">Not supported: money transfer, cryptocurrency, betting and gambling, dating and adult services. Some stores may also decline the card.</p>
   <div class="cd-msg" id="cMsg"></div><button class="cd-btn" id="cBtn">CONTINUE TO PAYMENT</button></div>`;
   main.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{design=b.dataset.d;main.querySelectorAll("[data-d]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
   main.querySelectorAll("[data-b]").forEach(b=>b.onclick=()=>{brand=b.dataset.b;main.querySelectorAll("[data-b]").forEach(x=>x.classList.toggle("on",x===b));document.getElementById("prev").innerHTML=cardHTML({brand},design)});
@@ -255,15 +255,17 @@ function showPay(o){
   const poll=async()=>{
     const r=await api("/api/cards/order?ref="+encodeURIComponent(o.reference));if(!r.success||!r.order)return;
     const st=r.order.status,el=document.getElementById("payState");if(!el)return stopPay();
+    const rm=()=>{const b=document.getElementById("payCancel");if(b)b.remove()};
+    if(st!=="awaiting_payment")rm();
     if(st==="awaiting_payment")return;
     if(st==="paid"||st==="processing"){el.innerHTML="Payment received. Finalising your "+(o.kind==="create"?"card":o.kind==="upgrade"?"card upgrade":"top-up")+"…";return}
     if(st==="pending"||st==="needs_funding"){el.textContent="Payment received. This is taking a little longer than usual. You will be notified when it is complete.";return}
     stopPay();
     if(st==="success"){el.textContent="Done!";setTimeout(load,700);return}
     const back='<button class="cd-btn" style="margin-top:12px" onclick="load()">BACK</button>';
-    if(st==="failed"){document.getElementById("payCancel").remove();el.textContent="We could not complete your request. Your payment has been refunded to your BOLTIV wallet."}
-    else if(st==="needs_review"){document.getElementById("payCancel").remove();el.textContent="We received your payment, but the amount did not match. Our team will review it shortly."}
-    else{document.getElementById("payCancel").remove();el.textContent="This payment window has closed. If you already transferred, please contact support."}
+    if(st==="failed"){rm();el.textContent="We could not complete your request. Your payment has been refunded to your BOLTIV wallet."}
+    else if(st==="needs_review"){rm();el.textContent="We received your payment, but the amount did not match. Our team will review it shortly."}
+    else{rm();el.textContent="This payment window has closed. If you already transferred, please contact support."}
     el.insertAdjacentHTML("afterend",back);
   };
   payTimer=setInterval(poll,4000);

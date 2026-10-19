@@ -15,6 +15,7 @@ module.exports = function createCards(d) {
   const KEY = process.env.PAYSCRIBE_API_KEY || "";
   const HASH_KEY = process.env.PAYSCRIBE_MERCHANT_HASH_KEY || "";
   const WEBHOOK_SECRET = process.env.PAYSCRIBE_WEBHOOK_SECRET || KEY;
+  const BLOCK_LOW_USD = process.env.PAYSCRIBE_BLOCK_LOW_USD === "1"; // default: take payments even when the USD wallet is empty (convert the collected naira, held orders finish by themselves)
 
   /* ---------- settings (admin-changeable via platform settings, env/defaults otherwise) ---------- */
   async function cfg() {
@@ -90,13 +91,14 @@ module.exports = function createCards(d) {
     const unit = Number((rate + margin).toFixed(2));
     const subtotal = Math.ceil(usdTotal * unit);
     const pct = (c?.collectionPct || 0) / 100;
-    const col = pct > 0 && pct < 1 ? Math.min(Math.ceil(subtotal * pct / (1 - pct)), c.collectionCap || 0) : 0;
+    const cap = c?.collectionCap > 0 ? c.collectionCap : Infinity;
+    const col = pct > 0 && pct < 1 ? Math.min(Math.ceil(subtotal * pct / (1 - pct)), cap) : 0;
     return { usd, feeUsd, usdTotal, ratePerUsd: unit, subtotalNgn: subtotal, collectionFeeNgn: col, ngnTotal: subtotal + col };
   }
 
   let balCache = { v: null, t: 0 };
-  async function usdBalance() {
-    if (Date.now() - balCache.t < Number(process.env.PAYSCRIBE_BALANCE_CACHE_MS || 45000)) return balCache.v;
+  async function usdBalance(fresh) {
+    if (!fresh && Date.now() - balCache.t < Number(process.env.PAYSCRIBE_BALANCE_CACHE_MS || 45000)) return balCache.v;
     const r = await ps("GET", "/my-account/balances"); let v = null;
     const list = r.data?.message?.details;
     if (r.outcome === "success" && Array.isArray(list)) { const x = list.find(y => String(y.currency || "").toUpperCase() === "USD"); if (x && Number.isFinite(Number(x.available_balance))) v = Number(x.available_balance); }
@@ -195,7 +197,7 @@ module.exports = function createCards(d) {
     const rate = await liveRate(c);
     if (!rate) return { code: 503, message: "Card pricing is unavailable right now. Please try again shortly." };
     const p = price(usd, kind === "topup" ? 0 : c.feeUsd, rate, c.margin, c);
-    if (!c.autoConvert) {
+    if (BLOCK_LOW_USD && !c.autoConvert) {
       const have = await usdBalance();
       if (have !== null && have < p.usdTotal) { console.error("CARD SALES PAUSED: USD wallet too low", have, "needed", p.usdTotal); return { code: 503, message: "The card service is temporarily unavailable. Please try again later." }; }
     }
@@ -206,7 +208,7 @@ module.exports = function createCards(d) {
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : (isUp ? clean(card.brand).toUpperCase() : null), isUp ? (card.design || "dark") : (designOk(b.design) ? b.design : "dark"), c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -381,11 +383,30 @@ module.exports = function createCards(d) {
     }
   }
 
+  /* ---------- held orders (NEEDS_FUNDING) complete by themselves once the USD wallet can cover them ---------- */
+  let sweepStarted = false;
+  async function sweepFunding() {
+    try {
+      const rows = (await db(`SELECT * FROM card_orders WHERE status='needs_funding' AND updated_at < NOW() - interval '60 seconds' ORDER BY id ASC LIMIT 5`)).rows;
+      if (!rows.length) return;
+      const have = await usdBalance(true);
+      if (have === null) return;
+      let left = have;
+      for (const o of rows) {
+        const need = o.kind === "topup" ? Number(o.usd_amount) : o.kind === "upgrade" ? Number(o.fee_usd) : Number(o.usd_amount) + Number(o.fee_usd);
+        if (left < need) continue;
+        const claimed = (await db(`UPDATE card_orders SET status='processing', error=NULL, updated_at=NOW() WHERE id=$1 AND status='needs_funding' RETURNING *`, [o.id])).rows[0];
+        if (claimed) { left -= need; fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message)); }
+      }
+    } catch (e) { console.error("CARD FUNDING SWEEP ERROR:", e.message); }
+  }
+  function startSweep() { if (sweepStarted) return; sweepStarted = true; const t = setInterval(sweepFunding, 120000); if (t.unref) t.unref(); }
+
   /* ---------- router ---------- */
   async function handle(req, res, path) {
     const M = req.method;
     if (!(path.startsWith("/api/cards") || path === "/api/payscribe/webhook" || path.startsWith("/api/admin/cards"))) return false;
-    await ensureTables();
+    await ensureTables(); startSweep();
 
     if (M === "POST" && path === "/api/payscribe/webhook") {
       const raw = await readRaw(req);
@@ -604,5 +625,5 @@ module.exports = function createCards(d) {
     }
     return send(res, 404, { success: false, message: "Route not found." }), true;
   }
-  return { handle };
+  return { handle, sweepFunding };
 };

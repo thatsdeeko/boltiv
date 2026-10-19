@@ -67,6 +67,12 @@ html[data-theme="dark"] .cd-pay b,html[data-theme="dark"] .cd-wait{color:#f4f4f1
 .cd-ack{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--t-fg-171717)}.cd-ack input{margin-top:2px;width:18px;height:18px;accent-color:#D4AF37;flex:none}
 html[data-theme="dark"] .cd-note,html[data-theme="dark"] .cd-ack{color:#f4f4f1}
 .cd-help{margin:12px 2px 0;font-size:11.5px;line-height:1.5;color:var(--t-fg-777777)}html[data-theme="dark"] .cd-help{color:#b9bdc4}
+.cd-day{font-size:10.5px;font-weight:900;letter-spacing:1.1px;color:var(--t-fg-777777);margin:16px 0 2px}.cd-day:first-child{margin-top:4px}
+.cd-tx2{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--t-bd-e5e5e1)}.cd-tx2:last-child{border:0}
+.tx-ic{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;background:rgba(212,175,55,.14);color:#b8921f}.tx-ic svg{width:19px;height:19px}.tx-ic.in{background:rgba(23,131,61,.12);color:#17833d}.tx-ic.no{background:rgba(185,76,76,.12);color:#b94c4c}
+.tx-main{flex:1;min-width:0}.tx-main b{display:block;font-size:13.5px;font-weight:800;color:var(--t-fg-171717);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tx-main small{display:block;margin-top:3px;font-size:11.5px;line-height:1.35;color:var(--t-fg-777777)}
+.tx-amt{font-size:13.5px;font-weight:800;color:var(--t-fg-171717);white-space:nowrap}.tx-amt.in{color:#17833d}.tx-amt.zero{color:var(--t-fg-777777)}
+html[data-theme="dark"] .tx-main b,html[data-theme="dark"] .tx-amt{color:#f4f4f1}html[data-theme="dark"] .tx-main small,html[data-theme="dark"] .cd-day,html[data-theme="dark"] .tx-amt.zero{color:#b9bdc4}html[data-theme="dark"] .tx-amt.in{color:#46c27a}html[data-theme="dark"] .tx-ic.in{color:#46c27a}
 </style></head>
 <body><div class="page cd-page"><div class="container">
 <div class="cd-header"><button class="cd-back" onclick="history.length>1?history.back():location.href='/dashboard'">‹</button><div><div class="cd-title">BOLTIV Card</div><div class="cd-sub">USD VIRTUAL CARD</div></div></div>
@@ -231,10 +237,55 @@ async function reveal(){
   const cb=document.getElementById("copyAddr");if(cb)cb.onclick=async()=>{try{await navigator.clipboard.writeText(line)}catch{const t=document.createElement("textarea");t.value=line;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove()}cb.textContent="COPIED"};
   setTimeout(()=>{box.innerHTML=""},60000);
 }
+/* ---------- card activity: plain-English rows ---------- */
+const TXI={
+ out:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>',
+ in:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17M15 17H7V9"/></svg>',
+ card:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.6"/><path d="M3 10.2h18M7 15h3"/></svg>',
+ snow:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
+ no:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 15.5 7-7"/></svg>'};
+const usd2=n=>"$"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+function niceName(s){return s.toLowerCase().replace(/(^|\s)[a-z]/g,m=>m.toUpperCase()).replace(/\b(Aws|Gcp|Usa|Uk|Tv|Ai|Api|Vpn|Ssl)\b/g,x=>x.toUpperCase())}
+function txMerchant(d,remark){
+  let m="";const i=d.search(/\sat\s/i);if(i>=0)m=d.slice(i+4);
+  m=m.replace(/^\s*Auth Reversal\s*-\s*/i,"").split(/\s\+?\d{6,}|\sAuth:|\s-\s/i)[0].trim();
+  if(!m&&remark){const p=String(remark).split("|");m=(p[2]||"").trim()}
+  if(m.includes(" "))m=m.replace(/\s+[A-Z]{2}\.?$/,"");
+  return m?niceName(m):"";
+}
+function fmtTx(t){
+  const d=String(t.description||"").trim(),low=d.toLowerCase(),rem=String(t.remark||""),amt=Math.abs(Number(t.amount)||0),st=String(t.status||"").toLowerCase();
+  const merchant=txMerchant(d,rem),bad=/fail|declin|reject|denied/.test(st)||/declin|denied|insufficient/.test(low);
+  let kind="out",title="",sub="",sign=-1;
+  if(/unfreeze/.test(low)){kind="snow";title="Card unfrozen";sub="Your card is active again";sign=0}
+  else if(/freeze/.test(low)){kind="snow";title="Card frozen";sub="Payments are paused";sign=0}
+  else if(/card issue|issue for customer/.test(low)){const L=(d.match(/with\s+([\d.]+)\s*USD/i)||[])[1];kind="card";title="Card created";sub=L?usd2(L)+" loaded + "+usd2(Math.max(0,amt-Number(L)))+" creation fee":"Your BOLTIV Card was issued"}
+  else if(/verification/.test(low)){kind="check";title="Card verification";sub="Verification check, no charge";sign=0}
+  else if(/refund|reversal/.test(low)){kind="in";title=merchant?"Refund from "+merchant:"Refund";sub="Returned to your card";sign=1}
+  else if(/withdraw/.test(low)){kind="out";title="Withdrawal";sub="Money taken off your card"}
+  else if(/top.?up|funded|funding/.test(low)){kind="in";title="Card funded";sub="Money added to your card";sign=1}
+  else if(bad){kind="no";title=merchant||"Payment declined";const why=rem.split("|").pop().trim();sub="Declined"+(why&&!/^approved/i.test(why)?": "+why:"");sign=0}
+  else{kind="out";title=merchant||d.replace(/\s*Auth:.*$/i,"").replace(/[0-9a-f]{8}-[0-9a-f-]{20,}/gi,"").replace(/\+?\d{7,}/g,"").trim().slice(0,40)||"Card payment";sub="Card payment"}
+  if(!/succ|approved|complete/.test(st)&&st&&!bad)sub+=" · "+niceName(st);
+  return{kind,title,sub,sign,amt};
+}
+function dayLabel(dt){const t=new Date(),s=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),diff=Math.round((s(t)-s(dt))/864e5);return diff===0?"Today":diff===1?"Yesterday":dt.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}
 async function loadTx(){
   const r=await api("/api/cards/transactions"),box=document.getElementById("txBox");if(!box)return;
   const list=Array.isArray(r.transactions)?r.transactions:[];
-  box.innerHTML=!r.success?`<p>${esc(r.message||"Activity is unavailable right now.")}</p>`:list.length?list.slice(0,15).map(t=>`<div class="cd-tx"><span>${esc(t.acceptor_name||t.description||t.type||"Card activity")}</span><b>${t.amount!=null?"$"+Number(t.amount).toFixed(2):""}</b></div>`).join(""):"<p>No card activity in the last 30 days.</p>";
+  if(!r.success)return box.innerHTML=`<p>${esc(r.message||"Activity is unavailable right now.")}</p>`;
+  if(!list.length)return box.innerHTML="<p>No card activity in the last 30 days.</p>";
+  const rows=list.map(t=>({t,dt:new Date(String(t.created_at||"").replace(" ","T"))})).sort((a,b)=>(b.dt-a.dt)||0).slice(0,25);
+  let html="",day="";
+  for(const {t,dt} of rows){
+    const f=fmtTx(t),ok=!isNaN(dt),dl=ok?dayLabel(dt):"";
+    if(dl&&dl!==day){day=dl;html+=`<div class="cd-day">${esc(dl.toUpperCase())}</div>`}
+    const time=ok?dt.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):"";
+    const amount=f.amt?(f.sign>0?"+":f.sign<0?"−":"")+usd2(f.amt):"";
+    html+=`<div class="cd-tx2"><span class="tx-ic ${f.kind==="in"?"in":f.kind==="no"?"no":""}">${TXI[f.kind]}</span><div class="tx-main"><b>${esc(f.title)}</b><small>${esc(f.sub)}${time?" · "+esc(time):""}</small></div><span class="tx-amt ${f.sign>0?"in":!f.amt||f.sign===0?"zero":""}">${esc(amount)}</span></div>`;
+  }
+  box.innerHTML=html;
 }
 /* ---------- bank-transfer payment panel ---------- */
 let payTimer=null,cdTimer=null;

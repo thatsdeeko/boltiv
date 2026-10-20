@@ -73,6 +73,17 @@ html[data-theme="dark"] .cd-note,html[data-theme="dark"] .cd-ack{color:#f4f4f1}
 .tx-main{flex:1;min-width:0}.tx-main b{display:block;font-size:13.5px;font-weight:800;color:var(--t-fg-171717);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tx-main small{display:block;margin-top:3px;font-size:11.5px;line-height:1.35;color:var(--t-fg-777777)}
 .tx-amt{font-size:13.5px;font-weight:800;color:var(--t-fg-171717);white-space:nowrap}.tx-amt.in{color:#17833d}.tx-amt.zero{color:var(--t-fg-777777)}
 html[data-theme="dark"] .tx-main b,html[data-theme="dark"] .tx-amt{color:#f4f4f1}html[data-theme="dark"] .tx-main small,html[data-theme="dark"] .cd-day,html[data-theme="dark"] .tx-amt.zero{color:#b9bdc4}html[data-theme="dark"] .tx-amt.in{color:#46c27a}html[data-theme="dark"] .tx-ic.in{color:#46c27a}
+.dt-ov{position:fixed;inset:0;z-index:2147483647;overflow-y:auto;padding:18px 20px 40px;box-sizing:border-box;color:var(--t-fg-171717)}
+.dt-back{background:none;border:0;padding:6px;margin-left:-6px;color:var(--t-fg-171717)}
+.dt-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:20px}.dt-head h2{margin:0;font-size:27px;font-weight:800;color:var(--t-fg-171717)}.dt-head p{margin:8px 0 0;font-size:13.5px;color:var(--t-fg-555555,#555)}
+.dt-net{text-align:right;flex:none}.dt-visa{display:block;font-weight:1000;font-style:italic;font-size:32px;line-height:1;letter-spacing:-1px;color:var(--t-fg-171717)}.dt-mc{justify-content:flex-end}.dt-net small{display:block;margin-top:5px;font-size:11.5px;color:var(--t-fg-777777)}
+.dt-about{margin:20px 0 14px;padding:13px 22px;border:0;border-radius:999px;background:linear-gradient(135deg,#D4AF37,#b88f1f);color:#111;font:900 13px inherit;letter-spacing:.3px}
+.dt-list{background:var(--t-bg-ffffff);border-radius:20px;padding:4px 20px}
+.dt-row{display:flex;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid var(--t-bd-e5e5e1)}.dt-row:last-child{border:0}
+.dt-val{flex:1;min-width:0}.dt-val .l{font-size:12.5px;color:var(--t-fg-777777)}.dt-val .v{margin-top:5px;font-size:16.5px;font-weight:600;line-height:1.35;word-break:break-word;color:var(--t-fg-171717)}
+.dt-cp{width:42px;height:42px;border:0;background:none;color:#9aa3b5;flex:none;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}.dt-cp svg{width:23px;height:23px}
+.dt-note{margin:16px 6px 0;font-size:12px;line-height:1.5;color:var(--t-fg-777777);text-align:center}
+html[data-theme="dark"] .dt-ov,html[data-theme="dark"] .dt-back,html[data-theme="dark"] .dt-head h2,html[data-theme="dark"] .dt-val .v,html[data-theme="dark"] .dt-visa{color:#f4f4f1}html[data-theme="dark"] .dt-head p,html[data-theme="dark"] .dt-val .l,html[data-theme="dark"] .dt-net small,html[data-theme="dark"] .dt-note{color:#b9bdc4}html[data-theme="dark"] .dt-cp{color:#8d97ad}
 </style></head>
 <body><div class="page cd-page"><div class="container">
 <div class="cd-header"><button class="cd-back" onclick="history.length>1?history.back():location.href='/dashboard'">‹</button><div><div class="cd-title">BOLTIV Card</div><div class="cd-sub">USD VIRTUAL CARD</div></div></div>
@@ -227,15 +238,39 @@ async function toggleFreeze(){
   const r=await api("/api/cards/freeze",{action:un?"unfreeze":"freeze",transactionPin:pin});
   if(r.success)return load();msg("aMsg",r.message||"Could not update the card.");
 }
+/* ---------- card details screen ---------- */
+let dtTimer=null;
+const CPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.6"/><path d="M15.5 8.5V6.6a2.1 2.1 0 0 0-2.1-2.1H6.6a2.1 2.1 0 0 0-2.1 2.1v6.8a2.1 2.1 0 0 0 2.1 2.1h1.9"/></svg>';
+const CPYOK='<svg viewBox="0 0 24 24" fill="none" stroke="#17833d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+function dtVis(){if(document.hidden)closeDetails()}
+function closeDetails(){clearInterval(dtTimer);document.removeEventListener("visibilitychange",dtVis);const o=document.getElementById("dtOv");if(o)o.remove();document.body.style.overflow=""}
+async function copyText(t){try{await navigator.clipboard.writeText(t)}catch{const x=document.createElement("textarea");x.value=t;document.body.appendChild(x);x.select();document.execCommand("copy");x.remove()}}
+function showDetails(r){
+  closeDetails();
+  const card=ME.card||{},b=r.billing||{},nm=String(card.holder_name||"").trim();
+  const country={NG:"Nigeria",US:"United States",GB:"United Kingdom"}[String(b.country||"").toUpperCase()]||b.country||"";
+  const rows=[["Card name",nm?niceName(nm):"",nm?niceName(nm):""],["Card number",String(r.number||"").replace(/(\d{4})(?=\d)/g,"$1 "),String(r.number||"")],["CVV",r.cvv,r.cvv],["Expiry date",r.expiry,r.expiry]];
+  if(b.address)rows.push(["Billing address",b.address,b.address],["City",b.city,b.city],["State",b.state,b.state],["Zip code",b.postal_code,b.postal_code],["Country",country,country]);
+  const net=(card.brand||"VISA").toUpperCase()==="MASTERCARD"?'<span class="bc-mc dt-mc"><i></i><i></i></span>':'<span class="dt-visa">VISA</span>';
+  const bg=getComputedStyle(document.body).backgroundColor,solid=(!bg||/rgba\(0, 0, 0, 0\)|transparent/.test(bg))?"#f6f7f9":bg;
+  const ov=document.createElement("div");ov.id="dtOv";ov.className="dt-ov";ov.style.background=solid;
+  ov.innerHTML=`<button class="dt-back" aria-label="Back" id="dtBack"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+  <div class="dt-head"><div><h2>Card details</h2><p>Find your virtual card details below</p></div><div class="dt-net">${net}<small>${card.contactless?"Contactless":"Virtual"}</small></div></div>
+  <button class="dt-about" id="dtAbout">About this card</button>
+  <div class="dt-list">${rows.filter(x=>x[1]).map(x=>`<div class="dt-row"><div class="dt-val"><div class="l">${esc(x[0])}</div><div class="v">${esc(x[1])}</div></div><button class="dt-cp" aria-label="Copy ${esc(x[0])}" data-copy="${esc(x[2])}">${CPY}</button></div>`).join("")}</div>
+  ${b.address?"":'<p class="dt-note">Billing address: use the address you entered during verification.</p>'}
+  <p class="dt-note">Your details hide automatically in <b id="dtCd">60</b> seconds. BOLTIV never stores your card number or CVV.</p>`;
+  document.body.appendChild(ov);document.body.style.overflow="hidden";
+  ov.onclick=async e=>{const cp=e.target.closest(".dt-cp");if(!cp)return;await copyText(cp.dataset.copy);cp.innerHTML=CPYOK;setTimeout(()=>{if(cp.isConnected)cp.innerHTML=CPY},1400)};
+  document.getElementById("dtBack").onclick=closeDetails;
+  document.getElementById("dtAbout").onclick=()=>{closeDetails();const h=document.getElementById("how");if(h)h.scrollIntoView({behavior:"smooth"})};
+  document.addEventListener("visibilitychange",dtVis);
+  let s=60;dtTimer=setInterval(()=>{s--;const el=document.getElementById("dtCd");if(el)el.textContent=s;if(s<=0)closeDetails()},1000);
+}
 async function reveal(){
   const pin=await boltivGetTransactionPin();if(!pin)return;msg("aMsg","");
   const r=await api("/api/cards/reveal",{transactionPin:pin});if(!r.success)return msg("aMsg",r.message||"Could not load card details.");
-  const box=document.getElementById("revBox");
-  const b=r.billing,line=b?[b.address,b.city,b.state,b.postal_code,b.country].filter(Boolean).join(", "):"";
-  const bill=b?`<div class="cd-rev" style="margin-top:10px"><b>Billing address</b><br>${esc(b.address)}<br>${esc(b.city)}, ${esc(b.state)} ${esc(b.postal_code)}<br>${esc(b.country)}<br><button class="cd-copy" id="copyAddr" style="margin:8px 0 0">COPY ADDRESS</button><br><small style="font-weight:600;opacity:.75">Type this exactly as shown when a store asks for your billing address.</small></div>`:`<div class="cd-rev" style="margin-top:10px"><small style="font-weight:600;opacity:.85">Billing address: use the address you entered during verification.</small></div>`;
-  box.innerHTML=`<div class="cd-rev">Card number: ${esc(String(r.number).replace(/(\d{4})(?=\d)/g,"$1 "))}<br>Expiry: ${esc(r.expiry)} &nbsp; CVV: ${esc(r.cvv)}<br><small style="font-weight:600;opacity:.75">Hidden again in 60 seconds.</small></div>`+bill;
-  const cb=document.getElementById("copyAddr");if(cb)cb.onclick=async()=>{try{await navigator.clipboard.writeText(line)}catch{const t=document.createElement("textarea");t.value=line;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove()}cb.textContent="COPIED"};
-  setTimeout(()=>{box.innerHTML=""},60000);
+  showDetails(r);
 }
 /* ---------- card activity: plain-English rows ---------- */
 const TXI={

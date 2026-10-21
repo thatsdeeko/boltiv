@@ -7,6 +7,7 @@
 const crypto = require("node:crypto");
 
 module.exports = function createCards(d) {
+  const deps = d;
   const { db, pool, send, body, clean, userFromToken, verifyPassword, reference, addFinancialLedger,
     addNotification, insertVTUTransaction, getPlatformSetting, rateLimit, rateLimitedResponse,
     adminFromToken, requireAdminCsrf, backendUrl } = d;
@@ -130,6 +131,52 @@ module.exports = function createCards(d) {
     return JSON.parse(out.toString("utf8"));
   }
 
+  /* ---------- card emails (same Resend sender and look as the other BOLTIV emails) ---------- */
+  const CARD_EMAILS = process.env.PAYSCRIBE_CARD_EMAILS !== "0"; // set PAYSCRIBE_CARD_EMAILS=0 to switch card emails off
+  const SITE = "https://boltiv.ng";
+  const h = v => String(v ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  const money = n => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const nowLagos = () => new Date().toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  function merchantName(raw) {
+    const first = (String(raw || "").replace(/^\s*Auth Reversal\s*-\s*/i, "").split(/\s{2,}/)[0] || "").trim();
+    const m = (first.split(/\s\*|\s\+?\d{6,}/)[0] || first).trim();
+    return m.toLowerCase().replace(/(^|\s)[a-z]/g, x => x.toUpperCase());
+  }
+  function cardEmail({ name, title, lead, rows, cta, ctaUrl, note }) {
+    const tr = (rows || []).filter(r => r && r[1] !== undefined && r[1] !== null && r[1] !== "").map(r => `<tr><td style="padding:11px 0;border-bottom:1px solid #eee;color:#777;font-size:13px">${h(r[0])}</td><td align="right" style="padding:11px 0;border-bottom:1px solid #eee;font-size:14px;font-weight:700;color:#171717">${h(r[1])}</td></tr>`).join("");
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,sans-serif;color:#171717">
+<div style="max-width:520px;margin:40px auto;background:#fff;border-radius:18px;padding:32px;border:1px solid #e7e7e7">
+<div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#c49a25;text-align:center">BOLTIV</div>
+<h2 style="text-align:center;margin-top:28px">${h(title)}</h2>
+<p style="font-size:15px;line-height:1.7;color:#555">Hello ${h(name || "BOLTIV User")},</p>
+<p style="font-size:15px;line-height:1.7;color:#555">${lead}</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 6px">${tr}</table>
+${cta ? `<p style="text-align:center;margin:26px 0 6px"><a href="${h(ctaUrl || SITE + "/cards")}" style="display:inline-block;background:#D4AF37;color:#171717;text-decoration:none;font-weight:800;padding:13px 26px;border-radius:12px;font-size:14px">${h(cta)}</a></p>` : ""}
+${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">${note}</p>` : ""}
+<p style="font-size:12px;line-height:1.6;color:#999;margin-top:24px;border-top:1px solid #eee;padding-top:16px">This is an automated message about your BOLTIV Card. BOLTIV will never ask for your card number, CVV or PIN by email.</p>
+</div></body></html>`;
+  }
+  async function sendMail({ to, subject, html }) {
+    if (typeof deps.sendEmail === "function") return deps.sendEmail({ to, subject, html });
+    const key = process.env.RESEND_API_KEY; if (!key) return;
+    const from = (process.env.MAIL_FROM || "BOLTIV <onboarding@resend.dev>").trim();
+    const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ from, to: [to], subject, html }) });
+    if (!r.ok) console.error("CARD EMAIL FAILED:", r.status);
+  }
+  // never throws and is never awaited by money or webhook code
+  function mailCard(userId, subject, spec) {
+    if (!CARD_EMAILS) return;
+    (async () => {
+      try {
+        const u = (await db(`SELECT name,email FROM users WHERE user_id=$1 LIMIT 1`, [String(userId)])).rows[0];
+        if (!u?.email) return;
+        await sendMail({ to: u.email, subject, html: cardEmail({ ...spec, name: u.name }) });
+      } catch (e) { console.error("CARD EMAIL ERROR:", e.message); }
+    })();
+  }
+  const dots = l4 => (l4 ? "•••• " + l4 : "");
+
   /* ---------- order settlement (idempotent) ---------- */
   const NGN = n => `₦${Number(n).toLocaleString("en-NG")}`;
   function orderView(o) {
@@ -159,6 +206,18 @@ module.exports = function createCards(d) {
     await insertVTUTransaction({ userId: o.user_id, type: "debit", service: "card", amount: Number(o.ngn_charged), reference: o.reference, status: "successful", recipient: "BOLTIV USD Card", providerReference: info.transId || null,
       metadata: { provider: "payscribe", payment_method: "bank_transfer", kind: o.kind, usd_amount: Number(o.usd_amount), fee_usd: Number(o.fee_usd), collection_fee_ngn: Number(o.collection_fee_ngn || 0), rate_ngn: Number(o.rate_ngn), margin_ngn: Number(o.margin_ngn) } }).catch(e => console.error("CARD HISTORY ROW ERROR:", e.message));
     addNotification(o.user_id, o.kind === "create" ? "Your BOLTIV card is ready" : o.kind === "upgrade" ? "Your contactless card is ready" : "Card funded", o.kind === "create" ? `Your USD virtual card is ready with $${Number(o.usd_amount).toFixed(2)}.` : o.kind === "upgrade" ? `Your balance of $${Number(o.upgrade_amount || 0).toFixed(2)} was moved to your new contactless card. Your card number, expiry and CVV have changed.` : `$${Number(o.usd_amount).toFixed(2)} was added to your card.`, "transaction").catch(() => { });
+    (async () => {
+      try {
+        const cr = (await db(`SELECT last_four,balance_usd,contactless FROM user_cards WHERE user_id=$1`, [o.user_id])).rows[0] || {};
+        const l4 = clean(cr.last_four), when = nowLagos(), paid = NGN(o.ngn_charged);
+        if (o.kind === "create") mailCard(o.user_id, "Your BOLTIV Card is ready", { title: "Your card is ready", lead: `Your ${cr.contactless ? "contactless " : ""}USD virtual card${l4 ? " ending " + h(l4) : ""} is ready and loaded with <b>${money(o.usd_amount)}</b>.`,
+          rows: [["Amount loaded", money(o.usd_amount)], ["Creation fee", money(o.fee_usd)], ["You paid", paid], ["Card", dots(l4)], ["Date", when], ["Reference", o.reference]], cta: "Open my card", note: "Open the Cards tab in BOLTIV to view your card details with your Transaction PIN." });
+        else if (o.kind === "upgrade") mailCard(o.user_id, "Your BOLTIV Card was upgraded", { title: "Card upgraded", lead: `Your balance of <b>${money(o.upgrade_amount || 0)}</b> was moved to your new contactless card${l4 ? " ending " + h(l4) : ""}. <b>Your card number, expiry and CVV have changed.</b> Please update any store or subscription that saved your old card.`,
+          rows: [["Balance moved", money(o.upgrade_amount || 0)], ["Upgrade fee paid", paid], ["New card", dots(l4)], ["Date", when], ["Reference", o.reference]], cta: "Open my card" });
+        else mailCard(o.user_id, `BOLTIV Card funded: ${money(o.usd_amount)}`, { title: "Card funded", lead: `<b>${money(o.usd_amount)}</b> was added to your BOLTIV Card${l4 ? " ending " + h(l4) : ""}.`,
+          rows: [["Amount added", money(o.usd_amount)], ["You paid", paid], ["Card balance", cr.balance_usd !== undefined ? money(cr.balance_usd) : ""], ["Card", dots(l4)], ["Date", when], ["Reference", o.reference]], cta: "View card activity" });
+      } catch (e) { console.error("CARD EMAIL ERROR:", e.message); }
+    })();
     return o;
   }
 
@@ -208,7 +267,7 @@ module.exports = function createCards(d) {
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : (isUp ? clean(card.brand).toUpperCase() : null), isUp ? (card.design || "dark") : (designOk(b.design) ? b.design : "dark"), c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -373,10 +432,33 @@ module.exports = function createCards(d) {
     if (!row) return;
     if (type === "card.status.changed") {
       const s = clean(p.new_status).toLowerCase(); if (s) await db(`UPDATE user_cards SET status=$2, updated_at=NOW() WHERE payscribe_card_id=$1`, [cardId, s]);
+      const prev = clean(p.previous_status).toLowerCase(), l4 = clean(row.last_four);
+      if (s && s !== prev) {
+        const t = { frozen: ["BOLTIV Card frozen", "Your card is frozen", "Your BOLTIV Card" + (l4 ? " ending " + l4 : "") + " is now <b>frozen</b>. Payments are paused until you unfreeze it."], active: ["BOLTIV Card unfrozen", "Your card is active again", "Your BOLTIV Card" + (l4 ? " ending " + l4 : "") + " is <b>active</b> again and can be used for payments."], terminated: ["BOLTIV Card closed", "Your card was closed", "Your BOLTIV Card" + (l4 ? " ending " + l4 : "") + " has been <b>closed</b> and can no longer be used."] }[s];
+        if (t) mailCard(row.user_id, t[0], { title: t[1], lead: t[2], rows: [["Card", dots(l4)], ["Status", s === "active" ? "Active" : s === "frozen" ? "Frozen" : "Closed"], ["Date", nowLagos()]], cta: "Open my card", note: "If you did not make this change, open the Cards tab and contact BOLTIV support straight away." });
+      }
       return;
     }
     const bal = Number(k.balance);
     if (Number.isFinite(bal)) await db(`UPDATE user_cards SET balance_usd=$2, updated_at=NOW() WHERE payscribe_card_id=$1`, [cardId, bal]);
+    {
+      const prevBal = Number(k.prev_balance), l4 = clean(k.last_four) || clean(row.last_four), m = merchantName(p.acceptor_name), when = nowLagos();
+      const ref = clean(p.trans_id || p.event_id);
+      if (type === "cards.auth.verified" || type === "card.auth.verified") {
+        const spent = Number.isFinite(prevBal) && Number.isFinite(bal) ? Number((prevBal - bal).toFixed(2)) : 0;
+        if (spent >= 0.01) mailCard(row.user_id, `BOLTIV Card: ${money(spent)} spent${m ? " at " + m : ""}`, { title: "Card payment", lead: `Your BOLTIV Card${l4 ? " ending " + h(l4) : ""} was charged <b>${money(spent)}</b>${m ? " at <b>" + h(m) + "</b>" : ""}.`,
+          rows: [["Merchant", m], ["Amount charged", money(spent)], [clean(p.auth_currency) && clean(p.auth_currency).toUpperCase() !== "USD" && Number(p.auth_amount) > 0 ? "Billed by merchant" : "", Number(p.auth_amount) > 0 ? `${Number(p.auth_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} ${clean(p.auth_currency).toUpperCase()}` : ""], ["Card", dots(l4)], ["Balance after", Number.isFinite(bal) ? money(bal) : ""], ["Date", when], ["Reference", ref]],
+          cta: "View card activity", note: "Don't recognise this payment? Open the Cards tab and freeze your card right away, then contact BOLTIV support." });
+      } else if (type === "cards.adjusted.refund" || type === "card.adjusted.refund") {
+        const back = Number(p.amount) > 0 ? Number(p.amount) : (Number.isFinite(prevBal) && Number.isFinite(bal) ? Math.max(0, bal - prevBal) : 0);
+        if (back >= 0.01) mailCard(row.user_id, `BOLTIV Card: ${money(back)} refunded${m ? " from " + m : ""}`, { title: "Refund received", lead: `<b>${money(back)}</b>${m ? " from <b>" + h(m) + "</b>" : ""} was returned to your BOLTIV Card${l4 ? " ending " + h(l4) : ""}.`,
+          rows: [["Merchant", m], ["Refund amount", money(back)], ["Card", dots(l4)], ["Balance after", Number.isFinite(bal) ? money(bal) : ""], ["Date", when], ["Reference", ref]], cta: "View card activity" });
+      } else if (/declin/i.test(type)) {
+        const amt = Number(p.amount ?? p.auth_amount); const why = clean(p.reason || p.decline_reason);
+        mailCard(row.user_id, `BOLTIV Card: payment declined${m ? " at " + m : ""}`, { title: "Payment declined", lead: `A payment${amt > 0 ? " of <b>" + money(amt) + "</b>" : ""}${m ? " at <b>" + h(m) + "</b>" : ""} on your BOLTIV Card${l4 ? " ending " + h(l4) : ""} was declined.`,
+          rows: [["Merchant", m], ["Amount", amt > 0 ? money(amt) : ""], ["Reason", why], ["Card", dots(l4)], ["Card balance", Number.isFinite(bal) ? money(bal) : ""], ["Date", when]], cta: "View card activity", note: "If your card balance is too low, fund it from the Cards tab. Too many declines for insufficient funds can lead to your card being closed." });
+      }
+    }
     if (type === "cards.topup") {
       const o = (await db(`SELECT reference FROM card_orders WHERE user_id=$1 AND kind='topup' AND status='pending' ORDER BY id ASC LIMIT 1`, [row.user_id])).rows[0];
       if (o) await settleSuccess(o.reference, { transId: p.trans_id });

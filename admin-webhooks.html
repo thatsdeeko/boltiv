@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex,nofollow"/><title>BOLTIV Admin: Payscribe webhook log</title>
+<script src="/boltiv-api-config.js?v=1"></script>
+<style>
+body{margin:0;background:#f6f6f4;color:#171717;font-family:Arial,Helvetica,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:18px 16px 60px}
+h1{font-size:20px;margin:6px 0 4px;color:#b8921f}p.sub{margin:0 0 14px;font-size:13px;color:#666;line-height:1.5}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.pill{padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;background:#fff;border:1px solid #e3e0d4}
+.btn{padding:10px 16px;border:0;border-radius:12px;background:#D4AF37;color:#111;font-weight:800;font-size:13px}.btn.ghost{background:#fff;border:1px solid #D4AF37}
+.card{background:#fff;border:1px solid #e7e2d3;border-radius:16px;padding:14px;margin:10px 0}
+.top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.type{font-weight:800;font-size:14px;word-break:break-all}.time{font-size:11.5px;color:#777;margin-top:3px}
+.badge{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:900;white-space:nowrap}.processed{background:#e3f4e8;color:#17833d}.error{background:#fbe5e5;color:#b94c4c}.ignored{background:#eee;color:#666}.received{background:#fff4cc;color:#8a6d12}
+.err{margin-top:8px;font-size:12.5px;color:#b94c4c;word-break:break-word}
+details{margin-top:8px}summary{font-size:12px;font-weight:800;color:#8a6d12;cursor:pointer}pre{background:#faf8f0;border-radius:10px;padding:10px;font-size:11px;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto}
+.note{background:#fff4cc;border:1px solid #ead58a;border-radius:12px;padding:10px 12px;font-size:12.5px;margin:10px 0;line-height:1.5}
+.msg{margin:10px 0;font-size:13px;font-weight:700}
+</style></head><body><div class="wrap">
+<h1>Payscribe webhook log</h1>
+<p class="sub">Every notification Payscribe sends to your server: card payments, refunds, freezes, bank-transfer payments and anything else. Failed ones are retried automatically every few minutes; you can also retry by hand. Entries are kept for 14 days. Sensitive values (codes, card numbers) are hidden here.</p>
+<div class="bar"><button class="btn" id="refresh">Refresh</button><a class="btn ghost" href="/admin" style="text-decoration:none">Back to admin</a></div>
+<div class="bar" id="counts"></div><div class="msg" id="msg"></div><div id="note"></div><div id="list"></div>
+</div>
+<script>
+const API=window.BOLTIV_API_BASE||"";const $=id=>document.getElementById(id);
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let csrf="";
+async function getCsrf(){if(csrf)return csrf;const r=await fetch(API+"/api/admin/csrf",{credentials:"include"});const d=await r.json().catch(()=>({}));if(!r.ok||!d.csrfToken)throw Error(d.message||"Could not get the security token.");csrf=d.csrfToken;return csrf}
+function fmt(t){const d=new Date(t);return isNaN(d)?"":d.toLocaleString("en-GB",{timeZone:"Africa/Lagos",day:"numeric",month:"short",hour:"numeric",minute:"2-digit",second:"2-digit",hour12:true})}
+function pretty(raw){try{return JSON.stringify(JSON.parse(raw),null,2)}catch{return String(raw||"")}}
+async function load(){
+  $("msg").textContent="Loading…";$("msg").style.color="#666";
+  try{
+    const r=await fetch(API+"/api/admin/cards/webhooks",{credentials:"include"});const d=await r.json().catch(()=>({}));
+    if(r.status===401){$("msg").style.color="#b94c4c";$("msg").innerHTML='You are not signed in. <a href="/admin">Sign in to the admin page</a>, then come back and refresh.';$("list").innerHTML="";return}
+    if(!r.ok)throw Error(d.message||"Could not load the log.");
+    const ev=d.events||[],c={processed:0,error:0,ignored:0,received:0};ev.forEach(e=>{c[e.status]=(c[e.status]||0)+1});
+    $("counts").innerHTML=`<span class="pill">Total ${ev.length}</span><span class="pill" style="color:#17833d">Processed ${c.processed}</span><span class="pill" style="color:#b94c4c">Failed ${c.error}</span><span class="pill">Ignored ${c.ignored}</span>`;
+    $("note").innerHTML=d.secretIsApiKey?'<div class="note">Signature check uses your API key. If Payscribe shows a separate webhook signing secret in its dashboard, add it on Railway as PAYSCRIBE_WEBHOOK_SECRET.</div>':"";
+    $("msg").textContent=ev.length?"":"No notifications received yet. Once Payscribe sends one, it will appear here.";
+    $("list").innerHTML=ev.map(e=>`<div class="card"><div class="top"><div><div class="type">${esc(e.event_type||"(no event name)")}</div><div class="time">${esc(fmt(e.created_at))} · attempts ${e.attempts}</div></div><span class="badge ${esc(e.status)}">${esc(String(e.status).toUpperCase())}</span></div>
+    ${e.error?`<div class="err">${esc(e.error)}</div>`:""}
+    <details><summary>View details</summary><pre>${esc(pretty(e.raw))}</pre></details>
+    ${(e.status==="error"||e.status==="received")?`<div style="margin-top:10px"><button class="btn" data-id="${e.id}">Retry now</button></div>`:""}</div>`).join("");
+    document.querySelectorAll("button[data-id]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{const t=await getCsrf();const rr=await fetch(API+"/api/admin/cards/webhooks/retry",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json","X-Admin-CSRF":t},body:JSON.stringify({id:Number(b.dataset.id)})});const dd=await rr.json().catch(()=>({}));$("msg").style.color=rr.ok?"#17833d":"#b94c4c";$("msg").textContent=dd.message||(rr.ok?"Done.":"Failed.");load()}catch(x){$("msg").style.color="#b94c4c";$("msg").textContent=x.message;b.disabled=false}});
+  }catch(e){$("msg").style.color="#b94c4c";$("msg").textContent=e.message}
+}
+$("refresh").onclick=load;load();setInterval(load,30000);
+</script></body></html>

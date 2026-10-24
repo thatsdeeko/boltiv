@@ -47,6 +47,8 @@ module.exports = function createCards(d) {
       await db(`DROP INDEX IF EXISTS card_orders_one_card2`);
       await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_one_card3 ON card_orders(user_id) WHERE kind='create' AND status IN ('awaiting_payment','paid','processing','pending','needs_review','needs_funding','success')`);
       await db(`CREATE INDEX IF NOT EXISTS card_orders_acct ON card_orders(account_id)`);
+      await db(`CREATE TABLE IF NOT EXISTS card_webhook_log(id SERIAL PRIMARY KEY, event_id TEXT, event_type TEXT, raw TEXT, status TEXT NOT NULL DEFAULT 'received', attempts INT NOT NULL DEFAULT 0, error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+      await db(`CREATE INDEX IF NOT EXISTS card_webhook_log_status ON card_webhook_log(status, updated_at)`);
       await db(`CREATE TABLE IF NOT EXISTS card_webhook_events(event_id TEXT PRIMARY KEY, event_type TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await db(`CREATE TABLE IF NOT EXISTS card_uploads(id TEXT PRIMARY KEY, user_id TEXT NOT NULL, mime TEXT NOT NULL, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
     })().catch(e => { tablesReady = null; throw e; });
@@ -267,7 +269,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
         [uid, kind, ref, idem, usd, p.feeUsd, rate, c.margin, p.ngnTotal, p.collectionFeeNgn, kind === "create" ? brand : (isUp ? clean(card.brand).toUpperCase() : null), isUp ? (card.design || "dark") : (designOk(b.design) ? b.design : "dark"), c.expiryMin]);
     } catch (e) { if (e.code === "23505") return { code: 409, message: "A card request is already in progress." }; throw e; }
     const r = await ps("POST", "/collections/virtual-accounts/create", { account_type: "dynamic", ref, currency: "NGN",
-      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minutes" } },
+      order: { amount: p.ngnTotal, amount_type: "EXACT", description: `BOLTIV card ${kind === "create" ? "creation" : isUp ? "upgrade" : "funding"} ${ref}`, expiry: { duration: c.expiryMin, duration_type: "minute" } },
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
@@ -482,7 +484,54 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       }
     } catch (e) { console.error("CARD FUNDING SWEEP ERROR:", e.message); }
   }
-  function startSweep() { if (sweepStarted) return; sweepStarted = true; const t = setInterval(sweepFunding, 120000); if (t.unref) t.unref(); }
+  function startSweep() { if (sweepStarted) return; sweepStarted = true; const t = setInterval(() => { sweepFunding(); retryWebhooks(); }, 120000); if (t.unref) t.unref(); }
+
+  /* ---------- webhook processing: save first, then process; failures are kept and retried, never lost ---------- */
+  const OTP_KEYS = ["otp", "otp_code", "one_time_password", "verification_code", "passcode"];
+  function findOtp(p) {
+    for (const o of [p, p.card, p.data, p.customer, p.details, p.message]) {
+      if (!o || typeof o !== "object") continue;
+      for (const k of OTP_KEYS) { const v = o[k]; if (v !== undefined && v !== null && /^\d{4,8}$/.test(String(v).trim())) return String(v).trim(); }
+    }
+    return null;
+  }
+  // if Payscribe sends a one-time code for a card (for example when adding the card to a phone wallet), pass it on to the cardholder by email
+  async function forwardOtp(type, p) {
+    const code = findOtp(p); if (!code) return false;
+    const cardId = clean(p.card?.id || p.card_id || p.data?.card_id), custId = clean(p.customer?.id || p.customer_id || p.data?.customer_id);
+    let uid = null;
+    if (cardId) uid = (await db(`SELECT user_id FROM user_cards WHERE payscribe_card_id=$1`, [cardId])).rows[0]?.user_id;
+    if (!uid && custId) uid = (await db(`SELECT user_id FROM card_profiles WHERE payscribe_customer_id=$1`, [custId])).rows[0]?.user_id;
+    if (!uid) { console.error("CARD OTP EVENT: no matching customer for", type); return false; }
+    mailCard(uid, "Your BOLTIV Card verification code", { title: "Your verification code", lead: `Use this code to finish verifying your BOLTIV Card:<br/><span style="display:block;text-align:center;font-size:30px;font-weight:900;letter-spacing:8px;color:#171717;margin:14px 0">${h(code)}</span>`, rows: [["Requested", nowLagos()]], note: "The code is valid for a short time. Never share it with anyone. BOLTIV will never ask you for it by phone, chat or email." });
+    return true;
+  }
+  function redact(raw) {
+    try {
+      const walk = o => { if (Array.isArray(o)) return o.map(walk); if (o && typeof o === "object") { const r = {}; for (const [k, v] of Object.entries(o)) r[k] = /otp|passcode|verification_code|cvv|ccv|secure_details|pin|number|pan/i.test(k) ? "[hidden]" : walk(v); return r; } return o; };
+      return JSON.stringify(walk(JSON.parse(raw))).slice(0, 4000);
+    } catch { return String(raw || "").slice(0, 500).replace(/\d{4,8}/g, "[hidden]"); }
+  }
+  async function processWebhook(type, p) {
+    let claimed = null;
+    await forwardOtp(type, p);
+    if (/^cards?\./.test(type)) await onEvent(type, p);
+    else if (type === "accounts.payment.status") claimed = await onPayment(p);
+    return claimed;
+  }
+  const kindOf = type => (/^cards?\./.test(type) || type === "accounts.payment.status" ? "processed" : "ignored");
+  async function retryWebhooks() {
+    try {
+      const rows = (await db(`SELECT id,event_type,raw FROM card_webhook_log WHERE status='error' AND attempts<6 AND updated_at < NOW() - interval '90 seconds' ORDER BY id ASC LIMIT 10`)).rows;
+      for (const r of rows) {
+        let claimed = null, ok = false, err = "";
+        try { claimed = await processWebhook(r.event_type, JSON.parse(r.raw)); ok = true; } catch (e) { err = clean(e && e.message).slice(0, 300); console.error("CARD WEBHOOK RETRY ERROR:", r.id, (e && e.stack) || e); }
+        await db(`UPDATE card_webhook_log SET status=$2, error=$3, raw=$4, attempts=attempts+1, updated_at=NOW() WHERE id=$1`, [r.id, ok ? kindOf(r.event_type) : "error", ok ? null : err, ok ? redact(r.raw) : r.raw]);
+        if (claimed) fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message));
+      }
+      await db(`DELETE FROM card_webhook_log WHERE created_at < NOW() - interval '14 days'`);
+    } catch (e) { console.error("CARD WEBHOOK RETRY SWEEP ERROR:", e.message); }
+  }
 
   /* ---------- router ---------- */
   async function handle(req, res, path) {
@@ -496,11 +545,19 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       let p; try { p = JSON.parse(raw || "{}"); } catch { return send(res, 400, { success: false }), true; }
       const type = clean(req.headers["x-payscribe-event"] || p.event_type || p.event);
       const eid = clean(req.headers["x-payscribe-event-id"] || p.event_id) || null;
-      if (eid) { const ins = await db(`INSERT INTO card_webhook_events(event_id,event_type) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING event_id`, [eid, type]); if (!ins.rows.length) return send(res, 200, { success: true, duplicate: true }), true; }
-      let claimed = null;
-      try { if (/^cards?\./.test(type)) await onEvent(type, p); else if (type === "accounts.payment.status") claimed = await onPayment(p); }
-      catch (e) { console.error("CARD WEBHOOK ERROR:", e.message); if (eid) await db(`DELETE FROM card_webhook_events WHERE event_id=$1`, [eid]).catch(() => { }); return send(res, 500, { success: false }), true; }
-      send(res, 200, { success: true });
+      let logId = null;
+      try {
+        if (eid) { const ins = await db(`INSERT INTO card_webhook_events(event_id,event_type) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING event_id`, [eid, type]); if (!ins.rows.length) return send(res, 200, { success: true, duplicate: true }), true; }
+        logId = (await db(`INSERT INTO card_webhook_log(event_id,event_type,raw,status) VALUES($1,$2,$3,'received') RETURNING id`, [eid, type, String(raw).slice(0, 60000)])).rows[0].id;
+      } catch (e) {
+        console.error("CARD WEBHOOK STORE ERROR (could not save the event):", (e && e.stack) || e);
+        return send(res, 500, { success: false, message: "Temporary error, please retry." }), true; // not saved: ask the sender to retry
+      }
+      let claimed = null, ok = false, errMsg = "";
+      try { claimed = await processWebhook(type, p); ok = true; }
+      catch (e) { errMsg = clean(e && e.message).slice(0, 300); console.error("CARD WEBHOOK ERROR:", type, (e && e.stack) || e); }
+      try { await db(`UPDATE card_webhook_log SET status=$2, error=$3, raw=$4, attempts=attempts+1, updated_at=NOW() WHERE id=$1`, [logId, ok ? kindOf(type) : "error", ok ? null : errMsg, ok ? redact(raw) : String(raw).slice(0, 60000)]); } catch (e) { console.error("CARD WEBHOOK LOG UPDATE ERROR:", e.message); }
+      send(res, 200, { success: true }); // saved: the event is processed now or retried automatically
       if (claimed) fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message));
       return true;
     }
@@ -591,6 +648,23 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
         if (!o) return send(res, 404, { success: false, message: "Nothing to retry for that order." }), true;
         send(res, 200, { success: true, message: "Retrying now. The card is being set up." });
         fulfillOrder(o).catch(e => console.error("CARD FULFILL ERROR:", e.message));
+        return true;
+      }
+      if (M === "GET" && path === "/api/admin/cards/webhooks") {
+        const a = await adminFromToken(req); if (!a) return send(res, 401, { success: false, message: "Unauthorized." }), true;
+        const r = await db(`SELECT id,event_type,status,attempts,error,raw,created_at FROM card_webhook_log ORDER BY id DESC LIMIT 80`);
+        return send(res, 200, { success: true, secretIsApiKey: !process.env.PAYSCRIBE_WEBHOOK_SECRET, events: r.rows.map(x => ({ ...x, raw: redact(x.raw) })) }), true;
+      }
+      if (M === "POST" && path === "/api/admin/cards/webhooks/retry") {
+        const chk = await requireAdminCsrf(req); if (!chk.success) return send(res, chk.statusCode || 403, chk), true;
+        const b = await body(req);
+        const r = (await db(`SELECT id,event_type,raw FROM card_webhook_log WHERE id=$1 AND status IN ('error','received')`, [Number(b.id) || 0])).rows[0];
+        if (!r) return send(res, 404, { success: false, message: "Nothing to retry for that event." }), true;
+        let claimed = null;
+        try { claimed = await processWebhook(r.event_type, JSON.parse(r.raw)); await db(`UPDATE card_webhook_log SET status=$2, error=NULL, raw=$3, attempts=attempts+1, updated_at=NOW() WHERE id=$1`, [r.id, kindOf(r.event_type), redact(r.raw)]); }
+        catch (e) { await db(`UPDATE card_webhook_log SET status='error', error=$2, attempts=attempts+1, updated_at=NOW() WHERE id=$1`, [r.id, clean(e && e.message).slice(0, 300)]).catch(() => { }); return send(res, 400, { success: false, message: "Still failing: " + clean(e && e.message) }), true; }
+        send(res, 200, { success: true, message: "Event processed." });
+        if (claimed) fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message));
         return true;
       }
       if (M === "POST" && path === "/api/admin/cards/refund") {
@@ -707,5 +781,5 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
     }
     return send(res, 404, { success: false, message: "Route not found." }), true;
   }
-  return { handle, sweepFunding };
+  return { handle, sweepFunding, retryWebhooks };
 };

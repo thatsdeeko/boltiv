@@ -16,5 +16,6 @@ Disallow: /security
 Disallow: /receipt
 Disallow: /forgot-password
 Disallow: /reset-password
+Disallow: /cards
 Disallow: /backend/
 Sitemap: https://boltiv.ng/sitemap.xml

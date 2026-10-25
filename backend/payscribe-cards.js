@@ -512,7 +512,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
         const cr = (await db(`SELECT last_four,balance_usd FROM user_cards WHERE user_id=$1`, [o.user_id])).rows[0] || {};
         const l4 = clean(cr.last_four);
         mailCard(o.user_id, "Card withdrawal successful", { title: "Withdrawal successful", lead: `<b>${money(o.usd_amount)}</b> was withdrawn from your BOLTIV Card${l4 ? " ending " + h(l4) : ""} and <b>${h(NGN(amt))}</b> was added to your BOLTIV wallet.`,
-          rows: [["Withdrawn", money(o.usd_amount)], [Number(o.fee_usd) > 0 ? "Withdrawal fee" : "", money(o.fee_usd)], ["Rate", `${NGN(Number(o.rate_ngn) - Number(o.margin_ngn))} / $1`], ["Added to wallet", NGN(amt)], ["Card balance", cr.balance_usd !== undefined ? money(cr.balance_usd) : ""], ["Card", dots(l4)], ["Date", nowLagos()], ["Reference", o.reference]], cta: "View card activity" });
+          rows: [["Withdrawn", money(o.usd_amount)], [Number(o.fee_usd) > 0 ? "Withdrawal fee" : "", money(o.fee_usd)], ["Rate", `${NGN(Number(o.rate_ngn) - Number(o.margin_ngn))} / $1`], ["Added to wallet", NGN(amt)], ["Card balance", cr.balance_usd !== undefined ? money(cr.balance_usd) : ""], ["Card", dots(l4)], ["Date", nowLagos()], ["Reference", o.reference]], cta: "View card activity", note: "Money in your BOLTIV wallet can be used to pay for BOLTIV services such as airtime, data, cable and electricity. It cannot be withdrawn to a bank account." });
       } catch (e) { console.error("CARD WITHDRAW EMAIL ERROR:", e.message); }
     })();
     return o;

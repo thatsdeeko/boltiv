@@ -380,7 +380,13 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
         await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd,design,contactless) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10) ON CONFLICT(user_id) DO NOTHING`,
           [uid, k.id, clean(k.brand) || o.brand, clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || profile.holder_name, usd, designOk(o.design) ? o.design : "dark", !!c.contactless]);
       } else {
-        const nb = Number(det.balance ?? det.card?.balance);
+        // det.balance (top level) is the MERCHANT wallet balance; only det.card.balance is the customer's card balance.
+        let nb = det.card?.balance == null ? NaN : Number(det.card.balance);
+        if (!Number.isFinite(nb)) {
+          const g = await ps("GET", `/cards/${card.payscribe_card_id}`).catch(() => null);
+          const gb = g?.outcome === "success" ? g.data?.message?.details?.balance : null;
+          nb = gb == null ? NaN : Number(gb);
+        }
         await db(`UPDATE user_cards SET balance_usd=${Number.isFinite(nb) ? "$2" : "balance_usd+$2"}, updated_at=NOW() WHERE user_id=$1`, [uid, Number.isFinite(nb) ? nb : usd]);
       }
       await settleSuccess(ref, { transId: det.trans_id });

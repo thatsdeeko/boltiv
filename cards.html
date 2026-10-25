@@ -55,7 +55,7 @@ html[data-theme="dark"] .cd-in::placeholder{color:#9aa0a8}
 .cd-acc summary::-webkit-details-marker{display:none}.cd-acc summary::after{content:"+";color:#D4AF37;font-size:22px;font-weight:700;line-height:1}.cd-acc details[open] summary::after{content:"\2013"}
 .cd-acc details[open] summary{color:#D4AF37}.cd-acc .body{padding:0 2px 14px}
 html[data-theme="dark"] .cd-acc summary{color:#f4f4f1}html[data-theme="dark"] .cd-acc details[open] summary{color:#D4AF37}
-.cd-acts{display:flex;justify-content:center;gap:34px;margin:18px 0 6px}.cd-ra{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:0;padding:0;color:var(--t-fg-171717);font-size:12px;font-weight:800;-webkit-tap-highlight-color:transparent}
+.cd-acts{display:flex;justify-content:center;gap:22px;margin:18px 0 6px}.cd-ra{display:flex;flex-direction:column;align-items:center;gap:8px;background:none;border:0;padding:0;color:var(--t-fg-171717);font-size:12px;font-weight:800;-webkit-tap-highlight-color:transparent}
 .cd-ra .ci{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--t-bg-ffffff);border:1px solid var(--t-bd-e5e5e1);box-shadow:0 3px 10px rgba(0,0,0,.1);color:#D4AF37}.cd-ra .ci svg{width:25px;height:25px}
 html[data-theme="dark"] .cd-ra{color:#e6e7ea}
 .cd-pay{margin:12px 0;border:1px solid var(--t-bd-e5e5e1);border-radius:16px;overflow:hidden}.cd-pay>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;border-bottom:1px solid var(--t-bd-e5e5e1)}.cd-pay>div:last-child{border:0}
@@ -129,7 +129,7 @@ async function load(){
   if(!m.success){main.innerHTML=`<div class="cd-box"><p>${esc(m.message||"Could not load your card.")}</p></div>`;return}
   if(m.open)return showPay(m.open);
   if(m.card)return viewCard();
-  if(m.pending)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Processing your request</h3><p>Your ${m.pending==="create"?"new card":m.pending==="upgrade"?"card upgrade":"top-up"} is being processed. This can take a few minutes. You will be notified when it is complete, and your wallet is refunded automatically if it cannot be completed.</p><button class="cd-btn ghost" onclick="load()">REFRESH</button></div>`;
+  if(m.pending)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Processing your request</h3><p>Your ${m.pending==="create"?"new card":m.pending==="upgrade"?"card upgrade":m.pending==="withdraw"?"withdrawal":"top-up"} is being processed. This can take a few minutes. You will be notified when it is complete, and your wallet is refunded automatically if it cannot be completed.</p><button class="cd-btn ghost" onclick="load()">REFRESH</button></div>`;
   if(!c.success||!c.enabled||!c.ready)return main.innerHTML=cardHTML(null,"dark")+`<div class="cd-box"><h3>Cards are temporarily unavailable</h3><p>${c.enabled===false?"The BOLTIV Card service is currently paused.":"We are unable to display card pricing at the moment."} Please try again shortly.</p></div>`;
   return m.verified?viewCreate():viewKyc();
 }
@@ -198,13 +198,15 @@ async function createCard(){
 function viewCard(){
   const c=ME.card;
   main.innerHTML=`<div id="prev">${cardHTML(c)}</div><div class="cd-bal">BALANCE<b>$${c.balance_usd.toFixed(2)}</b></div>
-  <div class="cd-acts"><button class="cd-ra" id="aShow"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>Details</button><button class="cd-ra" id="aFreeze"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.5 4.5 12 6.5l2.5-2M9.5 19.5l2.5-2 2.5 2"/></svg></span>${c.status==="frozen"?"Unfreeze":"Freeze"}</button><button class="cd-ra" id="aFund"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Fund</button></div>
+  <div class="cd-acts"><button class="cd-ra" id="aShow"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>Details</button><button class="cd-ra" id="aFreeze"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.5 4.5 12 6.5l2.5-2M9.5 19.5l2.5-2 2.5 2"/></svg></span>${c.status==="frozen"?"Unfreeze":"Freeze"}</button><button class="cd-ra" id="aFund"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Fund</button>${CFG.withdrawEnabled?`<button class="cd-ra" id="aWd"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v13M6 12l6 6 6-6"/></svg></span>Withdraw</button>`:""}</div>
   <div class="cd-msg" id="aMsg"></div><div id="fundBox"></div><div id="revBox"></div>
   ${CFG.upgradeEnabled&&!c.contactless&&c.status==="active"?`<div class="cd-box"><h3>Upgrade to a contactless card</h3><p>A contactless card can be added to a phone wallet where your phone and country support it. Your balance moves to the new card automatically. Your card number, expiry and CVV will change, so update any store or subscription that saved your old card. You pay the card creation fee by bank transfer.</p><button class="cd-btn ghost" id="upBtn">UPGRADE MY CARD</button></div>`:""}
   <div class="cd-box"><h3>Card style</h3><div class="cd-pills"><button class="cd-pill ${c.design==="dark"?"on":""}" data-d="dark">Dark</button><button class="cd-pill ${c.design==="light"?"on":""}" data-d="light">Light</button></div></div>
   <div class="cd-box"><h3>Recent card activity</h3><div id="txBox"><p>Loading…</p></div></div>`;
   main.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const r=await api("/api/cards/design",{design:b.dataset.d});if(r.success){ME.card.design=r.design;viewCard()}});
   document.getElementById("aFund").onclick=openFund;
+  const wb=document.getElementById("aWd");if(wb)wb.onclick=openWithdraw;
+  if(ME.pending==="withdraw")msg("aMsg","Your withdrawal is being confirmed. Your wallet will be credited as soon as it is done.");
   document.getElementById("aFreeze").onclick=toggleFreeze;
   document.getElementById("aShow").onclick=reveal;
   const ub=document.getElementById("upBtn");if(ub)ub.onclick=startUpgrade;
@@ -222,6 +224,28 @@ function openFund(){
     btn.disabled=false;btn.textContent="CONTINUE TO PAYMENT";
     if(r.success&&r.order)return showPay(r.order);
     msg("fMsg",r.message||"Could not start your top-up.");
+  };
+}
+let wTimer;
+function wquote(){
+  clearTimeout(wTimer);const box=document.getElementById("wquote"),usd=Number(document.getElementById("w_amt").value);
+  if(!(usd>0)){box.innerHTML="";return}
+  wTimer=setTimeout(async()=>{const q=await api("/api/cards/quote",{kind:"withdraw",usd});
+    box.innerHTML=q.success?`<div class="cd-quote"><div><span>Withdraw from card</span><b>$${q.quote.usd.toFixed(2)}</b></div>${q.quote.feeUsd?`<div><span>Withdrawal fee</span><b>$${q.quote.feeUsd.toFixed(2)}</b></div>`:""}<div><span>Rate</span><b>${ngn(q.quote.ratePerUsd)} / $1</b></div><div class="tot"><span>Added to your wallet</span><b>${ngn(q.quote.ngnReceive)}</b></div></div>`:`<div class="cd-quote">${esc(q.message)}</div>`},350)}
+function openWithdraw(){
+  const c=ME.card,min=CFG.withdrawMinUsd||1;
+  document.getElementById("fundBox").innerHTML=`<div class="cd-box"><h3>Withdraw to wallet</h3><p>Move money from your card to your BOLTIV wallet in naira. It is added to your wallet straight away.</p><label class="cd-label">AMOUNT (USD)<a href="#" id="w_max" style="float:right;color:#D4AF37;font-weight:900;text-decoration:none">MAX $${c.balance_usd.toFixed(2)}</a></label><input class="cd-in" id="w_amt" inputmode="decimal" placeholder="${min}"/><div id="wquote"></div><div class="cd-msg" id="wMsg"></div><button class="cd-btn" id="wBtn">WITHDRAW TO WALLET</button></div>`;
+  document.getElementById("w_amt").oninput=wquote;
+  document.getElementById("w_max").onclick=e=>{e.preventDefault();document.getElementById("w_amt").value=Math.floor(c.balance_usd*100)/100;wquote()};
+  document.getElementById("wBtn").onclick=async()=>{
+    const usd=Number(document.getElementById("w_amt").value),btn=document.getElementById("wBtn");msg("wMsg","");
+    if(!(usd>=min))return msg("wMsg",`The minimum withdrawal is $${min}.`);
+    if(usd>c.balance_usd+0.001)return msg("wMsg","That is more than your card balance.");
+    const pin=await boltivGetTransactionPin();if(!pin)return;btn.disabled=true;btn.textContent="PLEASE WAIT…";
+    const r=await api("/api/cards/withdraw",{usd,transactionPin:pin,idempotencyKey:crypto.randomUUID?crypto.randomUUID():String(Date.now())});
+    btn.disabled=false;btn.textContent="WITHDRAW TO WALLET";
+    if(!r.success)return msg("wMsg",r.message||"Could not complete your withdrawal.");
+    const m=await api("/api/cards/me");if(m.success)ME=m;viewCard();msg("aMsg",r.message||"Withdrawal complete.",true);
   };
 }
 async function startUpgrade(){

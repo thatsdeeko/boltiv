@@ -302,21 +302,27 @@ function detectNetworkFromPhone(phone){return NETWORK_PREFIXES[clean(phone).slic
 function findTransactionField(value,keys,depth=0){if(depth>6||value==null)return "";if(Array.isArray(value)){for(const item of value){const found=findTransactionField(item,keys,depth+1);if(found)return found;}return "";}if(typeof value!=="object")return "";for(const key of keys){const v=value[key];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}for(const key of Object.keys(value)){const found=findTransactionField(value[key],keys,depth+1);if(found)return found;}return "";}
 
 function vtugateStatus(data,responseOk=true){
-// provider_status is the provider's own verdict on the delivery. When it is present, it decides:
-// an unrecognised value must never be rescued by the top-level "status":true, which only says the API call worked.
-const ps=data?.data?.provider_status;
-const providerSpoke=ps!==undefined&&ps!==null&&String(ps).trim()!=="";
-const nested=data?.data?.status??data?.data?.transaction?.status??data?.transaction?.status??data?.state??data?.result;
-const nestedSpoke=nested!==undefined&&nested!==null&&String(nested).trim()!=="";
-const raw=providerSpoke?ps:(nestedSpoke?nested:data?.status);
+// VTUGATE's own settled status (data.status) is what moves the wallet on their side, so when it is final it wins.
+// provider_status (the upstream network's verdict) can lag or use unfamiliar wording; it is only a fallback
+// when VTUGATE itself has no final status. The top-level "status":true only says the API call worked, so it is last.
+const classify=(raw)=>{
+if(raw===undefined||raw===null||String(raw).trim()==="")return "unknown";
 if(typeof raw==="boolean")return raw?(responseOk?"successful":"unknown"):(responseOk?"failed":"unknown");
-const value=String(raw??"").trim().toLowerCase();
+const value=String(raw).trim().toLowerCase();
 if(!value)return "unknown";
 if(/(pending|processing|initiated|queued|in progress|awaiting)/.test(value))return "pending";
 if(/(refund|revers)/.test(value))return responseOk?"refunded":"unknown";
 if(/(fail|unsuccess|not success|declin|reject|cancel|error|invalid|insufficient)/.test(value)||value==="false")return responseOk?"failed":"unknown";
 if(/(success|complete|deliver)/.test(value)||value==="true")return "successful";
 return "unknown";
+};
+const nested=data?.data?.status??data?.data?.transaction?.status??data?.transaction?.status??data?.state??data?.result;
+const a=classify(nested);
+if(a==="successful"||a==="failed"||a==="refunded")return a;
+if(a==="pending")return "pending";
+const b=classify(data?.data?.provider_status);
+if(b!=="unknown")return b;
+return classify(data?.status);
 }
 
 async function vtugateRequest(endpoint,payload={},options={}){
@@ -744,9 +750,11 @@ if(!lookupReference)return{success:false,outcome:"unknown",message:"Missing tran
 // external_reference, never as transaction_id. When we have both, send both
 // so VTUGATE can use the precise ID while still validating the original ref.
 const payload={requery:true};
-if(providerReference && /^\d+$/.test(String(providerReference).trim())) payload.transaction_id=Number(providerReference);
-if(merchantReference) payload.external_reference=clean(merchantReference);
-if(!payload.transaction_id && !payload.external_reference) return{success:false,outcome:"unknown",message:"Missing valid VTUGATE transaction identifier for requery."};
+const storedRef=clean(providerReference||"");
+if(/^\d+$/.test(storedRef))payload.transaction_id=Number(storedRef);
+else if(storedRef)payload.external_reference=storedRef; // VTUGATE's own reference, as echoed in the buy response
+else if(merchantReference)payload.client_reference=clean(merchantReference); // the reference we sent on the buy call
+if(!payload.transaction_id && !payload.external_reference && !payload.client_reference) return{success:false,outcome:"unknown",message:"Missing valid VTUGATE transaction identifier for requery."};
 await vtugateRequeryThrottle();
 const r=await vtugateRequest("api/v1/transactionstatus",payload);
 const confirmedReference=r.providerReference||providerReference||null;
@@ -937,9 +945,9 @@ if(agentService.isAgent){
   const boltivGrossProfit=pricingMeta.providerCost!=null?Number((agentPrice-Number(pricingMeta.providerCost)).toFixed(2)):0;
   pricingMeta={...pricingMeta,customerPrice:agentPrice,grossProfit:boltivGrossProfit,agentPrice,agentMarkupPct:agentPricing.markup_pct,customerSellingPrice:Number(customerSellingPrice.toFixed(2)),agentProfit:Number((customerSellingPrice-agentPrice).toFixed(2))};
 }
-const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount:debitAmount,reference:referenceValue,recipient,idempotencyKey:idem,useBonus:data.useBonus===true,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta,...(opts.autopay?{autopay:opts.autopay}:{})}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
+const referenceValue=reference("BOLTIV-TX");providerPayload.ref=referenceValue;providerPayload.client_reference=referenceValue;const reserved=await createVTUTransactionAndDebit({userId,service,amount:debitAmount,reference:referenceValue,recipient,idempotencyKey:idem,useBonus:data.useBonus===true,metadata:{provider:"vtugate",request:providerPayload,pricing:pricingMeta,...(opts.autopay?{autopay:opts.autopay}:{})}});if(!reserved.success)return{success:false,statusCode:400,message:reserved.message,balance:0};if(reserved.existing){const t=reserved.transaction;const wallet=await getWallet(userId);return{success:t.status==="successful"||t.status==="pending"||t.status==="processing",message:t.status==="successful"?"Transaction already completed.":"Transaction is already being processed.",reference:t.reference,status:t.status,amount:Number(t.amount),providerReference:t.provider_reference,balance:wallet?.balance??0,alreadyProcessed:true};}
 let endpoint="";if(service==="airtime")endpoint="api/v1/buyairtime";else if(service==="data")endpoint="api/v1/buydata";else if(service==="exam_pin")endpoint="api/v1/buyeducation";else if(service==="cable")endpoint="api/v1/buycabletv";else if(service==="electricity")endpoint="api/v1/buyelectricity";
-let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload);}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
+let providerResult;try{providerResult=await vtugateRequest(endpoint,providerPayload,{timeoutMs:Number(process.env.VTUGATE_BUY_TIMEOUT_MS||60000)});}catch(e){providerResult={success:false,outcome:"unknown",statusCode:502,message:"VTUGATE connection could not be confirmed. Your transaction is being verified."};}
 if(!providerResult.success)console.error("VTUGATE TRANSACTION NOT CONFIRMED:",JSON.stringify({endpoint,outcome:providerResult.outcome,sentPayload:{...providerPayload,ref:providerPayload.ref},providerMessage:providerResult.message,providerRawResponse:providerResult.data}));
 const providerData=providerResult.data||{};const providerReference=providerResult.providerReference||findTransactionField(providerData,["transaction_id","external_reference","reference","transactionId","id"])||null;const finalized=await finalizeVTUTransaction(reserved.transaction.id,providerResult.outcome||"unknown",providerData,providerReference);const wallet=await getWallet(userId);if(finalized.status==="refunded")return{success:false,statusCode:providerResult.statusCode>=500?502:400,message:providerResult.message||"Transaction failed. Your wallet has been refunded.",reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??0,status:"refunded"};const delivery=providerData?.data?.delivery||providerData?.delivery||null;const pins=providerData?.data?.pins||providerData?.pins||delivery?.pins||[];const token=service==="electricity"?(findTransactionField(providerData,["token","meter_token","recharge_token","standard_token","units_token","electricity_token","vend_token"])||delivery?.token||""):"";const units=service==="electricity"?(findTransactionField(providerData,["units","kwh","unit"])||""):"";return{success:true,statusCode:200,message:providerResult.message||(finalized.status==="pending"?"Your transaction is being processed.":"Transaction successful."),reference:reserved.transaction.reference,providerReference,balance:wallet?.balance??reserved.balance,status:finalized.status,providerData,delivery,pins,token,units,amountCharged:debitAmount};
 }

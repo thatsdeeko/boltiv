@@ -47,7 +47,8 @@ module.exports = function createCards(d) {
       await db(`ALTER TABLE user_cards ADD COLUMN IF NOT EXISTS contactless BOOLEAN NOT NULL DEFAULT false`);
       await db(`DROP INDEX IF EXISTS card_orders_one_card`);
       await db(`DROP INDEX IF EXISTS card_orders_one_card2`);
-      await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_one_card3 ON card_orders(user_id) WHERE kind='create' AND status IN ('awaiting_payment','paid','processing','pending','needs_review','needs_funding','success')`);
+      await db(`DROP INDEX IF EXISTS card_orders_one_card3`);
+      await db(`CREATE UNIQUE INDEX IF NOT EXISTS card_orders_one_card4 ON card_orders(user_id) WHERE kind='create' AND status IN ('awaiting_payment','paid','processing','pending','needs_review','needs_funding')`);
       await db(`CREATE INDEX IF NOT EXISTS card_orders_acct ON card_orders(account_id)`);
       await db(`CREATE TABLE IF NOT EXISTS card_webhook_log(id SERIAL PRIMARY KEY, event_id TEXT, event_type TEXT, raw TEXT, status TEXT NOT NULL DEFAULT 'received', attempts INT NOT NULL DEFAULT 0, error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
       await db(`CREATE INDEX IF NOT EXISTS card_webhook_log_status ON card_webhook_log(status, updated_at)`);
@@ -237,7 +238,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
     const brand = clean(b.brand).toUpperCase();
     if (kind === "create") {
       if (!profile) return { code: 400, message: "Please complete card verification first." };
-      if (card) return { code: 409, message: "You already have a BOLTIV card." };
+      if (card && card.status !== "terminated") return { code: 409, message: "You already have a BOLTIV card." };
       if (!brandOk(brand)) return { code: 400, message: "Choose Visa or Mastercard." };
     } else if (isUp) {
       if (!c.upgradeEnabled) return { code: 403, message: "Card upgrades are not available right now." };
@@ -380,7 +381,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       if (o.kind === "create") {
         const k = det.card || {};
         if (!k.id) { await db(`UPDATE card_orders SET status='pending', error='Provider returned no card id', payscribe_trans_id=$2, updated_at=NOW() WHERE reference=$1`, [ref, det.trans_id || null]); return; }
-        await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd,design,contactless) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10) ON CONFLICT(user_id) DO NOTHING`,
+        await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd,design,contactless) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET payscribe_card_id=EXCLUDED.payscribe_card_id, brand=EXCLUDED.brand, first_six=EXCLUDED.first_six, last_four=EXCLUDED.last_four, masked=EXCLUDED.masked, holder_name=EXCLUDED.holder_name, status='active', balance_usd=EXCLUDED.balance_usd, design=EXCLUDED.design, contactless=EXCLUDED.contactless, created_at=NOW(), updated_at=NOW() WHERE user_cards.status='terminated'`,
           [uid, k.id, clean(k.brand) || o.brand, clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || profile.holder_name, usd, designOk(o.design) ? o.design : "dark", !!c.contactless]);
       } else {
         // det.balance (top level) is the MERCHANT wallet balance; only det.card.balance is the customer's card balance.
@@ -433,7 +434,10 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
     if (type === "cards.created") {
       const prof = custId ? (await db(`SELECT * FROM card_profiles WHERE payscribe_customer_id=$1`, [custId])).rows[0] : null;
       if (!prof || !k.id) return;
-      await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8) ON CONFLICT DO NOTHING`, [prof.user_id, k.id, clean(k.brand), clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || prof.holder_name, Number(k.balance || 0)]);
+      const cur = (await db(`SELECT status FROM user_cards WHERE user_id=$1`, [prof.user_id])).rows[0];
+      const inflight = (await db(`SELECT 1 FROM card_orders WHERE user_id=$1 AND kind='create' AND status IN ('processing','pending')`, [prof.user_id])).rows[0];
+      if (!cur) await db(`INSERT INTO user_cards(user_id,payscribe_card_id,brand,first_six,last_four,masked,holder_name,status,balance_usd) VALUES($1,$2,$3,$4,$5,$6,$7,'active',$8) ON CONFLICT DO NOTHING`, [prof.user_id, k.id, clean(k.brand), clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || prof.holder_name, Number(k.balance || 0)]);
+      else if (cur.status === "terminated" && inflight) await db(`UPDATE user_cards SET payscribe_card_id=$2, brand=$3, first_six=$4, last_four=$5, masked=$6, holder_name=$7, status='active', balance_usd=$8, created_at=NOW(), updated_at=NOW() WHERE user_id=$1 AND status='terminated'`, [prof.user_id, k.id, clean(k.brand), clean(k.first_six), clean(k.last_four), clean(k.masked), clean(k.name) || prof.holder_name, Number(k.balance || 0)]);
       const o = (await db(`SELECT reference FROM card_orders WHERE user_id=$1 AND kind='create' AND status IN ('processing','pending') ORDER BY id DESC LIMIT 1`, [prof.user_id])).rows[0];
       if (o) await settleSuccess(o.reference, { transId: p.trans_id });
       return;
@@ -814,7 +818,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       await expireStale(uid);
       const openRow = (await db(`SELECT * FROM card_orders WHERE user_id=$1 AND status='awaiting_payment' ORDER BY id DESC LIMIT 1`, [uid])).rows[0];
       const pending = (await db(`SELECT kind FROM card_orders WHERE user_id=$1 AND status IN ('paid','processing','pending','needs_review','needs_funding','withdrawn') LIMIT 1`, [uid])).rows[0];
-      return send(res, 200, { success: true, verified: !!(await getProfile(uid)), card: cardView(card), open: orderView(openRow), pending: pending ? pending.kind : null }), true;
+      return send(res, 200, { success: true, verified: !!(await getProfile(uid)), card: card && card.status === "terminated" ? null : cardView(card), terminatedCard: card && card.status === "terminated" ? cardView(card) : null, open: orderView(openRow), pending: pending ? pending.kind : null }), true;
     }
     if (M === "POST" && path === "/api/cards/quote") {
       const b = await body(req); const c = await cfg(); const usd = num2(b.usd); const kind = b.kind === "topup" ? "topup" : b.kind === "upgrade" ? "upgrade" : "create";

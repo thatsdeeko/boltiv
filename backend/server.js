@@ -3079,6 +3079,17 @@ message:
 
 }
 
+// Names may only contain letters, spaces, dots, apostrophes and hyphens (blocks <script>/HTML payloads).
+if(name.length>60||!/^[\p{L}][\p{L}\p{M} .'\u2019-]*$/u.test(name)){
+
+return{
+success:false,
+message:
+"Name can only contain letters, spaces, hyphens and apostrophes."
+};
+
+}
+
 if(!validPhone(phone)){
 
 return{

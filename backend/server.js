@@ -48,7 +48,11 @@ connectionTimeoutMillis:5000
 // replace this with a shared store such as Redis.
 const rateBuckets=new Map();
 function requestIp(req){
-return String(req.headers["x-forwarded-for"]||req.socket?.remoteAddress||"unknown").split(",")[0].trim();
+// The FIRST x-forwarded-for entry is supplied by the client and can be faked to dodge rate limits.
+// The LAST entry is appended by the proxy in front of us (Railway), so it is the real visitor IP.
+if(process.env.BEHIND_CLOUDFLARE==="true"&&req.headers["cf-connecting-ip"])return String(req.headers["cf-connecting-ip"]).trim();
+const parts=String(req.headers["x-forwarded-for"]||"").split(",").map(x=>x.trim()).filter(Boolean);
+return parts.length?parts[parts.length-1]:String(req.socket?.remoteAddress||"unknown");
 }
 function rateLimit(req,key,limit,windowMs){
 const now=Date.now();
@@ -5395,7 +5399,7 @@ if(
 req.method==="POST"&&
 path==="/api/auth/register"
 ){
-const rl=rateLimit(req,"register",5,15*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
+const rl=rateLimit(req,"register",3,60*60*1000);if(!rl.allowed)return rateLimitedResponse(res,rl);
 if(!Boolean(await getPlatformSetting('registration_enabled',true)))return send(res,403,{success:false,message:'New user registration is currently disabled.'});
 const b=
 await body(req);

@@ -100,20 +100,29 @@ res.end(payload);
 return true;
 }
 
+function expectedError(message,statusCode){
+const e=new Error(message);
+e.statusCode=statusCode;
+e.expected=true;
+return e;
+}
+
 async function body(req){
 return new Promise((resolve,reject)=>{
 let data="";
 
 req.on("data",chunk=>{
 data+=chunk;
-if(data.length>1024*1024){req.destroy();reject(new Error("Request body too large."));}
+if(data.length>1024*1024){req.destroy();reject(expectedError("Request body too large.",413));}
 });
 
 req.on("end",()=>{
 try{
+// A null byte (raw or JSON-escaped) makes Postgres throw error 22021, so refuse it early.
+if(data.indexOf("\u0000")>=0||/\\u0000/i.test(data))return reject(expectedError("Invalid request body.",400));
 resolve(data?JSON.parse(data):{});
 }catch(error){
-reject(error);
+reject(expectedError("Invalid JSON body.",400));
 }
 });
 
@@ -126,7 +135,7 @@ return pool.query(query,params);
 }
 
 function clean(value){
-return String(value??"").trim();
+return String(value??"").replace(/\u0000/g,"").trim();
 }
 
 // VTUGATE has used slightly different casing/nesting for catalogue fields.
@@ -1874,7 +1883,25 @@ salt,
 return `${salt}:${hash}`;
 }
 
-function verifyPassword(
+// Wrong-PIN lockout: 5 wrong 4-digit PINs against the same stored PIN locks it for 30 minutes.
+// Passwords are at least 6 characters, so a 4-digit value is always a PIN attempt.
+const pinFails=new Map();
+setInterval(()=>{const now=Date.now();for(const [k,v] of pinFails){if(v.resetAt<=now&&v.lockUntil<=now)pinFails.delete(k);}},10*60*1000).unref();
+function verifyPassword(plain,stored){
+if(!/^\d{4}$/.test(String(plain||"")))return verifyPasswordRaw(plain,stored);
+const key=String(stored||"");
+const now=Date.now();
+let f=pinFails.get(key);
+if(f&&f.lockUntil>now)return false;
+if(verifyPasswordRaw(plain,stored)){pinFails.delete(key);return true;}
+if(!f||f.resetAt<=now)f={count:0,resetAt:now+30*60*1000,lockUntil:0};
+f.count++;
+if(f.count>=5){f.lockUntil=now+30*60*1000;f.resetAt=f.lockUntil;f.count=0;}
+pinFails.set(key,f);
+return false;
+}
+
+function verifyPasswordRaw(
 password,
 stored
 ){
@@ -6637,6 +6664,7 @@ try{const b=await body(req),accountType=String(b.accountType||"static").toLowerC
 }
 
 if(req.method==="POST"&&path==="/api/flutterwave/webhook"){
+{const wrl=rateLimit(req,"flw-webhook",300,60*1000);if(!wrl.allowed)return rateLimitedResponse(res,wrl);}
 let rawBody="";
 try{
 rawBody=await new Promise((resolve,reject)=>{
@@ -6656,7 +6684,7 @@ const directSignature=String(req.headers["verif-hash"]||"");
 const hmacSignature=String(req.headers["flutterwave-signature"]||"");
 let valid=false;
 if(FLW_SECRET_HASH){
-if(directSignature&&directSignature===FLW_SECRET_HASH)valid=true;
+if(directSignature&&directSignature.length===FLW_SECRET_HASH.length&&crypto.timingSafeEqual(Buffer.from(directSignature),Buffer.from(FLW_SECRET_HASH)))valid=true;
 if(hmacSignature){
 const expected=crypto.createHmac("sha256",FLW_SECRET_HASH).update(rawBody).digest("base64");
 const supplied=Buffer.from(hmacSignature,"utf8");
@@ -6959,6 +6987,20 @@ try{
 
 res.__corsOrigin=corsOrigin(req);
 
+if(/%00/i.test(req.url||""))return send(res,400,{success:false,message:"Bad request."});
+
+// CSRF guard: browsers always send Origin on cross-site POST/PATCH/DELETE. Refuse any that is not our own site.
+// Server-to-server calls (webhooks) send no Origin, so they are unaffected.
+{
+const reqOrigin=String(req.headers.origin||"");
+if(reqOrigin&&req.method!=="GET"&&req.method!=="HEAD"&&req.method!=="OPTIONS"
+&&!FRONTEND_ORIGINS.includes(reqOrigin)
+&&reqOrigin!==`https://${req.headers.host||""}`
+&&!/webhook/i.test(req.url||"")){
+return send(res,403,{success:false,message:"Origin not allowed."});
+}
+}
+
 const url=
 new URL(
 req.url,
@@ -7162,6 +7204,10 @@ message:
 });
 
 }catch(error){
+
+if(error&&error.expected&&error.statusCode){
+return send(res,error.statusCode,{success:false,message:error.message});
+}
 
 console.error(
 "SERVER ERROR:",

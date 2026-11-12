@@ -642,6 +642,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
     await ensureTables(); startSweep();
 
     if (M === "POST" && path === "/api/payscribe/webhook") {
+      const wrl = rateLimit(req, "card-webhook", 300, 60000); if (!wrl.allowed) return rateLimitedResponse(res, wrl), true;
       const raw = await readRaw(req);
       if (!sigOk(req, raw)) { console.error("CARD WEBHOOK REJECTED: invalid signature", JSON.stringify({ hasSignature: !!req.headers["x-payscribe-signature"], hasTimestamp: !!req.headers["x-payscribe-timestamp"], hasEventId: !!req.headers["x-payscribe-event-id"], secretIsApiKey: !process.env.PAYSCRIBE_WEBHOOK_SECRET })); return send(res, 401, { success: false, message: "Invalid signature." }), true; }
       let p; try { p = JSON.parse(raw || "{}"); } catch { return send(res, 400, { success: false }), true; }

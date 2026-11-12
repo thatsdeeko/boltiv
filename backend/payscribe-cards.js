@@ -276,6 +276,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       customer: { name: clean(user.name) || clean(profile?.holder_name) || "BOLTIV Customer", email: clean(user.email), phone: clean(user.phone) } });
     const acct = r.data?.message?.details?.account?.[0];
     if (r.outcome !== "success" || !acct?.account_number) {
+      console.error("CARD PAYMENT ACCOUNT FAILED:", r.outcome, r.code || "", clean(r.message).slice(0, 200), "| amount:", p.ngnTotal, "| ref:", ref);
       await db(`UPDATE card_orders SET status='failed', error=$2, updated_at=NOW() WHERE reference=$1`, [ref, clean(r.message || "Payment account could not be created.").slice(0, 300)]);
       return { code: r.outcome === "unknown" ? 503 : 400, message: "We could not set up your payment details. Please try again." };
     }

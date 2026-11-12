@@ -2339,6 +2339,8 @@ logged_out_at TIMESTAMPTZ
 )`);
 await db(`CREATE INDEX IF NOT EXISTS user_login_history_user_idx ON user_login_history(user_id,created_at DESC)`);
 await db(`CREATE INDEX IF NOT EXISTS user_login_history_session_idx ON user_login_history(session_hash)`);
+await db(`CREATE INDEX IF NOT EXISTS user_login_history_ip_idx ON user_login_history(ip,created_at)`);
+await db(`CREATE INDEX IF NOT EXISTS user_login_history_time_idx ON user_login_history(created_at DESC)`);
 
 await db(`
 CREATE TABLE IF NOT EXISTS wallets(
@@ -4853,6 +4855,29 @@ async function adminUserLogins(req,userId){
   return{success:true,logins:rows.rows,summary:{ips24h:Number(d.ips||0),devices24h:Number(d.devices||0),failed24h:Number(d.failed||0)}};
 }
 
+async function adminLoginHistory(req,params){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  const days=Math.min(90,Math.max(1,parseInt(params.get("days"),10)||1));
+  const rawResult=String(params.get("result")||"all");
+  const result=["all","ok","failed"].includes(rawResult)?rawResult:"all";
+  const q=clean(params.get("q")).toLowerCase().slice(0,60).replace(/[\\%_]/g,m=>"\\"+m);
+  const limit=Math.min(500,Math.max(10,parseInt(params.get("limit"),10)||200));
+  const rows=await db(
+`SELECT h.id,h.user_id,h.email,h.success,h.reason,h.ip,h.device,h.created_at,h.logged_out_at,u.name,
+(SELECT COUNT(DISTINCT x.user_id) FROM user_login_history x WHERE x.ip=h.ip AND x.success AND x.created_at>NOW()-INTERVAL '24 hours') AS ip_accounts
+FROM user_login_history h
+LEFT JOIN users u ON u.user_id=h.user_id
+WHERE h.created_at>NOW()-($1::int*INTERVAL '1 day')
+AND($2='all' OR($2='ok' AND h.success) OR($2='failed' AND NOT h.success))
+AND($3='' OR LOWER(COALESCE(u.name,'')||' '||COALESCE(h.email,'')||' '||COALESCE(h.ip,'')||' '||COALESCE(h.device,'')||' '||h.user_id) LIKE '%'||$3||'%' ESCAPE '\\')
+ORDER BY h.created_at DESC
+LIMIT $4`,[days,result,q,limit]);
+  const sum=(await db(`SELECT COUNT(*) FILTER(WHERE success) AS ok,COUNT(*) FILTER(WHERE NOT success) AS failed,COUNT(DISTINCT ip) FILTER(WHERE success) AS ips FROM user_login_history WHERE created_at>NOW()-INTERVAL '24 hours'`)).rows[0]||{};
+  const shared=(await db(`SELECT COUNT(*) AS n FROM(SELECT ip FROM user_login_history WHERE success AND ip IS NOT NULL AND created_at>NOW()-INTERVAL '24 hours' GROUP BY ip HAVING COUNT(DISTINCT user_id)>=3) s`)).rows[0]||{};
+  return{success:true,logins:rows.rows.map(x=>({...x,ip_accounts:Number(x.ip_accounts||0)})),summary:{ok24h:Number(sum.ok||0),failed24h:Number(sum.failed||0),ips24h:Number(sum.ips||0),sharedIps24h:Number(shared.n||0)}};
+}
+
 async function adminTransactionsResponse(req){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
@@ -5340,6 +5365,11 @@ result
 /*
 ADMIN USERS
 */
+
+if(req.method==="GET"&&path==="/api/admin/login-history"){
+const result=await adminLoginHistory(req,new URL(req.url,"http://localhost").searchParams);
+return send(res,result.success?200:(result.statusCode||400),result);
+}
 
 if(req.method==="GET"&&path==="/api/admin/users/logins"){
 const result=await adminUserLogins(req,new URL(req.url,"http://localhost").searchParams.get("userId"));

@@ -173,6 +173,28 @@ function validEmail(email){
 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// Signups are limited to major mailbox providers (blocks throwaway domains).
+// Add more without redeploying code: set EXTRA_EMAIL_DOMAINS in Railway, e.g. "company.com,school.edu.ng".
+const ALLOWED_EMAIL_DOMAINS=new Set([
+"gmail.com","googlemail.com","yahoo.com","ymail.com","rocketmail.com",
+"hotmail.com","outlook.com","live.com","msn.com","icloud.com","me.com",
+"proton.me","protonmail.com","email.com",
+...String(process.env.EXTRA_EMAIL_DOMAINS||"").split(",").map(x=>x.trim().toLowerCase()).filter(Boolean)
+]);
+
+function allowedSignupEmail(email){
+const parts=String(email||"").toLowerCase().split("@");
+if(parts.length!==2||!parts[0]||!parts[1])return false;
+// "+" aliases (name+1@gmail.com) would let one mailbox create unlimited accounts.
+return ALLOWED_EMAIL_DOMAINS.has(parts[1])&&!parts[0].includes("+");
+}
+
+// Gmail ignores dots, so a.b@gmail.com and ab@gmail.com are the same mailbox.
+function gmailLocalKey(email){
+const parts=String(email||"").toLowerCase().split("@");
+return(parts[1]==="gmail.com"||parts[1]==="googlemail.com")?parts[0].replace(/\./g,""):null;
+}
+
 function validPhone(phone){
 return /^0\d{10}$/.test(phone);
 }
@@ -2302,6 +2324,23 @@ expires_at TIMESTAMPTZ NOT NULL
 )`);
 
 await db(`
+CREATE TABLE IF NOT EXISTS user_login_history(
+id BIGSERIAL PRIMARY KEY,
+user_id TEXT NOT NULL,
+email TEXT,
+success BOOLEAN NOT NULL,
+reason TEXT NOT NULL DEFAULT 'ok',
+ip TEXT,
+device TEXT,
+user_agent TEXT,
+session_hash TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+logged_out_at TIMESTAMPTZ
+)`);
+await db(`CREATE INDEX IF NOT EXISTS user_login_history_user_idx ON user_login_history(user_id,created_at DESC)`);
+await db(`CREATE INDEX IF NOT EXISTS user_login_history_session_idx ON user_login_history(session_hash)`);
+
+await db(`
 CREATE TABLE IF NOT EXISTS wallets(
 user_id TEXT PRIMARY KEY,
 balance NUMERIC(14,2) NOT NULL DEFAULT 0,
@@ -3137,6 +3176,16 @@ message:
 
 }
 
+if(!allowedSignupEmail(email)){
+
+return{
+success:false,
+message:
+"Please sign up with a Gmail, Yahoo, Outlook, Hotmail or iCloud email address (no + aliases)."
+};
+
+}
+
 if(password.length<6){
 
 return{
@@ -3151,8 +3200,12 @@ const existing=
 await db(
 `SELECT id
 FROM users
-WHERE LOWER(email)=LOWER($1)`,
-[email]
+WHERE LOWER(email)=LOWER($1)
+OR(
+SPLIT_PART(LOWER(email),'@',2) IN ('gmail.com','googlemail.com')
+AND REPLACE(SPLIT_PART(LOWER(email),'@',1),'.','')=$2
+)`,
+[email,gmailLocalKey(email)]
 );
 
 if(existing.rows.length){
@@ -3241,9 +3294,44 @@ email:user.email
 
 }
 
+function describeDevice(ua){
+ua=String(ua||"");
+if(!ua)return"Unknown";
+let os="Other";
+const android=ua.match(/Android[\s/]*([\d.]+)?;?\s*([^;)]*?)(?:\s+Build|[;)])/i);
+if(/Android/i.test(ua))os="Android"+(android&&android[2]&&!/^(wv|mobile|linux)$/i.test(android[2].trim())?" ("+android[2].trim().slice(0,30)+")":"");
+else if(/iPhone|iPad|iPod/i.test(ua))os=/iPad/i.test(ua)?"iPad":"iPhone";
+else if(/Windows/i.test(ua))os="Windows";
+else if(/Mac OS X|Macintosh/i.test(ua))os="Mac";
+else if(/Linux/i.test(ua))os="Linux";
+let browser="Browser";
+if(/SamsungBrowser/i.test(ua))browser="Samsung Browser";
+else if(/Edg(e|A|iOS)?\//i.test(ua))browser="Edge";
+else if(/OPR\/|Opera/i.test(ua))browser="Opera";
+else if(/Firefox|FxiOS/i.test(ua))browser="Firefox";
+else if(/CriOS|Chrome/i.test(ua))browser="Chrome";
+else if(/Safari/i.test(ua))browser="Safari";
+return os+" · "+browser;
+}
+
+async function recordUserLogin({user,email,success,reason,req,sessionToken}){
+try{
+const ua=String(req?.headers?.["user-agent"]||"").slice(0,300);
+const sessionHash=sessionToken?crypto.createHash("sha256").update(String(sessionToken)).digest("hex"):null;
+await db(
+`INSERT INTO user_login_history(user_id,email,success,reason,ip,device,user_agent,session_hash)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+[String(user.user_id||user.id),clean(email).slice(0,120),!!success,reason||"ok",req?requestIp(req).slice(0,60):null,describeDevice(ua),ua,sessionHash]
+);
+}catch(e){
+console.error("LOGIN HISTORY ERROR:",e?.message||e);
+}
+}
+
 async function loginUser(
 email,
-password
+password,
+req=null
 ){
 
 email=
@@ -3282,6 +3370,7 @@ const user=
 result.rows[0];
 
 if(user.status==="suspended"){
+void recordUserLogin({user,email,success:false,reason:"suspended",req});
 return{success:false,message:"Your account is suspended. Please contact support."};
 }
 
@@ -3289,6 +3378,8 @@ if(!verifyPassword(
 password,
 user.password_hash
 )){
+
+void recordUserLogin({user,email,success:false,reason:"bad_password",req});
 
 return{
 success:false,
@@ -3299,6 +3390,7 @@ message:
 }
 
 if(user.email_verified !== true){
+void recordUserLogin({user,email,success:false,reason:"unverified",req});
 return{
 success:false,
 code:"EMAIL_NOT_VERIFIED",
@@ -3347,6 +3439,8 @@ user.id
 ]
 );
 
+void recordUserLogin({user,email,success:true,reason:"ok",req,sessionToken});
+
 const agent=await getAgentProfile(user.user_id);
 const isAgent=agent&&agent.status==='active';
 
@@ -3371,7 +3465,10 @@ agent
 
 async function logoutUser(req,res){
   const sessionToken=getUserSessionToken(req);
-  if(sessionToken){ await db(`DELETE FROM user_sessions WHERE token=$1`,[sessionToken]); }
+  if(sessionToken){
+try{await db(`UPDATE user_login_history SET logged_out_at=NOW() WHERE session_hash=$1 AND logged_out_at IS NULL`,[crypto.createHash("sha256").update(String(sessionToken)).digest("hex")]);}catch(e){console.error("LOGIN HISTORY LOGOUT ERROR:",e?.message||e);}
+await db(`DELETE FROM user_sessions WHERE token=$1`,[sessionToken]);
+}
   clearUserSessionCookie(res);
   return{success:true,message:"Logged out successfully."};
 }
@@ -4550,6 +4647,111 @@ const pending=(await db(`SELECT COUNT(*)::int count,COALESCE(SUM(amount),0) amou
 const out={customerWallet:Number(customer?.balance||0),customerLedger:Number(customerLedger?.balance||0),adminWallet:Number(admin?.balance||0),adminLedger:Number(adminLedger?.balance||0),revenueWallet:Number(revenue?.balance||0),revenueLedger:Number(revenueLedger?.balance||0),fundingTransactions:Number(fundingTx?.total||0),fundingLedger:Number(fundingLedger?.total||0),pendingCount:Number(pending?.count||0),pendingAmount:Number(pending?.amount||0)};
 out.customerVariance=Number((out.customerWallet-out.customerLedger).toFixed(2));out.adminVariance=Number((out.adminWallet-out.adminLedger).toFixed(2));out.revenueVariance=Number((out.revenueWallet-out.revenueLedger).toFixed(2));out.fundingVariance=Number((out.fundingTransactions-out.fundingLedger).toFixed(2));out.ok=[out.customerVariance,out.adminVariance,out.revenueVariance,out.fundingVariance].every(v=>Math.abs(v)<0.01);return out;
 }
+/* ===================== PER-WALLET RECONCILIATION ===================== */
+// Finds which individual wallets do not match their ledger history, and which users were credited
+// more (or less) than their successful Wallet Funding payments. variance > 0 means the wallet holds
+// more money than its history justifies.
+async function getWalletMismatches(){
+const wallets=(await db(`
+SELECT w.user_id,u.name,u.email,COALESCE(u.status,'active') AS status,w.balance,COALESCE(l.total,0) AS ledger
+FROM wallets w
+LEFT JOIN users u ON u.user_id=w.user_id
+LEFT JOIN(
+SELECT owner_id,SUM(amount) AS total
+FROM financial_ledger
+WHERE account_type='customer_wallet'
+GROUP BY owner_id
+) l ON l.owner_id=w.user_id
+WHERE ABS(w.balance-COALESCE(l.total,0))>=0.01 OR w.balance<0
+ORDER BY ABS(w.balance-COALESCE(l.total,0)) DESC
+LIMIT 200`)).rows.map(x=>({user_id:x.user_id,name:x.name||"",email:x.email||"",status:x.status,balance:Number(x.balance||0),ledger:Number(x.ledger||0),variance:Number((Number(x.balance||0)-Number(x.ledger||0)).toFixed(2))}));
+const funding=(await db(`
+WITH ls AS(SELECT MIN(created_at) AS t FROM financial_ledger WHERE category='opening_balance'),
+tx AS(
+SELECT t.user_id,SUM(t.amount) AS total
+FROM transactions t,ls
+WHERE t.type='credit' AND t.status='successful' AND t.service='Wallet Funding' AND(ls.t IS NULL OR t.date>=ls.t)
+GROUP BY t.user_id
+),
+lg AS(
+SELECT owner_id AS user_id,SUM(amount) AS total
+FROM financial_ledger
+WHERE account_type='customer_wallet' AND category='wallet_funding'
+GROUP BY owner_id
+)
+SELECT COALESCE(tx.user_id,lg.user_id) AS user_id,COALESCE(tx.total,0) AS paid,COALESCE(lg.total,0) AS credited
+FROM tx FULL OUTER JOIN lg ON tx.user_id=lg.user_id
+WHERE ABS(COALESCE(tx.total,0)-COALESCE(lg.total,0))>=0.01
+LIMIT 200`)).rows.map(x=>({user_id:x.user_id,paid:Number(x.paid||0),credited:Number(x.credited||0),over:Number((Number(x.credited||0)-Number(x.paid||0)).toFixed(2))}));
+return{wallets,funding};
+}
+
+// A mismatch must show up in two checks in a row (about 5 minutes apart) with the same numbers before it
+// raises an alert, so a payment that is mid-way through being written cannot cause a false alarm.
+let walletMismatchSeen=new Set();
+let walletReconBusy=false;
+async function runWalletReconciliation(){
+if(walletReconBusy)return;
+walletReconBusy=true;
+try{
+const{wallets,funding}=await getWalletMismatches();
+const seenNow=new Set();
+const confirmedWallets=[],confirmedFunding=[];
+for(const w of wallets){const k=`w|${w.user_id}|${w.balance}|${w.ledger}`;seenNow.add(k);if(walletMismatchSeen.has(k))confirmedWallets.push(w);}
+for(const f of funding){const k=`f|${f.user_id}|${f.paid}|${f.credited}`;seenNow.add(k);if(walletMismatchSeen.has(k))confirmedFunding.push(f);}
+walletMismatchSeen=seenNow;
+
+const suspendMin=Number(process.env.RECONCILE_SUSPEND_MIN||1000);
+
+if(confirmedWallets.length){
+const worst=confirmedWallets[0];
+const critical=confirmedWallets.some(w=>w.balance<0||w.variance>=suspendMin);
+await upsertPlatformAlert("wallet_mismatch",critical?"critical":"warning",
+`${confirmedWallets.length} wallet(s) do not match their ledger`,
+`Largest difference is ₦${Math.abs(worst.variance).toFixed(2)} on user ${worst.user_id}. Open WALLET CHECK on the Alerts page for the full list.`,
+{wallets:confirmedWallets.slice(0,25).map(w=>({user_id:w.user_id,balance:w.balance,ledger:w.ledger,variance:w.variance}))});
+}else await resolvePlatformAlert("wallet_mismatch");
+
+if(confirmedFunding.length){
+const worst=[...confirmedFunding].sort((a,b)=>Math.abs(b.over)-Math.abs(a.over))[0];
+const critical=confirmedFunding.some(f=>f.over>=suspendMin);
+await upsertPlatformAlert("funding_user_mismatch",critical?"critical":"warning",
+`${confirmedFunding.length} user(s) have funding credits that do not match their payments`,
+`Largest difference is ₦${Math.abs(worst.over).toFixed(2)} on user ${worst.user_id}. Open WALLET CHECK on the Alerts page for the full list.`,
+{users:confirmedFunding.slice(0,25)});
+}else await resolvePlatformAlert("funding_user_mismatch");
+
+// Optional automatic hold. OFF unless RECONCILE_AUTO_SUSPEND=true is set in Railway.
+// Only suspends when a user holds, or was credited, MORE than their history justifies by RECONCILE_SUSPEND_MIN or more.
+if(process.env.RECONCILE_AUTO_SUSPEND==="true"){
+const toSuspend=new Map();
+for(const w of confirmedWallets){if(w.variance>=suspendMin&&w.status!=="suspended")toSuspend.set(w.user_id,`wallet is ₦${w.variance.toFixed(2)} above its ledger`);}
+for(const f of confirmedFunding){if(f.over>=suspendMin)toSuspend.set(f.user_id,`credited ₦${f.over.toFixed(2)} more than paid`);}
+for(const[uid,why]of toSuspend){
+const r=await db(`UPDATE users SET status='suspended',updated_at=NOW() WHERE user_id=$1 AND COALESCE(status,'active')<>'suspended' RETURNING user_id`,[uid]);
+if(r.rows.length)await recordSecurityEvent("wallet_auto_suspend","critical",{user_id:uid,reason:why},null,null);
+}
+}
+}catch(e){
+console.error("WALLET RECONCILIATION ERROR:",e?.message||e);
+}finally{
+walletReconBusy=false;
+}
+}
+
+async function adminWalletMismatches(req){
+const admin=await adminFromToken(req);
+if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+const r=await getWalletMismatches();
+const names=new Map(r.wallets.map(w=>[w.user_id,w]));
+const missing=r.funding.map(f=>f.user_id).filter(id=>!names.has(id));
+if(missing.length){
+const u=await db(`SELECT user_id,name,email FROM users WHERE user_id=ANY($1::text[])`,[missing]);
+for(const x of u.rows)names.set(x.user_id,{name:x.name||"",email:x.email||""});
+}
+return{success:true,wallets:r.wallets,funding:r.funding.map(f=>({...f,name:names.get(f.user_id)?.name||"",email:names.get(f.user_id)?.email||""})),autoSuspend:process.env.RECONCILE_AUTO_SUSPEND==="true"};
+}
+
 async function upsertPlatformAlert(alertKey,severity,title,message,details={}){
 const r=await db(`INSERT INTO platform_alerts(alert_key,severity,title,message,status,details) VALUES($1,$2,$3,$4,'open',$5::jsonb) ON CONFLICT(alert_key) DO UPDATE SET severity=EXCLUDED.severity,title=EXCLUDED.title,message=EXCLUDED.message,status='open',details=EXCLUDED.details,last_seen_at=NOW(),resolved_at=NULL RETURNING *`,[alertKey,severity,title,message,JSON.stringify(details)]);
 const row=r.rows[0];
@@ -4573,7 +4775,7 @@ openingBalanceCheck=(await db(`SELECT owner_id,amount,created_at FROM financial_
 return{success:true,statusCode:200,explanation:"txWithoutLedger = Wallet Funding transactions with NO matching ledger entry. ledgerWithoutTx = wallet_funding ledger entries with NO matching transaction. openingBalanceCheck = each affected user's opening-balance ledger row (compare its created_at against the transaction dates above to see if it was taken before or after).",txWithoutLedger,ledgerWithoutTx,openingBalanceCheck};
 }catch(e){return{success:false,statusCode:200,message:"DIAGNOSTIC CRASHED: "+(e&&e.stack||e&&e.message||String(e))};}
 }
-async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['vtugate_config',!VTUGATE_API_KEY,'critical','VTUGATE is not configured','The VTUGATE API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
+async function runPlatformAlerts(){try{const r=await getFinancialReconciliation();const f=(await db(`SELECT COUNT(*) FILTER(WHERE status='failed' AND date>=NOW()-INTERVAL '1 hour')::int failed,COUNT(*) FILTER(WHERE date>=NOW()-INTERVAL '1 hour')::int total FROM transactions`)).rows[0]||{};const failed=Number(f.failed||0),total=Number(f.total||0);const checks=[['recon_customer',Math.abs(r.customerVariance)>=.01,'critical','Customer wallet reconciliation mismatch',`Customer wallet differs from ledger by ₦${Math.abs(r.customerVariance).toFixed(2)}.`,{variance:r.customerVariance}],['recon_admin',Math.abs(r.adminVariance)>=.01,'critical','Admin operating wallet mismatch',`Admin operating wallet differs from ledger by ₦${Math.abs(r.adminVariance).toFixed(2)}.`,{variance:r.adminVariance}],['recon_revenue',Math.abs(r.revenueVariance)>=.01,'critical','Revenue wallet reconciliation mismatch',`Revenue wallet differs from ledger by ₦${Math.abs(r.revenueVariance).toFixed(2)}.`,{variance:r.revenueVariance}],['recon_funding',Math.abs(r.fundingVariance)>=.01,'critical','Funding reconciliation mismatch',`Credited deposits differ from Wallet Funding transactions by ₦${Math.abs(r.fundingVariance).toFixed(2)}.`,{variance:r.fundingVariance}],['vtugate_config',!VTUGATE_API_KEY,'critical','VTUGATE is not configured','The VTUGATE API key is missing from the server environment.',{}],['high_failure_rate',total>=10 && failed/total>=0.2,'warning','High transaction failure rate',`${failed} of ${total} transactions failed in the last hour.`,{failed,total,rate:failed/total}],['stale_pending',r.pendingCount>0 && r.pendingAmount>0,'warning','Pending VTU transactions require attention',`${r.pendingCount} transactions worth ₦${r.pendingAmount.toFixed(2)} remain pending or processing.`,{count:r.pendingCount,amount:r.pendingAmount}]];for(const c of checks){if(c[1])await upsertPlatformAlert(c[0],c[2],c[3],c[4],c[5]);else await resolvePlatformAlert(c[0]);}await runWalletReconciliation();return r;}catch(e){await upsertPlatformAlert('reconciliation_job','critical','Reconciliation job failed',e.message||'Automated reconciliation failed.',{});return null;}}
 async function adminAlerts(req,action){
   const admin=await adminFromToken(req);
   if(!admin)return{success:false,statusCode:401,message:'Unauthorized.'};
@@ -4638,6 +4840,17 @@ async function adminUsersResponse(req){
     FROM users u LEFT JOIN wallets w ON w.user_id=u.user_id
     ORDER BY u.created_at DESC LIMIT 1000`);
   return{success:true,users:r.rows.map(x=>({...x,balance:Number(x.balance||0)}))};
+}
+
+async function adminUserLogins(req,userId){
+  const admin=await adminFromToken(req);
+  if(!admin)return{success:false,statusCode:401,message:"Unauthorized."};
+  userId=clean(userId).slice(0,40);
+  if(!userId)return{success:false,statusCode:400,message:"User ID is required."};
+  const rows=await db(`SELECT success,reason,ip,device,created_at,logged_out_at FROM user_login_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[userId]);
+  const day=await db(`SELECT COUNT(DISTINCT ip) FILTER(WHERE success) AS ips,COUNT(DISTINCT device) FILTER(WHERE success) AS devices,COUNT(*) FILTER(WHERE NOT success) AS failed FROM user_login_history WHERE user_id=$1 AND created_at>NOW()-INTERVAL '24 hours'`,[userId]);
+  const d=day.rows[0]||{};
+  return{success:true,logins:rows.rows,summary:{ips24h:Number(d.ips||0),devices24h:Number(d.devices||0),failed24h:Number(d.failed||0)}};
 }
 
 async function adminTransactionsResponse(req){
@@ -5128,6 +5341,11 @@ result
 ADMIN USERS
 */
 
+if(req.method==="GET"&&path==="/api/admin/users/logins"){
+const result=await adminUserLogins(req,new URL(req.url,"http://localhost").searchParams.get("userId"));
+return send(res,result.success?200:(result.statusCode||400),result);
+}
+
 if(
 req.method==="GET"&&
 path==="/api/admin/users"
@@ -5208,6 +5426,7 @@ if(req.method==="GET"&&path==="/api/admin/monitoring"){const result=await adminM
 if(req.method==="GET"&&path==="/api/admin/vtugate/rawplans"){const qNetwork=new URL(req.url,"http://localhost").searchParams.get("network");const result=await adminVTUGATEProvider(req,"rawplans",qNetwork);return send(res,result.statusCode||200,result);}
 if(req.method==="GET"&&path==="/api/admin/diagnostics/funding"){const result=await adminFundingDiagnostics(req);return send(res,result.statusCode||200,result);}
 if(req.method==="GET"&&path==="/api/admin/analytics"){const result=await adminAnalytics(req);return send(res,result.success?200:(result.statusCode||400),result);}
+if(req.method==="GET"&&path==="/api/admin/reconciliation/wallets"){const result=await adminWalletMismatches(req);return send(res,result.success?200:(result.statusCode||400),result);}
 if(req.method==="GET"&&path==="/api/admin/reconciliation"){const admin=await adminFromToken(req);if(!admin)return;const result=await getFinancialReconciliation();return send(res,200,{success:true,reconciliation:result});}
 if(req.method==="GET"&&path==="/api/admin/ledger"){const admin=await adminFromToken(req);if(!admin)return;const r=await db(`SELECT id,account_type,owner_id,direction,amount,balance_after,reference,transaction_id,category,description,created_at FROM financial_ledger ORDER BY created_at DESC LIMIT 300`);return send(res,200,{success:true,ledger:r.rows.map(x=>({...x,amount:Number(x.amount||0),balance_after:Number(x.balance_after||0)}))});}
 if(req.method==="GET"&&path==="/api/admin/alerts"){const result=await adminAlerts(req,"list");return send(res,result.success?200:(result.statusCode||400),result);}
@@ -5498,7 +5717,8 @@ await body(req);
 const result=
 await loginUser(
 b.email,
-b.password
+b.password,
+req
 );
 if(result.success && result._sessionToken){ setUserSessionCookie(res,result._sessionToken); result.sessionToken=result._sessionToken; delete result._sessionToken; }
 return send(
@@ -7233,6 +7453,10 @@ setInterval(()=>runPlatformAlerts().catch(e=>console.error("ALERT CHECK ERROR",e
 // Bonus expiry sweep: shortly after boot, then every 30 minutes.
 setTimeout(()=>expireBonusLots().catch(e=>console.error("BONUS EXPIRY ERROR",e)),20000).unref();
 setInterval(()=>expireBonusLots().catch(e=>console.error("BONUS EXPIRY ERROR",e)),30*60*1000).unref();
+// Login history is kept for 90 days, then deleted.
+const purgeLoginHistory=()=>db(`DELETE FROM user_login_history WHERE created_at<NOW()-INTERVAL '90 days'`).catch(e=>console.error("LOGIN HISTORY PURGE ERROR",e?.message||e));
+setTimeout(purgeLoginHistory,60000).unref();
+setInterval(purgeLoginHistory,6*60*60*1000).unref();
 
 await cleanupPasswordResetTokens();
 cleanupTransactionPinResetTokens();

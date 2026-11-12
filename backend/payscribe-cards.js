@@ -615,14 +615,17 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       return JSON.stringify(walk(JSON.parse(raw))).slice(0, 4000);
     } catch { return String(raw || "").slice(0, 500).replace(/\d{4,8}/g, "[hidden]"); }
   }
+  // Payscribe's docs write this event both as accounts.payment.status (payload) and accounts.payments.status (heading),
+  // so accept either spelling, from the header or from the body.
+  const isPaymentEvent = (type, p) => /^accounts?\.payments?\.status$/i.test(String(type || "")) || /^accounts?\.payments?\.status$/i.test(String((p && p.event_type) || ""));
   async function processWebhook(type, p) {
     let claimed = null;
     await forwardOtp(type, p);
     if (/^cards?\./.test(type)) await onEvent(type, p);
-    else if (type === "accounts.payment.status") claimed = await onPayment(p);
+    else if (isPaymentEvent(type, p)) claimed = await onPayment(p);
     return claimed;
   }
-  const kindOf = type => (/^cards?\./.test(type) || type === "accounts.payment.status" ? "processed" : "ignored");
+  const kindOf = (type, p) => (/^cards?\./.test(type) || isPaymentEvent(type, p) ? "processed" : "ignored");
   async function retryWebhooks() {
     try {
       const rows = (await db(`SELECT id,event_type,raw FROM card_webhook_log WHERE status='error' AND attempts<6 AND updated_at < NOW() - interval '90 seconds' ORDER BY id ASC LIMIT 10`)).rows;
@@ -660,7 +663,7 @@ ${note ? `<p style="font-size:13px;line-height:1.6;color:#777;margin-top:22px">$
       let claimed = null, ok = false, errMsg = "";
       try { claimed = await processWebhook(type, p); ok = true; }
       catch (e) { errMsg = clean(e && e.message).slice(0, 300); console.error("CARD WEBHOOK ERROR:", type, (e && e.stack) || e); }
-      try { await db(`UPDATE card_webhook_log SET status=$2, error=$3, raw=$4, attempts=attempts+1, updated_at=NOW() WHERE id=$1`, [logId, ok ? kindOf(type) : "error", ok ? null : errMsg, ok ? redact(raw) : String(raw).slice(0, 60000)]); } catch (e) { console.error("CARD WEBHOOK LOG UPDATE ERROR:", e.message); }
+      try { await db(`UPDATE card_webhook_log SET status=$2, error=$3, raw=$4, attempts=attempts+1, updated_at=NOW() WHERE id=$1`, [logId, ok ? kindOf(type, p) : "error", ok ? null : errMsg, ok ? redact(raw) : String(raw).slice(0, 60000)]); } catch (e) { console.error("CARD WEBHOOK LOG UPDATE ERROR:", e.message); }
       send(res, 200, { success: true }); // saved: the event is processed now or retried automatically
       if (claimed) fulfillOrder(claimed).catch(e => console.error("CARD FULFILL ERROR:", e.message));
       return true;

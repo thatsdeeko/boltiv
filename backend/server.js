@@ -3,6 +3,7 @@ const crypto=require("node:crypto");
 const zlib=require("node:zlib");
 const {Pool}=require("pg");
 const createCards=require("./payscribe-cards");
+const createBusinessManager=require("./business");
 
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
@@ -7213,6 +7214,12 @@ result
 return null;
 
   }
+/* BOLTIV Business Manager: created once, shared by every request (see business/index.js). */
+function getBusinessManager(){
+if(!global.__boltivBusiness)global.__boltivBusiness=createBusinessManager({db,pool,send,body,clean,userFromToken,verifyPassword,reference,addFinancialLedger,addNotification,addNotificationOnce,getPlatformSetting,rateLimit,rateLimitedResponse,adminFromToken,requireAdminCsrf,requestIp});
+return global.__boltivBusiness;
+}
+
 const server=http.createServer(
 async(req,res)=>{
 
@@ -7444,6 +7451,15 @@ if(cardsHandled!==false)return;
 }
 
 /*
+BOLTIV BUSINESS MANAGER - see business/index.js
+*/
+if(path.startsWith("/api/business/")||path.startsWith("/api/admin/business/")){
+const bm=getBusinessManager();
+const bmHandled=await bm.handle(req,res,path);
+if(bmHandled!==false)return;
+}
+
+/*
 UNKNOWN ROUTE
 */
 
@@ -7514,6 +7530,8 @@ console.log(
 console.log(
 `Frontend: ${FRONTEND_URL}`
 );
+
+try{getBusinessManager().init();}catch(error){console.error("BUSINESS MANAGER INIT ERROR:",error&&error.message);}
 
 // Reconcile provider-pending transactions every 5 minutes.
 const reconcileIntervalMs=Math.max(30000,Number(process.env.PENDING_RECONCILE_INTERVAL_MS||300000));

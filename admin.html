@@ -120,6 +120,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="nav">
 <button data-page="services">◈ Services</button>
 <button data-page="cards">▭ Cards</button>
+<button data-page="business">▤ Business Manager</button>
 <button data-page="smsid">✉ SMS Sender IDs</button>
 <button data-page="agent-pricing">₦ Agent Pricing</button>
 <button data-page="notifications">♢ Notifications</button>
@@ -256,6 +257,32 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <p style="margin-top:10px;font-size:12px;color:#777">Contactless applies only to NEW cards; cards already issued stay as they are. Customers pay (amount + creation fee) × (Payscribe live rate + margin) plus the payment processing fee, by bank transfer to a one-time account. Payscribe gives 20 free rate lookups a day, then $0.30 each, so keep the refresh at 60+ minutes. Use a $1 creation fee only if you are on the Business Pro plan.</p>
 </div></div>
 <div class="section"><div class="section-head"><h2>RECENT CARD ORDERS</h2><button class="btn" onclick="loadCards()">REFRESH</button></div><div class="section-body" id="cdOrders"><div class="loading">Loading...</div></div></div>
+</section>
+<section class="page" id="page-business">
+<div class="heading"><h1>Business Manager</h1><p>Plans, prices, discounts, subscriptions and businesses for BOLTIV Business Manager.</p></div>
+<div class="stats">
+<div class="stat"><div class="stat-label">BUSINESSES</div><div class="stat-value" id="bmTotal">—</div></div>
+<div class="stat"><div class="stat-label">ACTIVE SUBSCRIPTIONS</div><div class="stat-value" id="bmActive">—</div></div>
+<div class="stat"><div class="stat-label">REVENUE · LAST 30 DAYS</div><div class="stat-value" id="bmRev30">—</div></div>
+<div class="stat"><div class="stat-label">EXPIRING IN 7 DAYS</div><div class="stat-value" id="bmExpiring">—</div></div>
+</div>
+<div class="section"><div class="section-head"><h2>SETTINGS</h2><button class="btn primary" id="bmSaveSettings">SAVE</button></div><div class="section-body">
+<div class="grid2">
+<label>Business Manager<select id="bmEnabled"><option value="true">On</option><option value="false">Off (maintenance)</option></select></label>
+<label>6-month discount (%)<input id="bmD6" type="number" min="0" max="90" step="0.5"/></label>
+<label>12-month discount (%)<input id="bmD12" type="number" min="0" max="90" step="0.5"/></label>
+<label>Grace period after expiry (days)<input id="bmGrace" type="number" min="0" max="60" step="1"/></label>
+<label>Free trial for new businesses (days, 0 = none)<input id="bmTrialDays" type="number" min="0" max="90" step="1"/></label>
+<label>Trial plan<select id="bmTrialPlan"></select></label>
+<label>Max businesses per user<input id="bmMaxBiz" type="number" min="1" max="50" step="1"/></label>
+</div>
+<div class="message" id="bmMsg"></div>
+</div></div>
+<div class="section"><div class="section-head"><h2>PLANS &amp; PRICES</h2></div><div class="section-body" id="bmPlans"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>BUSINESSES</h2></div><div class="section-body">
+<div class="toolbar"><input id="bmSearch" placeholder="Search business name or owner email"/><button class="btn primary" id="bmSearchBtn">SEARCH</button></div>
+<div id="bmList"><div class="loading">Loading...</div></div>
+</div></div>
 </section>
 <section class="page" id="page-alerts">
 <div class="heading"><h1>Platform Alerts</h1><p>Automated financial, provider and operational warnings.</p></div>
@@ -765,7 +792,7 @@ function showApp(){$("loginPage").classList.add("hidden");$("app").classList.rem
 function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
 async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});showApp();}catch(e){showMsg(e.message)}}
 $("loginButton").onclick=login;
-function go(page){if(window.innerWidth<=900&&$("sidebar")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show");}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="smsid")loadSmsIds();if(page==="users")loadUsers();if(page==="agents"){loadAgents();loadAgentAnalytics();loadAgentLimits();}if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="reconciliation"){loadReconciliation();loadLedger();loadFlutterwaveCashReconciliation();}if(page==="alerts")loadAlerts();if(page==="cards")loadCards();if(page==="announcements")loadAnnouncementSettings();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="notifications")loadNotificationHistory();if(page==="services")loadServices();if(page==="agent-pricing")loadAgentPricingPage();if(page==="security")loadSecurity();if(page==="logins")loadLoginHistory();if(page==="settings")loadSettings();if(page==="analytics")loadAnalytics();if(page==="dashboard")loadMonitoring();}
+function go(page){if(window.innerWidth<=900&&$("sidebar")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show");}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="smsid")loadSmsIds();if(page==="users")loadUsers();if(page==="agents"){loadAgents();loadAgentAnalytics();loadAgentLimits();}if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="reconciliation"){loadReconciliation();loadLedger();loadFlutterwaveCashReconciliation();}if(page==="alerts")loadAlerts();if(page==="cards")loadCards();if(page==="business")loadBusinessAdmin();if(page==="announcements")loadAnnouncementSettings();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="notifications")loadNotificationHistory();if(page==="services")loadServices();if(page==="agent-pricing")loadAgentPricingPage();if(page==="security")loadSecurity();if(page==="logins")loadLoginHistory();if(page==="settings")loadSettings();if(page==="analytics")loadAnalytics();if(page==="dashboard")loadMonitoring();}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
 if($("menu"))$("menu").onclick=()=>{const open=$("sidebar").classList.toggle("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.toggle("show",open)};
 document.addEventListener("click",e=>{if(window.innerWidth<=900&&$("sidebar").classList.contains("open")&&!e.target.closest("#sidebar")&&!e.target.closest("#menu")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show")}});
@@ -1085,6 +1112,66 @@ api("/api/admin/me")
   .then(d=>{ if(d && d.success){ sessionReady=true; showApp(d); loadMonitoring(); } else { showLogin(); } })
   .catch(()=>showLogin());
 
+
+/* ---------- Business Manager admin ---------- */
+const bmMoney=v=>"₦"+Number(v||0).toLocaleString("en-NG",{maximumFractionDigits:0});
+function bmNote(t,ok){const m=$("bmMsg");if(!m)return;m.textContent=t;m.className="message show "+(ok?"success":"error");}
+async function loadBusinessAdmin(){
+ try{
+  const [ov,pl,st]=await Promise.all([api("/api/admin/business/overview"),api("/api/admin/business/plans"),api("/api/admin/business/settings")]);
+  $("bmTotal").textContent=ov.businesses.total+" (+"+ov.businesses.new30+" in 30d)";
+  $("bmActive").textContent=Object.values(ov.activeByPlan).reduce((a,b)=>a+b,0)+(Object.keys(ov.activeByPlan).length?" ("+Object.entries(ov.activeByPlan).map(([k,v])=>k+": "+v).join(", ")+")":"");
+  $("bmRev30").textContent=bmMoney(ov.revenue.last30Days)+" · all-time "+bmMoney(ov.revenue.total);
+  $("bmExpiring").textContent=ov.expiringIn7Days;
+  const s=st.settings;
+  $("bmEnabled").value=String(s.enabled);$("bmD6").value=s.discounts[6];$("bmD12").value=s.discounts[12];$("bmGrace").value=s.graceDays;$("bmTrialDays").value=s.trialDays;$("bmMaxBiz").value=s.maxBusinesses;
+  $("bmTrialPlan").innerHTML=pl.plans.map(p=>'<option value="'+esc(p.key)+'">'+esc(p.name)+'</option>').join("");$("bmTrialPlan").value=s.trialPlan;
+  $("bmPlans").innerHTML='<div class="grid3">'+pl.plans.map(p=>'<div class="stat" data-plan="'+esc(p.key)+'"><div class="stat-label">'+esc(p.key.toUpperCase())+'</div>'+
+   '<label>Name<input data-f="name" value="'+esc(p.name)+'" maxlength="40"/></label><label>Tagline<input data-f="tagline" value="'+esc(p.tagline||"")+'" maxlength="100"/></label>'+
+   '<label>Price per month (₦)<input data-f="price" type="number" min="1" step="100" value="'+p.priceMonthly+'"/></label>'+
+   '<label>Max branches (-1 = unlimited)<input data-f="branches" type="number" min="-1" step="1" value="'+p.maxBranches+'"/></label>'+
+   '<label>Max team members (-1 = unlimited)<input data-f="members" type="number" min="-1" step="1" value="'+p.maxMembers+'"/></label>'+
+   '<label>Appointments<select data-f="f_appointments"><option value="true"'+(p.features&&p.features.appointments?" selected":"")+'>Included</option><option value="false"'+(!(p.features&&p.features.appointments)?" selected":"")+'>Not included</option></select></label>'+
+   '<label>Advanced inventory (transfers, expiry)<select data-f="f_advanced_inventory"><option value="true"'+(p.features&&p.features.advanced_inventory?" selected":"")+'>Included</option><option value="false"'+(!(p.features&&p.features.advanced_inventory)?" selected":"")+'>Not included</option></select></label>'+
+   '<label>Audit log export<select data-f="f_audit_export"><option value="true"'+(p.features&&p.features.audit_export?" selected":"")+'>Included</option><option value="false"'+(!(p.features&&p.features.audit_export)?" selected":"")+'>Not included</option></select></label>'+
+   '<label>Reports<select data-f="f_reports"><option value="basic"'+((p.features&&p.features.reports)!=="full"?" selected":"")+'>Basic (31 days)</option><option value="full"'+((p.features&&p.features.reports)==="full"?" selected":"")+'>Full (12 months, all reports, CSV)</option></select></label>'+
+   '<label>Available to customers<select data-f="enabled"><option value="true"'+(p.enabled?" selected":"")+'>Yes</option><option value="false"'+(!p.enabled?" selected":"")+'>No (hidden)</option></select></label>'+
+   '<button class="btn primary" data-bm="savePlan" data-key="'+esc(p.key)+'">SAVE PLAN</button></div>').join("")+'</div><p style="font-size:10px;color:#888;margin-top:10px">A price change applies from each business\'s next payment. Businesses already subscribed keep their current period.</p>';
+  bmLoadList();
+ }catch(e){bmNote(e.message)}
+}
+async function bmLoadList(){
+ const q=encodeURIComponent($("bmSearch").value.trim());
+ try{
+  const d=await api("/api/admin/business/list?limit=50&search="+q);
+  $("bmList").innerHTML=d.businesses.length?'<div class="table-wrap"><table><thead><tr><th>BUSINESS</th><th>OWNER</th><th>PLAN</th><th>STATE</th><th>EXPIRES</th><th>BRANCHES</th><th>TEAM</th><th>ACTIONS</th></tr></thead><tbody>'+d.businesses.map(b=>
+   '<tr><td>'+esc(b.name)+(b.status!=="active"?' <b style="color:#c0392b">(SUSPENDED)</b>':"")+'</td><td>'+esc(b.ownerEmail||"—")+'</td><td>'+esc(b.planKey||"—")+'</td><td>'+esc(b.subscriptionState)+'</td><td>'+(b.expiresAt?new Date(b.expiresAt).toLocaleDateString("en-NG"):"—")+'</td><td>'+b.branches+'</td><td>'+b.members+'</td><td>'+
+   '<button class="btn" data-bm="extend" data-id="'+b.id+'">+DAYS</button> <button class="btn" data-bm="setPlan" data-id="'+b.id+'">PLAN</button> '+
+   (b.subscriptionState==="suspended"?'<button class="btn" data-bm="unsuspend" data-id="'+b.id+'">RESUME SUB</button>':'<button class="btn" data-bm="suspend" data-id="'+b.id+'">PAUSE SUB</button>')+' '+
+   '<button class="btn danger" data-bm="'+(b.status==="active"?"suspendBiz":"activateBiz")+'" data-id="'+b.id+'">'+(b.status==="active"?"SUSPEND BUSINESS":"REACTIVATE")+'</button></td></tr>').join("")+'</tbody></table></div>':'<div class="loading">No businesses found.</div>';
+ }catch(e){$("bmList").innerHTML='<div class="loading">'+esc(e.message)+'</div>'}
+}
+async function bmSubAction(id,body){try{const d=await api("/api/admin/business/subscription",{method:"POST",body:JSON.stringify({businessId:id,...body})});bmNote(d.message,true);bmLoadList();}catch(e){bmNote(e.message)}}
+document.addEventListener("click",async e=>{
+ const t=e.target.closest("[data-bm]");if(!t)return;
+ const a=t.dataset.bm,id=Number(t.dataset.id||0);
+ try{
+  if(a==="savePlan"){
+   const box=t.closest("[data-plan]"),g=f=>box.querySelector('[data-f="'+f+'"]').value;
+   const d=await api("/api/admin/business/plans/update",{method:"POST",body:JSON.stringify({key:t.dataset.key,name:g("name"),tagline:g("tagline"),priceMonthly:Number(g("price")),maxBranches:Number(g("branches")),maxMembers:Number(g("members")),features:{appointments:g("f_appointments")==="true",advanced_inventory:g("f_advanced_inventory")==="true",audit_export:g("f_audit_export")==="true",reports:g("f_reports")},enabled:g("enabled")==="true"})});
+   bmNote(d.message,true);
+  }else if(a==="extend"){const days=Number(prompt("Add how many days to this subscription?","30"));if(days>0){let planKey;if(!confirm("Extend by "+days+" days?"))return;await bmSubAction(id,{action:"extend",days,planKey:undefined});}}
+  else if(a==="setPlan"){const planKey=prompt("Plan key (starter, growth or enterprise):");if(planKey)await bmSubAction(id,{action:"set_plan",planKey:planKey.trim().toLowerCase()});}
+  else if(a==="suspend"||a==="unsuspend"){if(confirm((a==="suspend"?"Pause":"Resume")+" this subscription?"))await bmSubAction(id,{action:a});}
+  else if(a==="suspendBiz"||a==="activateBiz"){if(confirm((a==="suspendBiz"?"Suspend":"Reactivate")+" this business?")){const d=await api("/api/admin/business/status",{method:"POST",body:JSON.stringify({businessId:id,status:a==="suspendBiz"?"suspended":"active"})});bmNote(d.message,true);bmLoadList();}}
+ }catch(err){bmNote(err.message)}
+});
+document.addEventListener("click",async e=>{
+ if(e.target.id==="bmSearchBtn")bmLoadList();
+ if(e.target.id==="bmSaveSettings"){
+  try{const d=await api("/api/admin/business/settings",{method:"POST",body:JSON.stringify({enabled:$("bmEnabled").value==="true",discount6:Number($("bmD6").value),discount12:Number($("bmD12").value),graceDays:Number($("bmGrace").value),trialDays:Number($("bmTrialDays").value),trialPlan:$("bmTrialPlan").value,maxBusinesses:Number($("bmMaxBiz").value)})});bmNote(d.message,true);}catch(err){bmNote(err.message)}
+ }
+});
 </script>
 </div></main></div><script src="/boltiv-install.js?v=53"></script>
 <script src="boltiv-footer.js?v=2"></script>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" data-page="business">
+<head>
+<script src="/boltiv-theme.js?v=20261010-pm2"></script>
+<script src="/boltiv-api-config.js?v=1"></script>
+<base href="/">
+<script src="boltiv-client.js?v=20260820-nostorage"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#0e0f12">
+<meta name="robots" content="noindex,nofollow">
+<title>BOLTIV Business Manager</title>
+<link href="assets/boltiv-icon.webp" rel="icon" type="image/png">
+<script>boltivRequireAuth();</script>
+<style>
+:root{--bg:#faf8f2;--card:#fff;--card2:#f6f1e1;--ink:#171717;--mut:#6f6b62;--line:#ece4cc;--gold:#c99f16;--gold2:#e1bf43;--goldink:#1b1503;--ok:#1f8a4c;--warn:#b7791f;--bad:#c0392b;--shadow:0 10px 30px rgba(60,45,0,.08)}
+html[data-theme="dark"]{--bg:#0e0f12;--card:#17181c;--card2:#1e2025;--ink:#f1f1ee;--mut:#9a9ea6;--line:#2a2c32;--shadow:0 10px 30px rgba(0,0,0,.35);--ok:#4cc67f;--warn:#e3b04b;--bad:#ef6b5b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit}
+.shell{min-height:100vh;display:flex}
+.side{display:none;width:240px;flex:none;padding:22px 16px;border-right:1px solid var(--line);position:sticky;top:0;height:100vh;background:var(--card)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em;margin-bottom:22px}
+.brand i{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:grid;place-items:center;color:var(--goldink);font-style:normal;font-weight:900}
+.brand small{display:block;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.08em}
+.side a.nv{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;color:var(--mut);text-decoration:none;font-weight:600;cursor:pointer;margin-bottom:2px}
+.side a.nv.on{background:var(--card2);color:var(--ink)}
+.side .back{margin-top:auto;font-size:13px;color:var(--mut);text-decoration:none;padding:10px 14px}
+.main{flex:1;min-width:0;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 96px);max-width:980px;margin:0 auto;width:100%}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.top .back-m{width:40px;height:40px;border-radius:13px;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;text-decoration:none;font-size:18px}
+.top h1{margin:0;font-size:20px;flex:1}
+select.sw{max-width:180px;padding:10px 12px;border-radius:13px;border:1px solid var(--line);background:var(--card);font-weight:600}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:8px 6px calc(env(safe-area-inset-bottom,0px) + 8px);z-index:20}
+.bar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--mut);padding:6px 0;border-radius:12px;cursor:pointer;text-decoration:none}
+.bar a.on{color:var(--gold)}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h2{margin:0 0 4px;font-size:16px}
+.mut{color:var(--mut);font-size:13px;line-height:1.5}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:1fr 1fr}
+.stat{padding:14px;border-radius:16px;background:var(--card2)}
+.stat b{display:block;font-size:20px;margin-top:2px}
+.btn{border:0;border-radius:14px;padding:13px 18px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--gold2),var(--gold));color:var(--goldink)}
+.btn.ghost{background:var(--card2);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:9px 13px;font-size:13px;border-radius:12px}
+.btn.bad{background:transparent;color:var(--bad);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.block{width:100%}
+label{display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px;letter-spacing:.03em}
+input,select.f{width:100%;padding:13px 14px;border-radius:13px;border:1px solid var(--line);background:var(--bg);font-size:15px}
+input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .grow{flex:1;min-width:0}
+.row .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:11px;font-weight:800;background:var(--card2);color:var(--mut)}
+.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}.pill.gold{color:var(--gold)}
+.banner{border-radius:18px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;align-items:center;border:1px solid var(--line);background:var(--card2)}
+.banner.warn{border-color:var(--warn)}.banner.bad{border-color:var(--bad)}.banner.ok{border-color:var(--ok)}
+.banner .grow{flex:1}
+.seg{display:flex;background:var(--card2);border-radius:14px;padding:4px;gap:4px;margin:10px 0 14px}
+.seg button{flex:1;border:0;background:transparent;padding:10px 4px;border-radius:11px;font-weight:700;cursor:pointer;color:var(--mut)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.seg small{display:block;font-size:10px;color:var(--ok);font-weight:800}
+.plans{display:grid;gap:12px}
+.plan{border:2px solid var(--line);border-radius:20px;padding:16px;background:var(--card);cursor:pointer}
+.plan.sel{border-color:var(--gold)}
+.plan h3{margin:0;font-size:17px;display:flex;align-items:center;gap:8px}
+.plan .pr{font-size:24px;font-weight:900;margin:6px 0}
+.plan ul{margin:8px 0 0;padding-left:18px;color:var(--mut);font-size:13px;line-height:1.7}
+.sum{background:var(--card2);border-radius:16px;padding:14px;margin-top:12px}
+.sum div{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}
+.sum .tot{font-weight:900;font-size:17px;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.empty{text-align:center;padding:26px 10px;color:var(--mut)}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:14px;font-weight:700;font-size:14px;z-index:60;max-width:90vw;box-shadow:var(--shadow)}
+.modal{position:fixed;inset:0;background:rgba(10,10,10,.6);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom,0px) + 22px);max-height:92vh;overflow:auto}
+.sheet h2{margin:0 0 4px}
+.chk{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chk label{margin:0;display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--ink);font-weight:600}
+.chk input{width:auto}
+.log{font-size:13px;padding:11px 0;border-bottom:1px solid var(--line)}
+.log b{font-size:13px}
+.spin{display:inline-block;width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.pos{display:grid;gap:14px}
+.pitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.pitem:disabled{opacity:.45;cursor:not-allowed}
+.pitem .pn{flex:1;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pitem .pp{font-weight:800}
+.pitem .ps{font-size:11px;color:var(--mut);min-width:64px;text-align:right}.ps.bad{color:var(--bad)}.ps.warn{color:var(--warn)}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--card2);font-weight:800;cursor:pointer}
+.qty input{width:54px;text-align:center;padding:6px;margin:0}
+.x{border:0;background:transparent;color:var(--mut);font-size:16px;cursor:pointer;padding:6px}
+.cartbar{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:19}
+.pay3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chip{border:1px solid var(--line);background:var(--card2);padding:8px 14px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;margin-right:6px}
+.chip.on{border-color:var(--gold);color:var(--gold)}
+.rcpt{background:#fff;color:#000;border-radius:12px;padding:14px;margin:12px 0;max-height:46vh;overflow:auto;font:12px/1.4 "Courier New",monospace}
+.rcpt .c{text-align:center}.rcpt .b{font-weight:700}.rcpt .r{display:flex;justify-content:space-between;gap:8px}.rcpt hr{border:0;border-top:1px dashed #000;margin:6px 0}.rcpt .it{margin:3px 0}
+.sum div span:last-child{text-align:right}
+@media(min-width:900px){.pos{grid-template-columns:1fr 400px;align-items:start}#cartPanel{position:sticky;top:16px}.cartbar{display:none}.side{display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain}.side .back{flex:none}#sideNav{flex:1}.bar{display:none}.main{padding-bottom:40px}.plans{grid-template-columns:repeat(3,1fr)}.modal{align-items:center}.sheet{border-radius:24px}.toast{bottom:30px}.top .back-m{display:none}}
+@media(prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" id="side">
+    <div class="brand"><i>B</i><div>BOLTIV<small>BUSINESS MANAGER</small></div></div>
+    <div id="sideNav"></div>
+    <a class="back" href="/dashboard">← Back to BOLTIV</a>
+  </aside>
+  <main class="main">
+    <div class="top">
+      <a class="back-m" href="/dashboard" aria-label="Back to BOLTIV">←</a>
+      <h1 id="title">Business Manager</h1>
+      <select class="sw" id="switcher" aria-label="Switch business" hidden></select>
+    </div>
+    <div id="view"><div class="empty"><span class="spin"></span></div></div>
+  </main>
+</div>
+<nav class="bar" id="bar" hidden></nav>
+<div id="layer"></div>
+
+<script src="transaction-pin.js?v=20261004-dark"></script>
+<script src="business.js?v=20261117-p4"></script>
+<script src="business-finance.js?v=20261117-p4"></script>
+<script src="business-ops.js?v=20261117-p4"></script>
+</body>
+</html>

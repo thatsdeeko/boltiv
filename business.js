@@ -325,10 +325,12 @@ function receiptText(s,h){
 function waPhone(p){const d=String(p||'').replace(/\D/g,'');return d.startsWith('234')&&d.length===13?d:d.startsWith('0')&&d.length===11?'234'+d.slice(1):''}
 function showReceipt(s,h,opts){
   opts=opts||{};S.last={s,h};
-  sheet('<h2>'+esc(s.receiptNo)+(s.status==='void'?' · Voided':'')+'</h2><div class="rcpt">'+receiptHtml(s,h)+'</div>'+
-    '<div class="grid g2"><button class="btn" data-act="printRcpt" data-w="80">Print 80mm</button><button class="btn ghost" data-act="printRcpt" data-w="58">Print 58mm</button></div>'+
-    '<div class="grid g2" style="margin-top:10px"><a class="btn ghost" style="text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/'+waPhone(s.customerPhone)+'?text='+encodeURIComponent(receiptText(s,h))+'">Share on WhatsApp</a><button class="btn ghost" data-act="close">'+(opts.history?'Close':'New sale')+'</button></div>'+
+  sheet('<h2>'+esc(s.receiptNo)+(s.status==='void'?' · Voided':'')+'</h2><div class="docprev" id="docPrev">'+(window.BDOC?BDOC.WAIT:'')+'</div>'+
+    '<div class="grid g2"><button class="btn" data-act="shareDoc">Share on WhatsApp</button><button class="btn ghost" data-act="saveDoc">Save picture</button></div>'+
+    '<div class="grid g2" style="margin-top:10px"><button class="btn ghost" data-act="printRcpt" data-w="80">Print 80mm</button><button class="btn ghost" data-act="printRcpt" data-w="58">Print 58mm</button></div>'+
+    '<button class="btn ghost block" style="margin-top:10px" data-act="close">'+(opts.history?'Close':'New sale')+'</button>'+
     (opts.canVoid&&s.status==='completed'?'<br><button class="btn bad block" data-act="voidSale" data-id="'+s.id+'">Void this sale</button>':''));
+  if(window.BDOC)BDOC.mount('receipt',s,h,{name:'Receipt-'+String(s.receiptNo||'sale').replace(/[^\w.-]+/g,'-')+'.png',text:h.name+'\nReceipt '+s.receiptNo+' · Total '+m2(s.total)+(s.balanceDue>0?'\nBalance owed: '+m2(s.balanceDue):'')+'\n\n'+(h.footer||'Thank you for your patronage!'),phone:waPhone(s.customerPhone)});
 }
 function printReceipt(w){
   if(!S.last)return;const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);

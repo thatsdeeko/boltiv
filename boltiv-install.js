@@ -98,7 +98,16 @@
   });
   window.addEventListener('load', function(){
     if('serviceWorker' in navigator){
-      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+      // When a new version of the app takes over, reload once so the page on screen is the new one.
+      // Only on the home pages, so nobody loses a half-filled payment form.
+      const hadController = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function(){
+        if(!hadController || reloaded) return;
+        if(!/^\/(dashboard(\.html)?|index\.html)?$/.test(location.pathname)) return;
+        reloaded = true; location.reload();
+      });
+      navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).then(function(reg){ try{ reg.update(); }catch(e){} }).catch(() => {});
     }
     // Chromium browsers get here via the beforeinstallprompt listener above;
     // iOS Safari has no such event, so it needs its own trigger.

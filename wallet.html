@@ -244,6 +244,6 @@ setProfileInitial(user());
 API.request("/api/me").then(r=>{if(r&&r.user){boltivMemoryStorage.setItem("boltivUser",JSON.stringify(r.user));setProfileInitial(r.user)}}).catch(()=>{});
 loadFundingAccount().finally(()=>loadWallet());loadWalletSummary();
 /* END OF BOLTIV WALLET */
-</script><script src="/boltiv-install.js?v=20261004-dark"></script>
+</script><script src="/boltiv-install.js?v=20261118-sw"></script>
 <script src="boltiv-footer.js?v=20261004-dark"></script>
 </body></html>

@@ -544,18 +544,40 @@ function actionsInit(){
       toast(d.message);const m=await api('/api/business/mine');S.businesses=m.businesses;S.tab=d.trial?'home':'billing';await selectBiz(d.businessId);
     }catch(e){toast(e.message);busy(el,false)}
   };
+  /* ----- business logo (shown on receipts and invoices) ----- */
+  let LOGO_NEW; /* undefined = unchanged, '' = remove, data URL = new image */
+  const initialsOf=n=>{const p=String(n||'B').replace(/[^A-Za-z0-9 ]/g,' ').split(/\s+/).filter(Boolean);return ((p[0]||'B').charAt(0)+(p[1]?p[1].charAt(0):'')).toUpperCase()};
+  const logoPrev=(src,name)=>src?'<img src="'+esc(src)+'" alt="Logo">':esc(initialsOf(name));
+  function shrinkLogo(file){return new Promise((res,rej)=>{
+    if(!/^image\/(png|jpe?g|webp)$/i.test(file.type))return rej(new Error('Choose a PNG, JPG or WebP image.'));
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{URL.revokeObjectURL(url);
+      for(const max of [256,192,128]){
+        const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*k)),h=Math.max(1,Math.round(img.naturalHeight*k));
+        const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+        let out=c.toDataURL('image/png');
+        if(out.length>110000){const c2=document.createElement('canvas');c2.width=w;c2.height=h;const x=c2.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);out=c2.toDataURL('image/jpeg',.85)}
+        if(out.length<=120000)return res(out);
+      }
+      rej(new Error('That image is too detailed. Try a simpler logo.'));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Could not read that image.'))};img.src=url;
+  })}
   actions.editBiz=()=>{
-    const b=S.detail.business;
-    const m=sheet('<h2>Edit business</h2><label>BUSINESS NAME</label><input id="e_name" maxlength="80" value="'+esc(b.name)+'"><label>TYPE</label><input id="e_industry" maxlength="40" value="'+esc(b.industry||'')+'">'+
+    const b=S.detail.business;LOGO_NEW=undefined;
+    const m=sheet('<h2>Edit business</h2><label>BUSINESS LOGO</label><div class="logoup"><div class="logoprev" id="e_logoprev">'+logoPrev(b.logo,b.name)+'</div><div><button type="button" class="btn ghost sm" data-act="logoPick">Choose image</button> <button type="button" class="btn ghost sm" data-act="logoClear">Remove</button><div class="mut" style="margin-top:6px">Shown on your receipts and invoices. A square PNG or JPG works best.</div></div><input type="file" id="e_logofile" accept="image/png,image/jpeg,image/webp" hidden></div><label>BUSINESS NAME</label><input id="e_name" maxlength="80" value="'+esc(b.name)+'"><label>TYPE</label><input id="e_industry" maxlength="40" value="'+esc(b.industry||'')+'">'+
       '<label>STATE</label><select class="f" id="e_state"><option value="">Select state</option>'+STATES.map(s=>'<option'+(s===b.state?' selected':'')+'>'+s+'</option>').join('')+'</select>'+
       '<label>PHONE</label><input id="e_phone" maxlength="20" value="'+esc(b.phone||'')+'"><label>EMAIL</label><input id="e_email" maxlength="120" value="'+esc(b.email||'')+'"><label>ADDRESS</label><input id="e_address" maxlength="200" value="'+esc(b.address||'')+'"><label>TIN</label><input id="e_tin" maxlength="20" value="'+esc(b.tin||'')+'">'+
       '<label>VAT RATE (%) — 0 IF NOT REGISTERED</label><input id="e_vat" inputmode="decimal" value="'+(b.vatRate||0)+'"><div class="chk"><label><input type="checkbox" id="e_vatinc"'+(b.vatInclusive?' checked':'')+'> My prices already include VAT</label></div><label>RECEIPT FOOTER</label><input id="e_footer" maxlength="120" value="'+esc(b.receiptFooter||'')+'" placeholder="Thank you for your patronage!">'+
       '<br><button class="btn block" data-act="saveBiz">Save changes</button><br><button class="btn ghost block" data-act="close">Cancel</button>');
+    const f=$('#e_logofile');if(f)f.onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;try{LOGO_NEW=await shrinkLogo(file);$('#e_logoprev').innerHTML=logoPrev(LOGO_NEW,b.name)}catch(err){toast(err.message)}};
   };
+  actions.logoPick=()=>{const f=$('#e_logofile');if(f)f.click()};
+  actions.logoClear=()=>{LOGO_NEW='';const p=$('#e_logoprev');if(p)p.innerHTML=logoPrev('',S.detail.business.name)};
   actions.close=()=>closeSheet();
   actions.saveBiz=async el=>{
     const g=id=>$('#'+id).value.trim();busy(el,true,'Saving…');
-    try{const d=await api('/api/business/update',{body:{businessId:S.bizId,name:g('e_name'),industry:g('e_industry'),state:g('e_state'),phone:g('e_phone'),email:g('e_email'),address:g('e_address'),tin:g('e_tin'),vatRate:Number($('#e_vat').value||0),vatInclusive:$('#e_vatinc').checked,receiptFooter:g('e_footer')}});toast(d.message);closeSheet();await selectBiz(S.bizId)}
+    try{const body={businessId:S.bizId,name:g('e_name'),industry:g('e_industry'),state:g('e_state'),phone:g('e_phone'),email:g('e_email'),address:g('e_address'),tin:g('e_tin'),vatRate:Number($('#e_vat').value||0),vatInclusive:$('#e_vatinc').checked,receiptFooter:g('e_footer')};if(LOGO_NEW!==undefined)body.logo=LOGO_NEW;const d=await api('/api/business/update',{body});toast(d.message);closeSheet();await selectBiz(S.bizId)}
     catch(e){toast(e.message);busy(el,false)}
   };
   actions.branchForm=el=>{

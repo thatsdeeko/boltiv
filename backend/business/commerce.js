@@ -59,7 +59,7 @@ module.exports = function createCommerce(h) {
       items: items.map(i => ({ productId: i.product_id ? num(i.product_id) : null, name: i.name, sku: i.sku, unit: i.unit, qty: num(i.qty), unitPrice: num(i.unit_price), discount: num(i.discount), lineTotal: num(i.line_total) })),
       payments: pays.map(p => ({ method: p.method, amount: num(p.amount) })) };
   }
-  const receiptHeader = b => ({ name: b.name, address: b.address, phone: b.phone, email: b.email, tin: b.tin, footer: b.receipt_footer || null });
+  const receiptHeader = b => ({ name: b.name, address: b.address, phone: b.phone, email: b.email, tin: b.tin, footer: b.receipt_footer || null, logo: b.logo || null });
 
   async function handle(req, res, path, M, url, user, settings) {
     const q = url.searchParams, uid = String(user.user_id);

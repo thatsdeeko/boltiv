@@ -109,6 +109,12 @@ function validateBusiness(b, { partial = false } = {}) {
   if (has("state")) { out.state = str(b.state, 30); if (out.state && !NG_STATES.includes(out.state)) errors.push("Choose a valid state."); }
   if (has("vatRate")) { const n = Number(b.vatRate || 0); if (!(n >= 0 && n <= 25)) errors.push("VAT rate must be between 0 and 25."); else out.vat_rate = Math.round(n * 100) / 100; }
   if (has("vatInclusive")) out.vat_inclusive = b.vatInclusive === true || b.vatInclusive === "true";
+  if (has("logo")) {
+    const l = typeof b.logo === "string" ? b.logo.trim() : "";
+    if (l.length > 140000) errors.push("Logo is too large. Choose a smaller image.");
+    else if (l && !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(l)) errors.push("Logo must be a PNG, JPG or WebP image.");
+    else out.logo = l;
+  }
   if (has("receiptFooter")) out.receipt_footer = str(b.receiptFooter, 120);
   if (has("tin")) { out.tin = str(b.tin, 20).toUpperCase(); if (out.tin && !/^[A-Z0-9-]{5,20}$/.test(out.tin)) errors.push("TIN may only contain letters, numbers and dashes."); }
   return { value: out, errors };

@@ -168,7 +168,7 @@ module.exports = function createBusinessManager(d) {
         .filter(x => L.canAccessBranch(ctx.member, x.id));
       return out(res, { business: { id: Number(ctx.business.id), name: ctx.business.name, industry: ctx.business.industry, phone: ctx.business.phone, email: ctx.business.email,
         address: ctx.business.address, state: ctx.business.state, tin: ctx.business.tin, currency: ctx.business.currency, status: ctx.business.status,
-        vatRate: Number(ctx.business.vat_rate || 0), vatInclusive: !!ctx.business.vat_inclusive, receiptFooter: ctx.business.receipt_footer },
+        vatRate: Number(ctx.business.vat_rate || 0), vatInclusive: !!ctx.business.vat_inclusive, receiptFooter: ctx.business.receipt_footer, logo: ctx.business.logo || null },
         branches: branches.map(x => ({ id: Number(x.id), name: x.name, address: x.address, phone: x.phone, isMain: x.is_main, status: x.status })),
         role: ctx.role, permissions: ALL_PERMS.filter(p => L.hasPerm(ctx.role, p)), subscription: subView(ctx.sub, ctx.state) || { state: "none", writable: false },
         usage: await usage(ctx.business.id) });
@@ -183,7 +183,8 @@ module.exports = function createBusinessManager(d) {
       if (!keys.length) return out(res, { message: "Nothing to update." });
       await withTx(async c => {
         await c.query(`UPDATE bm_businesses SET ${keys.map((k, i) => `${k}=$${i + 2}`).join(",")}, updated_at=NOW() WHERE id=$1`, [ctx.business.id, ...keys.map(k => (v.value[k] === "" ? null : v.value[k]))]);
-        await audit(c, req, ctx, "business.update", "business", ctx.business.id, Object.fromEntries(keys.map(k => [k, ctx.business[k]])), Object.fromEntries(keys.map(k => [k, v.value[k]])));
+        const shown = (k, x) => (k === "logo" ? (x ? "[logo image]" : null) : x);
+        await audit(c, req, ctx, "business.update", "business", ctx.business.id, Object.fromEntries(keys.map(k => [k, shown(k, ctx.business[k])])), Object.fromEntries(keys.map(k => [k, shown(k, v.value[k])])));
       });
       return out(res, { message: "Business updated." });
     }

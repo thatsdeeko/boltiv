@@ -49,7 +49,7 @@ module.exports = function createAccounting(h) {
       ...(items ? { items: items.map(i => ({ description: i.description, qty: num(i.qty), unitPrice: num(i.unit_price), lineTotal: num(i.line_total) })) } : {}),
       ...(pays ? { payments: pays.map(p => ({ id: num(p.id), amount: num(p.amount), method: p.method, date: dateStr(p.paid_on), note: p.note, status: p.status })) } : {}) };
   }
-  const receiptHeader = b => ({ name: b.name, address: b.address, phone: b.phone, email: b.email, tin: b.tin });
+  const receiptHeader = b => ({ name: b.name, address: b.address, phone: b.phone, email: b.email, tin: b.tin, logo: b.logo || null });
 
   async function handle(req, res, path, M, url, user, settings) {
     const q = url.searchParams, uid = String(user.user_id);

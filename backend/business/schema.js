@@ -65,6 +65,7 @@ async function createSchema(db) {
   await db(`ALTER TABLE bm_businesses ADD COLUMN IF NOT EXISTS vat_rate NUMERIC(5,2) NOT NULL DEFAULT 0`);
   await db(`ALTER TABLE bm_businesses ADD COLUMN IF NOT EXISTS vat_inclusive BOOLEAN NOT NULL DEFAULT FALSE`);
   await db(`ALTER TABLE bm_businesses ADD COLUMN IF NOT EXISTS receipt_footer TEXT`);
+  await db(`ALTER TABLE bm_businesses ADD COLUMN IF NOT EXISTS logo TEXT`);
   await db(`CREATE TABLE IF NOT EXISTS bm_products(
     id BIGSERIAL PRIMARY KEY, business_id BIGINT NOT NULL REFERENCES bm_businesses(id), name TEXT NOT NULL, sku TEXT, barcode TEXT, category TEXT,
     unit TEXT NOT NULL DEFAULT 'pcs', cost_price NUMERIC(14,2) NOT NULL DEFAULT 0, sell_price NUMERIC(14,2) NOT NULL CHECK(sell_price>=0),

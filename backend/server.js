@@ -4,6 +4,7 @@ const zlib=require("node:zlib");
 const {Pool}=require("pg");
 const createCards=require("./payscribe-cards");
 const createBusinessManager=require("./business");
+const createLink=require("./link");
 
 const PORT=process.env.PORT||3000;
 const DATABASE_URL=process.env.DATABASE_URL||"";
@@ -7214,6 +7215,11 @@ result
 return null;
 
   }
+/* BOLTIV Link: created once, shared by every request (see link/index.js). */
+function getLink(){
+if(!global.__boltivLink)global.__boltivLink=createLink({db,pool,send,body,clean,userFromToken,verifyPassword,reference,addFinancialLedger,addNotification,addNotificationOnce,getPlatformSetting,rateLimit,rateLimitedResponse,adminFromToken,requireAdminCsrf,requestIp});
+return global.__boltivLink;
+}
 /* BOLTIV Business Manager: created once, shared by every request (see business/index.js). */
 function getBusinessManager(){
 if(!global.__boltivBusiness)global.__boltivBusiness=createBusinessManager({db,pool,send,body,clean,userFromToken,verifyPassword,reference,addFinancialLedger,addNotification,addNotificationOnce,getPlatformSetting,rateLimit,rateLimitedResponse,adminFromToken,requireAdminCsrf,requestIp});
@@ -7222,6 +7228,9 @@ return global.__boltivBusiness;
 
 const server=http.createServer(
 async(req,res)=>{
+
+// BOLTIV Link customer websites (*.boltiv.link) are answered before anything else; they never touch the API rules below.
+if(await getLink().serveSite(req,res))return;
 
 if(req.method==="OPTIONS"){
 
@@ -7451,6 +7460,18 @@ if(cardsHandled!==false)return;
 }
 
 /*
+BOLTIV LINK - see link/index.js
+*/
+{
+const lm=/^\/api\/link\/img\/(\d{1,12})$/.exec(path);
+if(lm&&req.method==="GET"){await getLink().serveImagePublic(req,res,lm[1]);return;}
+}
+if(path.startsWith("/api/link/")||path.startsWith("/api/admin/link/")){
+const lh=await getLink().handle(req,res,path);
+if(lh!==false)return;
+}
+
+/*
 BOLTIV BUSINESS MANAGER - see business/index.js
 */
 if(path.startsWith("/api/business/")||path.startsWith("/api/admin/business/")){
@@ -7545,6 +7566,7 @@ setInterval(()=>verifyRecentSuccessfulTransactions(),15*60*1000).unref();
 // AutoPay: check for due runs and day-before reminders every minute.
 setTimeout(()=>autopayTick().catch(e=>console.error("AUTOPAY INITIAL TICK ERROR:",e)),25000).unref();
 setInterval(()=>smsSyncSenderIds(true).catch(e=>console.error("SMS SENDER SYNC ERROR",e?.message)),30*60*1000).unref();
+getLink().startTimers();
 setInterval(()=>autopayTick().catch(e=>console.error("AUTOPAY TICK ERROR:",e)),60*1000).unref();
 
 // Data expiry reminders: check every 30 minutes.

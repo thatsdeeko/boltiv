@@ -116,6 +116,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <button data-page="transactions">↔ Transactions</button>
 <button data-page="reconciliation">▤ Reconciliation</button>
 </div>
+<div class="side-label">BOLTIV LINK</div>
+<div class="nav">
+<button data-page="link">◈ Websites</button>
+</div>
 <div class="side-label">PLATFORM</div>
 <div class="nav">
 <button data-page="services">◈ Services</button>
@@ -282,6 +286,34 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 <div class="section"><div class="section-head"><h2>BUSINESSES</h2></div><div class="section-body">
 <div class="toolbar"><input id="bmSearch" placeholder="Search business name or owner email"/><button class="btn primary" id="bmSearchBtn">SEARCH</button></div>
 <div id="bmList"><div class="loading">Loading...</div></div>
+</div></div>
+</section>
+<section class="page" id="page-link">
+<div class="heading"><h1>BOLTIV Link</h1><p>Customer websites: status, renewals, suspensions and pricing. Websites and usernames can never be deleted.</p></div>
+<div class="stats">
+<div class="stat"><div class="stat-label">WEBSITES</div><div class="stat-value" id="lkTotal">—</div></div>
+<div class="stat"><div class="stat-label">ACTIVE</div><div class="stat-value" id="lkActive">—</div></div>
+<div class="stat"><div class="stat-label">EXPIRED / SUSPENDED</div><div class="stat-value" id="lkExpired">—</div></div>
+<div class="stat"><div class="stat-label">EXPIRING IN 7 DAYS</div><div class="stat-value" id="lkExpiring">—</div></div>
+<div class="stat"><div class="stat-label">REVENUE · 30 DAYS</div><div class="stat-value" id="lkRev30">—</div></div>
+<div class="stat"><div class="stat-label">REVENUE · ALL TIME</div><div class="stat-value" id="lkRev">—</div></div>
+<div class="stat"><div class="stat-label">CUSTOMERS</div><div class="stat-value" id="lkOwners">—</div></div>
+<div class="stat"><div class="stat-label">RENEWALS</div><div class="stat-value" id="lkRenewals">—</div></div>
+</div>
+<div class="section"><div class="section-head"><h2>SETTINGS</h2><button class="btn primary" id="lkSave">SAVE</button></div><div class="section-body">
+<div class="grid2">
+<label>BOLTIV Link<select id="lkEnabled"><option value="true">On (new websites allowed)</option><option value="false">Off (no new websites, renewals still work)</option></select></label>
+<label>Price per website (₦)<input id="lkPrice" type="number" min="0" step="100"/></label>
+<label>Days per payment<input id="lkDays" type="number" min="1" max="366" step="1"/></label>
+<label>Max websites per customer<input id="lkMax" type="number" min="1" max="100" step="1"/></label>
+</div>
+<div class="message" id="lkMsg"></div>
+<p style="font-size:12px;color:#777;margin:10px 0 0">If you change the price or days, also update the written text on the public BOLTIV Link page and the dashboard card.</p>
+</div></div>
+<div class="section"><div class="section-head"><h2>DESIGNS IN USE</h2></div><div class="section-body" id="lkTpl"><div class="loading">Loading...</div></div></div>
+<div class="section"><div class="section-head"><h2>WEBSITES</h2></div><div class="section-body">
+<div class="toolbar"><input id="lkSearch" placeholder="Search name, website name or owner email"/><select id="lkFilter"><option value="">All</option><option value="active">Active</option><option value="expiring">Expiring in 7 days</option><option value="expired">Expired</option><option value="suspended">Suspended</option></select><button class="btn primary" id="lkSearchBtn">SEARCH</button></div>
+<div id="lkList"><div class="loading">Loading...</div></div>
 </div></div>
 </section>
 <section class="page" id="page-alerts">
@@ -792,7 +824,7 @@ function showApp(){$("loginPage").classList.add("hidden");$("app").classList.rem
 function showMsg(t,ok=false){const m=$("message");m.textContent=t;m.className="message show "+(ok?"success":"error");}
 async function login(){try{const d=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email:$("email").value,password:$("password").value})});showApp();}catch(e){showMsg(e.message)}}
 $("loginButton").onclick=login;
-function go(page){if(window.innerWidth<=900&&$("sidebar")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show");}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="smsid")loadSmsIds();if(page==="users")loadUsers();if(page==="agents"){loadAgents();loadAgentAnalytics();loadAgentLimits();}if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="reconciliation"){loadReconciliation();loadLedger();loadFlutterwaveCashReconciliation();}if(page==="alerts")loadAlerts();if(page==="cards")loadCards();if(page==="business")loadBusinessAdmin();if(page==="announcements")loadAnnouncementSettings();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="notifications")loadNotificationHistory();if(page==="services")loadServices();if(page==="agent-pricing")loadAgentPricingPage();if(page==="security")loadSecurity();if(page==="logins")loadLoginHistory();if(page==="settings")loadSettings();if(page==="analytics")loadAnalytics();if(page==="dashboard")loadMonitoring();}
+function go(page){if(window.innerWidth<=900&&$("sidebar")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show");}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));const p=$("page-"+page);if(p)p.classList.add("active");document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));if(page==="link")loadLinkAdmin();if(page==="smsid")loadSmsIds();if(page==="users")loadUsers();if(page==="agents"){loadAgents();loadAgentAnalytics();loadAgentLimits();}if(page==="payments")loadPayments();if(page==="transactions")loadTransactions();if(page==="reconciliation"){loadReconciliation();loadLedger();loadFlutterwaveCashReconciliation();}if(page==="alerts")loadAlerts();if(page==="cards")loadCards();if(page==="business")loadBusinessAdmin();if(page==="announcements")loadAnnouncementSettings();if(page==="support")loadSupport();if(page==="audit")loadAudit();if(page==="notifications")loadNotificationHistory();if(page==="services")loadServices();if(page==="agent-pricing")loadAgentPricingPage();if(page==="security")loadSecurity();if(page==="logins")loadLoginHistory();if(page==="settings")loadSettings();if(page==="analytics")loadAnalytics();if(page==="dashboard")loadMonitoring();}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
 if($("menu"))$("menu").onclick=()=>{const open=$("sidebar").classList.toggle("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.toggle("show",open)};
 document.addEventListener("click",e=>{if(window.innerWidth<=900&&$("sidebar").classList.contains("open")&&!e.target.closest("#sidebar")&&!e.target.closest("#menu")){$("sidebar").classList.remove("open");if($("sidebarBackdrop"))$("sidebarBackdrop").classList.remove("show")}});
@@ -1113,6 +1145,41 @@ api("/api/admin/me")
   .catch(()=>showLogin());
 
 
+/* ---------- BOLTIV Link admin ---------- */
+const lkMoney=v=>"₦"+Number(v||0).toLocaleString("en-NG",{maximumFractionDigits:0});
+const lkEsc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function lkNote(t,ok){const m=$("lkMsg");if(!m)return;m.textContent=t;m.className="message show "+(ok?"success":"error");}
+async function loadLinkAdmin(){
+ try{
+  const ov=await api("/api/admin/link/overview"),st=ov.stats,se=ov.settings;
+  $("lkTotal").textContent=st.total+" (+"+st.new30+" in 30d)";$("lkActive").textContent=st.active;$("lkExpired").textContent=st.expired+" / "+st.suspended;$("lkExpiring").textContent=st.expiring7;
+  $("lkRev30").textContent=lkMoney(st.revenue30);$("lkRev").textContent=lkMoney(st.revenue);$("lkOwners").textContent=st.owners;$("lkRenewals").textContent=st.renewals;
+  $("lkEnabled").value=String(se.enabled);$("lkPrice").value=se.price;$("lkDays").value=se.days;$("lkMax").value=se.maxSites;
+  $("lkTpl").innerHTML=ov.templates.length?ov.templates.map(t=>'<span style="display:inline-block;margin:0 8px 8px 0;padding:8px 14px;border:1px solid var(--line);border-radius:99px;font-weight:700;text-transform:capitalize">'+lkEsc(t.t)+' · '+t.n+'</span>').join(""):'<div class="empty">No websites yet.</div>';
+ }catch(e){lkNote(e.message,false);}
+ lkLoadList();
+}
+async function lkLoadList(){
+ const box=$("lkList");box.innerHTML='<div class="loading">Loading...</div>';
+ try{
+  const d=await api("/api/admin/link/sites?q="+encodeURIComponent($("lkSearch").value.trim())+"&filter="+encodeURIComponent($("lkFilter").value));
+  if(!d.sites.length){box.innerHTML='<div class="empty">No websites found.</div>';return;}
+  box.innerHTML='<div style="overflow:auto"><table><thead><tr><th>WEBSITE</th><th>OWNER</th><th>DESIGN</th><th>STATUS</th><th>EXPIRES</th><th>PAID</th><th>VIEWS 30D</th><th>ACTIONS</th></tr></thead><tbody>'+d.sites.map(x=>{
+   const col=x.state==="active"?"#15803d":x.state==="expired"?"#b45309":"#b42318";
+   return '<tr><td><b>'+lkEsc(x.name||x.username)+'</b><br><a href="'+lkEsc(x.url)+'" target="_blank" rel="noopener">'+lkEsc(x.username)+'.boltiv.ng</a></td><td>'+lkEsc(x.owner||"")+'<br><small>'+lkEsc(x.email||"")+(x.owner_sites>1?" · "+x.owner_sites+" sites":"")+'</small></td><td style="text-transform:capitalize">'+lkEsc(x.template)+'</td><td><b style="color:'+col+'">'+x.state.toUpperCase()+'</b>'+(x.published_at?"":"<br><small>not published</small>")+'</td><td>'+new Date(x.expires_at).toLocaleDateString("en-NG")+'</td><td>'+lkMoney(x.paid_total)+'</td><td>'+x.views30+'</td><td style="white-space:nowrap"><button class="btn" data-lk="extend" data-id="'+x.id+'">+30 DAYS</button> '+(x.state==="suspended"?'<button class="btn" data-lk="active" data-id="'+x.id+'">ACTIVATE</button>':'<button class="btn danger" data-lk="suspended" data-id="'+x.id+'">SUSPEND</button>')+'</td></tr>';}).join("")+'</tbody></table></div>';
+ }catch(e){box.innerHTML='<div class="empty">'+lkEsc(e.message)+'</div>';}
+}
+document.addEventListener("click",async e=>{
+ const b=e.target.closest("[data-lk]");
+ if(b){const a=b.dataset.lk,id=Number(b.dataset.id);
+  if(a==="extend"){if(!confirm("Add 30 free days to this website?"))return;}
+  else if(!confirm((a==="suspended"?"Suspend":"Reactivate")+" this website?"))return;
+  try{await api("/api/admin/link/site",{method:"PATCH",body:JSON.stringify(a==="extend"?{id,extendDays:30}:{id,status:a})});lkNote("Updated.",true);loadLinkAdmin();}catch(er){lkNote(er.message,false);}
+  return;}
+ if(e.target.closest("#lkSearchBtn"))lkLoadList();
+ if(e.target.closest("#lkSave")){
+  api("/api/admin/link/settings",{method:"PATCH",body:JSON.stringify({enabled:$("lkEnabled").value==="true",price:Number($("lkPrice").value),days:Number($("lkDays").value),maxSites:Number($("lkMax").value)})}).then(()=>{lkNote("Settings saved.",true);loadLinkAdmin();}).catch(er=>lkNote(er.message,false));}
+});
 /* ---------- Business Manager admin ---------- */
 const bmMoney=v=>"₦"+Number(v||0).toLocaleString("en-NG",{maximumFractionDigits:0});
 function bmNote(t,ok){const m=$("bmMsg");if(!m)return;m.textContent=t;m.className="message show "+(ok?"success":"error");}

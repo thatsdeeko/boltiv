@@ -7463,8 +7463,8 @@ if(cardsHandled!==false)return;
 BOLTIV LINK - see link/index.js
 */
 {
-const lm=/^\/api\/link\/img\/(\d{1,12})$/.exec(path);
-if(lm&&req.method==="GET"){await getLink().serveImagePublic(req,res,lm[1]);return;}
+const lm=/^\/api\/link\/img\/(\d{1,12})(?:\/(s|m))?$/.exec(path);
+if(lm&&req.method==="GET"){await getLink().serveImagePublic(req,res,lm[1],lm[2]||"");return;}
 }
 if(path.startsWith("/api/link/")||path.startsWith("/api/admin/link/")){
 const lh=await getLink().handle(req,res,path);

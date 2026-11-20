@@ -289,12 +289,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--g);box-shadow:0 0 0 3
 </div></div>
 </section>
 <section class="page" id="page-link">
-<div class="heading"><h1>BOLTIV Link</h1><p>Customer websites: status, renewals, suspensions and pricing. Websites and usernames can never be deleted.</p></div>
+<div class="heading"><h1>BOLTIV Link</h1><p>Customer websites: status, renewals, suspensions and pricing, plus orders, bookings and enquiries taken through them. Websites and usernames can never be deleted.</p></div>
 <div class="stats">
 <div class="stat"><div class="stat-label">WEBSITES</div><div class="stat-value" id="lkTotal">—</div></div>
 <div class="stat"><div class="stat-label">ACTIVE</div><div class="stat-value" id="lkActive">—</div></div>
 <div class="stat"><div class="stat-label">EXPIRED / SUSPENDED</div><div class="stat-value" id="lkExpired">—</div></div>
 <div class="stat"><div class="stat-label">EXPIRING IN 7 DAYS</div><div class="stat-value" id="lkExpiring">—</div></div>
+<div class="stat"><div class="stat-label">ORDERS TAKEN</div><div class="stat-value" id="lkOrders">—</div></div>
+<div class="stat"><div class="stat-label">ORDER VALUE</div><div class="stat-value" id="lkOrderVal">—</div></div>
+<div class="stat"><div class="stat-label">BOOKINGS</div><div class="stat-value" id="lkBookings">—</div></div>
+<div class="stat"><div class="stat-label">ENQUIRIES</div><div class="stat-value" id="lkEnq">—</div></div>
+<div class="stat"><div class="stat-label">CUSTOMERS SAVED</div><div class="stat-value" id="lkContacts">—</div></div>
+<div class="stat"><div class="stat-label">SHOPS WITH ORDERS (30D)</div><div class="stat-value" id="lkShops">—</div></div>
 <div class="stat"><div class="stat-label">REVENUE · 30 DAYS</div><div class="stat-value" id="lkRev30">—</div></div>
 <div class="stat"><div class="stat-label">REVENUE · ALL TIME</div><div class="stat-value" id="lkRev">—</div></div>
 <div class="stat"><div class="stat-label">CUSTOMERS</div><div class="stat-value" id="lkOwners">—</div></div>
@@ -1153,7 +1159,7 @@ async function loadLinkAdmin(){
  try{
   const ov=await api("/api/admin/link/overview"),st=ov.stats,se=ov.settings;
   $("lkTotal").textContent=st.total+" (+"+st.new30+" in 30d)";$("lkActive").textContent=st.active;$("lkExpired").textContent=st.expired+" / "+st.suspended;$("lkExpiring").textContent=st.expiring7;
-  $("lkRev30").textContent=lkMoney(st.revenue30);$("lkRev").textContent=lkMoney(st.revenue);$("lkOwners").textContent=st.owners;$("lkRenewals").textContent=st.renewals;
+  $("lkRev30").textContent=lkMoney(st.revenue30);$("lkRev").textContent=lkMoney(st.revenue);$("lkOwners").textContent=st.owners;$("lkRenewals").textContent=st.renewals;const hb=st.hub||{};$("lkOrders").textContent=hb.orders||0;$("lkOrderVal").textContent=lkMoney(hb.order_value||0);$("lkBookings").textContent=hb.bookings||0;$("lkEnq").textContent=hb.enquiries||0;$("lkContacts").textContent=hb.contacts||0;$("lkShops").textContent=hb.shops30||0;
   $("lkEnabled").value=String(se.enabled);$("lkPrice").value=se.price;$("lkDays").value=se.days;$("lkMax").value=se.maxSites;
   $("lkTpl").innerHTML=ov.templates.length?ov.templates.map(t=>'<span style="display:inline-block;margin:0 8px 8px 0;padding:8px 14px;border:1px solid var(--line);border-radius:99px;font-weight:700;text-transform:capitalize">'+lkEsc(t.t)+' · '+t.n+'</span>').join(""):'<div class="empty">No websites yet.</div>';
  }catch(e){lkNote(e.message,false);}

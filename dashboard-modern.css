@@ -150,3 +150,18 @@ html[data-theme] body .boltiv-home .dm-strip .lk-card::after,html[data-theme] bo
 html[data-theme] body .boltiv-home .dm-strip .lk-card,html[data-theme] body .boltiv-home .dm-strip .bm-card,html[data-theme] body .boltiv-home .dm-strip .hc-wrap{background:var(--dm-surf)!important;box-shadow:none!important}
 html[data-theme] body .boltiv-home .header,html[data-theme] body .boltiv-home .home-header{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
 html[data-theme] body .boltiv-home .boltiv-announcement,html[data-theme] body .boltiv-home .insight-card,html[data-theme] body .boltiv-home .home-transaction{box-shadow:none!important}
+/* v6: compact, professional promo cards */
+html[data-theme] body .boltiv-home .dm-strip{gap:10px;margin-top:20px}
+html[data-theme] body .boltiv-home .dm-strip>.section{flex:0 0 78%;max-width:290px}
+html[data-theme] body .boltiv-home .dm-strip .lk-card,html[data-theme] body .boltiv-home .dm-strip .bm-card,html[data-theme] body .boltiv-home .dm-strip .hc-wrap{min-height:0!important;height:100%;padding:14px!important;gap:6px!important;border-radius:18px!important}
+html[data-theme] body .boltiv-home .dm-strip .bm-grid{display:none!important}
+html[data-theme] body .boltiv-home .dm-strip .lk-top{display:block}
+html[data-theme] body .boltiv-home .dm-strip .lk-badge,html[data-theme] body .boltiv-home .dm-strip .bm-badge{font-size:10.5px!important;padding:3px 9px!important}
+html[data-theme] body .boltiv-home .dm-strip h3{font-size:15px!important;margin:2px 0 0!important;line-height:1.25}
+html[data-theme] body .boltiv-home .dm-strip .lk-copy,html[data-theme] body .boltiv-home .dm-strip .bm-copy{font-size:12px!important;-webkit-line-clamp:2}
+html[data-theme] body .boltiv-home .dm-strip .bm-top{gap:10px}
+html[data-theme] body .boltiv-home .dm-strip .bm-ico{width:36px;height:36px;border-radius:12px}
+html[data-theme] body .boltiv-home .dm-strip .bm-ico svg{width:19px;height:19px}
+html[data-theme] body .boltiv-home .dm-strip .lk-actions,html[data-theme] body .boltiv-home .dm-strip .bm-actions{margin-top:6px}
+html[data-theme] body .boltiv-home .dm-strip .lk-btn.p,html[data-theme] body .boltiv-home .dm-strip .bm-btn.primary,html[data-theme] body .boltiv-home .dm-strip .hc-btn.primary{display:inline-flex;align-items:center;justify-content:center;width:auto!important;min-height:34px!important;padding:0 16px!important;border-radius:999px!important;font-size:12.5px!important}
+html[data-theme] body .boltiv-home .dm-strip .bcard{zoom:.5}

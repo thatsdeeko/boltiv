@@ -144,7 +144,8 @@ body.modal-open{overflow:hidden!important}
 .bm-btn.ghost{background:rgba(255,255,255,.08);color:#fff!important;border:1px solid rgba(255,255,255,.2)}
 @media(max-width:360px){.bm-actions{flex-direction:column}.bm-head h3{font-size:15.5px}}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet"><link href="/boltiv-premium.css?v=20261010-pm" rel="stylesheet"></head>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet"><link href="/boltiv-premium.css?v=20261010-pm" rel="stylesheet"><link href="dashboard-modern.css?v=20261121" rel="stylesheet"/>
+</head>
 <body class="boltiv-animated-home">
 <div aria-hidden="true" class="home-ambient">
 <span class="ambient-orb ambient-orb-one"></span>
@@ -185,26 +186,24 @@ body.modal-open{overflow:hidden!important}
 </section>
 <section class="home-balance-card">
 <div class="home-balance-top">
-<div><div class="balance-label-row"><div class="balance-label">AVAILABLE BALANCE</div><button aria-label="Hide balance" aria-pressed="false" class="balance-visibility-toggle" id="balanceVisibilityToggle" title="Hide balance" type="button">
+<div><div class="balance-label-row"><div class="balance-label">Available balance</div><button aria-label="Hide balance" aria-pressed="false" class="balance-visibility-toggle" id="balanceVisibilityToggle" title="Hide balance" type="button">
 <svg aria-hidden="true" class="balance-eye balance-eye-open" fill="none" viewBox="0 0 24 24"><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path><circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="1.8"></circle></svg>
 <svg aria-hidden="true" class="balance-eye balance-eye-closed" fill="none" viewBox="0 0 24 24" hidden><path d="m3 3 18 18M10.6 6.8A9.8 9.8 0 0 1 12 6.5c5.8 0 9.2 5.5 9.2 5.5a18 18 0 0 1-3.2 3.6M6.5 6.6C4 8.2 2.8 12 2.8 12s3.4 5.5 9.2 5.5c1.3 0 2.5-.3 3.5-.8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path></svg>
 </button></div><div class="balance-value boltiv-skeleton" id="walletBalance">₦0.00</div></div>
 <div class="balance-mark">₦</div>
 </div>
-<div class="home-balance-actions">
-<button class="btn btn-primary" onclick="location.href='/wallet'">+ FUND WALLET</button>
-<button class="btn btn-light" onclick="location.href='/transactions'">VIEW ACTIVITY</button>
-</div>
+<div class="home-balance-actions dm-actions"><button class="dm-act p" type="button" onclick="location.href='/wallet'"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i>Fund</button><button class="dm-act" type="button" onclick="location.href='/transactions'"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21zM10 8h4M10 12h4"/></svg></i>History</button><button class="dm-act" type="button" onclick="document.getElementById('bonusSection').scrollIntoView({behavior:'smooth',block:'center'})"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M12 9v11M4 13h16M12 9c-2-4-5-3-4.5-1s3 1 4.5 1zM12 9c2-4 5-3 4.5-1s-3 1-4.5 1z"/></svg></i>Bonus</button><button class="dm-act" type="button" onclick="document.getElementById('referralSection').scrollIntoView({behavior:'smooth',block:'center'})"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M17 5v6M14 8h6"/></svg></i>Refer</button></div>
 </section>
 <section class="section home-services-section" id="quickServicesSection">
-<div class="section-head"><h2 class="section-title">QUICK SERVICES</h2><a class="section-link" href="/services.html">More services →</a></div>
+<div class="section-head"><h2 class="section-title">Services</h2><a class="section-link" href="/services.html">More →</a></div>
 <div class="home-service-grid">
 <a class="home-service-card" href="/airtime"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.2"></rect><path d="M10 6h4M11 18h2"></path></svg></span><strong>Airtime</strong><small>Recharge any network</small></a>
 <a class="home-service-card" href="/data"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5a11 11 0 0 1 16 0M7 12.5a7 7 0 0 1 10 0M10 15.5a3 3 0 0 1 4 0"></path><circle cx="12" cy="18" r="1"></circle></svg></span><strong>Data</strong><small>Choose a live bundle</small></a>
-<a class="home-service-card" href="/cable"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="12" rx="2"></rect><path d="M8 21h8M12 17v4M9 3l3 3 3-3"></path></svg></span><strong>Cable TV</strong><small>Renew your subscription</small></a>
-<a class="home-service-card" href="/electricity"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.8 5.8 13h5.3l-.8 8.2L18.2 11h-5.1l.4-8.2Z"></path></svg></span><strong>Electricity</strong><small>Pay your meter</small></a><a class="home-service-card" href="/exam-pin"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></span><strong>Exam PINs</strong><small></small></a><a class="home-service-card" href="/bulk-airtime"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="11" height="14" rx="2"/><path d="M9 3h9a2 2 0 0 1 2 2v12"/></svg></span><strong>Bulk Airtime</strong><small></small></a><a class="home-service-card" href="/international"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></span><strong>International</strong><small></small></a><a class="home-service-card" href="/sms"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/></svg></span><strong>Bulk SMS</strong><small></small></a>
+
+<a class="home-service-card" href="/electricity"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2.8 5.8 13h5.3l-.8 8.2L18.2 11h-5.1l.4-8.2Z"></path></svg></span><strong>Electricity</strong><small>Pay your meter</small></a><a class="home-service-card" href="/international"><span class="service-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg></span><strong>International</strong><small></small></a>
 </div>
 </section>
+<div class="dm-strip">
 <section class="section lk-section" id="linkSection" aria-label="BOLTIV Link">
 <div class="section-head"><h2 class="section-title">BOLTIV LINK</h2><a class="section-link" href="/boltiv-link">Learn more →</a></div>
 <div class="lk-card">
@@ -250,8 +249,9 @@ return'<a class="lk-site" href="/link?site='+s.id+'"><span class="lk-dot '+cls+'
 <div class="section-head"><h2 class="section-title">BOLTIV CARD</h2><a class="section-link" href="/cards" id="hcLink">Learn more →</a></div>
 <div class="hc-wrap" id="hcWrap"></div>
 </section>
+</div>
 <section class="section home-smart-feature-section" id="smartFeaturesSection" aria-labelledby="smartFeaturesHeading">
-<div class="section-head"><h2 class="section-title" id="smartFeaturesHeading">SMART FEATURES</h2><a class="section-link" href="/smart-features">View all →</a></div>
+<div class="section-head"><h2 class="section-title" id="smartFeaturesHeading">Smart features</h2><a class="section-link" href="/smart-features">View all →</a></div>
 <div class="sf-wrap">
 <p class="sf-intro">Automate routine payments, simplify repeat purchases and stay in control, all built into BOLTIV.</p>
 <div class="sf-grid">
@@ -263,18 +263,18 @@ return'<a class="lk-site" href="/link?site='+s.id+'"><span class="lk-dot '+cls+'
 </div>
 </section>
 <section class="section home-repeat-section" aria-label="Buy again">
-<div class="section-head"><h2 class="section-title">BUY AGAIN</h2><a class="section-link" href="/transactions">See all →</a></div>
+<div class="section-head"><h2 class="section-title">Buy again</h2><a class="section-link" href="/transactions">See all →</a></div>
 <div class="repeat-list" id="quickRepeatList"><div class="insight-empty">Your successful services will appear here for quick access.</div></div>
 </section>
 <section class="section home-bonus-slot" id="bonusSection" aria-label="Bonus balance"></section>
 <section class="section home-referral-slot" id="referralSection" aria-label="Refer and earn"></section>
 <section class="section home-recent-section">
-<div class="section-head"><h2 class="section-title">RECENT ACTIVITY</h2><a class="section-link" href="/transactions">See all →</a></div>
+<div class="section-head"><h2 class="section-title">Recent activity</h2><a class="section-link" href="/transactions">See all →</a></div>
 <div class="home-recent-list" id="recentList"><div class="home-loading">Loading your latest transactions…</div></div>
 </section>
 <section class="dashboard-insights" aria-label="Wallet insights">
 <section class="insight-card">
-<div class="insight-head"><span class="insight-title">SPENDING OVERVIEW</span><button class="insight-link" onclick="location.href='/transactions'" type="button">View →</button></div>
+<div class="insight-head"><span class="insight-title">This month</span><button class="insight-link" onclick="location.href='/transactions'" type="button">View →</button></div>
 <div class="insight-main boltiv-skeleton" id="monthlySpent">₦0.00</div>
 <div class="insight-sub" id="monthlySpentLabel">Spent this month</div>
 <div class="insight-stats">

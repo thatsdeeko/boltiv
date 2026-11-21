@@ -1,0 +1,72 @@
+/* BOLTIV dashboard redesign: flat, calm, fintech look. Scoped to the dashboard only. */
+html[data-theme="dark"]{--dm-surf:#15181D;--dm-surf2:#1D2128;--dm-line:rgba(255,255,255,.07);--dm-text:#F2F2F2;--dm-mut:#8A8F98;--dm-gold:#D9B341;--dm-on:#0B0D10}
+html[data-theme="light"],html:not([data-theme]){--dm-surf:#FFFFFF;--dm-surf2:#F3F1EA;--dm-line:rgba(0,0,0,.07);--dm-text:#17181A;--dm-mut:#6B7078;--dm-gold:#B8901C;--dm-on:#FFFFFF}
+@keyframes dmIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+body .boltiv-home main>*{animation:dmIn .45s ease both}
+body .boltiv-home main>*:nth-child(2){animation-delay:.05s}body .boltiv-home main>*:nth-child(3){animation-delay:.1s}body .boltiv-home main>*:nth-child(4){animation-delay:.15s}
+body .boltiv-home .section{margin-top:24px}
+body .boltiv-home .section-head{margin-bottom:12px}
+body .boltiv-home .section-title{font-size:15px!important;font-weight:600!important;letter-spacing:0!important;color:var(--dm-text)!important}
+body .boltiv-home .section-link{font-size:13px!important;font-weight:500!important;color:var(--dm-gold)!important}
+body .boltiv-home .home-welcome .eyebrow{display:none}
+body .boltiv-home .home-welcome h1{font-size:24px!important}
+body .boltiv-home .home-balance-card{background:var(--dm-surf)!important;border:0!important;box-shadow:none!important;border-radius:24px!important;padding:20px 18px 18px!important}
+body .boltiv-home .home-balance-card::before,body .boltiv-home .home-balance-card::after,body .boltiv-home .balance-mark{display:none!important}
+body .boltiv-home .balance-label{font-size:13px!important;letter-spacing:0!important;font-weight:500!important;color:var(--dm-mut)!important;text-transform:none!important}
+body .boltiv-home .balance-value{font-size:36px!important;font-weight:600!important;letter-spacing:-.5px!important;color:var(--dm-text)!important;margin-top:6px}
+body .boltiv-home .dm-actions{display:flex;justify-content:space-between;margin-top:22px;padding:0 4px}
+body .boltiv-home .dm-act{display:flex;flex-direction:column;align-items:center;gap:7px;border:0;background:none;padding:0;font:inherit;font-size:12px;color:var(--dm-mut);cursor:pointer;min-width:64px}
+body .boltiv-home .dm-act i{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--dm-surf2);color:var(--dm-gold);font-style:normal;transition:transform .15s}
+body .boltiv-home .dm-act.p i{background:var(--dm-gold);color:var(--dm-on)}
+body .boltiv-home .dm-act svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+body .boltiv-home .dm-act:active i,body .boltiv-home .home-service-card:active .service-icon{transform:scale(.92)}
+body .boltiv-home .home-service-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important}
+body .boltiv-home .home-service-card{min-height:0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;border-radius:0!important;gap:8px;align-items:center;text-align:center;animation:none}
+body .boltiv-home .home-service-card small{display:none!important}
+body .boltiv-home .home-service-card strong{font-size:12.5px!important;font-weight:500!important;color:var(--dm-text)!important}
+body .boltiv-home .home-service-card .service-icon{width:58px!important;height:58px!important;border-radius:19px!important;display:grid!important;place-items:center;border:0!important;box-shadow:none!important;transition:transform .15s}
+body .boltiv-home .home-service-card .service-icon svg{width:26px!important;height:26px!important;stroke:currentColor!important}
+body .boltiv-home .home-service-card:nth-child(1) .service-icon{background:rgba(74,222,128,.15)!important;color:#22A85A!important}
+body .boltiv-home .home-service-card:nth-child(2) .service-icon{background:rgba(96,165,250,.16)!important;color:#3B82F6!important}
+body .boltiv-home .home-service-card:nth-child(3) .service-icon{background:rgba(251,191,36,.16)!important;color:#D99A06!important}
+body .boltiv-home .home-service-card:nth-child(4) .service-icon{background:rgba(56,189,248,.16)!important;color:#0EA5E9!important}
+body .boltiv-home .dm-strip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;margin-top:24px;padding-bottom:2px;scrollbar-width:none}
+body .boltiv-home .dm-strip::-webkit-scrollbar{display:none}
+body .boltiv-home .dm-strip>.section{flex:0 0 82%;max-width:320px;margin:0;scroll-snap-align:start}
+body .boltiv-home .dm-strip .section-head,body .boltiv-home .dm-strip .lk-chips,body .boltiv-home .dm-strip .lk-sites,body .boltiv-home .dm-strip .lk-win,body .boltiv-home .dm-strip .lk-btn.g,body .boltiv-home .dm-strip .bm-grid,body .boltiv-home .dm-strip .bm-btn.ghost,body .boltiv-home .dm-strip .hc-sub,body .boltiv-home .dm-strip .hc-chips,body .boltiv-home .dm-strip .hc-title,body .boltiv-home .dm-strip .bm-ico{display:none!important}
+body .boltiv-home .dm-strip .lk-card,body .boltiv-home .dm-strip .bm-card,body .boltiv-home .dm-strip .hc-wrap{height:100%;background:var(--dm-surf)!important;border:0!important;box-shadow:none!important;border-radius:20px!important;padding:16px!important;display:flex;flex-direction:column;gap:10px}
+body .boltiv-home .dm-strip h3{font-size:16px!important;font-weight:600!important;color:var(--dm-text)!important;margin:4px 0 0!important}
+body .boltiv-home .dm-strip .lk-copy,body .boltiv-home .dm-strip .bm-copy{font-size:12.5px!important;color:var(--dm-mut)!important;margin:0!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+body .boltiv-home .dm-strip .lk-badge,body .boltiv-home .dm-strip .bm-badge{font-size:11px!important;letter-spacing:0!important;font-weight:500!important;color:var(--dm-gold)!important;background:none!important;padding:0!important;text-transform:none!important}
+body .boltiv-home .dm-strip .lk-actions,body .boltiv-home .dm-strip .bm-actions{margin-top:auto}
+body .boltiv-home .dm-strip .lk-btn.p,body .boltiv-home .dm-strip .bm-btn.primary,body .boltiv-home .dm-strip .hc-btn.primary{background:var(--dm-gold)!important;color:var(--dm-on)!important;border:0!important;border-radius:14px!important;box-shadow:none!important;font-size:13px!important;font-weight:600!important;min-height:42px}
+body .boltiv-home .dm-strip .bcard{zoom:.7;margin:0 auto}
+body .boltiv-home .dm-strip .hc-actions .hc-btn.ghost{display:none}
+body .boltiv-home .sf-wrap,body .boltiv-home #bonusSection>*,body .boltiv-home #referralSection>*{background:var(--dm-surf)!important;border:0!important;box-shadow:none!important;border-radius:20px!important}
+body .boltiv-home .sf-wrap{padding:12px!important}
+body .boltiv-home .sf-intro{display:none}
+body .boltiv-home .sf-grid{gap:10px!important}
+body .boltiv-home .sf-tile{background:var(--dm-surf2)!important;border:0!important;box-shadow:none!important;border-radius:16px!important}
+body .boltiv-home .sf-tile small{display:none}
+body .boltiv-home .sf-tile strong{color:var(--dm-text)!important;font-weight:500!important}
+body .boltiv-home .repeat-list{display:flex!important;gap:8px;overflow-x:auto;scrollbar-width:none}
+body .boltiv-home .repeat-list::-webkit-scrollbar{display:none}
+body .boltiv-home .repeat-item{flex:0 0 auto;width:auto!important;background:var(--dm-surf)!important;border:0!important;border-radius:999px!important;padding:8px 16px 8px 8px!important;box-shadow:none!important}
+body .boltiv-home .repeat-icon{border-radius:50%!important;background:var(--dm-surf2)!important;color:var(--dm-gold)!important}
+body .boltiv-home .repeat-arrow{display:none!important}
+body .boltiv-home .repeat-main strong{font-weight:500!important;color:var(--dm-text)!important}
+body .boltiv-home .repeat-main small{color:var(--dm-mut)!important}
+body .boltiv-home .home-recent-list{display:block;background:var(--dm-surf);border-radius:20px;padding:4px 16px}
+body .boltiv-home .home-transaction{background:none!important;border:0!important;border-bottom:.5px solid var(--dm-line)!important;border-radius:0!important;box-shadow:none!important;padding:14px 0!important}
+body .boltiv-home .home-transaction:last-child{border-bottom:0!important}
+body .boltiv-home .transaction-icon{border-radius:50%!important;background:var(--dm-surf2)!important;color:var(--dm-gold)!important}
+body .boltiv-home .dashboard-insights{grid-template-columns:1fr!important;gap:0!important;margin-top:24px}
+body .boltiv-home .insight-card{background:var(--dm-surf)!important;border:0!important;box-shadow:none!important;border-radius:20px!important}
+body .boltiv-home .insight-card+.insight-card{margin-top:-8px;border-radius:0 0 20px 20px!important;padding-top:0!important}
+body .boltiv-home .insight-card:first-child{border-radius:20px 20px 0 0!important}
+body .boltiv-home .insight-card+.insight-card .insight-main,body .boltiv-home .insight-card+.insight-card .insight-sub,body .boltiv-home .insight-card+.insight-card .insight-head{display:none}
+body .boltiv-home .insight-title{font-size:15px!important;font-weight:600!important;letter-spacing:0!important;color:var(--dm-text)!important;text-transform:none!important}
+body .boltiv-home .insight-main{font-weight:600!important;font-size:26px!important}
+body .boltiv-home .insight-stat{background:var(--dm-surf2)!important;border:0!important;border-radius:14px!important}
+body .boltiv-home .home-trust-card,body:has(.boltiv-home) .boltiv-global-footer{display:none!important}
+body .boltiv-home .home-header{border-bottom:0!important}

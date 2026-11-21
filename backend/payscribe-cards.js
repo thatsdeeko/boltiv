@@ -16,6 +16,20 @@ module.exports = function createCards(d) {
   const KEY = process.env.PAYSCRIBE_API_KEY || "";
   const HASH_KEY = process.env.PAYSCRIBE_MERCHANT_HASH_KEY || "";
   const WEBHOOK_SECRET = process.env.PAYSCRIBE_WEBHOOK_SECRET || KEY;
+  // Request signing (Payscribe dashboard > Settings > API Keys > Request Signing). Set PAYSCRIBE_SIGNING_SECRET
+  // (pss_live_... / pss_test_...) in Railway AFTER this code is deployed, then turn signing on in the dashboard.
+  // Empty = unsigned requests (works only from a whitelisted IP).
+  const SIGNING_SECRET = process.env.PAYSCRIBE_SIGNING_SECRET || "";
+  function signHeaders(method, url, bodyStr) {
+    if (!SIGNING_SECRET) return {};
+    const u = new URL(url);
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const nonce = crypto.randomBytes(16).toString("hex"); // 32 chars, [0-9a-f]
+    const bodyHash = crypto.createHash("sha256").update(bodyStr || "", "utf8").digest("hex");
+    const toSign = [timestamp, nonce, method.toUpperCase(), u.pathname + u.search, bodyHash].join("\n");
+    const signature = crypto.createHmac("sha256", SIGNING_SECRET).update(toSign, "utf8").digest("hex");
+    return { "X-Payscribe-Timestamp": timestamp, "X-Payscribe-Nonce": nonce, "X-Payscribe-Signature": signature };
+  }
   const BLOCK_LOW_USD = process.env.PAYSCRIBE_BLOCK_LOW_USD === "1"; // default: take payments even when the USD wallet is empty (convert the collected naira, held orders finish by themselves)
 
   /* ---------- settings (admin-changeable via platform settings, env/defaults otherwise) ---------- */
@@ -64,9 +78,10 @@ module.exports = function createCards(d) {
     if (!KEY) return { outcome: "failed", message: "Card service is not configured yet.", data: {} };
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30000);
     try {
+      const bodyStr = payload ? JSON.stringify(payload) : undefined; // sign and send the exact same string
       const r = await fetch(BASE + path, { method, signal: ctl.signal,
-        headers: { Authorization: "Bearer " + KEY, "Content-Type": "application/json", Accept: "application/json" },
-        body: payload ? JSON.stringify(payload) : undefined });
+        headers: { Authorization: "Bearer " + KEY, "Content-Type": "application/json", Accept: "application/json", ...signHeaders(method, BASE + path, bodyStr) },
+        body: bodyStr });
       let j = {}; try { j = await r.json(); } catch { }
       const code = Number(j.status_code || r.status);
       const message = clean(j.description || j.message?.description || (typeof j.message === "string" ? j.message : "")).replace(/payscribe/gi, "our card service");

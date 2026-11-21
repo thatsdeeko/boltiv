@@ -138,3 +138,15 @@ body .boltiv-home .home-balance-card{background:linear-gradient(145deg,#e4c34a 0
 body .boltiv-home .home-balance-card::before{display:block!important;content:"";position:absolute;inset:-45% 35% 35% -20%;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 58%);pointer-events:none}
 body .boltiv-home .dm-strip .lk-win{display:none!important}
 body .boltiv-home .dm-strip .lk-top>div:first-child{padding-right:0}
+/* v5: beat the dark-theme overrides so the hero is really gold; remove glows and heavy shadows */
+html[data-theme] body:has(.boltiv-home){background:#0b0d10!important}
+html[data-theme="light"] body:has(.boltiv-home){background:#f6f5f1!important}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card{background:linear-gradient(145deg,#e4c34a 0%,#c9a227 48%,#b88b12 100%)!important;border:1px solid rgba(157,115,5,.42)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.32)!important;color:#171717!important}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card::before{display:block!important;content:""!important;position:absolute!important;inset:-45% 35% 35% -20%!important;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 58%)!important;border:0!important;pointer-events:none}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card .balance-label{color:rgba(32,27,13,.72)!important}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card .balance-value,html[data-theme] body .boltiv-home .home-balance-card.home-balance-card #dmBonusAmt{color:#171717!important;text-shadow:none!important}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card .balance-visibility-toggle{background:rgba(255,255,255,.2)!important;border-color:rgba(40,30,5,.18)!important;color:#171717!important}
+html[data-theme] body .boltiv-home .dm-strip .lk-card::after,html[data-theme] body .boltiv-home .dm-strip .bm-card::after,html[data-theme] body .boltiv-home .dm-strip .hc-wrap::after{display:none!important}
+html[data-theme] body .boltiv-home .dm-strip .lk-card,html[data-theme] body .boltiv-home .dm-strip .bm-card,html[data-theme] body .boltiv-home .dm-strip .hc-wrap{background:var(--dm-surf)!important;box-shadow:none!important}
+html[data-theme] body .boltiv-home .header,html[data-theme] body .boltiv-home .home-header{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important}
+html[data-theme] body .boltiv-home .boltiv-announcement,html[data-theme] body .boltiv-home .insight-card,html[data-theme] body .boltiv-home .home-transaction{box-shadow:none!important}

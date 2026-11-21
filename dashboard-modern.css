@@ -105,3 +105,31 @@ body .boltiv-home .home-recent-list{background:none!important;padding:0!importan
 body .boltiv-home .home-transaction,body .boltiv-home .home-transaction:last-child{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;border-radius:22px!important;padding:14px 16px!important;margin-bottom:12px}
 body .boltiv-home .transaction-icon{background:var(--dm-tile)!important}
 body .bottom-nav .nav-item.active{background:rgba(217,179,65,.16)!important;border-radius:999px!important;color:var(--dm-gold)!important}
+/* v3: compact pure-gold hero, designed promo cards */
+html[data-theme="dark"]{--dm-glow:#2B2310}
+html[data-theme="light"],html:not([data-theme]){--dm-glow:#FBF0CC}
+body .boltiv-home .home-balance-card{display:grid!important;grid-template-columns:1fr auto;align-items:center;gap:8px 12px;text-align:left;background:#D9B341!important;border-radius:22px!important;padding:12px 14px 14px!important}
+body .boltiv-home .home-balance-card::before{display:none!important}
+body .boltiv-home .dm-tabs{grid-column:1/-1;justify-self:start;margin:0;padding:3px}
+body .boltiv-home .dm-tabs button{padding:6px 16px;font-size:13px}
+body .boltiv-home .home-balance-top{grid-column:1;min-width:0}
+body .boltiv-home .balance-label-row{justify-content:flex-start}
+body .boltiv-home .balance-label{font-size:12px!important}
+body .boltiv-home .balance-value,body .boltiv-home #dmBonusAmt{font-size:28px!important;margin-top:2px!important}
+body .boltiv-home .home-balance-top .balance-value.is-hidden{font-size:26px!important}
+body .boltiv-home .dm-hbtns{grid-column:2;margin:0!important;display:block}
+body .boltiv-home .dm-hbtn{flex:none;min-height:44px;padding:0 18px;font-size:14px;white-space:nowrap}
+body .boltiv-home .boltiv-announcement{margin-top:-26px!important;padding-top:30px!important}
+body .boltiv-home .dm-strip .lk-card,body .boltiv-home .dm-strip .bm-card,body .boltiv-home .dm-strip .hc-wrap{position:relative;overflow:hidden;min-height:220px;background:linear-gradient(155deg,var(--dm-glow),var(--dm-surf) 65%)!important}
+body .boltiv-home .dm-strip .lk-card::after,body .boltiv-home .dm-strip .bm-card::after,body .boltiv-home .dm-strip .hc-wrap::after{content:"";position:absolute;right:-50px;top:-50px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(217,179,65,.38),transparent 70%);pointer-events:none}
+body .boltiv-home .dm-strip .lk-card>*,body .boltiv-home .dm-strip .bm-card>*,body .boltiv-home .dm-strip .hc-wrap>*{position:relative;z-index:1}
+body .boltiv-home .dm-strip .lk-badge,body .boltiv-home .dm-strip .bm-badge{display:inline-block;background:var(--dm-tile)!important;border:1px solid var(--dm-line);border-radius:999px!important;padding:4px 10px!important}
+body .boltiv-home .dm-strip .lk-win{display:block!important;position:absolute!important;right:12px;top:14px;zoom:.7;z-index:1}
+body .boltiv-home .dm-strip .lk-top>div:first-child{padding-right:82px}
+body .boltiv-home .dm-strip .bm-top{display:flex;align-items:center;gap:12px}
+body .boltiv-home .dm-strip .bm-ico{display:grid!important;place-items:center;flex:0 0 auto;width:44px;height:44px;border-radius:14px;background:var(--dm-gold)!important;color:var(--dm-on)!important}
+body .boltiv-home .dm-strip .bm-ico svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+body .boltiv-home .dm-strip .bm-grid{display:flex!important;flex-wrap:wrap;gap:6px}
+body .boltiv-home .dm-strip .bm-feat{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;background:var(--dm-tile);border:1px solid var(--dm-line);font-size:11px;color:var(--dm-text)}
+body .boltiv-home .dm-strip .bm-feat svg{width:13px;height:13px;fill:none;stroke:var(--dm-gold);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+body .boltiv-home .dm-strip .bm-card h3{font-size:15px!important}

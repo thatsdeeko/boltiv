@@ -70,3 +70,38 @@ body .boltiv-home .insight-main{font-weight:600!important;font-size:26px!importa
 body .boltiv-home .insight-stat{background:var(--dm-surf2)!important;border:0!important;border-radius:14px!important}
 body .boltiv-home .home-trust-card,body:has(.boltiv-home) .boltiv-global-footer{display:none!important}
 body .boltiv-home .home-header{border-bottom:0!important}
+/* v2: bolder hero and outlined cards, inspired by the reference app */
+html[data-theme="dark"]{--dm-line:rgba(217,179,65,.24);--dm-tile:rgba(217,179,65,.10)}
+html[data-theme="light"],html:not([data-theme]){--dm-line:rgba(168,122,11,.26);--dm-tile:rgba(184,144,28,.12)}
+body .boltiv-home .home-welcome p{display:none}
+body .boltiv-home .home-welcome h1{font-size:20px!important;margin:0!important}
+body .boltiv-home .section-title::before{content:"";display:inline-block;width:4px;height:18px;border-radius:2px;background:var(--dm-gold);margin-right:10px;vertical-align:-3px}
+body .boltiv-home .home-balance-card{position:relative;z-index:2;overflow:hidden;text-align:center;background:linear-gradient(150deg,#F6D25C 0%,#DCAE2A 55%,#B98410 100%)!important;border-radius:28px!important;padding:16px 16px 18px!important}
+body .boltiv-home .home-balance-card::before{display:block!important;content:"";position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.09) 0 2px,transparent 2px 15px);pointer-events:none}
+body .boltiv-home .home-balance-card>*{position:relative}
+body .boltiv-home .home-balance-top>div{width:100%}
+body .boltiv-home .balance-label-row{justify-content:center}
+body .boltiv-home .balance-label{color:#3A2A05!important}
+body .boltiv-home .balance-visibility-toggle{background:rgba(23,20,13,.16)!important;border-color:transparent!important;color:#17140D!important}
+body .boltiv-home .balance-value,body .boltiv-home #dmBonusAmt{color:#17140D!important;font-size:40px!important;font-weight:700!important;margin-top:8px!important}
+#dmBonusAmt{display:none}
+body .boltiv-home .dm-bonus #walletBalance{display:none}
+body .boltiv-home .dm-bonus #dmBonusAmt{display:block}
+body .boltiv-home .dm-tabs{display:inline-flex;background:rgba(255,255,255,.3);border-radius:999px;padding:5px;margin:0 auto 18px}
+body .boltiv-home .dm-tabs button{border:0;background:none;border-radius:999px;padding:9px 26px;font:inherit;font-size:15px;font-weight:600;color:#3A2A05;cursor:pointer}
+body .boltiv-home .dm-tabs button.on{background:#17140D;color:#fff}
+body .boltiv-home .dm-hbtns{display:flex;gap:10px;margin-top:22px}
+body .boltiv-home .dm-hbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;border:0;border-radius:999px;background:#17140D;color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer}
+body .boltiv-home .dm-hbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+body .boltiv-home .dm-hbtn:active{transform:scale(.97)}
+body .boltiv-home .boltiv-announcement{position:relative;z-index:1;margin:-30px 8px 0!important;padding:34px 14px 10px!important;background:var(--dm-surf)!important;border:0!important;border-radius:0 0 24px 24px!important;font-size:13px!important}
+body .boltiv-home .home-service-card .service-icon{width:100%!important;height:auto!important;max-width:84px;aspect-ratio:1/1;margin:0 auto;border-radius:26px!important;border:1px solid var(--dm-line)!important}
+body .boltiv-home .home-service-card:nth-child(n) .service-icon{background:var(--dm-tile)!important;color:var(--dm-gold)!important}
+body .boltiv-home .home-service-card .service-icon svg{width:34px!important;height:34px!important}
+body .boltiv-home .home-service-card strong{font-size:14px!important}
+body .boltiv-home .dm-strip .lk-card,body .boltiv-home .dm-strip .bm-card,body .boltiv-home .dm-strip .hc-wrap,body .boltiv-home .sf-wrap,body .boltiv-home #bonusSection>*,body .boltiv-home #referralSection>*,body .boltiv-home .insight-card,body .boltiv-home .repeat-item{border:1px solid var(--dm-line)!important}
+body .boltiv-home .sf-tile{border:1px solid var(--dm-line)!important;background:var(--dm-tile)!important}
+body .boltiv-home .home-recent-list{background:none!important;padding:0!important}
+body .boltiv-home .home-transaction,body .boltiv-home .home-transaction:last-child{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;border-radius:22px!important;padding:14px 16px!important;margin-bottom:12px}
+body .boltiv-home .transaction-icon{background:var(--dm-tile)!important}
+body .bottom-nav .nav-item.active{background:rgba(217,179,65,.16)!important;border-radius:999px!important;color:var(--dm-gold)!important}

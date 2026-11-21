@@ -133,3 +133,8 @@ body .boltiv-home .dm-strip .bm-grid{display:flex!important;flex-wrap:wrap;gap:6
 body .boltiv-home .dm-strip .bm-feat{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;background:var(--dm-tile);border:1px solid var(--dm-line);font-size:11px;color:var(--dm-text)}
 body .boltiv-home .dm-strip .bm-feat svg{width:13px;height:13px;fill:none;stroke:var(--dm-gold);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 body .boltiv-home .dm-strip .bm-card h3{font-size:15px!important}
+/* v4: hero matches the BOLTIV Agent gold card; no browser illustration */
+body .boltiv-home .home-balance-card{background:linear-gradient(145deg,#e4c34a 0%,#c9a227 48%,#b88b12 100%)!important;border:1px solid rgba(157,115,5,.42)!important;box-shadow:0 18px 42px rgba(158,122,18,.22),inset 0 1px 0 rgba(255,255,255,.32)!important;color:#171717!important}
+body .boltiv-home .home-balance-card::before{display:block!important;content:"";position:absolute;inset:-45% 35% 35% -20%;background:radial-gradient(circle,rgba(255,255,255,.25),transparent 58%);pointer-events:none}
+body .boltiv-home .dm-strip .lk-win{display:none!important}
+body .boltiv-home .dm-strip .lk-top>div:first-child{padding-right:0}

@@ -165,3 +165,9 @@ html[data-theme] body .boltiv-home .dm-strip .bm-ico svg{width:19px;height:19px}
 html[data-theme] body .boltiv-home .dm-strip .lk-actions,html[data-theme] body .boltiv-home .dm-strip .bm-actions{margin-top:6px}
 html[data-theme] body .boltiv-home .dm-strip .lk-btn.p,html[data-theme] body .boltiv-home .dm-strip .bm-btn.primary,html[data-theme] body .boltiv-home .dm-strip .hc-btn.primary{display:inline-flex;align-items:center;justify-content:center;width:auto!important;min-height:34px!important;padding:0 16px!important;border-radius:999px!important;font-size:12.5px!important}
 html[data-theme] body .boltiv-home .dm-strip .bcard{zoom:.5}
+/* v7: cards share one compact height; buttons sit at the bottom so no dead space */
+html[data-theme] body .boltiv-home .dm-strip{align-items:stretch}
+html[data-theme] body .boltiv-home .dm-strip .bcard{zoom:.4;margin:0 auto -6px}
+html[data-theme] body .boltiv-home .dm-strip .hc-wrap{gap:4px!important;padding:12px 14px!important}
+html[data-theme] body .boltiv-home .dm-strip .lk-actions,html[data-theme] body .boltiv-home .dm-strip .bm-actions{margin-top:auto!important;padding-top:6px}
+html[data-theme] body .boltiv-home .dm-strip .hc-btn.primary{min-height:34px!important;height:34px!important;font-size:12.5px!important;border-radius:999px!important}

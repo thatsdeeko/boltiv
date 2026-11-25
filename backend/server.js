@@ -6421,7 +6421,12 @@ const pin=clean(b.pin);
 if(!/^\d{4}$/.test(pin))return send(res,400,{success:false,message:"Enter your 4-digit PIN."});
 const security=await getSecurity(user.user_id);
 if(!security?.transaction_pin_hash)return send(res,400,{success:false,message:"No Transaction PIN is set on this account."});
-if(!verifyPassword(pin,security.transaction_pin_hash))return send(res,401,{success:false,message:"Incorrect PIN."});
+if(!verifyPassword(pin,security.transaction_pin_hash)){
+void recordUserLogin({user,email:user.email,success:false,reason:"bad_pin",req,sessionToken:getUserSessionToken(req)});
+return send(res,401,{success:false,message:"Incorrect PIN."});
+}
+// Unlocking after inactivity counts as a sign-in: show it in the admin Login History.
+void recordUserLogin({user,email:user.email,success:true,reason:"pin_unlock",req,sessionToken:getUserSessionToken(req)});
 return send(res,200,{success:true});
 }
 /*
@@ -6466,6 +6471,7 @@ const rl=rateLimit(req,`webauthn-auth-verify:${user.user_id}`,20,15*60*1000);
 if(!rl.allowed)return rateLimitedResponse(res,rl);
 const b=await body(req);
 const result=await webauthnAuthenticationVerify(user,b.credential);
+void recordUserLogin({user,email:user.email,success:!!result.success,reason:result.success?"biometric_unlock":"bad_biometric",req,sessionToken:getUserSessionToken(req)});
 return send(res,result.success?200:(result.statusCode||400),result);
 }
 if(req.method==="GET"&&path==="/api/transactions/detail"){

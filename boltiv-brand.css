@@ -95,7 +95,7 @@ body.bx .seo-hero .seo-btn.secondary:hover,body.bx .seo-final .seo-btn.secondary
    ========================================================================== */
 body.bx .seo-hero{position:relative;display:block;text-align:left;padding:86px 0 calc(var(--bx-cut) + 70px);color:#fff}
 body.bx .seo-hero::before{content:"";position:absolute;z-index:-1;top:0;bottom:0;left:50%;width:100vw;transform:translateX(-50%);
-  background:radial-gradient(70% 90% at 92% 0%,rgba(201,162,39,.22),transparent 60%),linear-gradient(180deg,var(--bx-navy) 0%,var(--bx-navy-2) 100%);
+  background:var(--bx-navy);
   clip-path:polygon(0 0,100% 0,100% calc(100% - var(--bx-cut)),0 100%)}
 body.bx .seo-hero>div:first-child{text-align:left}
 body.bx .seo-kicker{display:inline-flex;align-items:center;gap:10px;font:700 12.5px/1 var(--bx-body);letter-spacing:.14em;color:var(--bx-gold-bright);margin:0}
@@ -211,8 +211,7 @@ body.bx .seo-status.live{color:#1d7a4d}
 /* ==========================================================================
    Homepage
    ========================================================================== */
-.hx-hero{position:relative;color:#fff;background:radial-gradient(60% 70% at 85% 10%,rgba(201,162,39,.24),transparent 62%),radial-gradient(50% 60% at 0% 100%,rgba(22,41,90,.9),transparent 70%),var(--bx-navy);clip-path:polygon(0 0,100% 0,100% calc(100% - var(--bx-cut)),0 100%);padding:72px 0 calc(var(--bx-cut) + 64px);overflow:hidden}
-.hx-hero::before{content:"";position:absolute;left:-10%;right:-10%;top:42%;height:1px;background:linear-gradient(90deg,transparent,rgba(230,194,90,.5),transparent);transform:rotate(-8deg);pointer-events:none}
+.hx-hero{position:relative;color:#fff;background:var(--bx-navy);clip-path:polygon(0 0,100% 0,100% calc(100% - var(--bx-cut)),0 100%);padding:72px 0 calc(var(--bx-cut) + 64px);overflow:hidden}
 .hx-hero-in{width:min(var(--bx-max),92%);margin:0 auto;display:grid;grid-template-columns:1.02fr .98fr;gap:40px;align-items:center}
 .hx-hero h1{font:700 clamp(42px,6.2vw,80px)/1.0 var(--bx-head);letter-spacing:-.045em;margin:0 0 26px;color:#fff;max-width:11ch}
 .hx-hero h1 em{font-style:normal;color:var(--bx-gold-bright)}

@@ -1,7 +1,7 @@
 {
-  "name": "BOLTIV — Digital Services & Payments",
+  "name": "BOLTIV — Moving Business Beyond Limits",
   "short_name": "BOLTIV",
-  "description": "Fast access to airtime, data, bills and your BOLTIV wallet.",
+  "description": "One business technology ecosystem: Business Manager, BOLTIV Link, BOLTIV Pay, BOLTIV Card and more.",
   "start_url": "/dashboard.html",
   "scope": "/",
   "display": "standalone",

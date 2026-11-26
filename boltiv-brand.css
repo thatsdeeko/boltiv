@@ -508,3 +508,13 @@ body.bx .seo-final p{max-width:56ch}
   body.bx .seo-table td[data-label]::before{content:attr(data-label) ": ";font-weight:700;color:var(--bx-gold-deep)}
 }
 body.bx .seo-benefit .icon svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+
+/* ---------- Fix: decorative stripes must sit behind content ---------- */
+.hx-tile.dk::after,.hx-visual::after,.hx-final::after,body.bx .seo-final::after{z-index:0}
+.hx-tile.dk>*,.hx-final>*,body.bx .seo-final>*{position:relative;z-index:1}
+.hx-visual>*{position:relative;z-index:1}
+
+/* ---------- Fix: in-page section links wrap cleanly ---------- */
+body.bx .seo-mini-nav{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;justify-content:flex-start}
+body.bx .seo-mini-nav a{display:inline-flex;align-items:center;min-height:38px;padding:0 14px;line-height:1;white-space:nowrap;text-decoration:none;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font:600 13.5px/1 var(--bx-body)}
+body.bx .seo-mini-nav a:hover{background:rgba(242,203,98,.18)}

@@ -9,13 +9,12 @@ Include before boltiv-footer.js (the old footer skips itself when this one exist
   var doc = document;
 
   var PRODUCTS = [
-    { icon: "bm",      name: "Business Manager", text: "Sales, stock, invoices, staff and branches.",        href: "/business-manager" },
-    { icon: "link",    name: "BOLTIV Link",      text: "Your business website with orders and bookings.",     href: "/boltiv-link" },
-    { icon: "wallet",  name: "BOLTIV Pay",       text: "One wallet for payments, bills and digital services.", href: "/all-services#wallet", soon: true },
-    { icon: "card",    name: "BOLTIV Card",      text: "A USD virtual card for online business spending.",    href: "/virtual-card" },
-    { icon: "spark",   name: "Smart Features",   text: "AutoPay, scheduled payments, insights and alerts.",   href: "/features" },
-    { icon: "connect", name: "BOLTIV Connect",   text: "Become an agent and earn from every sale.",           href: "/agents", soon: true }
+    { icon: "bm",    name: "Business Manager", text: "Sales, stock, invoices, staff and branches.",        href: "/business-manager" },
+    { icon: "link",  name: "BOLTIV Link",      text: "Your business website with orders and bookings.",     href: "/boltiv-link" },
+    { icon: "card",  name: "BOLTIV Card",      text: "A USD virtual card for online business spending.",    href: "/virtual-card" },
+    { icon: "spark", name: "Smart Features",   text: "AutoPay, scheduled payments, insights and alerts.",   href: "/features" }
   ];
+
 
   var SPRITE =
     '<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>' +
@@ -55,17 +54,15 @@ Include before boltiv-footer.js (the old footer skips itself when this one exist
 
   function navHTML() {
     var items = PRODUCTS.map(function (p) {
-      if (p.soon) return '<div class="soon"><span class="ic">' + icon(p.icon) + '</span><span><b>' + p.name + ' <em>Coming soon</em></b><span>' + p.text + "</span></span></div>";
       return '<a href="' + p.href + '"><span class="ic">' + icon(p.icon) + '</span><span><b>' + p.name + "</b><span>" + p.text + "</span></span></a>";
     }).join("");
     return (
       '<div class="bx-nav-in">' +
       '<a class="bx-brand" href="/" aria-label="BOLTIV home"><img src="assets/boltiv-logo-dark-2.webp" alt="" width="30" height="37"><span>BOLTIV</span></a>' +
       '<nav class="bx-menu" id="bx-menu" aria-label="Main">' +
-      '<div class="bx-dd"><button type="button" aria-expanded="false" aria-haspopup="true">Products<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5l4 4 4-4"/></svg></button><div class="bx-panel">' + items + "</div></div>" +
+      '<div class="bx-dd"><button type="button" aria-expanded="false" aria-haspopup="true">Products<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5l4 4 4-4"/></svg></button><div class="bx-panel">' + items + '<a class="all" href="/products"><span><b>Explore the full ecosystem</b><span>See how every BOLTIV product works together.</span></span></a></div></div>' +
       '<a href="/#solutions">Solutions</a>' +
       '<a href="/#pricing">Pricing</a>' +
-      '<a href="/all-services">All services</a>' +
       '<a href="/contact">Help</a>' +
       '<div class="bx-m-cta"><a class="bx-btn secondary" href="/login" style="color:#fff;border-color:rgba(255,255,255,.4)">Sign in</a><a class="bx-btn primary" href="/register">Get started</a></div>' +
       "</nav>" +
@@ -76,7 +73,10 @@ Include before boltiv-footer.js (the old footer skips itself when this one exist
   }
 
   function mountNav() {
-    var old = doc.querySelector("header.seo-nav");
+    var old = doc.querySelector("header.seo-nav") || doc.querySelector(".container>header.header");
+    var mini = old && old.querySelector(".seo-mini-nav");
+    var heroEl = doc.querySelector(".seo-hero");
+    if (mini && heroEl) heroEl.appendChild(mini); // keep the in-page section links
     if (old && old.parentNode) old.parentNode.removeChild(old);
     var nav = doc.querySelector("[data-bx-nav]");
     if (!nav) {
@@ -122,8 +122,8 @@ Include before boltiv-footer.js (the old footer skips itself when this one exist
       '<div class="bx-foot-brand"><a class="bx-brand" href="/" aria-label="BOLTIV home"><img src="assets/boltiv-logo-dark-2.webp" alt="" width="30" height="37"><span>BOLTIV</span></a>' +
       '<div class="tag">Moving Business Beyond Limits.</div>' +
       "<p>One business technology ecosystem to start, operate, manage and grow, for individuals, entrepreneurs, SMEs and established businesses.</p></div>" +
-      col("Products", PRODUCTS.filter(function (p) { return !p.soon; }).map(function (p) { return [p.name, p.href]; }).concat([["BOLTIV Agent", "/agents"]])) +
-      col("Explore", [["All services", "/all-services"], ["Solutions", "/#solutions"], ["Pricing", "/#pricing"], ["Contact", "/contact"]]) +
+      col("Products", PRODUCTS.map(function (p) { return [p.name, p.href]; }).concat([["Ecosystem overview", "/products"]])) +
+      col("Explore", [["Solutions", "/#solutions"], ["Pricing", "/#pricing"], ["Become an agent", "/agents"], ["Contact", "/contact"]]) +
       col("Account", [["Sign in", "/login"], ["Create an account", "/register"], ["Privacy policy", "/privacy"], ["Terms &amp; conditions", "/terms"]]) +
       '</div><div class="bx-foot-base"><span>&copy; 2026 BOLTIV. All rights reserved.</span><span>Powered by <strong>BOLTIV TECHNOLOGIES LIMITED</strong></span></div></div>'
     );
@@ -166,7 +166,7 @@ Include before boltiv-footer.js (the old footer skips itself when this one exist
 
   function init() {
     var m = doc.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute("content", "#08122B");
+    if (m) m.setAttribute("content", "#0A1736");
     doc.body.classList.add("bx");
     injectSprite();
     mountNav();

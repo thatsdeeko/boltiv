@@ -6,8 +6,8 @@
    ========================================================================== */
 
 /* ---- colour tokens used across the dashboard ---- */
-html[data-theme="dark"]{--dm-surf:#102252;--dm-surf2:#16306B;--dm-line:rgba(255,255,255,.12);--dm-text:#F4F6FB;--dm-mut:#A3AECB;--dm-gold:#F2CB62;--dm-on:#0A1736;--dm-tile:rgba(255,255,255,.07);--dm-glow:#102252}
-html[data-theme="light"],html:not([data-theme]){--dm-surf:#FFFFFF;--dm-surf2:#EAEEF6;--dm-line:rgba(10,23,54,.12);--dm-text:#0B1530;--dm-mut:#56617A;--dm-gold:#946F0B;--dm-on:#FFFFFF;--dm-tile:#EEF1F8;--dm-glow:#FFFFFF}
+html[data-theme="dark"]{--dm-surf:#102252;--dm-surf2:#16306B;--dm-line:rgba(255,255,255,.12);--dm-text:#F4F6FB;--dm-mut:#E6EBF7;--dm-gold:#F2CB62;--dm-on:#0A1736;--dm-tile:rgba(255,255,255,.07);--dm-glow:#102252}
+html[data-theme="light"],html:not([data-theme]){--dm-surf:#FFFFFF;--dm-surf2:#EAEEF6;--dm-line:rgba(10,23,54,.12);--dm-text:#0B1530;--dm-mut:#38476A;--dm-gold:#946F0B;--dm-on:#FFFFFF;--dm-tile:#EEF1F8;--dm-glow:#FFFFFF}
 
 /* ---- page ---- */
 html[data-theme="dark"] body.boltiv-animated-home{background:#0A1736!important;color:var(--dm-text)}
@@ -130,3 +130,42 @@ html body .boltiv-home .home-service-card .service-icon{flex:0 0 auto;width:52px
 html body .boltiv-home .home-service-grid{align-items:start!important;row-gap:0!important}
 html body .boltiv-home .home-service-card strong{margin:0!important;padding:0!important;display:block}
 html body .boltiv-home .home-service-card::before,html body .boltiv-home .home-service-card::after{display:none!important}
+
+/* ==========================================================================
+   Compact density: tighter header, cards and gaps (reference: dense wallet apps)
+   ========================================================================== */
+html body .boltiv-home{padding-bottom:96px!important}
+html body .boltiv-home .home-header,html body .boltiv-home>header{padding-top:8px!important;padding-bottom:4px!important;min-height:0!important}
+html body .boltiv-home .home-brand img{width:30px!important;height:36px!important}
+html body .boltiv-home .icon-button,html body .boltiv-home .profile-mini{width:38px!important;height:38px!important}
+html body .boltiv-home .home-welcome{padding:6px 0 4px!important;margin-bottom:8px!important}
+html body .boltiv-home .home-welcome h1{font-size:20px!important}
+html body .boltiv-home .home-welcome p{margin:2px 0 0!important;font-size:12.5px!important}
+html body .boltiv-home .boltiv-announcement,html[data-theme] body .boltiv-home .boltiv-announcement{padding:8px 12px!important;min-height:0!important;height:auto!important;margin:0 0 10px!important}
+html body .boltiv-home .home-balance-card,html[data-theme] body .boltiv-home .home-balance-card.home-balance-card{padding:10px 14px 12px!important;border-radius:18px!important}
+html body .boltiv-home .home-balance-card .balance-value{font-size:28px!important}
+html body .boltiv-home .home-balance-card .dm-hbtn{min-height:40px!important;height:40px!important;padding:0 14px!important}
+html body .boltiv-home .home-services-section{margin-top:12px!important}
+html body .boltiv-home .section{margin-top:14px!important}
+html body .boltiv-home .section-head{margin-bottom:8px!important}
+html body .boltiv-home .dm-biz-head{margin-top:14px!important;margin-bottom:8px!important}
+html body .boltiv-home .dm-strip{margin-top:0!important}
+html body .boltiv-home .dm-strip .lk-card,html body .boltiv-home .dm-strip .bm-card,html body .boltiv-home .dm-strip .hc-wrap{padding:12px!important}
+html body .boltiv-home .dm-strip .lk-btn,html body .boltiv-home .dm-strip .bm-btn,html body .boltiv-home .dm-strip .hc-btn{min-height:38px!important;height:38px!important}
+html body .boltiv-home #smartFeaturesSection{margin-top:14px!important}
+html body .boltiv-home .sf-wrap{padding:10px!important;gap:8px!important}
+html body .boltiv-home .sf-intro{margin-bottom:6px!important;font-size:12.5px!important}
+html body .boltiv-home .sf-grid{gap:8px!important}
+html body .boltiv-home .sf-tile{padding:10px!important;gap:6px!important;min-height:0!important}
+html body .boltiv-home .sf-ico{width:32px!important;height:32px!important}
+html body .boltiv-home .insight-card{padding:12px!important}
+html body .boltiv-home .insight-stat{padding:8px 10px!important}
+html body .boltiv-home .home-trust-card{margin-top:14px!important;padding:12px!important}
+
+/* ---- text: no grey, readable on navy ---- */
+html[data-theme="dark"] body .boltiv-home,html[data-theme="dark"] body .boltiv-home *:not(svg):not(path):not(.section-link):not(.insight-link):not(#userName):not(.home-balance-card *):not(.lk-btn):not(.bm-btn):not(.hc-btn){--grey-fix:1}
+html[data-theme="dark"] body .boltiv-home small,html[data-theme="dark"] body .boltiv-home .section p,html[data-theme="dark"] body .boltiv-home .sf-intro,html[data-theme="dark"] body .boltiv-home .insight-sub,html[data-theme="dark"] body .boltiv-home .home-service-card strong,html[data-theme="dark"] body .boltiv-home .home-welcome p,html[data-theme="dark"] body .boltiv-home .home-trust-card p{color:#F2F5FC!important;opacity:1!important}
+html[data-theme="dark"] body .bottom-nav .nav-item{color:#E6EBF7!important}
+html body .boltiv-home .dm-strip .section{margin-top:0!important}
+html body .boltiv-home .home-recent-list>*{padding:14px!important;min-height:0!important}
+html body .boltiv-home .home-repeat-empty,html body .boltiv-home #repeatSection p{margin:0!important}

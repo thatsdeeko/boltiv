@@ -216,7 +216,7 @@ body.modal-open{overflow:hidden!important}
 <div class="lk-win" aria-hidden="true"><b><i></i><i></i><i></i></b><u></u><s><i></i><i></i><i></i></s></div></div>
 <div class="lk-chips" id="lkChips"><span>Fashion</span><span>Restaurants</span><span>Retail</span><span>Services</span><span>Portfolio</span><span>Beauty</span></div>
 <div class="lk-sites" id="lkSites"></div>
-<div class="lk-actions"><a class="lk-btn p" href="/link" id="lkCta">Create my website</a><a class="lk-btn g" href="/boltiv-link">See designs</a></div>
+<div class="lk-actions"><a class="lk-btn p" href="/link" id="lkCta">Open BOLTIV Link</a><a class="lk-btn g" href="/boltiv-link">See features</a></div>
 </div>
 </section>
 <script>
@@ -228,7 +228,7 @@ if(!n)return;
 document.getElementById("lkTitle").textContent=n===1?"Your website":"Your websites ("+n+")";
 document.getElementById("lkCopy").textContent="Manage your content, see your visitors and renew in a few taps.";
 document.getElementById("lkChips").style.display="none";
-document.getElementById("lkCta").textContent="Create another website";
+document.getElementById("lkCta").textContent="Open BOLTIV Link";
 el.innerHTML=d.sites.slice(0,3).map(function(s){var cls=s.state==="active"?(s.daysLeft<=7?"w":""):"x",txt=s.state==="active"?s.daysLeft+" days left":s.state==="expired"?"Offline · renew":"Suspended";
 return'<a class="lk-site" href="/link?site='+s.id+'"><span class="lk-dot '+cls+'"></span><span class="lk-m"><b>'+esc(s.name)+'</b><small>'+esc(s.url.replace("https://",""))+" · "+txt+'</small></span><span class="lk-go">Manage →</span></a>'}).join("")+(n>3?'<a class="lk-site" href="/link"><span class="lk-m"><b>View all '+n+' websites</b></span><span class="lk-go">Open →</span></a>':"");
 }).catch(function(){})}catch(e){}})();
@@ -511,7 +511,7 @@ setInterval(loadHome,30000);
 <script src="boltiv-share.js?v=20261010-pm"></script>
 <script src="boltiv-referral.js?v=20261010-pm"></script>
 <script src="/boltiv-install.js?v=20261118-sw"></script>
-<script src="boltiv-service-availability.js?v=20261009"></script><script src="boltiv-footer.js?v=20261010-pm"></script>
+<script src="boltiv-service-availability.js?v=20261009"></script>
 <script src="/boltiv-motion.js?v=20261010-pm"></script><style>/* ---- the card ---- */
 .bcard{position:relative;aspect-ratio:1.59;border-radius:22px;padding:22px 24px;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;max-width:420px;margin:0 auto;isolation:isolate}
 .bcard>*{position:relative;z-index:2}

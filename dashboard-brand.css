@@ -114,3 +114,19 @@ html body.boltiv-animated-home .page,html body.boltiv-animated-home .container{b
 html body .boltiv-home .home-recent-list>*,html body .boltiv-home .home-recent-list .empty,html body .boltiv-home .home-recent-list .home-empty{background:var(--dm-surf)!important;border-color:var(--dm-line)!important;color:var(--dm-text)!important}
 html body .boltiv-home .home-recent-list *{color:inherit}
 html body .boltiv-home .home-recent-list small,html body .boltiv-home .home-recent-list p{color:var(--dm-mut)!important}
+
+/* ---- everyday services: back at the top, compact ---- */
+html body .boltiv-home .home-services-section{margin-top:18px}
+html body .boltiv-home .home-services-section .section-head{margin-bottom:8px}
+html body .boltiv-home .home-service-grid{gap:6px!important}
+html body .boltiv-home .home-service-card{gap:5px!important}
+html body .boltiv-home .home-service-card .service-icon,
+html body .boltiv-home .home-service-card:nth-child(n) .service-icon{width:100%!important;max-width:52px!important;height:auto!important;aspect-ratio:1/1;border-radius:16px!important;margin:0 auto}
+html body .boltiv-home .home-service-card .service-icon svg{width:22px!important;height:22px!important}
+html body .boltiv-home .home-service-card strong{font-size:11.5px!important;line-height:1.2}
+html body .boltiv-home .dm-biz-head{margin-top:20px}
+html body .boltiv-home .home-service-card{display:flex!important;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px!important;height:auto!important;min-height:0!important;padding:0!important}
+html body .boltiv-home .home-service-card .service-icon{flex:0 0 auto;width:52px!important;height:52px!important;max-width:none!important;aspect-ratio:auto}
+html body .boltiv-home .home-service-grid{align-items:start!important;row-gap:0!important}
+html body .boltiv-home .home-service-card strong{margin:0!important;padding:0!important;display:block}
+html body .boltiv-home .home-service-card::before,html body .boltiv-home .home-service-card::after{display:none!important}

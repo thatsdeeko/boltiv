@@ -1,0 +1,54 @@
+/* ==========================================================================
+   BOLTIV sign-in pages: brand layer ("Moving Business Beyond Limits.")
+   Login, register, forgot password, reset password, verify email.
+   Loaded after style.css / boltiv-premium.css / app-brand.css. Styling only.
+   ========================================================================== */
+html,html body{background:var(--bg)!important}
+html body .page,html body .container{background:transparent!important;background-image:none!important}
+html body .auth-page{min-height:100vh;padding:32px 0 28px!important;background:transparent!important}
+
+/* ---- logo block ---- */
+html body .auth-logo{gap:10px!important;color:var(--text)!important}
+html body .auth-logo img{width:56px!important;height:68px!important}
+html body .auth-logo span{font-family:"Sora","Figtree",system-ui,sans-serif!important;font-size:26px!important;font-weight:700!important;letter-spacing:.18em!important;color:var(--text)!important;background:none!important;-webkit-text-fill-color:currentColor!important}
+html body .auth-tagline{margin-top:8px!important;font-size:12.5px!important;letter-spacing:.02em!important;color:var(--muted)!important;font-weight:500}
+
+/* ---- card ---- */
+html body .auth-card{margin-top:22px!important;padding:24px 22px!important;background:var(--card)!important;border:1px solid var(--line)!important;border-radius:20px!important}
+html body .auth-card h1{font-family:"Sora","Figtree",sans-serif!important;font-size:22px!important;font-weight:700!important;letter-spacing:-.02em;color:var(--text)!important}
+html body .auth-subtitle{font-size:14px!important;line-height:1.55!important;color:var(--muted)!important;margin:6px 0 20px!important}
+
+/* ---- form ---- */
+html body .auth-card .label,html body label.label{font-size:11.5px!important;letter-spacing:.08em!important;font-weight:700!important;color:var(--text)!important}
+html body .auth-card .input,html body .auth-card input{background:var(--card2)!important;border:1px solid var(--line)!important;border-radius:12px!important;color:var(--text)!important;min-height:48px;font-size:15px!important}
+html body .auth-card .input::placeholder,html body .auth-card input::placeholder{color:var(--muted)!important;opacity:.75}
+html body .auth-card .input:focus,html body .auth-card input:focus{outline:2px solid #D6A92B!important;outline-offset:1px;border-color:#D6A92B!important}
+html body .password-toggle{background:transparent!important;border:0!important;color:var(--boltiv-gold-dark,#D6A92B)!important;font-weight:700!important;font-size:12px!important}
+
+/* ---- buttons & links ---- */
+html body .auth-btn,html body .auth-card button[type="submit"]{background:#D6A92B!important;background-image:none!important;color:#0A1736!important;border:0!important;border-radius:12px!important;min-height:50px;font-weight:700!important;font-size:15.5px!important;letter-spacing:0!important}
+html body .auth-btn:hover{background:#F2CB62!important}
+html body .auth-links a,html body .auth-card a{color:var(--boltiv-gold-dark,#D6A92B)!important;font-weight:600!important}
+html body .auth-links{margin-top:18px!important}
+html body .status-message{border-radius:12px!important}
+html body #resendVerificationButton{background:transparent!important;border:1px solid #D6A92B!important;color:var(--boltiv-gold-dark,#D6A92B)!important;border-radius:12px!important}
+html body .auth-card input[type="checkbox"]{accent-color:#D6A92B;min-height:0}
+
+/* ---- verify email (standalone card) ---- */
+html body .card .logo{font-family:"Sora","Figtree",sans-serif!important;letter-spacing:.18em!important;color:var(--text)!important;font-size:26px!important}
+html body .card{background:var(--card)!important;border:1px solid var(--line)!important;border-radius:20px!important;color:var(--text)!important}
+html body .card h1{font-family:"Sora","Figtree",sans-serif!important;color:var(--text)!important;font-size:24px!important}
+html body .card p{color:var(--muted)!important}
+html body .card button{background:#D6A92B!important;color:#0A1736!important;border-radius:12px!important;font-weight:700!important}
+html body .card a{color:var(--boltiv-gold-dark,#D6A92B)!important;font-weight:600}
+
+/* ---- footer on these (public) pages sits on the page colour ---- */
+html body #boltiv-global-footer{margin-top:0}
+
+/* ---- primary button: beat boltiv-premium.css gradient ---- */
+html body .auth-card .auth-btn,html body .auth-card button.auth-btn,html body button.auth-btn#loginButton,html body #loginButton,html body #registerButton,html body #submitButton{background:#D6A92B!important;background-image:none!important;color:#0A1736!important;border:0!important;box-shadow:none!important;border-radius:12px!important;font-weight:700!important}
+html body .auth-card .auth-btn:hover{background:#F2CB62!important}
+
+/* ---- light mode: deeper gold for text links so they stay readable on white ---- */
+html[data-theme="light"] body .auth-links a,html[data-theme="light"] body .auth-card a,html[data-theme="light"] body .password-toggle,html[data-theme="light"] body .card a{color:#8A6508!important}
+html:not([data-theme]) body .auth-links a,html:not([data-theme]) body .auth-card a,html:not([data-theme]) body .password-toggle{color:#8A6508!important}

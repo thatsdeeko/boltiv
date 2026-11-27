@@ -7,22 +7,23 @@
 <script src="boltiv-client.js?v=20260820-nostorage"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<meta name="theme-color" content="#0e0f12">
+<meta name="theme-color" content="#0A1736">
 <meta name="robots" content="noindex,nofollow">
 <title>BOLTIV Business Manager</title>
 <link href="assets/boltiv-icon.webp" rel="icon" type="image/png">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
 <script>boltivRequireAuth();</script>
 <style>
-:root{--bg:#faf8f2;--card:#fff;--card2:#f6f1e1;--ink:#171717;--mut:#6f6b62;--line:#ece4cc;--gold:#c99f16;--gold2:#e1bf43;--goldink:#1b1503;--ok:#1f8a4c;--warn:#b7791f;--bad:#c0392b;--shadow:0 10px 30px rgba(60,45,0,.08)}
-html[data-theme="dark"]{--bg:#0e0f12;--card:#17181c;--card2:#1e2025;--ink:#f1f1ee;--mut:#9a9ea6;--line:#2a2c32;--shadow:0 10px 30px rgba(0,0,0,.35);--ok:#4cc67f;--warn:#e3b04b;--bad:#ef6b5b}
+:root{--bg:#F3F5FA;--card:#fff;--card2:#EEF1F8;--ink:#0B1530;--mut:#56617A;--line:#DFE4EF;--gold:#D6A92B;--gold2:#F2CB62;--goldink:#0A1736;--ok:#1f8a4c;--warn:#b7791f;--bad:#c0392b;--shadow:none}
+html[data-theme="dark"]{--bg:#0A1736;--card:#102252;--card2:#16306B;--ink:#F4F6FB;--mut:#A3AECB;--line:rgba(255,255,255,.12);--shadow:none;--ok:#4cc67f;--warn:#e3b04b;--bad:#ef6b5b}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
 a{color:inherit}
 .shell{min-height:100vh;display:flex}
 .side{display:none;width:240px;flex:none;padding:22px 16px;border-right:1px solid var(--line);position:sticky;top:0;height:100vh;background:var(--card)}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.02em;margin-bottom:22px}
-.brand i{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:grid;place-items:center;color:var(--goldink);font-style:normal;font-weight:900}
+.brand i{width:34px;height:34px;border-radius:11px;background:var(--gold);display:grid;place-items:center;color:var(--goldink);font-style:normal;font-weight:900}
 .brand small{display:block;font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.08em}
 .side a.nv{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;color:var(--mut);text-decoration:none;font-weight:600;cursor:pointer;margin-bottom:2px}
 .side a.nv.on{background:var(--card2);color:var(--ink)}
@@ -36,14 +37,14 @@ select.sw{max-width:180px;padding:10px 12px;border-radius:13px;border:1px solid 
 .bar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--mut);padding:6px 0;border-radius:12px;cursor:pointer;text-decoration:none}
 .bar a.on{color:var(--gold)}
 .ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:none}
 .card h2{margin:0 0 4px;font-size:16px}
 .mut{color:var(--mut);font-size:13px;line-height:1.5}
 .grid{display:grid;gap:12px}
 .g2{grid-template-columns:1fr 1fr}
 .stat{padding:14px;border-radius:16px;background:var(--card2)}
 .stat b{display:block;font-size:20px;margin-top:2px}
-.btn{border:0;border-radius:14px;padding:13px 18px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--gold2),var(--gold));color:var(--goldink)}
+.btn{border:0;border-radius:14px;padding:13px 18px;font-weight:800;cursor:pointer;background:var(--gold);color:var(--goldink)}
 .btn.ghost{background:var(--card2);color:var(--ink);border:1px solid var(--line)}
 .btn.sm{padding:9px 13px;font-size:13px;border-radius:12px}
 .btn.bad{background:transparent;color:var(--bad);border:1px solid var(--line)}
@@ -63,7 +64,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .banner .grow{flex:1}
 .seg{display:flex;background:var(--card2);border-radius:14px;padding:4px;gap:4px;margin:10px 0 14px}
 .seg button{flex:1;border:0;background:transparent;padding:10px 4px;border-radius:11px;font-weight:700;cursor:pointer;color:var(--mut)}
-.seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:none}
 .seg small{display:block;font-size:10px;color:var(--ok);font-weight:800}
 .plans{display:grid;gap:12px}
 .plan{border:2px solid var(--line);border-radius:20px;padding:16px;background:var(--card);cursor:pointer}
@@ -75,7 +76,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .sum div{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}
 .sum .tot{font-weight:900;font-size:17px;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
 .empty{text-align:center;padding:26px 10px;color:var(--mut)}
-.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:14px;font-weight:700;font-size:14px;z-index:60;max-width:90vw;box-shadow:var(--shadow)}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:14px;font-weight:700;font-size:14px;z-index:60;max-width:90vw;box-shadow:none}
 .modal{position:fixed;inset:0;background:rgba(10,10,10,.6);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:50}
 .sheet{background:var(--card);width:100%;max-width:520px;border-radius:24px 24px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom,0px) + 22px);max-height:92vh;overflow:auto}
 .sheet h2{margin:0 0 4px}
@@ -100,7 +101,7 @@ input:focus,select:focus{outline:2px solid var(--gold);outline-offset:1px}
 .pay3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .chip{border:1px solid var(--line);background:var(--card2);padding:8px 14px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;margin-right:6px}
 .chip.on{border-color:var(--gold);color:var(--gold)}
-.logoup{display:flex;gap:14px;align-items:center;margin:6px 0 12px}.logoprev{width:66px;height:66px;flex:none;border-radius:50%;background:linear-gradient(135deg,var(--gold2),var(--gold));color:var(--goldink);display:grid;place-items:center;font-weight:900;font-size:20px;overflow:hidden;border:2px solid var(--gold)}.logoprev img{width:100%;height:100%;object-fit:contain;background:#fff}
+.logoup{display:flex;gap:14px;align-items:center;margin:6px 0 12px}.logoprev{width:66px;height:66px;flex:none;border-radius:50%;background:var(--gold);color:var(--goldink);display:grid;place-items:center;font-weight:900;font-size:20px;overflow:hidden;border:2px solid var(--gold)}.logoprev img{width:100%;height:100%;object-fit:contain;background:#fff}
 .rcpt{background:#fff;color:#000;border-radius:12px;padding:14px;margin:12px 0;max-height:46vh;overflow:auto;font:12px/1.4 "Courier New",monospace}
 .rcpt .c{text-align:center}.rcpt .b{font-weight:700}.rcpt .r{display:flex;justify-content:space-between;gap:8px}.rcpt hr{border:0;border-top:1px dashed #000;margin:6px 0}.rcpt .it{margin:3px 0}
 .sum div span:last-child{text-align:right}

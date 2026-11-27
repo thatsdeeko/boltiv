@@ -1,0 +1,116 @@
+/* ==========================================================================
+   BOLTIV dashboard: brand layer ("Moving Business Beyond Limits.")
+   Loaded AFTER dashboard-modern.css. Changes colours, type and spacing only.
+   No markup behaviour, scripts or data flows are touched.
+   Palette: navy #0A1736 · gold #D6A92B · bright gold #F2CB62 · mist #F3F5FA
+   ========================================================================== */
+
+/* ---- colour tokens used across the dashboard ---- */
+html[data-theme="dark"]{--dm-surf:#102252;--dm-surf2:#16306B;--dm-line:rgba(255,255,255,.12);--dm-text:#F4F6FB;--dm-mut:#A3AECB;--dm-gold:#F2CB62;--dm-on:#0A1736;--dm-tile:rgba(255,255,255,.07);--dm-glow:#102252}
+html[data-theme="light"],html:not([data-theme]){--dm-surf:#FFFFFF;--dm-surf2:#EAEEF6;--dm-line:rgba(10,23,54,.12);--dm-text:#0B1530;--dm-mut:#56617A;--dm-gold:#946F0B;--dm-on:#FFFFFF;--dm-tile:#EEF1F8;--dm-glow:#FFFFFF}
+
+/* ---- page ---- */
+html[data-theme="dark"] body.boltiv-animated-home{background:#0A1736!important;color:var(--dm-text)}
+html[data-theme="light"] body.boltiv-animated-home,html:not([data-theme]) body.boltiv-animated-home{background:#F3F5FA!important;color:var(--dm-text)}
+html body.boltiv-animated-home,html body.boltiv-animated-home button,html body.boltiv-animated-home input{font-family:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important}
+html body.boltiv-animated-home h1,html body.boltiv-animated-home h2,html body.boltiv-animated-home h3,html body.boltiv-animated-home .balance-value,html body.boltiv-animated-home .insight-main,html body.boltiv-animated-home .home-brand span{font-family:"Sora","Figtree",system-ui,sans-serif!important;letter-spacing:-.02em}
+.home-ambient{display:none!important}
+html body.boltiv-animated-home *{box-shadow:none!important;text-shadow:none!important}
+
+/* ---- header / greeting ---- */
+html body .boltiv-home .home-brand span{color:var(--dm-text)!important;letter-spacing:.14em}
+html body .boltiv-home .home-welcome{margin-bottom:14px}
+html body .boltiv-home .home-welcome h1{font-size:24px!important;color:var(--dm-text)!important;line-height:1.2}
+html body .boltiv-home .home-welcome h1 #userName{color:var(--dm-gold)!important}
+html body .boltiv-home .home-welcome p{display:block!important;margin:4px 0 0!important;font-size:13.5px;color:var(--dm-mut)!important}
+html body .boltiv-home .icon-button,html body .boltiv-home .profile-mini{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;color:var(--dm-text)!important}
+html body .boltiv-home .profile-mini{color:var(--dm-gold)!important}
+
+/* ---- announcement ---- */
+html body .boltiv-home .boltiv-announcement{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;border-radius:14px!important;margin-bottom:14px}
+html body .boltiv-home .boltiv-announcement-mark{color:var(--dm-gold)!important}
+html body .boltiv-home .boltiv-announcement-copy{color:var(--dm-text)!important}
+html body .boltiv-home .boltiv-announcement-dot{background:var(--dm-gold)!important}
+
+/* ---- wallet card: one flat brand-gold surface ---- */
+html body .boltiv-home .home-balance-card{background:#D6A92B!important;border:0!important;border-radius:22px!important;color:#0A1736!important}
+html body .boltiv-home .home-balance-card .balance-label,
+html body .boltiv-home .home-balance-card .balance-value,
+html body .boltiv-home .home-balance-card .balance-mark{color:#0A1736!important}
+html body .boltiv-home .home-balance-card .balance-mark{opacity:.12}
+html body .boltiv-home .home-balance-card .dm-tabs{background:rgba(10,23,54,.14)!important;border:0!important}
+html body .boltiv-home .home-balance-card .dm-tabs button{color:#0A1736!important;background:transparent!important}
+html body .boltiv-home .home-balance-card .dm-tabs button.on{background:#0A1736!important;color:#FFFFFF!important}
+html body .boltiv-home .home-balance-card .balance-visibility-toggle{background:rgba(10,23,54,.14)!important;color:#0A1736!important}
+html body .boltiv-home .home-balance-card .dm-hbtn{background:#0A1736!important;color:#FFFFFF!important;border:0!important;border-radius:14px!important}
+html body .boltiv-home .home-balance-card .dm-hbtn svg{stroke:#FFFFFF!important}
+
+/* ---- sections ---- */
+html body .boltiv-home .section-title{color:var(--dm-text)!important;font-family:"Sora","Figtree",sans-serif!important;font-size:15.5px!important;letter-spacing:-.01em!important}
+html body .boltiv-home .section-title::before{background:var(--dm-gold)!important;transform:skewX(-14deg);border-radius:2px}
+html body .boltiv-home .section-link{color:var(--dm-gold)!important;font-weight:600!important}
+html body .boltiv-home .dm-biz-head{margin-top:24px;margin-bottom:12px}
+
+/* ---- cards (Link, Business Manager, Card, Smart features, insights, lists) ---- */
+html body .boltiv-home .dm-strip .lk-card,html body .boltiv-home .dm-strip .bm-card,html body .boltiv-home .dm-strip .hc-wrap,
+html body .boltiv-home .sf-wrap,html body .boltiv-home .insight-card,html body .boltiv-home .repeat-item,html body .boltiv-home .home-trust-card,
+html body .boltiv-home #bonusSection>*,html body .boltiv-home #referralSection>*{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;border-radius:18px!important}
+html body .boltiv-home .dm-strip .lk-card,html body .boltiv-home .dm-strip .bm-card,html body .boltiv-home .dm-strip .hc-wrap{background:var(--dm-surf)!important}
+html body .boltiv-home .dm-strip .lk-card::after,html body .boltiv-home .dm-strip .bm-card::after,html body .boltiv-home .dm-strip .hc-wrap::after{display:none!important}
+html body .boltiv-home .dm-strip .lk-badge,html body .boltiv-home .dm-strip .bm-badge{background:var(--dm-tile)!important;color:var(--dm-gold)!important;border:1px solid var(--dm-line)!important}
+html body .boltiv-home .dm-strip .bm-ico{background:#0A1736!important;color:#F2CB62!important}
+html[data-theme="dark"] body .boltiv-home .dm-strip .bm-ico{background:#D6A92B!important;color:#0A1736!important}
+html body .boltiv-home .dm-strip h3,html body .boltiv-home .sf-tile strong,html body .boltiv-home .insight-title,html body .boltiv-home .insight-main{color:var(--dm-text)!important}
+html body .boltiv-home .dm-strip .lk-copy,html body .boltiv-home .dm-strip .bm-copy,html body .boltiv-home .sf-intro,html body .boltiv-home .sf-tile small,html body .boltiv-home .insight-sub,html body .boltiv-home .insight-stat small{color:var(--dm-mut)!important}
+html body .boltiv-home .insight-stat{background:var(--dm-tile)!important;border:0!important;border-radius:12px!important}
+html body .boltiv-home .insight-stat b{color:var(--dm-text)!important}
+html body .boltiv-home .insight-link{color:var(--dm-gold)!important}
+
+/* ---- primary buttons: gold with navy text ---- */
+html body .boltiv-home .dm-strip .lk-btn.p,html body .boltiv-home .dm-strip .bm-btn.primary,html body .boltiv-home .dm-strip .hc-btn.primary{background:#D6A92B!important;color:#0A1736!important;border:0!important}
+
+/* ---- smart features tiles ---- */
+html body .boltiv-home .sf-tile{background:var(--dm-tile)!important;border:1px solid var(--dm-line)!important;border-radius:14px!important}
+html body .boltiv-home .sf-ico{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;color:var(--dm-gold)!important}
+
+/* ---- everyday services (icons) ---- */
+html body .boltiv-home .home-service-card .service-icon,
+html body .boltiv-home .home-service-card:nth-child(n) .service-icon{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;color:var(--dm-gold)!important;border-radius:20px!important}
+html body .boltiv-home .home-service-card strong{color:var(--dm-text)!important;font-weight:600!important}
+html body .boltiv-home .home-service-card small{display:none!important}
+
+/* ---- trust card & icons ---- */
+html body .boltiv-home .trust-icon{background:#0A1736!important;color:#F2CB62!important}
+html[data-theme="dark"] body .boltiv-home .trust-icon{background:#D6A92B!important;color:#0A1736!important}
+html body .boltiv-home .home-trust-card strong{color:var(--dm-text)!important}
+html body .boltiv-home .home-trust-card p{color:var(--dm-mut)!important}
+html body .boltiv-home .insight-empty,html body .boltiv-home .home-loading{color:var(--dm-mut)!important}
+
+/* ---- bottom navigation ---- */
+html body .bottom-nav{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important}
+html body .bottom-nav .nav-item{color:var(--dm-mut)!important}
+html body .bottom-nav .nav-item.active{color:#0A1736!important}
+html body .bottom-nav .nav-item.active .nav-icon,html body .bottom-nav .nav-item.active{background:#D6A92B!important}
+html body .bottom-nav .nav-item.active span{color:#0A1736!important}
+
+/* ---- "coming soon" dialog ---- */
+html body .coming-modal-card{background:var(--dm-surf)!important;border:1px solid var(--dm-line)!important;color:var(--dm-text)!important}
+html body .coming-modal-button{background:#D6A92B!important;color:#0A1736!important}
+html body .coming-modal-kicker{color:var(--dm-gold)!important}
+
+/* ---- overrides for the higher-specificity rules in dashboard-modern.css ---- */
+html body .boltiv-home .home-balance-card,
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card{background:#D6A92B!important;background-image:none!important;border:0!important;color:#0A1736!important}
+html body .boltiv-home .home-balance-card::before,html body .boltiv-home .home-balance-card::after,
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card::before,html[data-theme] body .boltiv-home .home-balance-card.home-balance-card::after{display:none!important;content:none!important}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card .balance-label{color:rgba(10,23,54,.78)!important}
+html[data-theme] body .boltiv-home .home-balance-card.home-balance-card .balance-value{color:#0A1736!important}
+html body .boltiv-home .boltiv-announcement,html[data-theme] body .boltiv-home .boltiv-announcement{margin:0 0 14px!important}
+html,html[data-theme="dark"]{background:#0A1736}
+html[data-theme="light"],html:not([data-theme]){background:#F3F5FA}
+html body.boltiv-animated-home .page,html body.boltiv-animated-home .container{background:transparent!important}
+
+/* ---- empty states ---- */
+html body .boltiv-home .home-recent-list>*,html body .boltiv-home .home-recent-list .empty,html body .boltiv-home .home-recent-list .home-empty{background:var(--dm-surf)!important;border-color:var(--dm-line)!important;color:var(--dm-text)!important}
+html body .boltiv-home .home-recent-list *{color:inherit}
+html body .boltiv-home .home-recent-list small,html body .boltiv-home .home-recent-list p{color:var(--dm-mut)!important}

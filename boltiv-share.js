@@ -38,7 +38,7 @@
     });
     if(status)lines.push('Status: '+status);
     lines.push('');
-    lines.push('Fast. Simple. Powerful. '+SITE);
+    lines.push('Moving Business Beyond Limits. '+SITE);
     if(window.boltivReferralLink)lines.push('Join me on BOLTIV: '+window.boltivReferralLink);
     return lines.join('\n');
   }
@@ -158,7 +158,7 @@
       ctx.fillText('BOLTIV',W/2+5,y+36);
       try{ctx.letterSpacing='0px';}catch(e){}
       y+=36+14;
-      ctx.fillStyle='#8a8a84';ctx.font='500 26px '+FONT;ctx.fillText('Fast. Simple. Powerful.',W/2,y+22);
+      ctx.fillStyle='#8a8a84';ctx.font='500 26px '+FONT;ctx.fillText('Moving Business Beyond Limits.',W/2,y+22);
       y+=22+34;
       // status
       drawMark(ctx,st.mark,W/2,y+60,56,st.color);

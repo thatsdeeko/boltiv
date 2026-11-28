@@ -1,15 +1,17 @@
 {
   "name": "BOLTIV — Moving Business Beyond Limits",
   "short_name": "BOLTIV",
-  "description": "One business technology ecosystem: Business Manager, BOLTIV Link, BOLTIV Pay, BOLTIV Card and more.",
+  "description": "One business technology ecosystem: Business Manager, BOLTIV Link, BOLTIV Card and Smart Features, under one account.",
   "start_url": "/dashboard.html",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#fffdf7",
-  "theme_color": "#C9A227",
+  "background_color": "#0A1736",
+  "theme_color": "#0A1736",
   "orientation": "portrait-primary",
   "icons": [
-    {"src":"/assets/boltiv-icon.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
-    {"src":"/assets/boltiv-icon.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {"src":"/assets/boltiv-app-icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/assets/boltiv-app-icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},
+    {"src":"/assets/boltiv-app-icon-192.png","sizes":"192x192","type":"image/png","purpose":"maskable"},
+    {"src":"/assets/boltiv-app-icon-512.png","sizes":"512x512","type":"image/png","purpose":"maskable"}
   ]
 }
